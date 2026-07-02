@@ -58,11 +58,16 @@ function doGet(e) {
  *
  * hideItem / hideComment:
  * { action:"hideItem", id:"...", adminPassword:"..." }
+ *
+ * verifyAdmin:
+ * { action:"verifyAdmin", adminPassword:"..." }
  */
 function doPost(e) {
   const lock = LockService.getScriptLock();
+  let lockAcquired = false;
   try {
     lock.waitLock(10000);
+    lockAcquired = true;
     setupSheets_();
     if (!e || !e.postData || !e.postData.contents) throw new Error("요청 본문이 없습니다.");
 
@@ -72,6 +77,9 @@ function doPost(e) {
         return json_({ ok: true, item: createItem_(body.item || {}) });
       case "createComment":
         return json_({ ok: true, comment: createComment_(body.comment || {}) });
+      case "verifyAdmin":
+        assertAdmin_(body.adminPassword);
+        return json_({ ok: true });
       case "hideItem":
         assertAdmin_(body.adminPassword);
         setHidden_(SERVER_CONFIG.ITEMS_SHEET, body.id);
@@ -86,7 +94,7 @@ function doPost(e) {
   } catch (error) {
     return json_({ ok: false, error: error.message });
   } finally {
-    lock.releaseLock();
+    if (lockAcquired) lock.releaseLock();
   }
 }
 
