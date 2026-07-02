@@ -7,7 +7,7 @@
 const SERVER_CONFIG = Object.freeze({
   ITEMS_SHEET: "items",
   COMMENTS_SHEET: "comments",
-  ADMIN_PASSWORD: "school-admin", // index.html의 CONFIG.ADMIN_PASSWORD와 같게 설정
+  ADMIN_PASSWORD: "11235813", // index.html의 CONFIG.ADMIN_PASSWORD와 같게 설정
   MAX_TEXT_LENGTH: 2000
 });
 
