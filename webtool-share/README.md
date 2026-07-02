@@ -4,7 +4,7 @@
 
 ## 파일
 
-- `index.html`: GitHub Pages에 올릴 단일 웹페이지
+- `../index.html`: 저장소 루트에서 GitHub Pages로 제공되는 단일 웹페이지
 - `Code.gs`: Google Apps Script 편집기에 붙여넣을 서버 코드
 
 ## Google Sheets 구조
@@ -65,10 +65,7 @@ const CONFIG = Object.freeze({
 
 `WEB_APP_URL`을 비워 두면 샘플 카드가 나타나는 데모 모드로 동작합니다. 데모에서 등록한 카드와 댓글은 새로고침하면 초기화됩니다.
 
-GitHub 저장소 설정의 **Settings → Pages**에서 배포할 브랜치와 폴더를 선택합니다. 이 프로젝트처럼 하위 폴더에 둔 경우 다음 중 하나를 사용할 수 있습니다.
-
-- 저장소 루트 전체를 Pages로 배포하고 `/webtool-share/` 주소로 접속
-- `webtool-share/index.html`을 저장소 루트 또는 `docs/`로 옮긴 뒤 해당 위치를 Pages 소스로 지정
+GitHub 저장소 설정의 **Settings → Pages**에서 배포 소스를 **Deploy from a branch**, 브랜치를 **main**, 폴더를 **/(root)**로 선택합니다. `index.html`이 저장소 루트에 있으므로 저장소의 GitHub Pages 기본 주소에서 바로 열립니다.
 
 ## API 형식
 
