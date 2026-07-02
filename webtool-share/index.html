@@ -1,0 +1,1030 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="선생님과 학생이 만든 수업용 웹툴과 아이디어를 함께 나누는 공간">
+  <title>학교용 웹툴 만들고 공유하기</title>
+  <style>
+    :root {
+      --navy: #183b56;
+      --blue: #3979e9;
+      --blue-dark: #245fca;
+      --mint: #43b8a0;
+      --cream: #f8fbff;
+      --paper: #ffffff;
+      --line: #dce7f2;
+      --muted: #6a7c8f;
+      --danger: #d94f5c;
+      --shadow: 0 14px 35px rgba(29, 64, 101, .10);
+      --radius: 20px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--navy);
+      font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at 8% 0%, rgba(91, 173, 255, .17), transparent 28rem),
+        radial-gradient(circle at 96% 12%, rgba(74, 205, 172, .13), transparent 24rem),
+        var(--cream);
+      line-height: 1.6;
+    }
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; }
+    [hidden] { display: none !important; }
+
+    .site-header {
+      padding: 58px 20px 34px;
+      text-align: center;
+    }
+    .brand-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 13px;
+      border: 1px solid rgba(57, 121, 233, .18);
+      border-radius: 999px;
+      background: rgba(255,255,255,.74);
+      color: var(--blue-dark);
+      font-size: .86rem;
+      font-weight: 800;
+    }
+    h1 {
+      margin: 17px 0 10px;
+      font-size: clamp(2rem, 5vw, 3.35rem);
+      line-height: 1.18;
+      letter-spacing: -.045em;
+    }
+    .intro {
+      max-width: 650px;
+      margin: 0 auto;
+      color: var(--muted);
+      font-size: 1.04rem;
+    }
+    .demo-notice {
+      display: inline-flex;
+      gap: 7px;
+      align-items: center;
+      margin-top: 18px;
+      padding: 8px 13px;
+      border-radius: 10px;
+      background: #fff7df;
+      color: #7f5b06;
+      font-size: .88rem;
+      font-weight: 700;
+    }
+
+    .container {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto 80px;
+    }
+    .toolbar {
+      position: sticky;
+      z-index: 10;
+      top: 12px;
+      display: grid;
+      grid-template-columns: auto minmax(220px, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid rgba(220, 231, 242, .9);
+      border-radius: 18px;
+      background: rgba(255,255,255,.9);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+    .tabs {
+      display: flex;
+      gap: 6px;
+      padding: 4px;
+      border-radius: 13px;
+      background: #edf4ff;
+    }
+    .tab {
+      border: 0;
+      border-radius: 10px;
+      padding: 9px 14px;
+      color: #54708a;
+      background: transparent;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .tab.active {
+      color: #fff;
+      background: var(--blue);
+      box-shadow: 0 5px 13px rgba(57,121,233,.25);
+    }
+    .search-wrap { position: relative; }
+    .search-wrap span {
+      position: absolute;
+      top: 50%;
+      left: 13px;
+      transform: translateY(-50%);
+      opacity: .55;
+    }
+    .search-wrap input {
+      width: 100%;
+      padding: 11px 14px 11px 40px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      outline: none;
+      color: var(--navy);
+      background: #fff;
+    }
+    input:focus, textarea:focus {
+      border-color: var(--blue) !important;
+      box-shadow: 0 0 0 3px rgba(57,121,233,.12);
+    }
+    .admin-button {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 13px;
+      color: var(--navy);
+      background: #fff;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+    .admin-button.active {
+      border-color: #f0c7cb;
+      color: var(--danger);
+      background: #fff7f7;
+    }
+
+    .composer {
+      margin-top: 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+    .composer-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px;
+      border: 0;
+      color: var(--navy);
+      background: linear-gradient(90deg, #f5f9ff, #f1fcf9);
+      text-align: left;
+      font-weight: 850;
+    }
+    .composer-toggle .plus {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--mint);
+      font-size: 1.2rem;
+    }
+    .item-form {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 15px;
+      padding: 22px;
+      border-top: 1px solid var(--line);
+    }
+    .field { display: grid; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    label {
+      font-size: .9rem;
+      font-weight: 800;
+    }
+    .required { color: var(--danger); }
+    input, textarea {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid #cfdce9;
+      border-radius: 11px;
+      outline: none;
+      color: var(--navy);
+      background: #fff;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    textarea { min-height: 96px; resize: vertical; }
+    .tag-suggestions {
+      min-height: 28px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      align-items: center;
+    }
+    .suggestion-label { color: var(--muted); font-size: .82rem; }
+    .suggestion-chip, .tag-filter {
+      border: 1px solid #cfe1f3;
+      border-radius: 999px;
+      padding: 5px 10px;
+      color: #34658c;
+      background: #f4f9ff;
+      font-size: .82rem;
+      font-weight: 750;
+    }
+    .suggestion-chip:hover { border-color: var(--blue); color: var(--blue); }
+    .form-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .primary-button {
+      border: 0;
+      border-radius: 11px;
+      padding: 11px 18px;
+      color: #fff;
+      background: var(--blue);
+      font-weight: 800;
+      box-shadow: 0 6px 15px rgba(57,121,233,.2);
+    }
+    .primary-button:hover { background: var(--blue-dark); }
+    button:disabled { cursor: wait; opacity: .65; }
+
+    .list-header {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin: 29px 2px 13px;
+    }
+    .list-header h2 { margin: 0; font-size: 1.25rem; }
+    .result-count { color: var(--muted); font-size: .9rem; }
+    .tag-filters {
+      display: flex;
+      gap: 8px;
+      padding: 2px 1px 14px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+    .tag-filter { flex: 0 0 auto; }
+    .tag-filter.active {
+      border-color: var(--mint);
+      color: #fff;
+      background: var(--mint);
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .card {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--paper);
+      box-shadow: 0 9px 26px rgba(38,75,109,.08);
+    }
+    .card-main { padding: 22px; }
+    .card-meta {
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: .8rem;
+    }
+    .type-badge {
+      border-radius: 999px;
+      padding: 4px 9px;
+      color: var(--blue-dark);
+      background: #eaf2ff;
+      font-weight: 850;
+    }
+    .type-badge.idea { color: #267d6d; background: #e6f8f3; }
+    .card h3 {
+      margin: 13px 0 3px;
+      font-size: 1.27rem;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+    .byline { color: #577087; font-size: .9rem; font-weight: 700; }
+    .description {
+      min-height: 3.2em;
+      margin: 14px 0;
+      color: #425b71;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .needed {
+      margin: -3px 0 14px;
+      padding: 11px 13px;
+      border-radius: 11px;
+      color: #345d56;
+      background: #effaf7;
+      font-size: .9rem;
+      white-space: pre-wrap;
+    }
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      border-radius: 999px;
+      padding: 3px 9px;
+      color: #4f6f89;
+      background: #f1f6fb;
+      font-size: .78rem;
+      font-weight: 700;
+    }
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 17px;
+    }
+    .open-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 10px;
+      padding: 8px 12px;
+      color: #fff;
+      background: var(--blue);
+      text-decoration: none;
+      font-size: .88rem;
+      font-weight: 800;
+    }
+    .hide-button {
+      margin-left: auto;
+      border: 1px solid #f0c7cb;
+      border-radius: 9px;
+      padding: 7px 10px;
+      color: var(--danger);
+      background: #fff8f8;
+      font-size: .8rem;
+      font-weight: 750;
+    }
+
+    .comments {
+      padding: 17px 22px 20px;
+      border-top: 1px solid var(--line);
+      background: #fbfdff;
+    }
+    .comments-title {
+      margin: 0 0 10px;
+      font-size: .92rem;
+    }
+    .comment-list { display: grid; gap: 8px; }
+    .comment {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2px 8px;
+      padding: 9px 11px;
+      border-radius: 10px;
+      background: #fff;
+    }
+    .comment-head {
+      color: #506a81;
+      font-size: .77rem;
+    }
+    .comment-content {
+      grid-column: 1;
+      margin: 0;
+      font-size: .88rem;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .comment .hide-button {
+      grid-column: 2;
+      grid-row: 1 / 3;
+      align-self: center;
+      padding: 4px 7px;
+    }
+    .empty-comments { color: #8393a2; font-size: .83rem; }
+    .comment-form {
+      display: grid;
+      grid-template-columns: 110px 1fr auto;
+      gap: 7px;
+      margin-top: 11px;
+    }
+    .comment-form input { padding: 8px 9px; font-size: .85rem; }
+    .comment-form button {
+      border: 0;
+      border-radius: 9px;
+      padding: 7px 10px;
+      color: #fff;
+      background: var(--mint);
+      font-size: .83rem;
+      font-weight: 800;
+    }
+    .empty-state {
+      grid-column: 1 / -1;
+      padding: 60px 20px;
+      border: 1px dashed #bfd0e0;
+      border-radius: var(--radius);
+      color: var(--muted);
+      background: rgba(255,255,255,.6);
+      text-align: center;
+    }
+    .empty-state strong { display: block; color: var(--navy); font-size: 1.1rem; }
+
+    .toast-region {
+      position: fixed;
+      z-index: 100;
+      right: 18px;
+      bottom: 18px;
+      display: grid;
+      gap: 8px;
+      width: min(360px, calc(100% - 36px));
+    }
+    .toast {
+      padding: 12px 15px;
+      border: 1px solid #cfe7de;
+      border-radius: 12px;
+      color: #245f50;
+      background: #f3fff9;
+      box-shadow: var(--shadow);
+      animation: rise .2s ease-out;
+    }
+    .toast.error { border-color: #f0c7cb; color: #9e3440; background: #fff7f7; }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+
+    dialog {
+      width: min(400px, calc(100% - 32px));
+      padding: 0;
+      border: 0;
+      border-radius: 18px;
+      color: var(--navy);
+      box-shadow: 0 24px 80px rgba(23,55,82,.28);
+    }
+    dialog::backdrop { background: rgba(18,42,61,.38); backdrop-filter: blur(3px); }
+    .dialog-body { padding: 24px; }
+    .dialog-body h2 { margin: 0 0 5px; }
+    .dialog-body p { margin: 0 0 17px; color: var(--muted); font-size: .9rem; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    .secondary-button {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 13px;
+      color: var(--navy);
+      background: #fff;
+      font-weight: 750;
+    }
+
+    @media (max-width: 760px) {
+      .site-header { padding-top: 38px; }
+      .container { width: min(100% - 20px, 1120px); }
+      .toolbar { position: static; grid-template-columns: 1fr auto; }
+      .tabs { grid-column: 1 / -1; }
+      .tab { flex: 1; }
+      .search-wrap { min-width: 0; }
+      .admin-button { font-size: 0; }
+      .admin-button::after { content: "관리"; font-size: .86rem; }
+      .admin-button.active::after { content: "관리 종료"; }
+      .cards { grid-template-columns: 1fr; }
+      .item-form { grid-template-columns: 1fr; padding: 18px; }
+      .field.full, .form-actions { grid-column: 1; }
+      .comment-form { grid-template-columns: 90px 1fr; }
+      .comment-form button { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand-mark">✦ 함께 만드는 수업 도구함</div>
+    <h1>학교용 웹툴 만들고 공유하기</h1>
+    <p class="intro">수업에서 유용했던 웹툴을 나누고, 아직 세상에 없는 도구의 아이디어도 함께 키워 보세요.</p>
+    <div class="demo-notice" id="demoNotice" hidden>🧪 데모 모드 · 새로고침하면 입력한 내용이 초기화됩니다.</div>
+  </header>
+
+  <main class="container">
+    <section class="toolbar" aria-label="목록 도구">
+      <div class="tabs" role="tablist" aria-label="게시물 유형">
+        <button class="tab active" type="button" role="tab" aria-selected="true" data-type="webtool">웹툴 모음</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-type="idea">웹툴 아이디어</button>
+      </div>
+      <label class="search-wrap">
+        <span aria-hidden="true">⌕</span>
+        <input id="searchInput" type="search" placeholder="이름, 설명, 제작자, 태그 검색" aria-label="카드 검색">
+      </label>
+      <button class="admin-button" id="adminButton" type="button">관리자</button>
+    </section>
+
+    <section class="composer">
+      <button class="composer-toggle" id="composerToggle" type="button" aria-expanded="false">
+        <span id="composerTitle">새 웹툴 등록하기</span>
+        <span class="plus" aria-hidden="true">+</span>
+      </button>
+      <form class="item-form" id="itemForm" hidden>
+        <div class="field">
+          <label for="itemTitle"><span id="titleLabel">웹툴 이름</span> <span class="required">*</span></label>
+          <input id="itemTitle" name="title" required maxlength="80" autocomplete="off">
+        </div>
+        <div class="field" id="urlField">
+          <label for="itemUrl">웹툴 링크 <span class="required">*</span></label>
+          <input id="itemUrl" name="url" type="url" placeholder="https://..." maxlength="500">
+        </div>
+        <div class="field full">
+          <label for="itemDescription">간단한 설명 <span class="required">*</span></label>
+          <textarea id="itemDescription" name="description" required maxlength="1000" placeholder="어떤 수업에서 어떻게 활용할 수 있나요?"></textarea>
+        </div>
+        <div class="field">
+          <label for="itemAuthor" id="authorLabel">제작자 <span class="required">*</span></label>
+          <input id="itemAuthor" name="author" required maxlength="50">
+        </div>
+        <div class="field" id="neededField" hidden>
+          <label for="neededFeatures">필요한 기능</label>
+          <input id="neededFeatures" name="neededFeatures" maxlength="500" placeholder="예: 결과 저장, 그래프 다운로드">
+        </div>
+        <div class="field full">
+          <label for="itemTags">태그</label>
+          <input id="itemTags" name="tags" maxlength="200" placeholder="쉼표로 구분해 주세요. 예: 수학, 시뮬레이션">
+          <div class="tag-suggestions" id="tagSuggestions" aria-live="polite"></div>
+        </div>
+        <div class="form-actions">
+          <button class="primary-button" id="submitItemButton" type="submit">웹툴 등록</button>
+        </div>
+      </form>
+    </section>
+
+    <section aria-live="polite">
+      <div class="list-header">
+        <h2 id="listTitle">등록된 웹툴</h2>
+        <span class="result-count" id="resultCount"></span>
+      </div>
+      <div class="tag-filters" id="tagFilters" aria-label="태그 필터"></div>
+      <div class="cards" id="cardList"></div>
+    </section>
+  </main>
+
+  <dialog id="adminDialog">
+    <form class="dialog-body" id="adminForm">
+      <h2>관리자 모드</h2>
+      <p>관리자 비밀번호를 입력하면 카드와 댓글의 숨김 버튼이 표시됩니다.</p>
+      <div class="field">
+        <label for="adminPassword">비밀번호</label>
+        <input id="adminPassword" type="password" required autocomplete="current-password">
+      </div>
+      <div class="dialog-actions">
+        <button class="secondary-button" id="cancelAdmin" type="button">취소</button>
+        <button class="primary-button" type="submit">확인</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-region" id="toastRegion" aria-live="assertive"></div>
+
+  <script>
+    /* =========================================================
+       가장 먼저 수정할 설정
+       - WEB_APP_URL: Apps Script 웹앱 배포 URL(/exec)
+       - ADMIN_PASSWORD: Code.gs의 ADMIN_PASSWORD와 같은 값
+       ========================================================= */
+    const CONFIG = Object.freeze({
+      WEB_APP_URL: "",
+      ADMIN_PASSWORD: "school-admin",
+      REQUEST_TIMEOUT_MS: 15000
+    });
+
+    const DEMO_ITEMS = [
+      {
+        id: "demo-tool-1", type: "webtool", title: "확률 주사위 실험실",
+        url: "https://example.com", description: "주사위를 여러 번 던져 이론적 확률과 실험 결과를 그래프로 비교하는 수업용 도구입니다.",
+        author: "수학쌤", neededFeatures: "", tags: ["확률", "시뮬레이션", "수학"],
+        createdAt: "2026-06-28T05:30:00.000Z", hidden: false
+      },
+      {
+        id: "demo-tool-2", type: "webtool", title: "우리 반 데이터 그래프",
+        url: "https://example.com", description: "학급 설문 자료를 입력하면 막대그래프와 평균을 바로 보여 줍니다.",
+        author: "데이터 연구회", neededFeatures: "", tags: ["통계", "수업활동"],
+        createdAt: "2026-06-25T02:00:00.000Z", hidden: false
+      },
+      {
+        id: "demo-idea-1", type: "idea", title: "AI 이미지 분류 체험",
+        url: "", description: "학생이 올린 이미지를 주제별로 분류하며 AI의 판단 기준을 탐구하는 도구가 있으면 좋겠어요.",
+        author: "과학부 김선생", neededFeatures: "이미지 업로드, 분류 결과, 정확도 비교",
+        tags: ["AI", "수업활동"], createdAt: "2026-06-30T07:10:00.000Z", hidden: false
+      },
+      {
+        id: "demo-idea-2", type: "idea", title: "모둠별 퀴즈 대결판",
+        url: "", description: "수업 마무리에 모둠별로 점수를 올리며 참여할 수 있는 간단한 게임형 도구를 제안합니다.",
+        author: "박하늘", neededFeatures: "모둠 이름 설정, 점수판, 문제 무작위 출제",
+        tags: ["게임", "평가"], createdAt: "2026-06-24T01:40:00.000Z", hidden: false
+      }
+    ];
+
+    const DEMO_COMMENTS = [
+      { id: "demo-comment-1", itemId: "demo-tool-1", author: "이선생", content: "확률 단원 도입 활동에 잘 어울리겠네요!", createdAt: "2026-06-29T03:15:00.000Z", hidden: false }
+    ];
+
+    const TAG_RULES = [
+      { tag: "확률", words: ["확률", "주사위", "경우의 수"] },
+      { tag: "통계", words: ["통계", "평균", "그래프", "자료"] },
+      { tag: "수학", words: ["이차함수", "함수", "방정식", "부등식", "수학"] },
+      { tag: "시뮬레이션", words: ["시뮬레이션", "실험"] },
+      { tag: "게임", words: ["게임", "점수", "대결"] },
+      { tag: "AI", words: ["ai", "인공지능", "이미지", "분류", "예측"] },
+      { tag: "평가", words: ["수행평가", "평가"] },
+      { tag: "수업활동", words: ["수업", "활동지", "탐구"] }
+    ];
+
+    const state = {
+      activeType: "webtool",
+      activeTag: "전체",
+      search: "",
+      items: [],
+      comments: [],
+      adminMode: false,
+      adminPassword: "",
+      demoMode: !CONFIG.WEB_APP_URL.trim()
+    };
+
+    const $ = (selector, root = document) => root.querySelector(selector);
+    const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+    document.addEventListener("DOMContentLoaded", init);
+
+    async function init() {
+      bindEvents();
+      $("#demoNotice").hidden = !state.demoMode;
+      updateTypeUI();
+      await loadData();
+    }
+
+    function bindEvents() {
+      $$(".tab").forEach((tab) => tab.addEventListener("click", () => switchType(tab.dataset.type)));
+      $("#searchInput").addEventListener("input", (event) => {
+        state.search = event.target.value.trim().toLocaleLowerCase("ko");
+        renderCards();
+      });
+      $("#composerToggle").addEventListener("click", toggleComposer);
+      $("#itemForm").addEventListener("submit", submitItem);
+      ["#itemTitle", "#itemDescription"].forEach((selector) => $(selector).addEventListener("input", renderTagSuggestions));
+      $("#tagSuggestions").addEventListener("click", addSuggestedTag);
+      $("#tagFilters").addEventListener("click", chooseTag);
+      $("#cardList").addEventListener("submit", submitComment);
+      $("#cardList").addEventListener("click", handleCardAction);
+      $("#adminButton").addEventListener("click", toggleAdmin);
+      $("#adminForm").addEventListener("submit", loginAdmin);
+      $("#cancelAdmin").addEventListener("click", () => $("#adminDialog").close());
+    }
+
+    /* Apps Script 또는 데모 데이터에서 전체 목록을 불러온다. */
+    async function loadData() {
+      try {
+        if (state.demoMode) {
+          state.items = structuredClone(DEMO_ITEMS);
+          state.comments = structuredClone(DEMO_COMMENTS);
+        } else {
+          const data = await apiGet({ action: "list" });
+          state.items = Array.isArray(data.items) ? data.items.map(normalizeItem) : [];
+          state.comments = Array.isArray(data.comments) ? data.comments : [];
+        }
+        renderAll();
+      } catch (error) {
+        showToast(`목록을 불러오지 못했습니다. ${error.message}`, true);
+        renderAll();
+      }
+    }
+
+    function normalizeItem(item) {
+      return { ...item, tags: parseTags(item.tags) };
+    }
+
+    function renderAll() {
+      renderTagFilters();
+      renderCards();
+    }
+
+    function switchType(type) {
+      state.activeType = type;
+      state.activeTag = "전체";
+      state.search = "";
+      $("#searchInput").value = "";
+      $("#itemForm").reset();
+      renderTagSuggestions();
+      updateTypeUI();
+      renderAll();
+    }
+
+    function updateTypeUI() {
+      const isTool = state.activeType === "webtool";
+      $$(".tab").forEach((tab) => {
+        const active = tab.dataset.type === state.activeType;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-selected", String(active));
+      });
+      $("#composerTitle").textContent = isTool ? "새 웹툴 등록하기" : "새 웹툴 아이디어 등록하기";
+      $("#titleLabel").textContent = isTool ? "웹툴 이름" : "아이디어 제목";
+      $("#authorLabel").innerHTML = `${isTool ? "제작자" : "제안자"} <span class="required">*</span>`;
+      $("#submitItemButton").textContent = isTool ? "웹툴 등록" : "아이디어 등록";
+      $("#listTitle").textContent = isTool ? "등록된 웹툴" : "모두의 웹툴 아이디어";
+      $("#urlField").hidden = !isTool;
+      $("#itemUrl").required = isTool;
+      $("#neededField").hidden = isTool;
+    }
+
+    function toggleComposer() {
+      const form = $("#itemForm");
+      form.hidden = !form.hidden;
+      $("#composerToggle").setAttribute("aria-expanded", String(!form.hidden));
+      $(".plus", $("#composerToggle")).textContent = form.hidden ? "+" : "−";
+      if (!form.hidden) $("#itemTitle").focus();
+    }
+
+    /* 이름/설명 속 키워드를 바탕으로 클릭 가능한 추천 태그를 만든다. */
+    function getSuggestedTags() {
+      const source = `${$("#itemTitle").value} ${$("#itemDescription").value}`.toLocaleLowerCase("ko");
+      if (!source.trim()) return [];
+      return TAG_RULES.filter((rule) => rule.words.some((word) => source.includes(word.toLocaleLowerCase("ko")))).map((rule) => rule.tag);
+    }
+
+    function renderTagSuggestions() {
+      const tags = getSuggestedTags();
+      $("#tagSuggestions").innerHTML = tags.length
+        ? `<span class="suggestion-label">추천 태그</span>${tags.map((tag) => `<button class="suggestion-chip" type="button" data-tag="${escapeHtml(tag)}">+ ${escapeHtml(tag)}</button>`).join("")}`
+        : `<span class="suggestion-label">이름과 설명을 입력하면 태그를 추천해 드려요.</span>`;
+    }
+
+    function addSuggestedTag(event) {
+      const button = event.target.closest("[data-tag]");
+      if (!button) return;
+      const current = parseTags($("#itemTags").value);
+      if (!current.some((tag) => tag.toLocaleLowerCase("ko") === button.dataset.tag.toLocaleLowerCase("ko"))) current.push(button.dataset.tag);
+      $("#itemTags").value = current.join(", ");
+    }
+
+    async function submitItem(event) {
+      event.preventDefault();
+      const button = $("#submitItemButton");
+      const item = {
+        type: state.activeType,
+        title: $("#itemTitle").value.trim(),
+        url: state.activeType === "webtool" ? $("#itemUrl").value.trim() : "",
+        description: $("#itemDescription").value.trim(),
+        author: $("#itemAuthor").value.trim(),
+        neededFeatures: state.activeType === "idea" ? $("#neededFeatures").value.trim() : "",
+        tags: parseTags($("#itemTags").value)
+      };
+      if (!item.title || !item.description || !item.author || (item.type === "webtool" && !item.url)) return;
+      button.disabled = true;
+      try {
+        if (state.demoMode) {
+          state.items.unshift({ ...item, id: crypto.randomUUID(), createdAt: new Date().toISOString(), hidden: false });
+        } else {
+          await apiPost({ action: "createItem", item });
+          await refreshFromServer();
+        }
+        event.target.reset();
+        renderTagSuggestions();
+        event.target.hidden = true;
+        $("#composerToggle").setAttribute("aria-expanded", "false");
+        $(".plus", $("#composerToggle")).textContent = "+";
+        renderAll();
+        showToast(`${item.type === "webtool" ? "웹툴" : "아이디어"}가 등록되었습니다.`);
+      } catch (error) {
+        showToast(`등록하지 못했습니다. ${error.message}`, true);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function renderTagFilters() {
+      const items = state.items.filter((item) => item.type === state.activeType && !toBoolean(item.hidden));
+      const tags = [...new Set(items.flatMap((item) => parseTags(item.tags)))].sort((a, b) => a.localeCompare(b, "ko"));
+      if (state.activeTag !== "전체" && !tags.includes(state.activeTag)) state.activeTag = "전체";
+      $("#tagFilters").innerHTML = ["전체", ...tags].map((tag) =>
+        `<button type="button" class="tag-filter ${tag === state.activeTag ? "active" : ""}" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`
+      ).join("");
+    }
+
+    function chooseTag(event) {
+      const button = event.target.closest("[data-tag]");
+      if (!button) return;
+      state.activeTag = button.dataset.tag;
+      renderTagFilters();
+      renderCards();
+    }
+
+    function filteredItems() {
+      return state.items
+        .filter((item) => !toBoolean(item.hidden) && item.type === state.activeType)
+        .filter((item) => state.activeTag === "전체" || parseTags(item.tags).includes(state.activeTag))
+        .filter((item) => {
+          if (!state.search) return true;
+          const haystack = [item.title, item.description, item.author, item.neededFeatures, ...parseTags(item.tags)].join(" ").toLocaleLowerCase("ko");
+          return haystack.includes(state.search);
+        })
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    function renderCards() {
+      const items = filteredItems();
+      $("#resultCount").textContent = `${items.length}개`;
+      $("#cardList").innerHTML = items.length
+        ? items.map(cardTemplate).join("")
+        : `<div class="empty-state"><strong>조건에 맞는 카드가 없어요.</strong>검색어나 태그를 바꾸거나 첫 카드를 등록해 보세요.</div>`;
+    }
+
+    function cardTemplate(item) {
+      const isTool = item.type === "webtool";
+      const comments = state.comments
+        .filter((comment) => comment.itemId === item.id && !toBoolean(comment.hidden))
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      const tags = parseTags(item.tags);
+      return `
+        <article class="card" data-item-id="${escapeHtml(item.id)}">
+          <div class="card-main">
+            <div class="card-meta">
+              <span class="type-badge ${isTool ? "" : "idea"}">${isTool ? "웹툴" : "아이디어"}</span>
+              <time datetime="${escapeHtml(item.createdAt)}">${formatDate(item.createdAt)}</time>
+            </div>
+            <h3>${escapeHtml(item.title)}</h3>
+            <div class="byline">${isTool ? "제작" : "제안"} · ${escapeHtml(item.author)}</div>
+            <p class="description">${escapeHtml(item.description)}</p>
+            ${!isTool && item.neededFeatures ? `<div class="needed"><strong>필요한 기능</strong><br>${escapeHtml(item.neededFeatures)}</div>` : ""}
+            <div class="tag-list">${tags.length ? tags.map((tag) => `<span class="tag">#${escapeHtml(tag)}</span>`).join("") : `<span class="tag">태그 없음</span>`}</div>
+            <div class="card-actions">
+              ${isTool ? `<a class="open-link" href="${safeUrl(item.url)}" target="_blank" rel="noopener noreferrer">웹툴 열기 ↗</a>` : ""}
+              ${state.adminMode ? `<button class="hide-button" type="button" data-action="hide-item">카드 숨김</button>` : ""}
+            </div>
+          </div>
+          <div class="comments">
+            <h4 class="comments-title">댓글 ${comments.length}</h4>
+            <div class="comment-list">
+              ${comments.length ? comments.map(commentTemplate).join("") : `<span class="empty-comments">아직 댓글이 없습니다. 첫 의견을 남겨 보세요.</span>`}
+            </div>
+            <form class="comment-form">
+              <input name="author" required maxlength="50" placeholder="작성자" aria-label="댓글 작성자">
+              <input name="content" required maxlength="500" placeholder="댓글을 입력하세요" aria-label="댓글 내용">
+              <button type="submit">댓글 등록</button>
+            </form>
+          </div>
+        </article>`;
+    }
+
+    function commentTemplate(comment) {
+      return `<div class="comment" data-comment-id="${escapeHtml(comment.id)}">
+        <div class="comment-head"><strong>${escapeHtml(comment.author)}</strong> · ${formatDate(comment.createdAt)}</div>
+        <p class="comment-content">${escapeHtml(comment.content)}</p>
+        ${state.adminMode ? `<button class="hide-button" type="button" data-action="hide-comment">숨김</button>` : ""}
+      </div>`;
+    }
+
+    async function submitComment(event) {
+      if (!event.target.matches(".comment-form")) return;
+      event.preventDefault();
+      const form = event.target;
+      const button = $("button", form);
+      const itemId = form.closest(".card").dataset.itemId;
+      const comment = {
+        itemId,
+        author: form.elements.author.value.trim(),
+        content: form.elements.content.value.trim()
+      };
+      if (!comment.author || !comment.content) return;
+      button.disabled = true;
+      try {
+        if (state.demoMode) {
+          state.comments.push({ ...comment, id: crypto.randomUUID(), createdAt: new Date().toISOString(), hidden: false });
+        } else {
+          await apiPost({ action: "createComment", comment });
+          await refreshFromServer();
+        }
+        renderCards();
+        showToast("댓글이 등록되었습니다.");
+      } catch (error) {
+        showToast(`댓글을 등록하지 못했습니다. ${error.message}`, true);
+        button.disabled = false;
+      }
+    }
+
+    async function handleCardAction(event) {
+      const button = event.target.closest("[data-action]");
+      if (!button) return;
+      const card = button.closest(".card");
+      const isItem = button.dataset.action === "hide-item";
+      const id = isItem ? card.dataset.itemId : button.closest(".comment").dataset.commentId;
+      const label = isItem ? "카드" : "댓글";
+      if (!confirm(`${label}를 숨김 처리할까요? 일반 사용자 목록에서 보이지 않게 됩니다.`)) return;
+      button.disabled = true;
+      try {
+        if (state.demoMode) {
+          const list = isItem ? state.items : state.comments;
+          const target = list.find((entry) => entry.id === id);
+          if (target) target.hidden = true;
+        } else {
+          await apiPost({ action: isItem ? "hideItem" : "hideComment", id, adminPassword: state.adminPassword });
+          await refreshFromServer();
+        }
+        renderAll();
+        showToast(`${label}가 숨김 처리되었습니다.`);
+      } catch (error) {
+        showToast(`숨김 처리하지 못했습니다. ${error.message}`, true);
+        button.disabled = false;
+      }
+    }
+
+    function toggleAdmin() {
+      if (state.adminMode) {
+        state.adminMode = false;
+        state.adminPassword = "";
+        $("#adminButton").classList.remove("active");
+        $("#adminButton").textContent = "관리자";
+        renderCards();
+        showToast("관리자 모드를 종료했습니다.");
+        return;
+      }
+      $("#adminPassword").value = "";
+      $("#adminDialog").showModal();
+      $("#adminPassword").focus();
+    }
+
+    function loginAdmin(event) {
+      event.preventDefault();
+      const password = $("#adminPassword").value;
+      if (password !== CONFIG.ADMIN_PASSWORD) {
+        showToast("관리자 비밀번호가 올바르지 않습니다.", true);
+        return;
+      }
+      state.adminMode = true;
+      state.adminPassword = password;
+      $("#adminDialog").close();
+      $("#adminButton").classList.add("active");
+      $("#adminButton").textContent = "관리 종료";
+      renderCards();
+      showToast("관리자 모드가 켜졌습니다.");
+    }
+
+    /* text/plain POST는 브라우저의 CORS 사전 요청(preflight)을 피하는 데 도움이 된다. */
+    async function apiPost(payload) {
+      return fetchJson(CONFIG.WEB_APP_URL, {
+        method: "POST",
+        redirect: "follow",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    async function apiGet(params) {
+      const url = new URL(CONFIG.WEB_APP_URL);
+      Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+      return fetchJson(url.toString(), { method: "GET", redirect: "follow" });
+    }
+
+    async function fetchJson(url, options) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT_MS);
+      try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        if (!response.ok) throw new Error(`서버 응답 ${response.status}`);
+        const data = await response.json();
+        if (!data.ok) throw new Error(data.error || "요청 처리 중 오류가 발생했습니다.");
+        return data;
+      } catch (error) {
+        if (error.name === "AbortError") throw new Error("요청 시간이 초과되었습니다.");
+        throw error;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function refreshFromServer() {
+      const data = await apiGet({ action: "list", cacheBust: Date.now() });
+      state.items = (data.items || []).map(normalizeItem);
+      state.comments = data.comments || [];
+    }
+
+    function parseTags(value) {
+      const values = Array.isArray(value) ? value : String(value || "").split(/[,#]/);
+      return [...new Set(values.map((tag) => String(tag).trim()).filter(Boolean))].slice(0, 12);
+    }
+
+    function formatDate(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "";
+      return new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "short", day: "numeric" }).format(date);
+    }
+
+    function safeUrl(value) {
+      try {
+        const url = new URL(value);
+        return ["http:", "https:"].includes(url.protocol) ? escapeHtml(url.href) : "#";
+      } catch (_) {
+        return "#";
+      }
+    }
+
+    function toBoolean(value) {
+      return value === true || String(value).toLowerCase() === "true";
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+      })[char]);
+    }
+
+    function showToast(message, isError = false) {
+      const toast = document.createElement("div");
+      toast.className = `toast${isError ? " error" : ""}`;
+      toast.textContent = message;
+      $("#toastRegion").append(toast);
+      setTimeout(() => toast.remove(), 4200);
+    }
+  </script>
+</body>
+</html>
