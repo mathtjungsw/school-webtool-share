@@ -1,0 +1,223 @@
+/* 사정안 페이지 — .assessment-plan-root 아래로 스코프(호스트 Tailwind와 충돌 차단).
+   인쇄는 services/assessmentPlan 의 iframe 사용(@media print 미사용). */
+.assessment-plan-root {
+  --ap-panel: #1e293b;       /* surface-800 */
+  --ap-panel2: #0f172a;      /* surface-900 */
+  --ap-border: rgba(255, 255, 255, 0.08);
+  --ap-text: #f1f5f9;
+  --ap-muted: #94a3b8;
+  --ap-accent: #8b5cf6;      /* violet-500 */
+  --ap-accent2: #7c3aed;
+  --ap-rose: #f43f5e;
+  --ap-green: #22c55e;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  color: var(--ap-text);
+  font-family: 'Noto Sans KR', 'Pretendard', system-ui, sans-serif;
+  font-size: 13px;
+}
+
+.assessment-plan-root .topbar {
+  background: var(--ap-panel);
+  border-bottom: 1px solid var(--ap-border);
+  padding: 10px 16px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.assessment-plan-root .topbar .brand { font-weight: 800; font-size: 15px; margin-right: 8px; }
+.assessment-plan-root .topbar .brand small { color: var(--ap-muted); font-weight: 500; font-size: 11px; display: block; }
+
+.assessment-plan-root .body { flex: 1; display: flex; overflow: hidden; }
+.assessment-plan-root .editor {
+  width: 380px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--ap-border);
+  overflow-y: auto;
+  padding: 14px;
+  background: var(--ap-panel);
+}
+.assessment-plan-root .preview {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px;
+  background: #0a0e18;
+  display: flex;
+  justify-content: center;
+}
+
+.assessment-plan-root label.lab { font-size: 11px; color: var(--ap-muted); font-weight: 600; }
+.assessment-plan-root input,
+.assessment-plan-root select,
+.assessment-plan-root textarea {
+  background: var(--ap-panel2);
+  border: 1px solid var(--ap-border);
+  color: var(--ap-text);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  outline: none;
+}
+.assessment-plan-root input:focus,
+.assessment-plan-root select:focus,
+.assessment-plan-root textarea:focus { border-color: var(--ap-accent); }
+
+.assessment-plan-root .btn {
+  background: var(--ap-accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 12px;
+}
+.assessment-plan-root .btn:hover { background: var(--ap-accent2); }
+.assessment-plan-root .btn.ghost { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--ap-border); color: var(--ap-text); }
+.assessment-plan-root .btn.ghost:hover { background: rgba(255, 255, 255, 0.1); }
+.assessment-plan-root .btn.rose { background: var(--ap-rose); }
+.assessment-plan-root .btn.green { background: var(--ap-green); }
+.assessment-plan-root .btn.sm { padding: 4px 8px; font-size: 11px; }
+
+.assessment-plan-root .meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.assessment-plan-root .meta .f { display: flex; flex-direction: column; gap: 2px; }
+.assessment-plan-root .meta .f input,
+.assessment-plan-root .meta .f select { width: 110px; }
+
+.assessment-plan-root .seccard {
+  border: 1px solid var(--ap-border);
+  border-radius: 9px;
+  padding: 11px;
+  margin-bottom: 10px;
+  background: var(--ap-panel2);
+}
+.assessment-plan-root .seccard .head { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.assessment-plan-root .seccard .head input { flex: 1; font-weight: 700; }
+.assessment-plan-root .seccard .kindtag { font-size: 10px; background: var(--ap-accent); color: #fff; padding: 2px 6px; border-radius: 4px; }
+.assessment-plan-root .fieldgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.assessment-plan-root .fieldgrid .f { display: flex; flex-direction: column; gap: 2px; }
+.assessment-plan-root .addbar { display: flex; gap: 6px; margin: 8px 0 16px; flex-wrap: wrap; }
+
+/* 미리보기 문서 (A4) */
+.assessment-plan-root .doc {
+  background: #fff;
+  color: #111;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 20mm 18mm;
+  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.5);
+}
+.assessment-plan-root .doc h1 { text-align: center; font-size: 20pt; margin: 0 0 4px; }
+.assessment-plan-root .doc .docmeta { text-align: center; color: #444; font-size: 10pt; margin-bottom: 18px; }
+.assessment-plan-root .doc section { margin-bottom: 16px; }
+.assessment-plan-root .doc section h2 { font-size: 12pt; border-bottom: 2px solid #222; padding-bottom: 3px; margin: 0 0 8px; }
+.assessment-plan-root .doc .desc { font-size: 9pt; color: #555; margin: 0 0 6px; }
+.assessment-plan-root .doc table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+.assessment-plan-root .doc th,
+.assessment-plan-root .doc td { border: 1px solid #555; padding: 4px 6px; font-size: 9.5pt; text-align: center; word-break: break-word; }
+.assessment-plan-root .doc th { background: #eef; }
+.assessment-plan-root .doc td.lab { background: #f4f6fb; font-weight: 600; }
+.assessment-plan-root .doc .note { white-space: pre-wrap; font-size: 10pt; min-height: 40px; }
+.assessment-plan-root .muted { color: var(--ap-muted); }
+
+/* ── 배포·취합 모달 ── */
+.assessment-plan-root .dist-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.assessment-plan-root .dist-modal {
+  background: var(--ap-panel);
+  border-radius: 12px;
+  width: min(96vw, 1000px);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+.assessment-plan-root .dist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: var(--ap-panel2);
+  border-bottom: 1px solid var(--ap-border);
+  font-size: 14px;
+  font-weight: 700;
+}
+.assessment-plan-root .dist-close {
+  background: none;
+  border: none;
+  color: var(--ap-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.assessment-plan-root .dist-close:hover { color: var(--ap-rose); }
+.assessment-plan-root .dist-tabs { display: flex; background: var(--ap-panel2); border-bottom: 1px solid var(--ap-border); }
+.assessment-plan-root .dist-tabs button {
+  flex: 1;
+  padding: 10px;
+  background: none;
+  border: none;
+  color: var(--ap-muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.assessment-plan-root .dist-tabs button.on { color: var(--ap-accent); border-bottom-color: var(--ap-accent); background: rgba(139, 92, 246, 0.08); }
+.assessment-plan-root .dist-body { flex: 1; overflow-y: auto; }
+.assessment-plan-root .dist-info {
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: var(--ap-muted);
+  line-height: 1.7;
+}
+.assessment-plan-root .dist-info strong { color: var(--ap-text); }
+.assessment-plan-root .dist-form { padding: 18px; display: flex; flex-direction: column; gap: 4px; }
+.assessment-plan-root .dist-filelist { border: 1px solid var(--ap-border); border-radius: 8px; overflow: hidden; margin-top: 8px; }
+.assessment-plan-root .dist-filerow { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--ap-border); font-size: 12px; }
+.assessment-plan-root .dist-filerow:last-child { border-bottom: none; }
+.assessment-plan-root .dist-classbadge { background: var(--ap-accent); color: #fff; border-radius: 4px; padding: 2px 7px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+
+.assessment-plan-root .dist-collect { display: flex; height: 100%; }
+.assessment-plan-root .dist-collect-left {
+  width: 280px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--ap-border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+.assessment-plan-root .dist-collect-right { flex: 1; overflow-y: auto; padding: 16px; background: #0a0e18; }
+.assessment-plan-root .dist-classlist { display: flex; flex-direction: column; gap: 4px; }
+.assessment-plan-root .dist-classitem {
+  background: var(--ap-panel2);
+  border: 1px solid var(--ap-border);
+  border-radius: 7px;
+  padding: 9px 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.assessment-plan-root .dist-classitem:hover { border-color: var(--ap-accent); }
+.assessment-plan-root .dist-classitem.on { background: rgba(139, 92, 246, 0.14); border-color: var(--ap-accent); }

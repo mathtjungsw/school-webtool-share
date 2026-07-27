@@ -1,0 +1,157 @@
+/* 시험감독 페이지 — .exam-supervisor-root 아래로 스코프(호스트 Tailwind와 충돌 차단).
+   원본 5종 테마 시스템 제거 → 호스트 다크테마 단일화(accent=violet). 인쇄는 io.js iframe 사용. */
+.exam-supervisor-root {
+  --bg: #151922;
+  --panel: #1e2430;
+  --panel2: #262d3b;
+  --border: #333c4d;
+  --text: #e5e9f0;
+  --muted: #8b97ad;
+  --accent: #8b5cf6;   /* violet-500 (호스트 통일) */
+  --accent2: #7c3aed;
+  --rose: #f43f5e;
+  --green: #22c55e;
+  --amber: #f59e0b;
+  --relax: #d946ef;
+
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Noto Sans KR", "Pretendard", "맑은 고딕", "Malgun Gothic", system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.exam-supervisor-root .sidebar {
+  width: 230px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+}
+.exam-supervisor-root .brand { font-weight: 800; font-size: 15px; line-height: 1.4; margin-bottom: 4px; }
+.exam-supervisor-root .brand small { color: var(--muted); font-weight: 500; font-size: 11px; }
+.exam-supervisor-root .nav { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
+.exam-supervisor-root .nav button {
+  text-align: left; padding: 10px 12px; border-radius: 8px; border: 1px solid transparent;
+  background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 600;
+}
+.exam-supervisor-root .nav button:hover { background: var(--panel2); color: var(--text); }
+.exam-supervisor-root .nav button.active { background: var(--accent); color: #fff; }
+.exam-supervisor-root .nav .step { font-size: 10px; opacity: .7; margin-right: 6px; }
+.exam-supervisor-root .sidebar .tools { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+.exam-supervisor-root .main { flex: 1; overflow: auto; padding: 22px 26px; }
+
+.exam-supervisor-root h2.title { margin: 0 0 4px; font-size: 20px; }
+.exam-supervisor-root .sub { color: var(--muted); margin-bottom: 18px; font-size: 13px; }
+.exam-supervisor-root .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+.exam-supervisor-root .card h3 { margin: 0 0 12px; font-size: 15px; }
+.exam-supervisor-root .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.exam-supervisor-root .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.exam-supervisor-root .field label { font-size: 12px; color: var(--muted); font-weight: 600; }
+.exam-supervisor-root label.lab { font-size: 12px; color: var(--muted); font-weight: 600; }
+
+.exam-supervisor-root input,
+.exam-supervisor-root select,
+.exam-supervisor-root textarea {
+  background: var(--panel2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 7px; padding: 7px 9px; font-size: 13px; outline: none;
+}
+.exam-supervisor-root input:focus,
+.exam-supervisor-root select:focus { border-color: var(--accent); }
+.exam-supervisor-root input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
+
+.exam-supervisor-root button.btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 7px;
+  padding: 8px 14px; font-weight: 700; cursor: pointer; font-size: 13px;
+}
+.exam-supervisor-root button.btn:hover { background: var(--accent2); }
+.exam-supervisor-root button.btn.ghost { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+.exam-supervisor-root button.btn.rose { background: var(--rose); }
+.exam-supervisor-root button.btn.green { background: var(--green); }
+.exam-supervisor-root button.btn.amber { background: var(--amber); color: #1a1a1a; }
+.exam-supervisor-root button.btn.sm { padding: 5px 9px; font-size: 12px; }
+
+.exam-supervisor-root table.grid { border-collapse: collapse; width: 100%; }
+.exam-supervisor-root table.grid th,
+.exam-supervisor-root table.grid td { border: 1px solid var(--border); padding: 6px 8px; font-size: 12px; text-align: center; }
+.exam-supervisor-root table.grid th { background: var(--panel2); position: sticky; top: 0; }
+.exam-supervisor-root table.grid td.left { text-align: left; }
+
+.exam-supervisor-root .chip { display: inline-flex; align-items: center; gap: 4px; background: var(--panel2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 10px; font-size: 12px; }
+.exam-supervisor-root .chip button { background: none; border: none; color: var(--rose); cursor: pointer; font-weight: 800; }
+.exam-supervisor-root .tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 700; }
+.exam-supervisor-root .tag.class { background: #1e3a5f; color: #93c5fd; }
+.exam-supervisor-root .tag.special { background: #4c1d95; color: #ddd6fe; }
+.exam-supervisor-root .tag.hallway { background: #064e3b; color: #6ee7b7; }
+.exam-supervisor-root .relaxed { color: var(--relax); font-weight: 700; }
+.exam-supervisor-root .banner { padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-weight: 600; font-size: 13px; }
+.exam-supervisor-root .banner.ok { background: #064e3b; color: #6ee7b7; }
+.exam-supervisor-root .banner.warn { background: #4a2a05; color: #fbbf24; }
+.exam-supervisor-root .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.exam-supervisor-root .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 22px; max-width: 640px; max-height: 80vh; overflow: auto; }
+.exam-supervisor-root .help { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.exam-supervisor-root .opts { display: flex; gap: 4px; flex-wrap: wrap; }
+.exam-supervisor-root .opts button { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel2); color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 600; }
+.exam-supervisor-root .opts button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.exam-supervisor-root .muted { color: var(--muted); }
+
+/* ── 고사명 배지 ── */
+.exam-supervisor-root .exam-badge {
+  display: inline-flex; align-items: center; gap: 3px; vertical-align: middle;
+  border: 1.5px dashed var(--muted); border-radius: 14px;
+  padding: 1px 8px; font-size: 11px; color: var(--muted); margin-left: 8px; font-weight: 400;
+}
+
+/* ── 결과 그리드 공통 툴바 ── */
+.exam-supervisor-root .rg-toolbar {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  padding: 8px 12px; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 10px; margin-bottom: 10px;
+}
+
+/* ── 학급별 / 교사별 그리드 ── */
+.exam-supervisor-root .rg-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+.exam-supervisor-root .rg-scale { transform-origin: top left; }
+.exam-supervisor-root table.rg { border-collapse: collapse; font-size: 12px; }
+.exam-supervisor-root table.rg th,
+.exam-supervisor-root table.rg td { border: 1px solid var(--border); padding: 5px 7px; text-align: center; white-space: nowrap; }
+.exam-supervisor-root table.rg th { background: var(--panel2); position: sticky; top: 0; z-index: 2; font-size: 11px; }
+.exam-supervisor-root table.rg th.rg-date { background: var(--panel); font-size: 10px; color: var(--muted); }
+.exam-supervisor-root table.rg td.rg-room { text-align: left; min-width: 106px; background: var(--panel); position: sticky; left: 0; z-index: 1; }
+.exam-supervisor-root table.rg th.rg-room { position: sticky; left: 0; z-index: 3; }
+.exam-supervisor-root table.rg td.rg-relax { background: rgba(217,70,239,.08); }
+.exam-supervisor-root .rg-subj { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+.exam-supervisor-root .rg-t {
+  display: inline-block; margin: 1px 2px; padding: 1px 7px; border-radius: 4px;
+  font-size: 11px; cursor: grab; user-select: none;
+  background: rgba(139,92,246,.18); border: 1px solid rgba(139,92,246,.35); color: var(--text);
+}
+.exam-supervisor-root .rg-t:active { cursor: grabbing; opacity: .65; }
+.exam-supervisor-root .rg-t.sub { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.3); }
+.exam-supervisor-root .rg-t.sub2 { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.3); }
+.exam-supervisor-root .rg-t:hover { filter: brightness(1.18); }
+.exam-supervisor-root td.rg-drop-over { outline: 2px dashed var(--accent) !important; background: rgba(139,92,246,.1) !important; }
+
+/* ── 우클릭 교체 메뉴 ── */
+.exam-supervisor-root .ctx-menu {
+  position: fixed; z-index: 9999; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 10px; padding: 4px 0; min-width: 170px; max-height: 320px; overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,.45);
+}
+.exam-supervisor-root .ctx-menu-title { padding: 6px 12px; font-size: 10px; color: var(--muted); font-weight: 700; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+.exam-supervisor-root .ctx-item { display: block; width: 100%; text-align: left; padding: 6px 14px; border: none; background: none; color: var(--text); cursor: pointer; font-size: 12px; }
+.exam-supervisor-root .ctx-item:hover { background: var(--panel2); }
+.exam-supervisor-root .ctx-item.current { color: var(--accent); font-weight: 700; }
+.exam-supervisor-root .ctx-item.del { color: var(--rose); }
+
+/* ── 규칙 위반 경고 토스트 ── */
+.exam-supervisor-root .ctx-warn {
+  position: fixed; bottom: 20px; right: 20px; z-index: 9998;
+  background: #4a2a05; color: #fbbf24; border: 1px solid #a16207;
+  border-radius: 10px; padding: 10px 16px; max-width: 400px; font-size: 13px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4); cursor: pointer; line-height: 1.5;
+}

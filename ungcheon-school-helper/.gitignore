@@ -1,0 +1,12 @@
+node_modules/
+out/
+dist-electron/
+release/
+*.log
+*.tsbuildinfo
+src/**/*.js
+src/**/*.d.ts
+!src/global.d.ts
+!src/vite-env.d.ts
+.env
+.DS_Store
