@@ -81,6 +81,12 @@ app.whenReady().then(() => {
 
   // 프로덕션 빌드에서만 자동 업데이트 확인 + 자동 실행 기본값 적용
   if (!process.env['ELECTRON_RENDERER_URL']) {
+    // app-update.yml이 손상되거나 누락된 설치본에서도 GitHub 공급자를 명시적으로 사용한다.
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: 'mathtjungsw',
+      repo: 'school-webtool-share',
+    })
     autoUpdater.checkForUpdatesAndNotify()
   }
 
