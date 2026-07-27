@@ -1,0 +1,89 @@
+name: 웅천고 업무도우미 업데이트 배포
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "배포 버전 (예: 1.0.1)"
+        required: true
+        type: string
+      release_notes:
+        description: "교직원에게 보여 줄 변경 내용"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Windows 설치본 빌드 및 GitHub Release 게시
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ungcheon-school-helper
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      RELEASE_NOTES: ${{ inputs.release_notes }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: 소스 받기
+        uses: actions/checkout@v4
+
+      - name: Node.js 준비
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ungcheon-school-helper/package-lock.json
+
+      - name: 버전 형식 확인
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_VERSION.Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "버전은 1.0.1처럼 숫자.숫자.숫자 형식이어야 합니다."
+          }
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: 패키지 설치
+        run: npm ci
+
+      - name: 배포 버전 적용
+        shell: pwsh
+        run: npm version $env:RELEASE_VERSION --no-git-tag-version
+
+      - name: 타입 검사
+        run: npm run typecheck
+
+      - name: Windows 설치본 만들기
+        run: npm run package
+
+      - name: GitHub Release 게시
+        shell: pwsh
+        run: |
+          $version = $env:RELEASE_VERSION
+          $tag = "ungcheon-helper-v$version"
+          if (gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null) {
+            throw "$tag 릴리스가 이미 존재합니다. 더 높은 버전을 입력하세요."
+          }
+
+          $notesPath = Join-Path $env:RUNNER_TEMP "ungcheon-release-notes.md"
+          @"
+          ## 웅천고 업무도우미 $version
+
+          $env:RELEASE_NOTES
+
+          프로그램을 실행하면 새 버전을 자동으로 내려받습니다. 자동 업데이트가 되지 않을 때는 설치 파일을 직접 실행하세요.
+          "@ | Set-Content -LiteralPath $notesPath -Encoding utf8
+
+          gh release create $tag `
+            "release/UngcheonSchoolHelper-Setup-$version.exe" `
+            "release/UngcheonSchoolHelper-Setup-$version.exe.blockmap" `
+            "release/latest.yml" `
+            --repo $env:GITHUB_REPOSITORY `
+            --target $env:GITHUB_SHA `
+            --title "웅천고 업무도우미 $version" `
+            --notes-file $notesPath `
+            --latest

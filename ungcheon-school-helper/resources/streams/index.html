@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>스트림스 마스터 — Streams Master</title>
+    <meta name="description" content="오름차순 숫자 배치 전략 게임. API 없이 즉시 플레이!" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+    <!-- ─── 배경 숫자 패턴 ─── -->
+    <div class="bg-pattern"></div>
+
+    <!-- ══════════════════════════════════════
+     메인 화면
+══════════════════════════════════════ -->
+    <section id="main-screen" class="screen">
+        <div class="main-logo">
+            <span class="logo-icon">🌊</span>
+            <h1>스트림스 마스터</h1>
+            <p>숫자의 흐름을 지배하라 — 오름차순 전략 게임</p>
+        </div>
+
+        <!-- 닉네임 입력 섹션 -->
+        <div style="width: 100%; max-width: 320px; margin-bottom: 24px;">
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px; padding-left: 4px;">나의 닉네임
+            </p>
+            <input type="text" id="nickname-input" placeholder="닉네임 입력 (최대 6자)" maxlength="6"
+                style="width: 100%; background: rgba(30,27,75,0.6); border: 1px solid var(--border); border-radius: 12px; padding: 14px; color: white; font-family: inherit; font-size: 1.1rem; text-align: center;">
+        </div>
+
+        <!-- 중복 모드 선택 섹션 -->
+        <div style="width: 100%; max-width: 320px; margin-bottom: 24px;">
+            <p
+                style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px; padding-left: 4px; text-align: center;">
+                숫자 중복 허용 여부</p>
+            <div
+                style="display: flex; gap: 8px; padding: 4px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                <button class="btn dup-mode-btn active" id="main-dup-false" onclick="setDuplicateMode(false)"
+                    style="flex: 1; padding: 10px; font-size: 0.85rem; border: none; background: transparent; color: var(--text-muted);">중복
+                    금지</button>
+                <button class="btn dup-mode-btn" id="main-dup-true" onclick="setDuplicateMode(true)"
+                    style="flex: 1; padding: 10px; font-size: 0.85rem; border: none; background: transparent; color: var(--text-muted);">중복
+                    허용</button>
+            </div>
+        </div>
+
+        <div class="main-buttons">
+            <button class="btn btn-primary" onclick="initGame(null, true)" id="start-btn">
+                🎮 혼자 하기
+            </button>
+            <button class="btn btn-secondary" onclick="openMultiplayer()" id="multi-btn">
+                ⚔️ 친구와 대결하기
+            </button>
+            <button class="btn btn-secondary" style="margin-top: 8px;" onclick="openTopRankings()" id="rank-btn">
+                🏆 최고 기록 랭킹
+            </button>
+            <button class="btn btn-secondary" style="margin-top: 8px;" onclick="openModal('how-to-modal')"
+                id="how-to-btn">
+                📖 게임 방법
+            </button>
+        </div>
+
+        <!-- 미리보기 점수 설명 -->
+        <div
+            style="margin-top: 48px; text-align: center; color: var(--text-muted); font-size: 0.85rem; line-height: 1.8;">
+            <p>1~30 숫자를 20개 슬롯에 전략적으로 배치</p>
+            <p>오름차순 연속이 길수록 <span style="color: var(--yellow);">높은 점수</span></p>
+            <p style="margin-top: 8px; font-size: 0.75rem;">API 키 불필요 · 완전 오프라인 동작</p>
+        </div>
+    </section>
+
+    <!-- ══════════════════════════════════════
+     게임 화면
+══════════════════════════════════════ -->
+    <section id="game-screen" class="screen">
+
+        <!-- 헤더 -->
+        <header class="game-header">
+            <button class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.85rem; border-radius: 10px;"
+                onclick="goToMain()" id="home-btn">
+                🏠 홈으로
+            </button>
+            <button class="btn btn-secondary" style="padding: 8px 14px; font-size: 0.85rem; border-radius: 10px;"
+                onclick="openModal('how-to-modal')" id="help-btn">
+                ❓ 방법
+            </button>
+            <h2>스트림스 마스터</h2>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <div class="current-room-info"
+                    style="display: none; background: rgba(251, 191, 36, 0.2); border: 1px solid var(--yellow); border-radius: 20px; padding: 6px 14px; font-size: 0.85rem; color: var(--yellow); font-weight: 700;">
+                    방 번호: -
+                </div>
+                <div class="turn-badge">
+                    <span id="turn-display">0</span> / 20
+                </div>
+                <div id="game-mode-badge"
+                    style="background: rgba(251, 191, 36, 0.2); border: 1px solid var(--yellow); border-radius: 20px; padding: 6px 14px; font-size: 0.85rem; color: var(--yellow); font-weight: 700;">
+                    중복 금지
+                </div>
+            </div>
+        </header>
+
+        <!-- 현재 숫자 패널 -->
+        <div class="number-panel">
+            <div class="current-number-display">
+                <span class="current-number-label">현재 숫자</span>
+                <span class="current-number-value" id="current-number-value">?</span>
+            </div>
+            <button class="btn btn-draw" id="draw-btn" onclick="drawNumber()">
+                🎲 숫자 뽑기
+            </button>
+        </div>
+
+        <!-- 게임 보드 -->
+        <div class="board-container">
+            <div class="board-grid" id="board-grid"></div>
+        </div>
+
+        <!-- 우리 팀 현황 (Simulation) -->
+        <div id="team-live-panel"
+            style="margin: 0 20px 24px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 16px; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h4 style="font-size: 0.85rem; color: var(--indigo-300); margin: 0;"><span id="live-team-name">A</span>팀
+                    진행 현황</h4>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">실시간</span>
+            </div>
+            <div id="team-live-members" style="display: flex; flex-direction: column; gap: 10px;">
+                <!-- 팀원 진행 바 아이템 -->
+            </div>
+        </div>
+
+        <!-- 생성하기 버튼 (20개 배치 완료 시 노출) -->
+        <div class="generate-area" id="generate-area">
+            <button class="btn btn-generate" style="width: 100%;" onclick="showAnalysis()" id="generate-btn">
+                ✨ 생성하기 — 결과 분석
+            </button>
+        </div>
+
+    </section>
+
+    <!-- ══════════════════════════════════════
+     모달: 게임 방법
+══════════════════════════════════════ -->
+    <div class="modal-overlay" id="how-to-modal">
+        <div class="modal-sheet" style="max-height: 85vh; overflow-y: auto;">
+            <div class="modal-handle"></div>
+            <h2 class="modal-title">📖 스트림스 완벽 가이드</h2>
+
+            <!-- 가이드 탭 버튼 -->
+            <div
+                style="display: flex; gap: 8px; margin-bottom: 24px; padding: 4px; background: rgba(255,255,255,0.05); border-radius: 12px;">
+                <button class="btn guide-tab-btn active" onclick="switchGuideTab('basic')"
+                    style="flex: 1; padding: 10px; font-size: 0.85rem; border: none; background: transparent; color: var(--text-muted);">규칙</button>
+                <button class="btn guide-tab-btn" onclick="switchGuideTab('modes')"
+                    style="flex: 1; padding: 10px; font-size: 0.85rem; border: none; background: transparent; color: var(--text-muted);">방식</button>
+                <button class="btn guide-tab-btn" onclick="switchGuideTab('strategy')"
+                    style="flex: 1; padding: 10px; font-size: 0.85rem; border: none; background: transparent; color: var(--text-muted);">전략</button>
+            </div>
+
+            <style>
+                .guide-tab-btn.active {
+                    background: var(--indigo-500) !important;
+                    color: white !important;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+                }
+
+                .guide-content {
+                    display: none;
+                    animation: fadeIn 0.3s ease;
+                }
+
+                .guide-content.active {
+                    display: block;
+                }
+
+                @keyframes fadeIn {
+                    from {
+                        opacity: 0;
+                        transform: translateY(10px);
+                    }
+
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+            </style>
+
+            <!-- 1. 기본 규칙 탭 -->
+            <div id="guide-basic" class="guide-content active">
+                <div class="how-to-step">
+                    <div class="step-num">1</div>
+                    <div class="step-text"><strong>1~30 숫자</strong> 중 하나가 무작위로 등장합니다.</div>
+                </div>
+                <div class="how-to-step">
+                    <div class="step-num">2</div>
+                    <div class="step-text">20개의 슬롯 중 하나를 골라 배치하세요. <strong>한 번 두면 끝!</strong></div>
+                </div>
+                <div class="how-to-step">
+                    <div class="step-num">3</div>
+                    <div class="step-text">숫자가 <strong>오름차순(점점 크게)</strong>으로 연결되면 스트릭이 쌓입니다.</div>
+                </div>
+            </div>
+
+            <!-- 2. 경기 방식 탭 -->
+            <div id="guide-modes" class="guide-content">
+                <div style="background: rgba(99,102,241,0.1); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                    <h4 style="color: var(--indigo-300); margin-bottom: 8px;">⚔️ 개인 대결 (Battle)</h4>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;">모든 플레이어가 <strong>같은
+                            숫자 순서</strong>를 공유합니다. 각자 최선의 배치를 하여 최종 점수로 순위를 가립니다.</p>
+                </div>
+                <div style="background: rgba(251,191,36,0.1); border-radius: 12px; padding: 16px;">
+                    <h4 style="color: var(--yellow); margin-bottom: 8px;">🏆 팀 대항 리그 (League)</h4>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;">A, B, C 팀으로 나뉘어
+                        경쟁합니다. 각 팀원들의 <strong>평균 점수</strong>가 높은 팀이 최종 승리합니다.</p>
+                </div>
+            </div>
+
+            <!-- 3. 점수 전략 탭 -->
+            <div id="guide-strategy" class="guide-content">
+                <div
+                    style="background: rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                    <p style="font-size: 0.85rem; color: var(--indigo-200); font-weight: 700; margin-bottom: 8px;">💡 점수
+                        대폭발의 비밀</p>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.6;">연속되는 숫자가 길어질수록 점수가
+                        폭발합니다!<br />
+                        10개 연속: 55점 | 20개 연속: <strong>210점</strong></p>
+                </div>
+                <ul style="font-size: 0.85rem; color: var(--text-secondary); padding-left: 20px; line-height: 1.8;">
+                    <li>1~10번은 앞쪽에, 21~30번은 뒤쪽에 배치하세요.</li>
+                    <li>가운데(11~20번) 관리 능력이 승패를 가립니다.</li>
+                    <li>불리한 숫자는 과감히 끊어서 새로운 흐름을 만드세요.</li>
+                </ul>
+            </div>
+
+            <button class="btn btn-primary" style="width: 100%; margin-top: 24px;" onclick="closeModal('how-to-modal')">
+                이해했습니다!
+            </button>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+     모달: 결과 분석
+══════════════════════════════════════ -->
+    <div class="modal-overlay" id="result-modal">
+        <div class="modal-sheet" style="max-height: 90vh; overflow-y: auto;">
+            <div class="modal-handle"></div>
+            <h2 class="modal-title">📊 최종 게임 분석</h2>
+
+            <!-- 점수 카드 -->
+            <div class="result-score-card">
+                <div class="result-score-label">최종 점수</div>
+                <div class="result-score-value" id="result-score">0</div>
+                <div class="result-score-unit">점</div>
+                <span class="result-grade" id="result-grade"></span>
+            </div>
+
+            <!-- 분석 리포트 -->
+            <div class="result-analysis">
+                <h3>🔍 분석 리포트</h3>
+                <p id="result-analysis-text"></p>
+                <div class="streak-report" id="streak-report"></div>
+            </div>
+
+            <!-- 실시간 순위표 (New) -->
+            <div class="result-analysis" style="border-color: var(--indigo-400);">
+                <h3 style="color: var(--indigo-300);">🏆 실시간 순위표</h3>
+                <div id="leaderboard-list" style="margin-top: 10px;">
+                    <!-- 순위 아이템이 여기에 추가됨 -->
+                </div>
+            </div>
+
+            <!-- 카카오 피드백 버튼 (노란색 강조) -->
+            <div class="feedback-btn-wrap">
+                <button class="btn btn-yellow" style="width: 100%;" onclick="openKakao()" id="feedback-btn">
+                    💬 피드백 보내기
+                </button>
+                <p class="feedback-url">open.kakao.com/o/sh4gBw6c</p>
+            </div>
+
+            <!-- 액션 버튼 -->
+            <div class="result-actions">
+                <button class="btn btn-secondary" onclick="restartGame()" id="restart-btn">
+                    🔄 다시 하기
+                </button>
+                <button class="btn btn-secondary" onclick="goToMain()" id="home-result-btn">
+                    🏠 홈으로
+                </button>
+                <button class="btn btn-primary" onclick="closeModal('result-modal')" id="close-result-btn">
+                    보드 보기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+     모달: 다인용 설정
+══════════════════════════════════════ -->
+    <div class="modal-overlay" id="multiplayer-modal">
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <h2 class="modal-title">⚔️ 친구와 대결하기</h2>
+
+            <div
+                style="background: rgba(99,102,241,0.15); border: 1px solid var(--border); border-radius: 20px; padding: 24px; text-align: center; margin-bottom: 24px;">
+                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 12px;">당신의 방 생성 번호</p>
+                <div style="font-size: 3rem; font-weight: 900; color: var(--indigo-300); letter-spacing: 4px;"
+                    id="room-code-display">7721</div>
+                <button class="btn btn-secondary" style="margin-top: 16px; padding: 10px 20px; font-size: 0.9rem;"
+                    onclick="copyRoomLink()">
+                    🔗 초대 링크 복사
+                </button>
+            </div>
+
+            <!-- 경기 방식 선택 -->
+            <div style="margin-bottom: 24px;">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px; text-align: center;">경기
+                    방식을 선택하세요</p>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary mode-btn active" style="flex: 1; padding: 12px;"
+                        onclick="selectMode('battle')" data-mode="battle">⚔️ 개인 대결</button>
+                    <button class="btn btn-secondary mode-btn" style="flex: 1; padding: 12px;"
+                        onclick="selectMode('league')" data-mode="league">🏆 팀 리그</button>
+                </div>
+                <style>
+                    .mode-btn.active {
+                        background: var(--indigo-500) !important;
+                        border-color: var(--indigo-300) !important;
+                        color: white !important;
+                        box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+                    }
+                </style>
+            </div>
+
+            <button class="btn btn-primary" style="width: 100%; margin-bottom: 24px;" onclick="startMultiplayer()">
+                이 번호로 방 만들기
+            </button>
+
+            <!-- 팀 선택 섹션 -->
+            <div id="team-select-section" style="margin-bottom: 24px; display: none;">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px; text-align: center;">
+                    참여할 팀을 선택하세요</p>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary team-btn" style="flex: 1; padding: 12px;" onclick="selectTeam('A')"
+                        data-team="A">A팀</button>
+                    <button class="btn btn-secondary team-btn" style="flex: 1; padding: 12px;" onclick="selectTeam('B')"
+                        data-team="B">B팀</button>
+                    <button class="btn btn-secondary team-btn" style="flex: 1; padding: 12px;" onclick="selectTeam('C')"
+                        data-team="C">C팀</button>
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                <div style="flex: 1; height: 1px; background: var(--border);"></div>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">또는 이미 생성된 방에 입장</span>
+                <div style="flex: 1; height: 1px; background: var(--border);"></div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <input type="number" id="room-code-input" placeholder="4자리 번호 입력"
+                    style="flex: 1; background: rgba(30,27,75,0.6); border: 1px solid var(--border); border-radius: 12px; padding: 14px; color: white; font-family: inherit; font-size: 1rem; text-align: center; letter-spacing: 2px;">
+                <button class="btn btn-secondary" style="padding: 14px 24px;" onclick="joinRoom()">
+                    입장
+                </button>
+            </div>
+
+            <!-- 다인용 중복 모드 설정 -->
+            <div style="margin-bottom: 24px;">
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px; text-align: center;">중복
+                    모드 설정</p>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary multi-dup-btn active" style="flex: 1; padding: 12px;"
+                        onclick="setDuplicateMode(false)" id="multi-dup-false">중복 금지</button>
+                    <button class="btn btn-secondary multi-dup-btn" style="flex: 1; padding: 12px;"
+                        onclick="setDuplicateMode(true)" id="multi-dup-true">중복 허용</button>
+                </div>
+            </div>
+
+            <button class="btn btn-secondary" style="width: 100%; margin-top: 10px; border: none;"
+                onclick="closeModal('multiplayer-modal')">
+                취소
+            </button>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+     모달: 전체 랭킹
+    ══════════════════════════════════════ -->
+    <div class="modal-overlay" id="ranking-modal">
+        <div class="modal-sheet" style="max-height: 85vh; overflow-y: auto;">
+            <div class="modal-handle"></div>
+            <h2 class="modal-title">🏆 명예의 전당 (Top 10)</h2>
+            <p style="text-align: center; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px;">지금까지 기록된
+                최고의 순간들</p>
+
+            <div id="top-ranking-list" style="margin-bottom: 24px;">
+                <!-- 랭킹 리스트가 여기에 동적으로 생성됩니다 -->
+            </div>
+
+            <button class="btn btn-primary" style="width: 100%;" onclick="closeModal('ranking-modal')">
+                닫기
+            </button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+
+</html>

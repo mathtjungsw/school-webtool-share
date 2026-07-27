@@ -1,0 +1,97 @@
+{
+  "name": "ungcheon-school-helper",
+  "version": "1.0.1",
+  "description": "웅천고등학교 교직원을 위한 통합 업무 지원 프로그램",
+  "main": "out/main/index.js",
+  "author": "웅천고등학교",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit --pretty false && tsc -p tsconfig.web.json --noEmit --pretty false",
+    "build": "electron-vite build",
+    "package": "npm run build && electron-builder --win --dir && node scripts/package-windows.cjs && electron-builder --win nsis --prepackaged release/win-unpacked",
+    "package:dir": "npm run build && electron-builder --win --dir"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "6.3.1",
+    "@dnd-kit/sortable": "10.0.0",
+    "@dnd-kit/utilities": "3.2.2",
+    "clsx": "2.1.1",
+    "date-fns": "3.6.0",
+    "electron-store": "8.2.0",
+    "electron-updater": "6.3.0",
+    "framer-motion": "11.3.24",
+    "kordoc": "file:vendor/kordoc",
+    "lucide-react": "0.417.0",
+    "pdfjs-dist": "6.0.227",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.26.0",
+    "tailwind-merge": "2.4.0",
+    "xlsx": "0.18.5",
+    "zustand": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.12",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "@vitejs/plugin-react": "4.3.1",
+    "autoprefixer": "10.4.20",
+    "electron": "31.7.7",
+    "electron-builder": "24.13.3",
+    "electron-vite": "2.3.0",
+    "png-to-ico": "^2.1.8",
+    "postcss": "8.4.40",
+    "rcedit": "^4.0.1",
+    "sharp": "^0.33.5",
+    "tailwindcss": "3.4.7",
+    "typescript": "5.5.4",
+    "vite": "5.3.5"
+  },
+  "build": {
+    "appId": "kr.hs.ungcheon.schoolhelper",
+    "productName": "웅천고 업무도우미",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "."
+      }
+    ],
+    "artifactName": "UngcheonSchoolHelper-Setup-${version}.${ext}",
+    "win": {
+      "icon": "resources/icon.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "웅천고 업무도우미"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "mathtjungsw",
+      "repo": "school-webtool-share"
+    }
+  }
+}
