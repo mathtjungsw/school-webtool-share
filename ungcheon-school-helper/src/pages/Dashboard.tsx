@@ -31,7 +31,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useAppStore } from '../stores/appStore'
 import { WeatherTodayView, WeatherForecastView } from '../components/WeatherBar'
 import { useWeather } from '../components/useWeather'
-import { getMeal, getSchedule, getTimetableRange, getSchoolDetail } from '../services/neis'
+import { getMeal, getSchedule, getTimetableRange, getSchoolDetail, NEIS_API_KEY } from '../services/neis'
 import type { MealInfo, ScheduleEvent, TimetableEntry } from '../types'
 import { format, addDays, startOfWeek } from 'date-fns'
 import { ko } from 'date-fns/locale'
@@ -283,7 +283,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const prevMonthRef = useRef('')
 
   const hasSchool = !!(config.officeCode && config.schoolCode)
-  const neisApiKey = config.neisApiKey || 'OPEN'
+  const neisApiKey = config.neisApiKey?.trim() || NEIS_API_KEY
   const schoolType = config.schoolType ?? ''
   const p1 = config.period1Start ?? '09:00'
   const p5 = config.period5Start ?? '13:30'

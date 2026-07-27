@@ -54,7 +54,7 @@ export default function NeisPage() {
   const hasSchool = !!(config.officeCode && config.schoolCode)
   const activeOffice = viewSchool?.officeCode ?? config.officeCode ?? ''
   const activeSchool = viewSchool?.schoolCode ?? config.schoolCode ?? ''
-  const neisKey = NEIS_API_KEY
+  const neisKey = config.neisApiKey?.trim() || NEIS_API_KEY
 
   // ── 학교 검색 디바운스 (race condition 방지: cancelled 플래그) ──
   useEffect(() => {
