@@ -1,19 +1,38 @@
-name: 웅천고 업무도우미 업데이트 배포
+name: 웅천고 업무도우미 자동 업데이트 배포
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "ungcheon-school-helper/electron/**"
+      - "ungcheon-school-helper/src/**"
+      - "ungcheon-school-helper/resources/**"
+      - "ungcheon-school-helper/vendor/**"
+      - "ungcheon-school-helper/scripts/**"
+      - "ungcheon-school-helper/package.json"
+      - "ungcheon-school-helper/package-lock.json"
+      - "ungcheon-school-helper/electron.vite.config.ts"
+      - "ungcheon-school-helper/postcss.config.js"
+      - "ungcheon-school-helper/tailwind.config.js"
+      - "ungcheon-school-helper/tsconfig*.json"
   workflow_dispatch:
     inputs:
       version:
-        description: "배포 버전 (예: 1.0.1)"
-        required: true
+        description: "선택: 직접 지정할 버전 (비워 두면 자동으로 패치 버전 증가)"
+        required: false
         type: string
       release_notes:
-        description: "교직원에게 보여 줄 변경 내용"
-        required: true
+        description: "선택: 교직원에게 보여 줄 변경 내용"
+        required: false
         type: string
 
 permissions:
   contents: write
+
+concurrency:
+  group: ungcheon-school-helper-release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -23,8 +42,8 @@ jobs:
       run:
         working-directory: ungcheon-school-helper
     env:
-      RELEASE_VERSION: ${{ inputs.version }}
-      RELEASE_NOTES: ${{ inputs.release_notes }}
+      REQUESTED_VERSION: ${{ inputs.version }}
+      REQUESTED_NOTES: ${{ inputs.release_notes }}
       GH_TOKEN: ${{ github.token }}
 
     steps:
@@ -38,14 +57,64 @@ jobs:
           cache: npm
           cache-dependency-path: ungcheon-school-helper/package-lock.json
 
-      - name: 버전 형식 확인
+      - name: 배포 버전과 변경 내용 결정
         shell: pwsh
         run: |
-          $version = $env:RELEASE_VERSION.Trim()
-          if ($version -notmatch '^\d+\.\d+\.\d+$') {
-            throw "버전은 1.0.1처럼 숫자.숫자.숫자 형식이어야 합니다."
+          $latestTag = gh release view `
+            --repo $env:GITHUB_REPOSITORY `
+            --json tagName `
+            --jq '.tagName' 2>$null
+
+          $latestVersion = $null
+          if ($LASTEXITCODE -eq 0 -and $latestTag -match '^ungcheon-helper-v(\d+\.\d+\.\d+)$') {
+            $latestVersion = [version]$Matches[1]
           }
-          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          $requested = "$env:REQUESTED_VERSION".Trim()
+          if ($requested) {
+            if ($requested -notmatch '^\d+\.\d+\.\d+$') {
+              throw "버전은 1.0.2처럼 숫자.숫자.숫자 형식이어야 합니다."
+            }
+            $version = [version]$requested
+            if ($latestVersion -and $version -le $latestVersion) {
+              throw "지정한 버전 $version 은 현재 최신 버전 $latestVersion 보다 높아야 합니다."
+            }
+          } elseif ($latestVersion) {
+            $version = [version]::new(
+              $latestVersion.Major,
+              $latestVersion.Minor,
+              $latestVersion.Build + 1
+            )
+          } else {
+            $packageVersion = node -p "require('./package.json').version"
+            $version = [version]$packageVersion
+          }
+
+          $versionText = $version.ToString(3)
+          "RELEASE_VERSION=$versionText" |
+            Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          $notes = "$env:REQUESTED_NOTES".Trim()
+          if (-not $notes) {
+            $event = Get-Content -LiteralPath $env:GITHUB_EVENT_PATH -Raw | ConvertFrom-Json
+            $notes = if ($event.head_commit.message) {
+              ($event.head_commit.message -split "`r?`n")[0]
+            } else {
+              "웅천고 업무도우미 기능 및 자료 업데이트"
+            }
+          }
+
+          $notesPath = Join-Path $env:RUNNER_TEMP "ungcheon-release-notes.md"
+          @"
+          ## 웅천고 업무도우미 $versionText
+
+          $notes
+
+          프로그램을 실행하면 새 버전을 자동으로 내려받습니다. 자동 업데이트가 되지 않을 때는 설치 파일을 직접 실행하세요.
+          "@ | Set-Content -LiteralPath $notesPath -Encoding utf8
+
+          "RELEASE_NOTES_PATH=$notesPath" |
+            Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: 패키지 설치
         run: npm ci
@@ -66,17 +135,8 @@ jobs:
           $version = $env:RELEASE_VERSION
           $tag = "ungcheon-helper-v$version"
           if (gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null) {
-            throw "$tag 릴리스가 이미 존재합니다. 더 높은 버전을 입력하세요."
+            throw "$tag 릴리스가 이미 존재합니다."
           }
-
-          $notesPath = Join-Path $env:RUNNER_TEMP "ungcheon-release-notes.md"
-          @"
-          ## 웅천고 업무도우미 $version
-
-          $env:RELEASE_NOTES
-
-          프로그램을 실행하면 새 버전을 자동으로 내려받습니다. 자동 업데이트가 되지 않을 때는 설치 파일을 직접 실행하세요.
-          "@ | Set-Content -LiteralPath $notesPath -Encoding utf8
 
           gh release create $tag `
             "release/UngcheonSchoolHelper-Setup-$version.exe" `
@@ -85,5 +145,5 @@ jobs:
             --repo $env:GITHUB_REPOSITORY `
             --target $env:GITHUB_SHA `
             --title "웅천고 업무도우미 $version" `
-            --notes-file $notesPath `
+            --notes-file $env:RELEASE_NOTES_PATH `
             --latest

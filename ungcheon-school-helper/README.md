@@ -33,8 +33,9 @@ npm run package
 
 ## 업데이트 배포
 
-GitHub Actions에서 버전과 변경 내용을 입력하면 Windows 설치본과 자동 업데이트 파일을
-GitHub Releases에 게시할 수 있습니다. 자세한 절차는 `docs/UPDATE_RELEASE.md`를 참고하세요.
+앱 소스가 `main` 브랜치에 반영되면 GitHub Actions가 패치 버전을 자동으로 올리고
+Windows 설치본과 자동업데이트 파일을 GitHub Releases에 게시합니다.
+자세한 절차는 `docs/UPDATE_RELEASE.md`를 참고하세요.
 
 ## 라이선스 고지
 
