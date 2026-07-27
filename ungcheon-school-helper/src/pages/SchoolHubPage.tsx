@@ -4,6 +4,7 @@ import {
   ShieldCheck, Trash2, AlertCircle, Search,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
+import { useAdminStore } from '../stores/adminStore'
 import { hubRequest, listLinks, listNotices, type SchoolNotice, type SharedLink } from '../services/schoolHub'
 import { useNoticeStore } from '../stores/noticeStore'
 
@@ -16,7 +17,8 @@ export default function SchoolHubPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
-  const [adminPassword, setAdminPassword] = useState('')
+  const isAdmin = useAdminStore(s => s.isAdmin)
+  const adminPassword = useAdminStore(s => s.adminPassword)
   const [linkForm, setLinkForm] = useState({
     department: '', title: '', url: '', description: '', registeredBy: config.teacherName ?? '',
   })
@@ -66,7 +68,7 @@ export default function SchoolHubPage() {
   }
 
   const deleteLink = async (id: string) => {
-    if (!adminPassword) { setError('삭제하려면 관리자 비밀번호를 입력하세요.'); return }
+    if (!isAdmin || !adminPassword) { setError('관리자 모드에서만 삭제할 수 있습니다.'); return }
     if (!confirm('이 공유 링크를 삭제할까요?')) return
     try {
       await hubRequest({ action: 'deleteLink', id, adminPassword })
@@ -78,7 +80,7 @@ export default function SchoolHubPage() {
 
   const addNotice = async (event: FormEvent) => {
     event.preventDefault()
-    if (!adminPassword) { setError('공지를 등록하려면 관리자 비밀번호를 입력하세요.'); return }
+    if (!isAdmin || !adminPassword) { setError('관리자 모드에서만 공지를 등록할 수 있습니다.'); return }
     try {
       await hubRequest({ action: 'addNotice', ...noticeForm, adminPassword })
       setNoticeForm({ title: '', body: '', level: 'info', expiresAt: '' })
@@ -90,7 +92,7 @@ export default function SchoolHubPage() {
   }
 
   const deleteNotice = async (id: number) => {
-    if (!adminPassword) { setError('삭제하려면 관리자 비밀번호를 입력하세요.'); return }
+    if (!isAdmin || !adminPassword) { setError('관리자 모드에서만 삭제할 수 있습니다.'); return }
     if (!confirm('이 공지를 삭제할까요?')) return
     try {
       await hubRequest({ action: 'deleteNotice', id, adminPassword })
@@ -135,16 +137,11 @@ export default function SchoolHubPage() {
         <button onClick={() => setTab('notices')} className={tab === 'notices' ? 'btn-primary' : 'btn-ghost'}>
           <span className="flex items-center gap-2"><Megaphone size={14} /> 학교 공지</span>
         </button>
-        <div className="ml-auto flex items-center gap-2 min-w-[260px]">
-          <ShieldCheck size={14} className="text-slate-500" />
-          <input
-            type="password"
-            className="input-field flex-1"
-            value={adminPassword}
-            onChange={e => setAdminPassword(e.target.value)}
-            placeholder="관리자 비밀번호(삭제·공지 관리)"
-            autoComplete="off"
-          />
+        <div className={`ml-auto flex items-center gap-2 rounded-xl px-3 py-2 text-xs ${
+          isAdmin ? 'bg-amber-500/10 text-amber-300' : 'bg-white/5 text-slate-500'
+        }`}>
+          <ShieldCheck size={14} />
+          {isAdmin ? '관리자 모드 활성화' : '현재 사용자 모드'}
         </div>
       </div>
 
@@ -185,9 +182,11 @@ export default function SchoolHubPage() {
                     {link.description && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{link.description}</p>}
                     <p className="text-[10px] text-slate-600 mt-3">{link.registeredBy} · {formatDate(link.createdAt)}</p>
                   </button>
-                  <button onClick={() => deleteLink(link.id)} className="self-start p-2 text-slate-600 hover:text-rose-400 opacity-40 group-hover:opacity-100" title="관리자 삭제">
-                    <Trash2 size={14} />
-                  </button>
+                  {isAdmin && (
+                    <button onClick={() => deleteLink(link.id)} className="self-start p-2 text-slate-600 hover:text-rose-400 opacity-40 group-hover:opacity-100" title="관리자 삭제">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               </article>
             ))}
@@ -196,21 +195,23 @@ export default function SchoolHubPage() {
         </>
       ) : (
         <>
-          <form onSubmit={addNotice} className="card p-5">
-            <h2 className="font-semibold text-white flex items-center gap-2 mb-4"><Megaphone size={16} className="text-violet-400" /> 관리자 공지 등록</h2>
-            <div className="grid sm:grid-cols-3 gap-3">
-              <input className="input-field sm:col-span-2" required maxLength={100} placeholder="공지 제목" value={noticeForm.title} onChange={e => setNoticeForm({ ...noticeForm, title: e.target.value })} />
-              <select className="input-field" value={noticeForm.level} onChange={e => setNoticeForm({ ...noticeForm, level: e.target.value })}>
-                <option value="info">일반</option><option value="important">중요</option><option value="urgent">긴급</option>
-              </select>
-              <textarea className="input-field sm:col-span-3 min-h-28 resize-y" required maxLength={3000} placeholder="공지 내용" value={noticeForm.body} onChange={e => setNoticeForm({ ...noticeForm, body: e.target.value })} />
-              <label className="text-xs text-slate-400">
-                팝업 만료일(선택)
-                <input type="date" className="input-field w-full mt-1" value={noticeForm.expiresAt} onChange={e => setNoticeForm({ ...noticeForm, expiresAt: e.target.value })} />
-              </label>
-              <button className="btn-primary px-5 self-end h-10" type="submit">공지 등록</button>
-            </div>
-          </form>
+          {isAdmin && (
+            <form onSubmit={addNotice} className="card p-5">
+              <h2 className="font-semibold text-white flex items-center gap-2 mb-4"><Megaphone size={16} className="text-violet-400" /> 관리자 공지 등록</h2>
+              <div className="grid sm:grid-cols-3 gap-3">
+                <input className="input-field sm:col-span-2" required maxLength={100} placeholder="공지 제목" value={noticeForm.title} onChange={e => setNoticeForm({ ...noticeForm, title: e.target.value })} />
+                <select className="input-field" value={noticeForm.level} onChange={e => setNoticeForm({ ...noticeForm, level: e.target.value })}>
+                  <option value="info">일반</option><option value="important">중요</option><option value="urgent">긴급</option>
+                </select>
+                <textarea className="input-field sm:col-span-3 min-h-28 resize-y" required maxLength={3000} placeholder="공지 내용" value={noticeForm.body} onChange={e => setNoticeForm({ ...noticeForm, body: e.target.value })} />
+                <label className="text-xs text-slate-400">
+                  팝업 만료일(선택)
+                  <input type="date" className="input-field w-full mt-1" value={noticeForm.expiresAt} onChange={e => setNoticeForm({ ...noticeForm, expiresAt: e.target.value })} />
+                </label>
+                <button className="btn-primary px-5 self-end h-10" type="submit">공지 등록</button>
+              </div>
+            </form>
+          )}
           <div className="space-y-3">
             {notices.map(notice => (
               <article key={notice.id} className="card p-4 flex gap-3">
@@ -220,7 +221,9 @@ export default function SchoolHubPage() {
                   <p className="text-sm text-slate-400 whitespace-pre-wrap mt-2">{notice.body}</p>
                   <p className="text-[10px] text-slate-600 mt-3">{notice.date}{notice.expiresAt ? ` · 팝업 만료 ${notice.expiresAt}` : ''}</p>
                 </div>
-                <button onClick={() => deleteNotice(notice.id)} className="self-start p-2 text-slate-600 hover:text-rose-400" title="관리자 삭제"><Trash2 size={14} /></button>
+                {isAdmin && (
+                  <button onClick={() => deleteNotice(notice.id)} className="self-start p-2 text-slate-600 hover:text-rose-400" title="관리자 삭제"><Trash2 size={14} /></button>
+                )}
               </article>
             ))}
           </div>

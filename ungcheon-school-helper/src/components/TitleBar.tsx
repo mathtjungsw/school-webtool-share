@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import {
-  AlertCircle, Check, ChevronLeft, Link2, Megaphone,
+  AlertCircle, Check, ChevronLeft, Link2, Megaphone, MessageSquareText,
   Minus, Moon, ScrollText, Square, Sun, SunMoon, X,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useNoticeStore } from '../stores/noticeStore'
+import AdminModeButton from './AdminModeButton'
 
 export default function TitleBar({
   currentPage,
@@ -51,6 +52,7 @@ export default function TitleBar({
       <div className="flex-1 flex items-center justify-center gap-1">
         <TopNav active={currentPage === 'dashboard'} onClick={() => onNavigate('dashboard')}>대시보드</TopNav>
         <TopNav active={currentPage === 'school_hub'} onClick={() => onNavigate('school_hub')} icon={<Link2 size={11} />}>학교 공유</TopNav>
+        <TopNav active={currentPage === 'feature_requests'} onClick={() => onNavigate('feature_requests')} icon={<MessageSquareText size={11} />}>기능개선</TopNav>
         <NoticeButton />
         <TopNav active={currentPage === 'settings'} onClick={() => onNavigate('settings')}>환경설정</TopNav>
       </div>
@@ -62,6 +64,7 @@ export default function TitleBar({
             <AlertCircle size={10} />업데이트 확인 실패
           </button>
         )}
+        <AdminModeButton />
         <button onClick={cycleTheme} title={`테마: ${theme}`} className="w-7 h-7 grid place-items-center text-slate-500 hover:text-slate-200 rounded hover:bg-white/5">
           <ThemeIcon size={13} />
         </button>

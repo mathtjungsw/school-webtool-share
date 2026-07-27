@@ -27,6 +27,7 @@
     "src/pages/UngcheonSettingsPage.tsx",
     "src/pages/UngcheonHelpPage.tsx",
     "src/pages/SchoolHubPage.tsx",
+    "src/pages/FeatureRequestsPage.tsx",
     "src/pages/ExcelProcessorPage.tsx",
     "src/pages/RecommendedSubjectsPage.tsx",
     "src/pages/PayrollPage.tsx",

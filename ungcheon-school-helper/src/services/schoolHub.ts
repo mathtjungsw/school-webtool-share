@@ -19,6 +19,21 @@ export interface SchoolNotice {
   expiresAt?: string
 }
 
+export type FeatureRequestType = 'new' | 'improvement'
+export type FeatureRequestStatus = 'submitted' | 'reviewing' | 'planned' | 'completed' | 'declined'
+
+export interface FeatureRequest {
+  id: string
+  requestType: FeatureRequestType
+  title: string
+  content: string
+  author: string
+  createdAt: string
+  status: FeatureRequestStatus
+  adminReply?: string
+  updatedAt?: string
+}
+
 interface HubResponse<T> {
   ok: boolean
   data?: T
@@ -27,9 +42,27 @@ interface HubResponse<T> {
 
 export async function hubRequest<T>(request: Record<string, unknown>): Promise<T> {
   const response = await window.electron.schoolHubRequest(request) as HubResponse<T>
-  if (!response?.ok) throw new Error(response?.error || '학교 공유 서비스 요청에 실패했습니다.')
+  if (!response?.ok) {
+    const message = response?.error || '학교 공유 서비스 요청에 실패했습니다.'
+    const action = String(request.action ?? '')
+    const needsVersion2 = [
+      'verifyAdmin',
+      'listFeatureRequests',
+      'addFeatureRequest',
+      'updateFeatureRequest',
+      'deleteFeatureRequest',
+    ].includes(action)
+    if (needsVersion2 && message.includes('허용되지 않는 요청')) {
+      throw new Error('학교 공유 서버 업데이트가 필요합니다. 관리자에게 문의하세요.')
+    }
+    throw new Error(message)
+  }
   return response.data as T
 }
 
 export const listLinks = () => hubRequest<SharedLink[]>({ action: 'listLinks' })
 export const listNotices = () => hubRequest<SchoolNotice[]>({ action: 'listNotices' })
+export const verifyAdmin = (adminPassword: string) =>
+  hubRequest<{ verified: boolean }>({ action: 'verifyAdmin', adminPassword })
+export const listFeatureRequests = () =>
+  hubRequest<FeatureRequest[]>({ action: 'listFeatureRequests' })
