@@ -582,7 +582,20 @@ ipcMain.handle('fs:readFileBase64', (_, filePath: string) => {
 
 // 웅천고 공유 서비스 — Google Apps Script 웹 앱을 메인 프로세스에서 호출한다.
 // 렌더러에는 임의 URL fetch 권한을 주지 않고, 환경설정에 저장된 Google 호스트만 허용한다.
-const HUB_ACTIONS = new Set(['health', 'listLinks', 'addLink', 'deleteLink', 'listNotices', 'addNotice', 'deleteNotice'])
+const HUB_ACTIONS = new Set([
+  'health',
+  'verifyAdmin',
+  'listLinks',
+  'addLink',
+  'deleteLink',
+  'listNotices',
+  'addNotice',
+  'deleteNotice',
+  'listFeatureRequests',
+  'addFeatureRequest',
+  'updateFeatureRequest',
+  'deleteFeatureRequest',
+])
 
 async function requestSchoolHub(payload: Record<string, unknown>) {
   const endpoint = String(store.get('config.schoolHubUrl', '')).trim()

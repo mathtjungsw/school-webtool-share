@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   Archive, Bell, BookCopy, BookOpen, Calculator, ChevronDown,
   ChevronRight, Clock, FileCode2, FileDown, FileScan, HelpCircle,
-  Images, Landmark, LayoutDashboard, Link2, Radio, ScrollText,
+  Images, Landmark, LayoutDashboard, Link2, MessageSquareText, Radio, ScrollText,
   Settings, Table2, UserCheck, Wand2, FileText,
   type LucideIcon,
 } from 'lucide-react'
@@ -29,6 +29,7 @@ const NAV: NavGroup[] = [
     items: [
       { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
       { id: 'school_hub', label: '학교 공유', icon: Link2 },
+      { id: 'feature_requests', label: '기능개선 요청', icon: MessageSquareText },
       { id: 'neis', label: 'NEIS 정보', icon: Radio },
       { id: 'settings', label: '환경설정', icon: Settings },
       { id: 'help', label: '사용 매뉴얼', icon: HelpCircle },

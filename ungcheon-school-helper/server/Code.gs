@@ -7,10 +7,11 @@
 
 const LINKS_SHEET = '공유링크';
 const NOTICES_SHEET = '공지';
+const FEATURE_REQUESTS_SHEET = '기능개선요청';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 1 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 2 } });
 }
 
 function doPost(e) {
@@ -19,7 +20,11 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 1 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 2 } });
+    if (action === 'verifyAdmin') {
+      requireAdmin_(body.adminPassword);
+      return json_({ ok: true, data: { verified: true } });
+    }
     if (action === 'listLinks') return json_({ ok: true, data: listLinks_() });
     if (action === 'addLink') return json_({ ok: true, data: addLink_(body) });
     if (action === 'deleteLink') {
@@ -35,6 +40,17 @@ function doPost(e) {
     if (action === 'deleteNotice') {
       requireAdmin_(body.adminPassword);
       deleteRowById_(NOTICES_SHEET, String(body.id || ''));
+      return json_({ ok: true });
+    }
+    if (action === 'listFeatureRequests') return json_({ ok: true, data: listFeatureRequests_() });
+    if (action === 'addFeatureRequest') return json_({ ok: true, data: addFeatureRequest_(body) });
+    if (action === 'updateFeatureRequest') {
+      requireAdmin_(body.adminPassword);
+      return json_({ ok: true, data: updateFeatureRequest_(body) });
+    }
+    if (action === 'deleteFeatureRequest') {
+      requireAdmin_(body.adminPassword);
+      deleteRowById_(FEATURE_REQUESTS_SHEET, String(body.id || ''));
       return json_({ ok: true });
     }
     throw new Error('허용되지 않는 요청입니다.');
@@ -76,6 +92,16 @@ function ensureSheets_() {
     notices = book.insertSheet(NOTICES_SHEET);
     notices.appendRow(['id', 'title', 'body', 'level', 'date', 'expiresAt']);
     notices.setFrozenRows(1);
+  }
+
+  let requests = book.getSheetByName(FEATURE_REQUESTS_SHEET);
+  if (!requests) {
+    requests = book.insertSheet(FEATURE_REQUESTS_SHEET);
+    requests.appendRow([
+      'id', 'requestType', 'title', 'content', 'author',
+      'createdAt', 'status', 'adminReply', 'updatedAt'
+    ]);
+    requests.setFrozenRows(1);
   }
 }
 
@@ -150,6 +176,71 @@ function addNotice_(body) {
   SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTICES_SHEET)
     .appendRow([id, title, content, level, date, expiresAt]);
   return { id: id };
+}
+
+function listFeatureRequests_() {
+  return readObjects_(FEATURE_REQUESTS_SHEET)
+    .map(function(row) {
+      const requestType = ['new', 'improvement'].indexOf(String(row.requestType)) >= 0
+        ? String(row.requestType) : 'new';
+      const status = ['submitted', 'reviewing', 'planned', 'completed', 'declined']
+        .indexOf(String(row.status)) >= 0 ? String(row.status) : 'submitted';
+      return {
+        id: String(row.id || ''),
+        requestType: requestType,
+        title: String(row.title || ''),
+        content: String(row.content || ''),
+        author: String(row.author || ''),
+        createdAt: iso_(row.createdAt),
+        status: status,
+        adminReply: String(row.adminReply || ''),
+        updatedAt: row.updatedAt ? iso_(row.updatedAt) : ''
+      };
+    })
+    .filter(function(row) { return row.id && row.title && row.author; })
+    .sort(function(a, b) { return b.createdAt.localeCompare(a.createdAt); });
+}
+
+function addFeatureRequest_(body) {
+  const requestType = ['new', 'improvement'].indexOf(String(body.requestType)) >= 0
+    ? String(body.requestType) : 'new';
+  const title = clean_(body.title, 100);
+  const content = clean_(body.content, 3000);
+  const author = clean_(body.author, 30);
+  if (!title || !content) throw new Error('요청 제목과 내용을 입력하세요.');
+  if (author.length < 2) throw new Error('작성자 실명을 두 글자 이상 입력하세요.');
+
+  const id = Utilities.getUuid();
+  const createdAt = new Date().toISOString();
+  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(FEATURE_REQUESTS_SHEET)
+    .appendRow([id, requestType, title, content, author, createdAt, 'submitted', '', '']);
+  return { id: id };
+}
+
+function updateFeatureRequest_(body) {
+  const id = clean_(body.id, 100);
+  const allowedStatuses = ['submitted', 'reviewing', 'planned', 'completed', 'declined'];
+  const status = String(body.status || '');
+  const adminReply = clean_(body.adminReply, 1000);
+  if (!id) throw new Error('처리할 요청 ID가 없습니다.');
+  if (allowedStatuses.indexOf(status) < 0) throw new Error('처리 상태가 올바르지 않습니다.');
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(FEATURE_REQUESTS_SHEET);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(String);
+  const idIndex = headers.indexOf('id');
+  const statusIndex = headers.indexOf('status');
+  const replyIndex = headers.indexOf('adminReply');
+  const updatedIndex = headers.indexOf('updatedAt');
+  for (let row = 1; row < values.length; row++) {
+    if (String(values[row][idIndex]) === id) {
+      sheet.getRange(row + 1, statusIndex + 1).setValue(status);
+      sheet.getRange(row + 1, replyIndex + 1).setValue(adminReply);
+      sheet.getRange(row + 1, updatedIndex + 1).setValue(new Date().toISOString());
+      return { id: id };
+    }
+  }
+  throw new Error('처리할 요청을 찾을 수 없습니다.');
 }
 
 function deleteRowById_(sheetName, id) {

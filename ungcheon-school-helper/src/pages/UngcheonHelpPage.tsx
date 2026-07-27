@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Bell, BookOpen, ExternalLink, FileSpreadsheet, Files, HelpCircle,
-  KeyRound, Link2, RefreshCw, School, ShieldCheck,
+  KeyRound, Link2, MessageSquareText, RefreshCw, School, ShieldCheck,
 } from 'lucide-react'
 
 const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
@@ -46,6 +46,15 @@ const SECTIONS = [
       '모든 교직원이 부서별 링크를 등록할 수 있으며 등록 즉시 전체에 반영됩니다.',
       '링크 삭제와 공지 등록·삭제에는 관리자 비밀번호가 필요합니다.',
       '학생 이름, 성적, 연락처 등 개인정보는 공유 링크 설명이나 공지에 입력하지 않습니다.',
+    ],
+  },
+  {
+    title: '관리자·기능개선',
+    icon: MessageSquareText,
+    items: [
+      '프로그램은 항상 사용자 모드로 시작하며 상단의 사용자 버튼에서 관리자 비밀번호를 입력하면 관리자 모드가 시작됩니다.',
+      '기능개선 요청은 새 기능과 기존 기능 개선으로 구분하고 작성자 실명을 입력해 등록합니다.',
+      '관리자는 요청 상태와 답변을 등록하거나 부적절한 요청을 삭제할 수 있습니다.',
     ],
   },
   {
@@ -159,7 +168,7 @@ export default function UngcheonHelpPage() {
         <div>
           <p className="text-sm font-semibold text-emerald-200">개인정보 처리 원칙</p>
           <p className="text-xs text-emerald-100/70 mt-1 leading-relaxed">
-            학생·교직원 원본 자료는 로컬에서만 처리합니다. 학교 공유 서비스에는 공지와 URL만 저장합니다.
+            학생·교직원 원본 자료는 로컬에서만 처리합니다. 학교 공유 서비스에는 공지·URL·실명으로 작성한 기능개선 요청만 저장합니다.
           </p>
         </div>
       </div>
