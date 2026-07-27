@@ -98,7 +98,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const apiKeyUpdates = API_KEY_FIELDS
       .filter((k) => k in patch && patch[k as keyof typeof patch] !== undefined)
     await Promise.all(apiKeyUpdates.map((k) =>
-      window.electron.apiKeySet(k, (newCfg[k as ApiKeyField] ?? '') as string),
+      window.electron.apiKeySet(k, ((newCfg[k as ApiKeyField] ?? '') as string).trim()),
     ))
 
     // API 키를 제외한 나머지를 단일 배치 IPC로 저장

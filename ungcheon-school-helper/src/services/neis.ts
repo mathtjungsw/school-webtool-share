@@ -1,7 +1,7 @@
 import type { MealInfo, ScheduleEvent, TimetableEntry, SchoolInfo, ClassEntry, DeptEntry } from '../types'
 
 const BASE_URL = 'https://open.neis.go.kr/hub'
-export const NEIS_API_KEY = (import.meta.env.VITE_NEIS_API_KEY as string) || 'OPEN'
+export const NEIS_API_KEY = ((import.meta.env.VITE_NEIS_API_KEY as string) || '').trim()
 
 function fmt(date: Date): string {
   return date.toISOString().slice(0, 10).replace(/-/g, '')
@@ -17,11 +17,23 @@ async function fetchNeis(endpoint: string, params: Record<string, string>) {
   const url = new URL(`${BASE_URL}/${endpoint}`)
   url.searchParams.set('Type', 'json')
   url.searchParams.set('pSize', '200')
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
+  for (const [k, v] of Object.entries(params)) {
+    const value = v.trim()
+    if (value) url.searchParams.set(k, value)
+  }
   const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10000) })
+  if (!res.ok) throw new Error(`NEIS 서버 응답 오류 (${res.status})`)
   const json = await res.json()
+  const topResult = json.RESULT
+  if (topResult?.CODE && topResult.CODE !== 'INFO-000' && topResult.CODE !== 'INFO-200') {
+    throw new Error(topResult.MESSAGE || `NEIS API 오류 (${topResult.CODE})`)
+  }
   const head = json[endpoint]?.[0]?.head
-  if (head?.[1]?.RESULT?.CODE === 'INFO-200') return null
+  const result = head?.find((entry: { RESULT?: { CODE?: string; MESSAGE?: string } }) => entry.RESULT)?.RESULT
+  if (result?.CODE === 'INFO-200') return null
+  if (result?.CODE && result.CODE !== 'INFO-000') {
+    throw new Error(result.MESSAGE || `NEIS API 오류 (${result.CODE})`)
+  }
   return json[endpoint]?.[1]?.row ?? null
 }
 

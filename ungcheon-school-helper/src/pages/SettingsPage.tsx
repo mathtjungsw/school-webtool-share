@@ -69,6 +69,7 @@ export default function SettingsPage() {
   const tcSubjectsCache = useRef<Record<string, string[]>>({})
 
   const schoolType = selectedSchool?.schoolType ?? config.schoolType ?? ''
+  const neisApiKey = config.neisApiKey?.trim() || NEIS_API_KEY
   const classDuration = schoolType.includes('고등') ? 50 : schoolType.includes('중학') ? 45 : schoolType.includes('초등') ? 40 : 50
   const interval = classDuration + BREAK_MINUTES
   // 학년 선택은 항상 1~6학년 제공 (초등학교 6학년까지 지원)
@@ -144,7 +145,7 @@ export default function SettingsPage() {
     setTcSubjectLoading(true)
     setTcSubject('')
     const { fromYmd, toYmd } = getCurrentWeekRange()
-    getTimetableRange(NEIS_API_KEY, officeCode, schoolCode, sType, tcGrade, tcClassNm, fromYmd, toYmd)
+    getTimetableRange(neisApiKey, officeCode, schoolCode, sType, tcGrade, tcClassNm, fromYmd, toYmd)
       .then(entries => {
         if (cancelled) return
         const unique = [...new Set(entries.map(e => e.subject).filter(Boolean))].sort()
@@ -155,7 +156,7 @@ export default function SettingsPage() {
       .catch(() => { if (!cancelled) setTcSubjectOptions([]) })
       .finally(() => { if (!cancelled) setTcSubjectLoading(false) })
     return () => { cancelled = true }
-  }, [tcGrade, tcClassNm, config.officeCode, config.schoolCode, config.schoolType, selectedSchool])
+  }, [tcGrade, tcClassNm, config.officeCode, config.schoolCode, config.schoolType, selectedSchool, neisApiKey])
 
 
   const handleSearch = async () => {
@@ -163,7 +164,7 @@ export default function SettingsPage() {
     setSearchError('')
     setSearching(true)
     try {
-      const results = await searchSchool(NEIS_API_KEY, searchQuery)
+      const results = await searchSchool(neisApiKey, searchQuery)
       setSearchResults(results)
       if (!results.length) setSearchError('검색 결과가 없습니다. 학교명을 확인해주세요.')
     } catch {

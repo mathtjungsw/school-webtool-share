@@ -28,7 +28,7 @@ async function checkNeis(
 
     // 오늘 학사일정 건수 (미확인 업무 대용)
     const url = new URL('https://open.neis.go.kr/hub/SchoolSchedule')
-    url.searchParams.set('KEY', apiKey)
+    if (apiKey.trim()) url.searchParams.set('KEY', apiKey.trim())
     url.searchParams.set('Type', 'json')
     url.searchParams.set('pIndex', '1')
     url.searchParams.set('pSize', '10')
@@ -78,7 +78,7 @@ export function startMonitoring(
     const result = await checkNeis(
       config.schoolCode ?? '',
       config.officeCode ?? '',
-      config.apiKey ?? 'OPEN'
+      config.apiKey ?? ''
     )
     if (!win.isDestroyed()) win.webContents.send('notifier:result', result)
   }
