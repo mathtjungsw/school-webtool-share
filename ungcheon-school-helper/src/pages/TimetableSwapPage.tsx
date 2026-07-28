@@ -189,6 +189,7 @@ export default function TimetableSwapPage() {
           </section>
 
           <div className="flex flex-wrap gap-3 text-[11px] text-slate-400">
+            <Legend className="bg-sky-500/20 border-sky-400/35" text="일반 수업" />
             <Legend className="bg-emerald-500/25 border-emerald-400/40" text="선택한 수업" />
             <Legend className="bg-amber-400/20 border-amber-300/35" text="선택 교사가 이동 가능한 공강" />
             <Legend className="bg-slate-700/70 border-slate-500/40" text="색상 제한으로 교체 불가" icon={<LockKeyhole size={11} />} />
@@ -222,7 +223,7 @@ export default function TimetableSwapPage() {
                           selected && 'bg-emerald-500/25 ring-1 ring-inset ring-emerald-400/40',
                           !selected && candidateTarget && 'bg-amber-400/15 ring-1 ring-inset ring-amber-300/25',
                           !selected && !candidateTarget && slot.locked && 'bg-slate-700/50',
-                          !selected && !candidateTarget && !slot.locked && slot.value && 'hover:bg-white/5',
+                          !selected && !candidateTarget && !slot.locked && slot.value && 'bg-sky-500/20 ring-1 ring-inset ring-sky-400/35 hover:bg-sky-500/30',
                         )}
                       >
                         <span className="text-[10px] text-slate-600 w-4 pt-0.5 flex-shrink-0">{periodOffset + 1}</span>
@@ -251,10 +252,10 @@ export default function TimetableSwapPage() {
                   const selectedClass = teacher.slots[selectedSlot].value
                   const partnerClass = partner.slots[candidate.partnerSlotIndex].value
                   return (
-                    <article key={`${candidate.partnerTeacherIndex}-${candidate.partnerSlotIndex}`} className="rounded-xl border border-orange-400/20 bg-orange-500/5 p-4">
+                    <article key={`${candidate.partnerTeacherIndex}-${candidate.partnerSlotIndex}`} className="rounded-xl border border-orange-400/40 bg-orange-500/10 p-4">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="font-semibold text-orange-200">{partner.label}</p>
-                        <span className="text-[10px] rounded-full bg-orange-500/15 text-orange-300 px-2 py-1">교체 가능</span>
+                        <p className="font-bold text-orange-400">{partner.label}</p>
+                        <span className="text-[10px] font-semibold rounded-full bg-orange-500/20 text-orange-400 px-2 py-1">교체 가능</span>
                       </div>
                       <div className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-xs">
                         <span className="text-slate-600">내 수업</span>
