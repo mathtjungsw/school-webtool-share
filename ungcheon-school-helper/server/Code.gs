@@ -2,16 +2,19 @@
  * 웅천고 업무도우미 학교 공유 서비스
  *
  * Google 스프레드시트에 바인딩된 Apps Script로 사용합니다.
- * 학생·교직원 개인정보를 저장하지 마세요.
+ * 학생 개인정보를 저장하지 마세요. 교사 시간표는 학교 내부 공유용입니다.
  */
 
 const LINKS_SHEET = '공유링크';
 const NOTICES_SHEET = '공지';
 const FEATURE_REQUESTS_SHEET = '기능개선요청';
+const TIMETABLE_META_SHEET = '시간표정보';
+const TIMETABLE_SHEET = '시간표';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
+const TIMETABLE_SLOT_COUNT = 35;
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 2 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 3 } });
 }
 
 function doPost(e) {
@@ -20,7 +23,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 2 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 3 } });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: { verified: true } });
@@ -52,6 +55,11 @@ function doPost(e) {
       requireAdmin_(body.adminPassword);
       deleteRowById_(FEATURE_REQUESTS_SHEET, String(body.id || ''));
       return json_({ ok: true });
+    }
+    if (action === 'getTimetable') return json_({ ok: true, data: getTimetable_() });
+    if (action === 'replaceTimetable') {
+      requireAdmin_(body.adminPassword);
+      return json_({ ok: true, data: replaceTimetable_(body) });
     }
     throw new Error('허용되지 않는 요청입니다.');
   } catch (error) {
@@ -103,6 +111,26 @@ function ensureSheets_() {
     ]);
     requests.setFrozenRows(1);
   }
+
+  let timetableMeta = book.getSheetByName(TIMETABLE_META_SHEET);
+  if (!timetableMeta) {
+    timetableMeta = book.insertSheet(TIMETABLE_META_SHEET);
+    timetableMeta.appendRow(['version', 'title', 'sourceFileName', 'uploadedBy', 'uploadedAt', 'teacherCount']);
+    timetableMeta.setFrozenRows(1);
+  }
+
+  let timetable = book.getSheetByName(TIMETABLE_SHEET);
+  const timetableHeaders = ['teacherName', 'teacherLabel', 'load'];
+  for (let slot = 1; slot <= TIMETABLE_SLOT_COUNT; slot++) timetableHeaders.push('slot' + slot);
+  for (let locked = 1; locked <= TIMETABLE_SLOT_COUNT; locked++) timetableHeaders.push('locked' + locked);
+  if (!timetable) {
+    timetable = book.insertSheet(TIMETABLE_SHEET);
+    timetable.setFrozenRows(1);
+  }
+  if (timetable.getMaxColumns() < timetableHeaders.length) {
+    timetable.insertColumnsAfter(timetable.getMaxColumns(), timetableHeaders.length - timetable.getMaxColumns());
+  }
+  timetable.getRange(1, 1, 1, timetableHeaders.length).setValues([timetableHeaders]);
 }
 
 function listLinks_() {
@@ -241,6 +269,86 @@ function updateFeatureRequest_(body) {
     }
   }
   throw new Error('처리할 요청을 찾을 수 없습니다.');
+}
+
+function getTimetable_() {
+  const metaRows = readObjects_(TIMETABLE_META_SHEET);
+  if (!metaRows.length) return null;
+  const meta = metaRows[0];
+  const teachers = readObjects_(TIMETABLE_SHEET)
+    .map(function(row) {
+      const slots = [];
+      for (let slot = 1; slot <= TIMETABLE_SLOT_COUNT; slot++) {
+        slots.push({
+          value: String(row['slot' + slot] || ''),
+          locked: row['locked' + slot] === true || String(row['locked' + slot]).toUpperCase() === 'TRUE'
+        });
+      }
+      return {
+        name: String(row.teacherName || ''),
+        label: String(row.teacherLabel || ''),
+        load: String(row.load || ''),
+        slots: slots
+      };
+    })
+    .filter(function(teacher) { return teacher.name; });
+
+  return {
+    version: Number(meta.version) || 1,
+    title: String(meta.title || ''),
+    sourceFileName: String(meta.sourceFileName || ''),
+    uploadedBy: String(meta.uploadedBy || ''),
+    uploadedAt: iso_(meta.uploadedAt),
+    teachers: teachers
+  };
+}
+
+function replaceTimetable_(body) {
+  const timetable = body.timetable || {};
+  const teachers = Array.isArray(timetable.teachers) ? timetable.teachers : [];
+  if (!teachers.length) throw new Error('업로드할 교사 시간표가 없습니다.');
+  if (teachers.length > 120) throw new Error('교사 수는 120명을 초과할 수 없습니다.');
+
+  const title = clean_(timetable.title, 100) || '주간시간표';
+  const sourceFileName = clean_(timetable.sourceFileName, 200);
+  const uploadedBy = clean_(body.uploadedBy, 30) || '관리자';
+  const uploadedAt = new Date().toISOString();
+  const existing = readObjects_(TIMETABLE_META_SHEET);
+  const version = (existing.length ? Number(existing[0].version) || 0 : 0) + 1;
+  const rows = teachers.map(function(teacher) {
+    const name = clean_(teacher.name, 30);
+    const label = clean_(teacher.label, 50) || name;
+    const load = clean_(teacher.load, 20);
+    const slots = Array.isArray(teacher.slots) ? teacher.slots : [];
+    if (!name) throw new Error('교사 이름이 없는 행이 있습니다.');
+    if (slots.length !== TIMETABLE_SLOT_COUNT) throw new Error(name + ' 교사의 시간표가 35칸이 아닙니다.');
+
+    const row = [name, label, load];
+    slots.forEach(function(slot) { row.push(clean_(slot && slot.value, 200)); });
+    slots.forEach(function(slot) { row.push(Boolean(slot && slot.locked)); });
+    return row;
+  });
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const book = SpreadsheetApp.getActiveSpreadsheet();
+    const dataSheet = book.getSheetByName(TIMETABLE_SHEET);
+    const metaSheet = book.getSheetByName(TIMETABLE_META_SHEET);
+    if (dataSheet.getLastRow() > 1) {
+      dataSheet.getRange(2, 1, dataSheet.getLastRow() - 1, dataSheet.getLastColumn()).clearContent();
+    }
+    dataSheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+
+    if (metaSheet.getLastRow() > 1) {
+      metaSheet.getRange(2, 1, metaSheet.getLastRow() - 1, metaSheet.getLastColumn()).clearContent();
+    }
+    metaSheet.getRange(2, 1, 1, 6)
+      .setValues([[version, title, sourceFileName, uploadedBy, uploadedAt, rows.length]]);
+  } finally {
+    lock.releaseLock();
+  }
+  return { version: version, uploadedAt: uploadedAt };
 }
 
 function deleteRowById_(sheetName, id) {

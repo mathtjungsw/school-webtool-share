@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Bell, BookOpen, ExternalLink, FileSpreadsheet, Files, HelpCircle,
+  ArrowLeftRight, Bell, BookOpen, ExternalLink, FileSpreadsheet, Files, HelpCircle,
   KeyRound, Link2, MessageSquareText, RefreshCw, School, ShieldCheck,
 } from 'lucide-react'
 
@@ -55,6 +55,16 @@ const SECTIONS = [
       '프로그램은 항상 사용자 모드로 시작하며 상단의 사용자 버튼에서 관리자 비밀번호를 입력하면 관리자 모드가 시작됩니다.',
       '기능개선 요청은 새 기능과 기존 기능 개선으로 구분하고 작성자 실명을 입력해 등록합니다.',
       '관리자는 요청 상태와 답변을 등록하거나 부적절한 요청을 삭제할 수 있습니다.',
+    ],
+  },
+  {
+    title: '시간표 교체',
+    icon: ArrowLeftRight,
+    items: [
+      '교사와 수업을 선택하면 같은 학급 수업을 맡으면서 서로 공강인 교체 후보를 찾아줍니다.',
+      '원본 시간표에서 색상이 지정된 수업은 기존 VBA 프로그램과 동일하게 교체 대상에서 제외합니다.',
+      '관리자 모드의 “새 시간표 업로드”에서 XLSM·XLSX·XLS 파일을 선택하면 기존 공유 시간표 전체가 새 내용으로 교체됩니다.',
+      '업로드한 Excel 파일과 VBA 코드는 전송하지 않고, 시간표 내용과 교체 제한 표시만 학교 공유 서비스에 저장합니다.',
     ],
   },
   {
@@ -157,7 +167,7 @@ export default function UngcheonHelpPage() {
           <h2 className="font-semibold text-white flex items-center gap-2 mb-4"><FileSpreadsheet size={16} className="text-violet-400" />선택된 도구</h2>
           <p className="text-sm text-slate-400 leading-relaxed">
             Excel 전처리, 대학 권장과목, 호봉획정, 방과후 점검, 인사기록 분석,
-            업무경감 도우미, 교육과정편제표, 사진대장, 학적업무, 출석부,
+            시간표 교체, 업무경감 도우미, 교육과정편제표, 사진대장, 학적업무, 출석부,
             위원회·비치 장부, PDF 추출, 파일 파서가 포함되어 있습니다.
           </p>
         </section>
@@ -168,7 +178,8 @@ export default function UngcheonHelpPage() {
         <div>
           <p className="text-sm font-semibold text-emerald-200">개인정보 처리 원칙</p>
           <p className="text-xs text-emerald-100/70 mt-1 leading-relaxed">
-            학생·교직원 원본 자료는 로컬에서만 처리합니다. 학교 공유 서비스에는 공지·URL·실명으로 작성한 기능개선 요청만 저장합니다.
+            학생 원본 자료와 업로드한 Excel 파일은 로컬에서만 처리합니다. 학교 공유 서비스에는 공지·URL·기능개선 요청과
+            교직원에게 공유할 교사 시간표 내용만 저장합니다.
           </p>
         </div>
       </div>
