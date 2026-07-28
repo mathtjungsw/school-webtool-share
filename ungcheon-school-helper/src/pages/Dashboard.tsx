@@ -32,6 +32,8 @@ import { useAppStore } from '../stores/appStore'
 import { WeatherTodayView, WeatherForecastView } from '../components/WeatherBar'
 import { useWeather } from '../components/useWeather'
 import { getMeal, getSchedule, getTimetableRange, getSchoolDetail, NEIS_API_KEY } from '../services/neis'
+import { getSchoolTimetable } from '../services/schoolHub'
+import type { TeacherTimetable } from '../services/schoolTimetable'
 import type { MealInfo, ScheduleEvent, TimetableEntry } from '../types'
 import { format, addDays, startOfWeek } from 'date-fns'
 import { ko } from 'date-fns/locale'
@@ -64,6 +66,7 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
     { id: 'insa_analysis', label: 'NEIS 인사기록 분석', icon: FileScan, desc: '인사기록 PDF 분석과 법정연수 점검' },
   ]},
   { group: '학사·기록', color: 'amber', items: [
+    { id: 'timetable_swap', label: '교환·대강 계획', icon: Shuffle, desc: '후보 시간표·연강 확인과 계획서 출력' },
     { id: 'work_reducer', label: '업무경감 도우미', icon: Wand2, desc: '시간표·수업변경·명렬표 작업' },
     { id: 'curriculum', label: '교육과정편제표', icon: FileText, desc: '학년·학기별 편제표 작성' },
     { id: 'photo_ledger', label: '사진대장', icon: Images, desc: '사진 배치·설명·출력' },
@@ -229,6 +232,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const [schedule, setSchedule] = useState<ScheduleEvent[]>([])
   const [timetable, setTimetable] = useState<TimetableEntry[]>([])
   const [teacherTT, setTeacherTT] = useState<TimetableEntry[]>([])
+  const [sharedTeacher, setSharedTeacher] = useState<TeacherTimetable | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -289,6 +293,26 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const p5 = config.period5Start ?? '13:30'
   const periodRanges = buildPeriodRanges(p1, p5, schoolType)
   const hasTeacher = !!(config.teacherClasses?.length)
+
+  useEffect(() => {
+    if (!config.schoolHubUrl || !config.teacherName?.trim()) {
+      setSharedTeacher(null)
+      return
+    }
+    let cancelled = false
+    getSchoolTimetable()
+      .then(shared => {
+        if (cancelled) return
+        const name = config.teacherName!.trim()
+        setSharedTeacher(shared?.teachers.find(teacher =>
+          teacher.name === name || teacher.label.startsWith(name),
+        ) ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setSharedTeacher(null)
+      })
+    return () => { cancelled = true }
+  }, [config.schoolHubUrl, config.teacherName])
 
   // schoolAddress 자동 보완
   useEffect(() => {
@@ -372,7 +396,16 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
 
   const todaySubjects: Record<string, string> = {}
   if (isToday) {
-    if (hasTeacher && config.teacherClasses) {
+    if (sharedTeacher) {
+      const dayIndex = getWeekDates(selectedDate).indexOf(selYmd)
+      if (dayIndex >= 0) {
+        sharedTeacher.slots
+          .slice(dayIndex * 7, (dayIndex + 1) * 7)
+          .forEach((slot, offset) => {
+            if (slot.value) todaySubjects[String(offset + 1)] = slot.value.split(/\r?\n/).filter(Boolean).join(' ')
+          })
+      }
+    } else if (hasTeacher && config.teacherClasses) {
       config.teacherClasses.forEach(tc => {
         teacherTT
           .filter(t =>
@@ -528,6 +561,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
               <TimetableSection
                 timetable={timetable}
                 teacherTT={teacherTT}
+                sharedTeacher={sharedTeacher}
                 selectedDate={selectedDate}
                 config={config}
                 periodRanges={periodRanges}
@@ -719,10 +753,11 @@ function ClassStatusBanner({ status }: { status: ClassStatus }) {
 
 // ─── TimetableSection ─────────────────────────────────────────────
 function TimetableSection({
-  timetable, teacherTT, selectedDate, config, periodRanges, currentTime, classStatus
+  timetable, teacherTT, sharedTeacher, selectedDate, config, periodRanges, currentTime, classStatus
 }: {
   timetable: TimetableEntry[]
   teacherTT: TimetableEntry[]
+  sharedTeacher: TeacherTimetable | null
   selectedDate: string
   config: import('../types').AppConfig
   periodRanges: [number, number, string][]
@@ -744,7 +779,7 @@ function TimetableSection({
     end: config.lunchEnd || (periodRanges[4] ? minsToTime(periodRanges[4][0]) : ''),
   }
 
-  if (!config.grade && !config.classNm && !hasTeacher) {
+  if (!config.grade && !config.classNm && !hasTeacher && !sharedTeacher) {
     return (
       <>
         {classStatus && classStatus.type !== 'weekend' && <ClassStatusBanner status={classStatus} />}
@@ -759,8 +794,40 @@ function TimetableSection({
         <ClassStatusBanner status={classStatus} />
       )}
 
-      {/* 교사 시간표 */}
-      {hasTeacher && config.teacherClasses && (
+      {/* 관리자가 업로드한 공유 교사 시간표 */}
+      {sharedTeacher && (
+        <div>
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <span className="text-[10px] font-semibold text-violet-300 bg-violet-500/15 px-2 py-1 rounded-lg">👩‍🏫 {sharedTeacher.name} 선생님</span>
+            <span className="text-[10px] text-slate-500">관리자 공유 시간표 · 원본 읽기 전용</span>
+          </div>
+          <WeekGrid
+            weekDates={weekDates}
+            DAY={DAY}
+            todayYmd={todayYmd}
+            currentPeriod={isToday(selectedDate) ? currentPeriod : null}
+            periodRanges={periodRanges}
+            lunch={lunch}
+            renderCell={(date, period) => {
+              const dayIndex = weekDates.indexOf(date)
+              const slotIndex = dayIndex * 7 + Number(period) - 1
+              const slot = sharedTeacher.slots[slotIndex]
+              if (!slot?.value) return null
+              const lines = slot.value.split(/\r?\n/).filter(Boolean)
+              const isNow = date === todayYmd && period === currentPeriod
+              return {
+                text: lines[0] || slot.value,
+                sub: lines.slice(1).join(' · '),
+                colorClass: slot.locked ? 'bg-slate-500/20 text-slate-300' : 'bg-violet-500/15 text-violet-300',
+                isNow,
+              }
+            }}
+          />
+        </div>
+      )}
+
+      {/* NEIS에서 조합한 교사 시간표 — 공유 시간표가 없을 때만 사용 */}
+      {!sharedTeacher && hasTeacher && config.teacherClasses && (
         <div>
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className="text-[10px] font-semibold text-violet-400 bg-violet-500/10 px-2 py-1 rounded-lg">👩‍🏫 내 수업</span>
