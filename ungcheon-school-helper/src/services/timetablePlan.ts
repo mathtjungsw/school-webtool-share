@@ -109,7 +109,9 @@ export function findSubstitutionCandidates(
   selectedSlotIndex: number,
 ): number[] {
   const selected = timetable.teachers[selectedTeacherIndex]?.slots[selectedSlotIndex]
-  if (!selected?.value || selected.locked) return []
+  // 색상 제한은 수업 교환에만 적용한다. 대강은 원래 수업의 색상과
+  // 관계없이 같은 시간에 비어 있는 교사를 찾을 수 있어야 한다.
+  if (!selected?.value) return []
   return timetable.teachers
     .map((teacher, index) => ({ teacher, index }))
     .filter(({ teacher, index }) =>

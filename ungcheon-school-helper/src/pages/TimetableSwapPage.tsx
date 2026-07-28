@@ -109,6 +109,14 @@ export default function TimetableSwapPage() {
     () => new Set(candidates.map(candidate => candidate.partnerSlotIndex)),
     [candidates],
   )
+  const candidatesByTargetSlot = useMemo(() => {
+    const grouped = new Map<number, typeof candidates>()
+    candidates.forEach(candidate => {
+      const current = grouped.get(candidate.partnerSlotIndex) ?? []
+      grouped.set(candidate.partnerSlotIndex, [...current, candidate])
+    })
+    return grouped
+  }, [candidates])
   const substitutionCandidates = useMemo(() => {
     if (!timetable || selectedSlot === null) return []
     return findSubstitutionCandidates(timetable, teacherIndex, selectedSlot)
@@ -330,7 +338,9 @@ export default function TimetableSwapPage() {
             <Legend className="bg-sky-500/20 border-sky-400/35" text="일반 수업" />
             <Legend className="bg-emerald-500/25 border-emerald-400/40" text="선택한 수업" />
             {viewMode === 'exchange' && <Legend className="bg-amber-400/20 border-amber-300/35" text="선택 교사가 이동 가능한 공강" />}
-            <Legend className="bg-slate-700/70 border-slate-500/40" text="색상 제한으로 교체 불가" icon={<LockKeyhole size={11} />} />
+            {viewMode === 'exchange'
+              ? <Legend className="bg-slate-700/70 border-slate-500/40" text="색상 제한으로 교환 불가" icon={<LockKeyhole size={11} />} />
+              : <Legend className="bg-violet-500/20 border-violet-400/35" text="색상 제한 수업도 대강 선택 가능" />}
           </div>
 
           <section className="grid lg:grid-cols-5 gap-3">
@@ -343,14 +353,26 @@ export default function TimetableSwapPage() {
                     const slot = teacher.slots[slotIndex]
                     const selected = selectedSlot === slotIndex
                     const candidateTarget = viewMode === 'exchange' && candidateTargetSlots.has(slotIndex)
+                    const inlineCandidates = viewMode === 'exchange'
+                      ? candidatesByTargetSlot.get(slotIndex) ?? []
+                      : []
                     return (
                       <button
                         key={slotIndex}
                         type="button"
                         onClick={() => {
                           setError('')
+                          if (inlineCandidates.length) {
+                            const candidate = inlineCandidates[0]
+                            setPreview({
+                              mode: 'exchange',
+                              teacherIndex: candidate.partnerTeacherIndex,
+                              partnerSlotIndex: candidate.partnerSlotIndex,
+                            })
+                            return
+                          }
                           if (!slot.value) return
-                          if (slot.locked) {
+                          if (slot.locked && viewMode === 'exchange') {
                             setError('색상이 지정된 수업은 원본 프로그램과 동일하게 교체 대상에서 제외됩니다.')
                             return
                           }
@@ -361,12 +383,15 @@ export default function TimetableSwapPage() {
                           'w-full min-h-20 px-3 py-2 flex gap-2 text-left transition-colors',
                           selected && 'bg-emerald-500/25 ring-1 ring-inset ring-emerald-400/40',
                           !selected && candidateTarget && 'bg-amber-400/15 ring-1 ring-inset ring-amber-300/25',
-                          !selected && !candidateTarget && slot.locked && 'bg-slate-700/50',
+                          !selected && !candidateTarget && slot.locked && viewMode === 'exchange' && 'bg-slate-700/50',
+                          !selected && slot.locked && viewMode === 'substitution' && 'bg-violet-500/20 ring-1 ring-inset ring-violet-400/35 hover:bg-violet-500/30',
                           !selected && !candidateTarget && !slot.locked && slot.value && 'bg-sky-500/20 ring-1 ring-inset ring-sky-400/35 hover:bg-sky-500/30',
                         )}
                       >
                         <span className="text-[10px] text-slate-600 w-4 pt-0.5 flex-shrink-0">{periodOffset + 1}</span>
-                        <SlotContent value={slot.value} locked={slot.locked} />
+                        {inlineCandidates.length
+                          ? <InlineSwapCandidates timetable={timetable} candidates={inlineCandidates} />
+                          : <SlotContent value={slot.value} locked={slot.locked} substitutionMode={viewMode === 'substitution'} />}
                       </button>
                     )
                   })}
@@ -459,14 +484,55 @@ export default function TimetableSwapPage() {
   )
 }
 
-function SlotContent({ value, locked }: { value: string; locked: boolean }) {
+function SlotContent({
+  value,
+  locked,
+  substitutionMode = false,
+}: {
+  value: string
+  locked: boolean
+  substitutionMode?: boolean
+}) {
   if (!value) return <span className="text-xs text-slate-700 self-center">공강</span>
   const lines = value.split('\n').filter(Boolean)
   return (
     <span className="min-w-0 flex-1">
       <span className="text-xs font-semibold text-slate-200 break-words">{lines[0]}</span>
       {lines.slice(1).map((line, index) => <span key={index} className="block text-[10px] text-slate-500 break-words mt-0.5">{line}</span>)}
-      {locked && <span className="inline-flex items-center gap-1 text-[9px] text-slate-500 mt-1"><LockKeyhole size={9} /> 교체 제한</span>}
+      {locked && (
+        <span className={clsx(
+          'inline-flex items-center gap-1 text-[9px] mt-1',
+          substitutionMode ? 'text-violet-400' : 'text-slate-500',
+        )}>
+          {substitutionMode ? <UserRoundSearch size={9} /> : <LockKeyhole size={9} />}
+          {substitutionMode ? '대강 선택 가능' : '교환 제한'}
+        </span>
+      )}
+    </span>
+  )
+}
+
+function InlineSwapCandidates({
+  timetable,
+  candidates,
+}: {
+  timetable: SchoolTimetable
+  candidates: ReturnType<typeof findSwapCandidates>
+}) {
+  return (
+    <span className="min-w-0 flex-1">
+      <span className="block text-[9px] font-bold text-orange-500 mb-1">교환 후보 · 클릭하여 미리보기</span>
+      {candidates.slice(0, 2).map(candidate => {
+        const partner = timetable.teachers[candidate.partnerTeacherIndex]
+        const lesson = partner.slots[candidate.partnerSlotIndex].value
+        return (
+          <span key={`${candidate.partnerTeacherIndex}-${candidate.partnerSlotIndex}`} className="block leading-tight mb-1 last:mb-0">
+            <span className="block text-[11px] font-extrabold text-orange-400">{partner.name}</span>
+            <span className="block text-[9px] text-slate-400 break-words">{oneLine(lesson)}</span>
+          </span>
+        )
+      })}
+      {candidates.length > 2 && <span className="block text-[9px] text-orange-400">외 {candidates.length - 2}명</span>}
     </span>
   )
 }
