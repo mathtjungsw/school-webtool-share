@@ -36,11 +36,6 @@ export interface FeatureRequest {
   updatedAt?: string
 }
 
-export interface SchoolNeisStatus {
-  configured: boolean
-  schoolName: string
-}
-
 interface HubResponse<T> {
   ok: boolean
   data?: T
@@ -60,9 +55,6 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
       'deleteFeatureRequest',
       'getTimetable',
       'replaceTimetable',
-      'getNeisStatus',
-      'setNeisApiKey',
-      'neisQuery',
     ].includes(action)
     if (needsServerUpdate && message.includes('허용되지 않는 요청')) {
       throw new Error('학교 공유 서버 업데이트가 필요합니다. 관리자에게 문의하세요.')
@@ -90,13 +82,3 @@ export const replaceSchoolTimetable = (
   adminPassword,
   uploadedBy,
 })
-
-export const getSchoolNeisStatus = () =>
-  hubRequest<SchoolNeisStatus>({ action: 'getNeisStatus' })
-
-export const setSchoolNeisApiKey = (apiKey: string, adminPassword: string) =>
-  hubRequest<SchoolNeisStatus>({
-    action: 'setNeisApiKey',
-    apiKey,
-    adminPassword,
-  })

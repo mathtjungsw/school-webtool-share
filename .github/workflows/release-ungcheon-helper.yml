@@ -45,7 +45,6 @@ jobs:
       REQUESTED_VERSION: ${{ inputs.version }}
       REQUESTED_NOTES: ${{ inputs.release_notes }}
       GH_TOKEN: ${{ github.token }}
-      VITE_SCHOOL_HUB_URL: ${{ secrets.UNGCHEON_SCHOOL_HUB_URL }}
 
     steps:
       - name: 소스 받기
