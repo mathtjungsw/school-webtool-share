@@ -11,6 +11,7 @@ const SettingsPage = lazy(() => import('../pages/UngcheonSettingsPage'))
 const HelpPage = lazy(() => import('../pages/UngcheonHelpPage'))
 const SchoolHubPage = lazy(() => import('../pages/SchoolHubPage'))
 const FeatureRequestsPage = lazy(() => import('../pages/FeatureRequestsPage'))
+const TimetableSwapPage = lazy(() => import('../pages/TimetableSwapPage'))
 const ExcelProcessorPage = lazy(() => import('../pages/ExcelProcessorPage'))
 const RecommendedSubjectsPage = lazy(() => import('../pages/RecommendedSubjectsPage'))
 const PayrollPage = lazy(() => import('../pages/PayrollPage'))
@@ -33,6 +34,7 @@ const PAGES: Record<string, React.ComponentType> = {
   help: HelpPage,
   school_hub: SchoolHubPage,
   feature_requests: FeatureRequestsPage,
+  timetable_swap: TimetableSwapPage,
   excel_processor: ExcelProcessorPage,
   recommended_subjects: RecommendedSubjectsPage,
   payroll: PayrollPage,

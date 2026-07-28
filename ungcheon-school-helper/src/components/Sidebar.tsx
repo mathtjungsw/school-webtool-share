@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Archive, Bell, BookCopy, BookOpen, Calculator, ChevronDown,
+  Archive, ArrowLeftRight, Bell, BookCopy, BookOpen, Calculator, ChevronDown,
   ChevronRight, Clock, FileCode2, FileDown, FileScan, HelpCircle,
   Images, Landmark, LayoutDashboard, Link2, MessageSquareText, Radio, ScrollText,
   Settings, Table2, UserCheck, Wand2, FileText,
@@ -54,6 +54,7 @@ const NAV: NavGroup[] = [
   {
     label: '학사·기록',
     items: [
+      { id: 'timetable_swap', label: '시간표 교체', icon: ArrowLeftRight },
       { id: 'work_reducer', label: '업무경감 도우미', icon: Wand2 },
       { id: 'curriculum', label: '교육과정편제표', icon: FileText },
       { id: 'photo_ledger', label: '사진대장', icon: Images },
