@@ -6,6 +6,7 @@ import {
 import { useAppStore } from '../stores/appStore'
 import { useNoticeStore } from '../stores/noticeStore'
 import AdminModeButton from './AdminModeButton'
+import schoolLogo from '../assets/ungcheon-logo.png'
 
 export default function TitleBar({
   currentPage,
@@ -39,13 +40,15 @@ export default function TitleBar({
   const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : SunMoon
 
   return (
-    <div className="drag-region h-10 flex items-center px-3 bg-surface-950 border-b border-white/5 flex-shrink-0">
+    <div className="app-titlebar drag-region h-11 flex items-center px-3 bg-surface-950 border-b flex-shrink-0">
       <div className="no-drag flex items-center gap-2 w-60">
         <button onClick={onGoBack} disabled={!canGoBack} className={canGoBack ? 'text-slate-400 hover:text-white' : 'text-slate-700'}>
           <ChevronLeft size={15} />
         </button>
-        <span className="w-3 h-3 rounded-full bg-gradient-to-br from-emerald-400 to-sky-500 shadow-[0_0_12px_rgba(52,211,153,.35)]" />
-        <span className="text-xs font-bold text-slate-300">웅천고 업무도우미</span>
+        <span className="school-logo-shell w-6 h-6 rounded-md p-0.5 flex-shrink-0">
+          <img src={schoolLogo} alt="" className="w-full h-full object-contain" />
+        </span>
+        <span className="text-xs font-black tracking-tight text-slate-300">웅천고 업무도우미</span>
         {version && <span className="text-[9px] text-slate-600">v{version}</span>}
       </div>
 
@@ -93,7 +96,7 @@ function TopNav({
     <button
       onClick={onClick}
       className={`no-drag flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-medium transition-colors ${
-        active ? 'bg-emerald-500/15 text-emerald-300' : 'text-slate-400 hover:text-white hover:bg-white/5'
+        active ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-400 hover:text-white hover:bg-white/5'
       }`}
     >
       {icon}{children}

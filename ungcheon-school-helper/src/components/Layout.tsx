@@ -71,7 +71,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="h-screen bg-surface-900 flex flex-col overflow-hidden">
+    <div className="app-shell h-screen bg-surface-900 flex flex-col overflow-hidden">
       <TitleBar
         currentPage={page}
         onNavigate={navigate}
@@ -87,7 +87,7 @@ export default function Layout() {
           onOpenLog={() => setLogOpen(open => !open)}
           logErrorCount={logErrorCount}
         />
-        <main className="flex-1 relative overflow-hidden">
+        <main className="app-main-surface flex-1 relative overflow-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               key={page}

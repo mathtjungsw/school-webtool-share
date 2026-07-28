@@ -1,19 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="bg" x1="48" y1="32" x2="460" y2="480" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#34d399"/>
-      <stop offset="1" stop-color="#0ea5e9"/>
-    </linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#063e46" flood-opacity=".32"/>
-    </filter>
-  </defs>
-  <rect x="28" y="28" width="456" height="456" rx="112" fill="url(#bg)"/>
-  <path d="M256 102 92 198h328L256 102Z" fill="#fff" filter="url(#shadow)"/>
-  <path d="M125 217h262v162H125z" fill="#f8fafc" filter="url(#shadow)"/>
-  <path d="M98 379h316v35H98z" fill="#fff"/>
-  <path d="M224 289h64v90h-64z" fill="#0f766e"/>
-  <path d="M157 248h42v42h-42zm156 0h42v42h-42z" fill="#38bdf8"/>
-  <circle cx="256" cy="184" r="24" fill="#fbbf24"/>
-  <path d="M256 165v38m-19-19h38" stroke="#fff" stroke-width="8" stroke-linecap="round"/>
+  <rect width="512" height="512" rx="84" fill="#fff"/>
+  <g transform="translate(28 16) scale(1.8)">
+    <path
+      d="M21 7H230L238 139C204 150 204 192 238 204L237 253H170C159 231 107 223 84 253H20V205C55 193 55 151 18 139L21 7Z"
+      fill="#fff"
+      stroke="#d9ba00"
+      stroke-width="7"
+      stroke-linejoin="round"
+    />
+    <path d="M70 37H130C154 37 171 52 171 76V154H135V77C135 67 130 62 120 62H70V37Z" fill="#d9ba00"/>
+    <path d="M71 84H105V167C105 178 111 184 122 184H190V203H116C88 203 71 190 71 168V84Z" fill="#d9ba00"/>
+  </g>
 </svg>

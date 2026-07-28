@@ -23,7 +23,7 @@ function createWindow() {
     minHeight: 600,
     frame: false,
     transparent: false,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#eeebe1',
     titleBarStyle: 'hidden',
     show: false,
     icon: process.env['ELECTRON_RENDERER_URL']

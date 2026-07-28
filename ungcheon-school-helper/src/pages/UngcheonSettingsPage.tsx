@@ -4,11 +4,7 @@ import {
   UserRound, Clock3, CalendarDays, Power, AlertCircle, ExternalLink,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
-
-const PERIOD_KEYS = [
-  'period1Start', 'period2Start', 'period3Start', 'period4Start',
-  'period5Start', 'period6Start', 'period7Start',
-] as const
+import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 
 const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
 
@@ -128,12 +124,14 @@ export default function UngcheonSettingsPage() {
         </Field>
       </Section>
 
-      <Section icon={<Clock3 size={17} />} title="수업 시작 시간">
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          {PERIOD_KEYS.map((key, index) => (
-            <Field key={key} label={`${index + 1}교시`}>
-              <input type="time" value={draft[key] ?? ''} onChange={e => setDraft({ ...draft, [key]: e.target.value })} />
-            </Field>
+      <Section icon={<Clock3 size={17} />} title="웅천고 고정 수업시간">
+        <p className="text-xs text-slate-500 mb-3">첨부된 학교 시간계획에 따라 모든 PC에서 같은 시간으로 표시됩니다.</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {UNGCHEON_PERIOD_PLAN.map(item => (
+            <div key={item.period} className="rounded-xl border border-white/10 bg-white/[0.025] px-3 py-3">
+              <p className="text-[11px] font-bold text-amber-400">{item.period}교시</p>
+              <p className="mt-1 text-sm font-semibold text-slate-200">{item.start} - {item.end}</p>
+            </div>
           ))}
         </div>
       </Section>
@@ -177,7 +175,7 @@ function Section({ icon, title, children }: { icon: React.ReactNode; title: stri
   return (
     <section className="card p-5">
       <h2 className="font-semibold text-white flex items-center gap-2 mb-4">
-        <span className="text-violet-400">{icon}</span>{title}
+        <span className="text-amber-400">{icon}</span>{title}
       </h2>
       {children}
     </section>

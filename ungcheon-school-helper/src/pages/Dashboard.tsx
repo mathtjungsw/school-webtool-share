@@ -34,6 +34,7 @@ import { useWeather } from '../components/useWeather'
 import { getMeal, getSchedule, getTimetableRange, getSchoolDetail, NEIS_API_KEY } from '../services/neis'
 import { getSchoolTimetable } from '../services/schoolHub'
 import type { TeacherTimetable } from '../services/schoolTimetable'
+import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
 import type { MealInfo, ScheduleEvent, TimetableEntry } from '../types'
 import { format, addDays, startOfWeek } from 'date-fns'
 import { ko } from 'date-fns/locale'
@@ -103,23 +104,8 @@ function getWeekDates(dateStr: string): string[] {
   return Array.from({ length: 5 }, (_, i) => format(addDays(mon, i), 'yyyyMMdd'))
 }
 
-function timeToMins(t: string) {
-  const [h, m] = t.split(':').map(Number)
-  return h * 60 + (m || 0)
-}
 function minsToTime(mins: number) {
   return `${String(Math.floor(mins / 60)).padStart(2,'0')}:${String(mins % 60).padStart(2,'0')}`
-}
-
-function buildPeriodRanges(p1: string, p5: string, schoolType?: string): [number, number, string][] {
-  const lesson = schoolType?.includes('초등') ? 40 : schoolType?.includes('고등') ? 50 : 45
-  const brk = 10
-  const ranges: [number, number, string][] = []
-  let cur = timeToMins(p1)
-  for (let p = 1; p <= 4; p++) { ranges.push([cur, cur + lesson, String(p)]); cur += lesson + brk }
-  cur = timeToMins(p5)
-  for (let p = 5; p <= 7; p++) { ranges.push([cur, cur + lesson, String(p)]); cur += lesson + brk }
-  return ranges
 }
 
 type ClassStatus =
@@ -186,7 +172,7 @@ function SortableCard({
     >
       <button
         onClick={() => onNavigate(item.id)}
-        className="w-full text-left p-4 rounded-xl bg-surface-800 border border-amber-500/20 hover:border-amber-500/40 hover:bg-surface-700 transition-all duration-200 active:scale-[0.98]"
+        className="w-full text-left p-4 rounded-[16px_16px_16px_5px] bg-surface-800 border border-amber-500/25 hover:border-amber-500/60 hover:bg-surface-700 transition-all duration-200 active:scale-[0.98] shadow-sm"
       >
         {/* 드래그 핸들 */}
         <div
@@ -288,10 +274,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
 
   const hasSchool = !!(config.officeCode && config.schoolCode)
   const neisApiKey = config.neisApiKey?.trim() || NEIS_API_KEY
-  const schoolType = config.schoolType ?? ''
-  const p1 = config.period1Start ?? '09:00'
-  const p5 = config.period5Start ?? '13:30'
-  const periodRanges = buildPeriodRanges(p1, p5, schoolType)
+  const periodRanges = UNGCHEON_PERIOD_RANGES
   const hasTeacher = !!(config.teacherClasses?.length)
 
   useEffect(() => {
@@ -634,7 +617,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       {/* ── 전체 프로그램 포트폴리오 ── */}
       <div className="mt-8 pb-4">
         <div className="flex items-center gap-2 mb-6">
-          <span className="w-1 h-5 rounded-full bg-gradient-to-b from-violet-500 to-sky-500 inline-block" />
+          <span className="w-1.5 h-5 rounded-sm bg-amber-400 inline-block" />
           <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>전체 프로그램</h2>
           <span className="text-xs text-slate-600">(★ 즐겨찾기 추가 가능 · 즐겨찾기에서 ⠿ 드래그로 순서 편집)</span>
         </div>
@@ -657,7 +640,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                     <div key={item.id} className="relative group">
                       <button
                         onClick={() => onNavigate(item.id)}
-                        className="w-full text-left p-4 rounded-xl bg-surface-800 border border-white/5 hover:border-violet-500/30 hover:bg-surface-700 transition-all duration-200 active:scale-[0.98]"
+                        className="w-full text-left p-4 rounded-[16px_16px_16px_5px] bg-surface-800 border border-white/5 hover:border-amber-500/45 hover:bg-surface-700 transition-all duration-200 active:scale-[0.98] shadow-sm"
                       >
                         <div className={clsx('w-8 h-8 rounded-lg flex items-center justify-center mb-3', c.bg)}>
                           <Icon size={16} className={c.icon} />
@@ -773,11 +756,7 @@ function TimetableSection({
   const currentPeriod = periodRanges.find(([s, e]) => nowMins >= s && nowMins <= e)?.[2] ?? null
 
   // 점심시간 — 설정값 우선, 없으면 4교시 종료~5교시 시작으로 자동 계산
-  const lunch = {
-    after: 4,
-    start: config.lunchStart || (periodRanges[3] ? minsToTime(periodRanges[3][1]) : ''),
-    end: config.lunchEnd || (periodRanges[4] ? minsToTime(periodRanges[4][0]) : ''),
-  }
+  const lunch = UNGCHEON_LUNCH
 
   if (!config.grade && !config.classNm && !hasTeacher && !sharedTeacher) {
     return (
@@ -905,7 +884,7 @@ function WeekGrid({ weekDates, DAY, todayYmd, currentPeriod, periodRanges = [], 
   lunch?: { after: number; start: string; end: string } | null
   renderCell: (date: string, period: string) => { text: string; sub: string; colorClass: string; isNow: boolean } | null
 }) {
-  const allPeriods = Array.from({length:7}, (_,i) => String(i+1))
+  const allPeriods = Array.from({length:8}, (_,i) => String(i+1))
     .filter(p => weekDates.some(d => renderCell(d, p) !== null))
   if (allPeriods.length === 0) return <Empty text="해당 주 시간표 정보가 없습니다." />
   const maxPeriod = Math.max(...allPeriods.map(Number))

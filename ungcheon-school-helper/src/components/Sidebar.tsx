@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAppStore } from '../stores/appStore'
+import schoolLogo from '../assets/ungcheon-logo.png'
 
 interface NavItem {
   id: string
@@ -112,10 +113,12 @@ export default function Sidebar({
       transition={{ duration: 0.22 }}
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
-      className="h-full bg-surface-950 border-r border-white/5 flex flex-col flex-shrink-0 overflow-hidden z-20"
+      className="app-sidebar h-full bg-surface-950 border-r flex flex-col flex-shrink-0 overflow-hidden z-20"
     >
       <div className="h-14 px-3 flex items-center border-b border-white/5">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-sky-500 flex items-center justify-center font-black text-white flex-shrink-0">웅</div>
+        <div className="school-logo-shell w-8 h-8 rounded-lg p-0.5 flex items-center justify-center flex-shrink-0">
+          <img src={schoolLogo} alt="웅천고등학교" className="w-full h-full object-contain" />
+        </div>
         <AnimatePresence>
           {expanded && (
             <motion.div initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="ml-2.5 min-w-0">
@@ -183,12 +186,12 @@ function NavButton({
       title={!expanded ? item.label : undefined}
       className={clsx(
         'relative h-9 mx-1.5 px-3 flex items-center rounded-xl transition-colors',
-        active ? 'bg-emerald-500/15 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5',
+        active ? 'bg-amber-400/20 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5',
       )}
       style={{ width: 'calc(100% - 12px)' }}
     >
-      {active && <span className="absolute left-0 w-0.5 h-5 rounded-full bg-emerald-400" />}
-      <Icon size={16} className={clsx('flex-shrink-0', active && 'text-emerald-400')} />
+      {active && <span className="absolute left-0 w-1 h-5 rounded-r-full bg-amber-400" />}
+      <Icon size={16} className={clsx('flex-shrink-0', active && 'text-amber-400')} />
       {expanded && <span className="ml-2.5 text-sm whitespace-nowrap">{item.label}</span>}
     </button>
   )
