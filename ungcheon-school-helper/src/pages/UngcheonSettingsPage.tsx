@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import {
   CheckCircle2, KeyRound, Link2, Palette, Save, School,
-  UserRound, Clock3, CalendarDays, Power, AlertCircle, ExternalLink,
+  UserRound, Clock3, CalendarDays, Power, AlertCircle, ExternalLink, LockKeyhole,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
+import { useAdminStore } from '../stores/adminStore'
 import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 
 const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
@@ -11,6 +12,7 @@ const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
 export default function UngcheonSettingsPage() {
   const config = useAppStore(s => s.config)
   const saveConfig = useAppStore(s => s.saveConfig)
+  const isAdmin = useAdminStore(s => s.isAdmin)
   const [draft, setDraft] = useState(config)
   const [saved, setSaved] = useState(false)
   const [hubStatus, setHubStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
@@ -22,13 +24,15 @@ export default function UngcheonSettingsPage() {
   }, [])
 
   const save = async () => {
-    await saveConfig(draft)
+    await saveConfig(isAdmin ? draft : { ...draft, schoolHubUrl: config.schoolHubUrl })
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
 
   const testHub = async () => {
-    await saveConfig({ schoolHubUrl: draft.schoolHubUrl?.trim() })
+    if (isAdmin) {
+      await saveConfig({ schoolHubUrl: draft.schoolHubUrl?.trim() })
+    }
     setHubStatus('testing')
     try {
       const result = await window.electron.schoolHubRequest({ action: 'health' }) as { ok?: boolean }
@@ -98,11 +102,23 @@ export default function UngcheonSettingsPage() {
           label="Google Apps Script 웹 앱 URL"
           help="공지와 부서별 공유 링크를 모든 교직원 PC에 동기화합니다. URL이 비어 있으면 공유 기능은 읽기 전용 안내 모드로 동작합니다."
         >
+          {!isAdmin && (
+            <p className="mb-2 flex items-center gap-1.5 text-xs text-amber-400">
+              <LockKeyhole size={12} />
+              사용자 모드에서는 주소를 변경할 수 없습니다. 관리자 모드에서만 수정할 수 있습니다.
+            </p>
+          )}
           <div className="flex gap-2">
             <input
-              className="flex-1"
+              className={`flex-1 ${!isAdmin ? 'cursor-not-allowed opacity-65' : ''}`}
               value={draft.schoolHubUrl ?? ''}
-              onChange={e => { setDraft({ ...draft, schoolHubUrl: e.target.value }); setHubStatus('idle') }}
+              readOnly={!isAdmin}
+              aria-readonly={!isAdmin}
+              onChange={e => {
+                if (!isAdmin) return
+                setDraft({ ...draft, schoolHubUrl: e.target.value })
+                setHubStatus('idle')
+              }}
               placeholder="https://script.google.com/macros/s/.../exec"
             />
             <button onClick={testHub} disabled={!draft.schoolHubUrl || hubStatus === 'testing'} className="btn-ghost px-4">
