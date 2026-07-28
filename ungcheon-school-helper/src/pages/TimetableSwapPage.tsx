@@ -130,10 +130,10 @@ export default function TimetableSwapPage() {
 
       {isAdmin && (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 flex gap-3">
-          <ShieldCheck size={17} className="text-amber-300 flex-shrink-0 mt-0.5" />
+          <ShieldCheck size={17} className="text-amber-400 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-amber-200">관리자 시간표 업로드</p>
-            <p className="text-xs text-amber-200/70 mt-1">
+            <p className="text-sm font-semibold text-amber-400">관리자 시간표 업로드</p>
+            <p className="text-xs font-medium text-amber-300 mt-1">
               `.xlsm`, `.xlsx`, `.xls` 파일의 `주간시간표` 시트를 읽습니다. 새 파일을 올리면 기존 공유 시간표는 전체 교체됩니다.
             </p>
           </div>
