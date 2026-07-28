@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle, ArrowLeftRight, CheckCircle2, FileSpreadsheet,
-  LockKeyhole, RefreshCw, ShieldCheck, Upload, Users,
+  ClipboardList, LockKeyhole, RefreshCw, ShieldCheck, Upload, UserRoundSearch, Users,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAdminStore } from '../stores/adminStore'
 import { useAppStore } from '../stores/appStore'
+import TeacherSchedulePreview from '../components/timetable/TeacherSchedulePreview'
+import TimetablePlanEditor from '../components/timetable/TimetablePlanEditor'
 import { getSchoolTimetable, replaceSchoolTimetable } from '../services/schoolHub'
 import {
   chooseAndParseTimetable,
@@ -15,6 +17,28 @@ import {
   TIMETABLE_DAYS,
   type SchoolTimetable,
 } from '../services/schoolTimetable'
+import {
+  buildPlanEntry,
+  createEmptyPlanDraft,
+  findSubstitutionCandidates,
+  loadTimetablePlanDraft,
+  saveTimetablePlanDraft,
+  simulateExchange,
+  simulateSubstitution,
+  slotDay,
+  type TimetablePlanDraft,
+} from '../services/timetablePlan'
+import {
+  buildTimetablePlanHwpBytes,
+  printTimetablePlan,
+} from '../services/timetablePlanDocument'
+
+type ViewMode = 'exchange' | 'substitution' | 'plan'
+type PreviewSelection = {
+  mode: 'exchange' | 'substitution'
+  teacherIndex: number
+  partnerSlotIndex: number
+}
 
 export default function TimetableSwapPage() {
   const config = useAppStore(state => state.config)
@@ -27,6 +51,10 @@ export default function TimetableSwapPage() {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [viewMode, setViewMode] = useState<ViewMode>('exchange')
+  const [preview, setPreview] = useState<PreviewSelection | null>(null)
+  const [planDraft, setPlanDraft] = useState<TimetablePlanDraft>(() => createEmptyPlanDraft(config.teacherName))
+  const [planLoaded, setPlanLoaded] = useState(false)
   const configured = Boolean(config.schoolHubUrl)
 
   const load = useCallback(async () => {
@@ -37,6 +65,7 @@ export default function TimetableSwapPage() {
       const next = await getSchoolTimetable()
       setTimetable(next)
       setSelectedSlot(null)
+      setPreview(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -45,6 +74,21 @@ export default function TimetableSwapPage() {
   }, [configured])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    loadTimetablePlanDraft(config.teacherName?.trim() || '').then(draft => {
+      setPlanDraft(draft)
+      setPlanLoaded(true)
+    })
+  }, [config.teacherName])
+
+  useEffect(() => {
+    if (!planLoaded) return
+    const timer = setTimeout(() => {
+      saveTimetablePlanDraft(planDraft).catch(() => {})
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [planDraft, planLoaded])
 
   useEffect(() => {
     if (!timetable?.teachers.length) return
@@ -65,6 +109,70 @@ export default function TimetableSwapPage() {
     () => new Set(candidates.map(candidate => candidate.partnerSlotIndex)),
     [candidates],
   )
+  const substitutionCandidates = useMemo(() => {
+    if (!timetable || selectedSlot === null) return []
+    return findSubstitutionCandidates(timetable, teacherIndex, selectedSlot)
+  }, [timetable, teacherIndex, selectedSlot])
+
+  const previewSimulation = useMemo(() => {
+    if (!timetable || selectedSlot === null || !preview) return null
+    return preview.mode === 'exchange'
+      ? simulateExchange(
+          timetable,
+          teacherIndex,
+          selectedSlot,
+          preview.teacherIndex,
+          preview.partnerSlotIndex,
+        )
+      : simulateSubstitution(
+          timetable,
+          teacherIndex,
+          selectedSlot,
+          preview.teacherIndex,
+        )
+  }, [preview, selectedSlot, teacherIndex, timetable])
+
+  const addPreviewToPlan = () => {
+    if (!timetable || selectedSlot === null || !preview) return
+    const entry = buildPlanEntry(
+      timetable,
+      preview.mode,
+      teacherIndex,
+      selectedSlot,
+      preview.teacherIndex,
+      preview.partnerSlotIndex,
+    )
+    const duplicate = planDraft.entries.some(item =>
+      item.kind === entry.kind &&
+      item.originalSlotIndex === entry.originalSlotIndex &&
+      item.replacementSlotIndex === entry.replacementSlotIndex &&
+      item.replacementTeacher === entry.replacementTeacher,
+    )
+    if (duplicate) {
+      setError('이미 계획서에 추가된 항목입니다.')
+      return
+    }
+    const nextEntries = [...planDraft.entries, entry]
+    const dates = nextEntries.flatMap(item => [item.originalDate, item.replacementDate]).filter(Boolean).sort()
+    setPlanDraft({
+      ...planDraft,
+      meta: {
+        ...planDraft.meta,
+        author: planDraft.meta.author || config.teacherName?.trim() || '',
+        startDate: dates[0] || planDraft.meta.startDate,
+        endDate: dates.at(-1) || planDraft.meta.endDate,
+      },
+      entries: nextEntries,
+    })
+    setSuccess(`${entry.replacementTeacher} 교사를 계획서에 추가했습니다.`)
+    setPreview(null)
+  }
+
+  const saveHwp = async () => {
+    const name = `교환보강_계획서_${planDraft.meta.documentDate || new Date().toISOString().slice(0, 10)}.hwp`
+    const saved = await window.electron?.saveFileDialog(name, buildTimetablePlanHwpBytes(planDraft))
+    if (saved) setSuccess('한글(HWP) 계획서를 저장했습니다.')
+  }
 
   const upload = async () => {
     if (!isAdmin || !adminPassword) {
@@ -110,11 +218,11 @@ export default function TimetableSwapPage() {
   const teacher = timetable?.teachers[teacherIndex]
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-6 max-w-7xl mx-auto space-y-5 min-w-0">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="page-title flex items-center gap-2"><ArrowLeftRight size={22} className="text-violet-400" /> 시간표 교체</h1>
-          <p className="text-sm text-slate-400 mt-1">수업을 선택하면 서로 공강이고 같은 학급 수업을 담당하는 교체 가능 교사를 찾습니다.</p>
+          <h1 className="page-title flex items-center gap-2"><ArrowLeftRight size={22} className="text-violet-400" /> 교환·대강 계획</h1>
+          <p className="text-sm text-slate-400 mt-1">교환·대강 후보의 예상 시간표와 연강을 확인하고 계획서를 작성합니다.</p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
@@ -140,6 +248,27 @@ export default function TimetableSwapPage() {
         </div>
       )}
 
+      <nav className="card p-1.5 flex flex-wrap gap-1">
+        <ModeButton
+          active={viewMode === 'exchange'}
+          onClick={() => { setViewMode('exchange'); setSelectedSlot(null); setPreview(null) }}
+          icon={<ArrowLeftRight size={14} />}
+          label="수업 교환"
+        />
+        <ModeButton
+          active={viewMode === 'substitution'}
+          onClick={() => { setViewMode('substitution'); setSelectedSlot(null); setPreview(null) }}
+          icon={<UserRoundSearch size={14} />}
+          label="대강 교사 찾기"
+        />
+        <ModeButton
+          active={viewMode === 'plan'}
+          onClick={() => { setViewMode('plan'); setPreview(null) }}
+          icon={<ClipboardList size={14} />}
+          label={`계획서 편집·출력 (${planDraft.entries.length})`}
+        />
+      </nav>
+
       {error && (
         <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300 flex items-center gap-2">
           <AlertCircle size={15} /> {error}
@@ -161,7 +290,15 @@ export default function TimetableSwapPage() {
         </div>
       )}
 
-      {timetable && teacher && (
+      {timetable && teacher && (viewMode === 'plan' ? (
+        <TimetablePlanEditor
+          draft={planDraft}
+          timetable={timetable}
+          onChange={setPlanDraft}
+          onPrint={() => printTimetablePlan(planDraft)}
+          onSaveHwp={saveHwp}
+        />
+      ) : (
         <>
           <section className="card p-4 flex flex-wrap items-center gap-4">
             <div className="min-w-0 flex-1">
@@ -179,6 +316,7 @@ export default function TimetableSwapPage() {
                 onChange={event => {
                   setTeacherIndex(Number(event.target.value))
                   setSelectedSlot(null)
+                  setPreview(null)
                 }}
               >
                 {timetable.teachers.map((item, index) => (
@@ -191,7 +329,7 @@ export default function TimetableSwapPage() {
           <div className="flex flex-wrap gap-3 text-[11px] text-slate-400">
             <Legend className="bg-sky-500/20 border-sky-400/35" text="일반 수업" />
             <Legend className="bg-emerald-500/25 border-emerald-400/40" text="선택한 수업" />
-            <Legend className="bg-amber-400/20 border-amber-300/35" text="선택 교사가 이동 가능한 공강" />
+            {viewMode === 'exchange' && <Legend className="bg-amber-400/20 border-amber-300/35" text="선택 교사가 이동 가능한 공강" />}
             <Legend className="bg-slate-700/70 border-slate-500/40" text="색상 제한으로 교체 불가" icon={<LockKeyhole size={11} />} />
           </div>
 
@@ -204,7 +342,7 @@ export default function TimetableSwapPage() {
                     const slotIndex = dayIndex * PERIODS_PER_DAY + periodOffset
                     const slot = teacher.slots[slotIndex]
                     const selected = selectedSlot === slotIndex
-                    const candidateTarget = candidateTargetSlots.has(slotIndex)
+                    const candidateTarget = viewMode === 'exchange' && candidateTargetSlots.has(slotIndex)
                     return (
                       <button
                         key={slotIndex}
@@ -217,6 +355,7 @@ export default function TimetableSwapPage() {
                             return
                           }
                           setSelectedSlot(slotIndex)
+                          setPreview(null)
                         }}
                         className={clsx(
                           'w-full min-h-20 px-3 py-2 flex gap-2 text-left transition-colors',
@@ -238,39 +377,84 @@ export default function TimetableSwapPage() {
 
           <section className="card p-5">
             <h2 className="font-semibold text-white flex items-center gap-2">
-              <ArrowLeftRight size={16} className="text-violet-400" /> 교체 후보
+              {viewMode === 'exchange'
+                ? <ArrowLeftRight size={16} className="text-violet-400" />
+                : <UserRoundSearch size={16} className="text-violet-400" />}
+              {viewMode === 'exchange' ? '교환 후보' : '대강 가능 교사'}
               {selectedSlot !== null && <span className="text-xs font-normal text-slate-500">· {slotLabel(selectedSlot)}</span>}
             </h2>
             {selectedSlot === null ? (
-              <p className="text-sm text-slate-500 mt-4">위 시간표에서 교체하려는 수업을 선택하세요.</p>
-            ) : candidates.length === 0 ? (
-              <p className="text-sm text-slate-500 mt-4">조건에 맞는 교체 후보가 없습니다.</p>
+              <p className="text-sm text-slate-500 mt-4">
+                위 시간표에서 {viewMode === 'exchange' ? '교환하려는' : '대강이 필요한'} 수업을 선택하세요.
+              </p>
+            ) : viewMode === 'exchange' && candidates.length === 0 ? (
+              <p className="text-sm text-slate-500 mt-4">서로 공강이고 같은 학급 수업을 담당하는 교환 후보가 없습니다.</p>
+            ) : viewMode === 'substitution' && substitutionCandidates.length === 0 ? (
+              <p className="text-sm text-slate-500 mt-4">해당 시간에 대강 가능한 공강 교사가 없습니다.</p>
             ) : (
               <div className="grid md:grid-cols-2 gap-3 mt-4">
-                {candidates.map(candidate => {
-                  const partner = timetable.teachers[candidate.partnerTeacherIndex]
-                  const selectedClass = teacher.slots[selectedSlot].value
-                  const partnerClass = partner.slots[candidate.partnerSlotIndex].value
-                  return (
-                    <article key={`${candidate.partnerTeacherIndex}-${candidate.partnerSlotIndex}`} className="rounded-xl border border-orange-400/40 bg-orange-500/10 p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-bold text-orange-400">{partner.label}</p>
-                        <span className="text-[10px] font-semibold rounded-full bg-orange-500/20 text-orange-400 px-2 py-1">교체 가능</span>
-                      </div>
-                      <div className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-xs">
-                        <span className="text-slate-600">내 수업</span>
-                        <span className="text-slate-300">{slotLabel(selectedSlot)} · {oneLine(selectedClass)}</span>
-                        <span className="text-slate-600">상대 수업</span>
-                        <span className="text-slate-300">{slotLabel(candidate.partnerSlotIndex)} · {oneLine(partnerClass)}</span>
-                      </div>
-                    </article>
-                  )
-                })}
+                {viewMode === 'exchange'
+                  ? candidates.map(candidate => {
+                      const partner = timetable.teachers[candidate.partnerTeacherIndex]
+                      const selectedClass = teacher.slots[selectedSlot].value
+                      const partnerClass = partner.slots[candidate.partnerSlotIndex].value
+                      return (
+                        <CandidateButton
+                          key={`${candidate.partnerTeacherIndex}-${candidate.partnerSlotIndex}`}
+                          name={partner.label}
+                          badge="교환 가능"
+                          active={preview?.mode === 'exchange' && preview.teacherIndex === candidate.partnerTeacherIndex && preview.partnerSlotIndex === candidate.partnerSlotIndex}
+                          onClick={() => setPreview({
+                            mode: 'exchange',
+                            teacherIndex: candidate.partnerTeacherIndex,
+                            partnerSlotIndex: candidate.partnerSlotIndex,
+                          })}
+                          rows={[
+                            ['내 수업', `${slotLabel(selectedSlot)} · ${oneLine(selectedClass)}`],
+                            ['상대 수업', `${slotLabel(candidate.partnerSlotIndex)} · ${oneLine(partnerClass)}`],
+                          ]}
+                        />
+                      )
+                    })
+                  : substitutionCandidates.map(candidateIndex => {
+                      const substitute = timetable.teachers[candidateIndex]
+                      const dayIndex = Math.floor(selectedSlot / PERIODS_PER_DAY)
+                      const dayLoad = substitute.slots
+                        .slice(dayIndex * PERIODS_PER_DAY, (dayIndex + 1) * PERIODS_PER_DAY)
+                        .filter(slot => slot.value).length
+                      return (
+                        <CandidateButton
+                          key={candidateIndex}
+                          name={substitute.label}
+                          badge="현재 공강"
+                          active={preview?.mode === 'substitution' && preview.teacherIndex === candidateIndex}
+                          onClick={() => setPreview({
+                            mode: 'substitution',
+                            teacherIndex: candidateIndex,
+                            partnerSlotIndex: selectedSlot,
+                          })}
+                          rows={[
+                            ['대강 수업', oneLine(teacher.slots[selectedSlot].value)],
+                            ['당일 수업', `${slotDay(selectedSlot)}요일 현재 ${dayLoad}시간 · 대강 후 ${dayLoad + 1}시간`],
+                          ]}
+                        />
+                      )
+                    })}
               </div>
             )}
           </section>
+
+          {preview && previewSimulation && (
+            <TeacherSchedulePreview
+              teacher={timetable.teachers[preview.teacherIndex]}
+              simulation={previewSimulation}
+              mode={preview.mode}
+              onAdd={addPreviewToPlan}
+              onClose={() => setPreview(null)}
+            />
+          )}
         </>
-      )}
+      ))}
     </div>
   )
 }
@@ -293,6 +477,75 @@ function Legend({ className, text, icon }: { className: string; text: string; ic
       <span className={`w-4 h-4 rounded border ${className}`} />
       {icon}{text}
     </span>
+  )
+}
+
+function ModeButton({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+        active ? 'bg-violet-500 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white',
+      )}
+    >
+      {icon}{label}
+    </button>
+  )
+}
+
+function CandidateButton({
+  name,
+  badge,
+  rows,
+  active,
+  onClick,
+}: {
+  name: string
+  badge: string
+  rows: [string, string][]
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        'rounded-xl border p-4 text-left transition-colors',
+        active
+          ? 'border-violet-400/70 bg-violet-500/15 ring-1 ring-violet-400/40'
+          : 'border-orange-400/40 bg-orange-500/10 hover:bg-orange-500/15',
+      )}
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className={clsx('font-bold', active ? 'text-violet-300' : 'text-orange-400')}>{name}</span>
+        <span className={clsx(
+          'text-[10px] font-semibold rounded-full px-2 py-1',
+          active ? 'bg-violet-500/20 text-violet-300' : 'bg-orange-500/20 text-orange-400',
+        )}>{badge}</span>
+      </span>
+      <span className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-xs">
+        {rows.map(([label, value]) => (
+          <span key={`${label}-${value}`} className="contents">
+            <span className="text-slate-600">{label}</span>
+            <span className="text-slate-300">{value}</span>
+          </span>
+        ))}
+      </span>
+      <span className="block text-[10px] text-violet-400 mt-3">클릭하여 예상 시간표 보기</span>
+    </button>
   )
 }
 
