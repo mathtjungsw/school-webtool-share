@@ -27,7 +27,9 @@ export default function NotifierPage() {
 
   const start = () => {
     window.electron.notifierStart({
-      schoolHubUrl: config.schoolHubUrl,
+      schoolCode: config.schoolCode,
+      officeCode: config.officeCode,
+      apiKey: config.neisApiKey,
       intervalMinutes: 15,
     })
     setRunning(true)
@@ -40,7 +42,9 @@ export default function NotifierPage() {
 
   const checkNow = () => {
     window.electron.notifierStart({
-      schoolHubUrl: config.schoolHubUrl,
+      schoolCode: config.schoolCode,
+      officeCode: config.officeCode,
+      apiKey: config.neisApiKey,
       intervalMinutes: 0,
     })
   }

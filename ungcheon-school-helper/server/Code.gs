@@ -11,23 +11,10 @@ const FEATURE_REQUESTS_SHEET = '기능개선요청';
 const TIMETABLE_META_SHEET = '시간표정보';
 const TIMETABLE_SHEET = '시간표';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
-const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
-const NEIS_BASE_URL = 'https://open.neis.go.kr/hub/';
-const UNGCHEON_OFFICE_CODE = 'S10';
-const UNGCHEON_SCHOOL_CODE = '9010464';
 const TIMETABLE_SLOT_COUNT = 35;
-const NEIS_CACHE_SECONDS = 300;
-const NEIS_ENDPOINT_PARAMS = {
-  schoolInfo: ['SCHUL_NM'],
-  mealServiceDietInfo: ['MLSV_YMD'],
-  SchoolSchedule: ['AA_YMD', 'AA_FROM_YMD', 'AA_TO_YMD'],
-  hisTimetable: ['AY', 'SEM', 'ALL_TI_YMD', 'TI_FROM_YMD', 'TI_TO_YMD', 'GRADE', 'CLASS_NM'],
-  classInfo: ['AY'],
-  schoolMajorinfo: ['AY']
-};
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 4 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 3 } });
 }
 
 function doPost(e) {
@@ -36,7 +23,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 4 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 3 } });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: { verified: true } });
@@ -73,16 +60,6 @@ function doPost(e) {
     if (action === 'replaceTimetable') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: replaceTimetable_(body) });
-    }
-    if (action === 'getNeisStatus') {
-      return json_({ ok: true, data: getNeisStatus_() });
-    }
-    if (action === 'setNeisApiKey') {
-      requireAdmin_(body.adminPassword);
-      return json_({ ok: true, data: setNeisApiKey_(body.apiKey) });
-    }
-    if (action === 'neisQuery') {
-      return json_({ ok: true, data: neisQuery_(body.endpoint, body.params) });
     }
     throw new Error('허용되지 않는 요청입니다.');
   } catch (error) {
@@ -372,114 +349,6 @@ function replaceTimetable_(body) {
     lock.releaseLock();
   }
   return { version: version, uploadedAt: uploadedAt };
-}
-
-function getNeisStatus_() {
-  return {
-    configured: Boolean(PropertiesService.getScriptProperties().getProperty(NEIS_API_KEY_PROPERTY)),
-    schoolName: '웅천고등학교'
-  };
-}
-
-function setNeisApiKey_(value) {
-  const apiKey = clean_(value, 200);
-  if (!apiKey) throw new Error('저장할 NEIS API 키를 입력하세요.');
-  if (!/^[A-Za-z0-9_-]+$/.test(apiKey)) throw new Error('NEIS API 키 형식이 올바르지 않습니다.');
-
-  const rows = fetchNeisRows_('schoolInfo', {}, apiKey);
-  if (!rows.length || String(rows[0].SD_SCHUL_CODE || '') !== UNGCHEON_SCHOOL_CODE) {
-    throw new Error('NEIS API 키로 웅천고등학교 정보를 확인하지 못했습니다.');
-  }
-
-  PropertiesService.getScriptProperties().setProperty(NEIS_API_KEY_PROPERTY, apiKey);
-  return { configured: true, schoolName: '웅천고등학교' };
-}
-
-function neisQuery_(endpointValue, paramsValue) {
-  const endpoint = String(endpointValue || '');
-  if (!Object.prototype.hasOwnProperty.call(NEIS_ENDPOINT_PARAMS, endpoint)) {
-    throw new Error('허용되지 않는 NEIS 조회입니다.');
-  }
-
-  const apiKey = PropertiesService.getScriptProperties().getProperty(NEIS_API_KEY_PROPERTY);
-  if (!apiKey) throw new Error('관리자가 NEIS API 키를 아직 등록하지 않았습니다.');
-
-  const input = paramsValue && typeof paramsValue === 'object' ? paramsValue : {};
-  const params = {};
-  NEIS_ENDPOINT_PARAMS[endpoint].forEach(function(name) {
-    const value = clean_(input[name], 20);
-    if (value) params[name] = value;
-  });
-  validateNeisParams_(params);
-
-  const cacheKey = 'neis:' + sha256_(endpoint + ':' + JSON.stringify(params)).slice(0, 40);
-  const cache = CacheService.getScriptCache();
-  const cached = cache.get(cacheKey);
-  if (cached) return JSON.parse(cached);
-
-  const rows = fetchNeisRows_(endpoint, params, apiKey);
-  try {
-    const serialized = JSON.stringify(rows);
-    if (serialized.length < 95000) cache.put(cacheKey, serialized, NEIS_CACHE_SECONDS);
-  } catch (ignore) {
-    // 캐시 실패는 실제 조회 결과에 영향을 주지 않습니다.
-  }
-  return rows;
-}
-
-function validateNeisParams_(params) {
-  const dateKeys = ['MLSV_YMD', 'AA_YMD', 'AA_FROM_YMD', 'AA_TO_YMD', 'ALL_TI_YMD', 'TI_FROM_YMD', 'TI_TO_YMD'];
-  dateKeys.forEach(function(key) {
-    if (params[key] && !/^\d{8}$/.test(params[key])) throw new Error('NEIS 날짜 형식이 올바르지 않습니다.');
-  });
-  if (params.AY && !/^\d{4}$/.test(params.AY)) throw new Error('NEIS 학년도 형식이 올바르지 않습니다.');
-  if (params.SEM && !/^[12]$/.test(params.SEM)) throw new Error('NEIS 학기 형식이 올바르지 않습니다.');
-  if (params.GRADE && !/^[1-3]$/.test(params.GRADE)) throw new Error('웅천고 학년 형식이 올바르지 않습니다.');
-  if (params.CLASS_NM && !/^\d{1,2}$/.test(params.CLASS_NM)) throw new Error('학급 형식이 올바르지 않습니다.');
-}
-
-function fetchNeisRows_(endpoint, params, apiKey) {
-  const query = {
-    KEY: apiKey,
-    Type: 'json',
-    pIndex: '1',
-    pSize: '200',
-    ATPT_OFCDC_SC_CODE: UNGCHEON_OFFICE_CODE,
-    SD_SCHUL_CODE: UNGCHEON_SCHOOL_CODE
-  };
-  Object.keys(params).forEach(function(key) { query[key] = params[key]; });
-  const queryString = Object.keys(query)
-    .map(function(key) { return encodeURIComponent(key) + '=' + encodeURIComponent(query[key]); })
-    .join('&');
-  const response = UrlFetchApp.fetch(NEIS_BASE_URL + endpoint + '?' + queryString, {
-    method: 'get',
-    muteHttpExceptions: true,
-    followRedirects: true
-  });
-  const status = response.getResponseCode();
-  if (status < 200 || status >= 300) throw new Error('NEIS 서버 응답 오류 (' + status + ')');
-
-  let payload;
-  try {
-    payload = JSON.parse(response.getContentText());
-  } catch (error) {
-    throw new Error('NEIS 서버 응답을 해석하지 못했습니다.');
-  }
-
-  if (payload.RESULT && payload.RESULT.CODE && payload.RESULT.CODE !== 'INFO-000' && payload.RESULT.CODE !== 'INFO-200') {
-    throw new Error(payload.RESULT.MESSAGE || 'NEIS API 오류 (' + payload.RESULT.CODE + ')');
-  }
-  const head = payload[endpoint] && payload[endpoint][0] && payload[endpoint][0].head;
-  const resultItem = Array.isArray(head)
-    ? head.filter(function(item) { return item && item.RESULT; })[0]
-    : null;
-  if (resultItem && resultItem.RESULT && resultItem.RESULT.CODE === 'INFO-200') return [];
-  if (resultItem && resultItem.RESULT && resultItem.RESULT.CODE !== 'INFO-000') {
-    throw new Error(resultItem.RESULT.MESSAGE || 'NEIS API 오류 (' + resultItem.RESULT.CODE + ')');
-  }
-  return payload[endpoint] && payload[endpoint][1] && Array.isArray(payload[endpoint][1].row)
-    ? payload[endpoint][1].row
-    : [];
 }
 
 function deleteRowById_(sheetName, id) {

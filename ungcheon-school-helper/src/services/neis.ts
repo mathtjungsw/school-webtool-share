@@ -1,5 +1,7 @@
 import type { MealInfo, ScheduleEvent, TimetableEntry, SchoolInfo, ClassEntry, DeptEntry } from '../types'
-import { hubRequest } from './schoolHub'
+
+const BASE_URL = 'https://open.neis.go.kr/hub'
+export const NEIS_API_KEY = ((import.meta.env.VITE_NEIS_API_KEY as string) || '').trim()
 
 function fmt(date: Date): string {
   return date.toISOString().slice(0, 10).replace(/-/g, '')
@@ -12,21 +14,32 @@ function monthRange(year: number, month: number) {
 }
 
 async function fetchNeis(endpoint: string, params: Record<string, string>) {
-  const safeParams = Object.fromEntries(
-    Object.entries(params)
-      .filter(([, value]) => value.trim())
-      .map(([key, value]) => [key, value.trim()]),
-  )
-  const rows = await hubRequest<Record<string, string>[]>({
-    action: 'neisQuery',
-    endpoint,
-    params: safeParams,
-  })
-  return rows.length ? rows : null
+  const url = new URL(`${BASE_URL}/${endpoint}`)
+  url.searchParams.set('Type', 'json')
+  url.searchParams.set('pSize', '200')
+  for (const [k, v] of Object.entries(params)) {
+    const value = v.trim()
+    if (value) url.searchParams.set(k, value)
+  }
+  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10000) })
+  if (!res.ok) throw new Error(`NEIS 서버 응답 오류 (${res.status})`)
+  const json = await res.json()
+  const topResult = json.RESULT
+  if (topResult?.CODE && topResult.CODE !== 'INFO-000' && topResult.CODE !== 'INFO-200') {
+    throw new Error(topResult.MESSAGE || `NEIS API 오류 (${topResult.CODE})`)
+  }
+  const head = json[endpoint]?.[0]?.head
+  const result = head?.find((entry: { RESULT?: { CODE?: string; MESSAGE?: string } }) => entry.RESULT)?.RESULT
+  if (result?.CODE === 'INFO-200') return null
+  if (result?.CODE && result.CODE !== 'INFO-000') {
+    throw new Error(result.MESSAGE || `NEIS API 오류 (${result.CODE})`)
+  }
+  return json[endpoint]?.[1]?.row ?? null
 }
 
-export async function searchSchool(name: string): Promise<SchoolInfo[]> {
+export async function searchSchool(apiKey: string, name: string): Promise<SchoolInfo[]> {
   const rows = await fetchNeis('schoolInfo', {
+    KEY: apiKey,
     SCHUL_NM: name,
   })
   if (!rows) return []
@@ -42,12 +55,14 @@ export async function searchSchool(name: string): Promise<SchoolInfo[]> {
 }
 
 export async function getMeal(
+  apiKey: string,
   officeCode: string,
   schoolCode: string,
   date?: Date
 ): Promise<MealInfo[]> {
   const d = fmt(date ?? new Date())
   const rows = await fetchNeis('mealServiceDietInfo', {
+    KEY: apiKey,
     ATPT_OFCDC_SC_CODE: officeCode,
     SD_SCHUL_CODE: schoolCode,
     MLSV_YMD: d,
@@ -63,6 +78,7 @@ export async function getMeal(
 }
 
 export async function getSchedule(
+  apiKey: string,
   officeCode: string,
   schoolCode: string,
   year: number,
@@ -70,6 +86,7 @@ export async function getSchedule(
 ): Promise<ScheduleEvent[]> {
   const { from, to } = monthRange(year, month)
   const rows = await fetchNeis('SchoolSchedule', {
+    KEY: apiKey,
     ATPT_OFCDC_SC_CODE: officeCode,
     SD_SCHUL_CODE: schoolCode,
     AA_FROM_YMD: from,
@@ -94,6 +111,7 @@ function getEndpoint(schoolType: string) {
 }
 
 export async function getTimetable(
+  apiKey: string,
   officeCode: string,
   schoolCode: string,
   schoolType: string,
@@ -104,6 +122,7 @@ export async function getTimetable(
   const d = fmt(date ?? new Date())
   const ep = getEndpoint(schoolType)
   const rows = await fetchNeis(ep, {
+    KEY: apiKey,
     ATPT_OFCDC_SC_CODE: officeCode,
     SD_SCHUL_CODE: schoolCode,
     AY: d.slice(0, 4),
@@ -123,6 +142,7 @@ export async function getTimetable(
 }
 
 export async function getTimetableRange(
+  apiKey: string,
   officeCode: string,
   schoolCode: string,
   schoolType: string,
@@ -133,6 +153,7 @@ export async function getTimetableRange(
 ): Promise<TimetableEntry[]> {
   const ep = getEndpoint(schoolType)
   const rows = await fetchNeis(ep, {
+    KEY: apiKey,
     ATPT_OFCDC_SC_CODE: officeCode,
     SD_SCHUL_CODE: schoolCode,
     AY: fromYmd.slice(0, 4),
@@ -155,10 +176,12 @@ export async function getTimetableRange(
 }
 
 export async function getSchoolDetail(
+  apiKey: string,
   officeCode: string,
   schoolCode: string
 ): Promise<SchoolInfo | null> {
   const rows = await fetchNeis('schoolInfo', {
+    KEY: apiKey,
     ATPT_OFCDC_SC_CODE: officeCode,
     SD_SCHUL_CODE: schoolCode,
   })
@@ -183,11 +206,13 @@ export async function getSchoolDetail(
 }
 
 export async function getClassInfo(
+  apiKey: string,
   officeCode: string,
   schoolCode: string
 ): Promise<ClassEntry[]> {
   const year = new Date().getFullYear().toString()
   const rows = await fetchNeis('classInfo', {
+    KEY: apiKey,
     ATPT_OFCDC_SC_CODE: officeCode,
     SD_SCHUL_CODE: schoolCode,
     AY: year,
@@ -201,11 +226,13 @@ export async function getClassInfo(
 }
 
 export async function getDeptInfo(
+  apiKey: string,
   officeCode: string,
   schoolCode: string
 ): Promise<DeptEntry[]> {
   const year = new Date().getFullYear().toString()
   const rows = await fetchNeis('schoolMajorinfo', {
+    KEY: apiKey,
     ATPT_OFCDC_SC_CODE: officeCode,
     SD_SCHUL_CODE: schoolCode,
     AY: year,

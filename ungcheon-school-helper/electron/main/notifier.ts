@@ -17,30 +17,35 @@ export interface PortalResult {
 let monitorInterval: ReturnType<typeof setInterval> | null = null
 let isRunning = false
 
-async function checkNeis(schoolHubUrl: string): Promise<PortalResult> {
+async function checkNeis(
+  schoolCode: string,
+  officeCode: string,
+  apiKey: string
+): Promise<PortalResult> {
   try {
     const today = new Date()
     const ymd = today.toISOString().slice(0, 10).replace(/-/g, '')
 
-    const endpoint = new URL(schoolHubUrl)
-    if (endpoint.protocol !== 'https:' || endpoint.hostname !== 'script.google.com') {
-      throw new Error('학교 공유 서비스 URL이 올바르지 않습니다.')
+    // 오늘 학사일정 건수 (미확인 업무 대용)
+    const url = new URL('https://open.neis.go.kr/hub/SchoolSchedule')
+    if (apiKey.trim()) url.searchParams.set('KEY', apiKey.trim())
+    url.searchParams.set('Type', 'json')
+    url.searchParams.set('pIndex', '1')
+    url.searchParams.set('pSize', '10')
+    url.searchParams.set('ATPT_OFCDC_SC_CODE', officeCode)
+    url.searchParams.set('SD_SCHUL_CODE', schoolCode)
+    url.searchParams.set('AA_YMD', ymd)
+    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(10000) })
+    const json = await res.json() as Record<string, unknown>
+
+    let count = 0
+    const head = (json.SchoolSchedule as Array<{ head?: Array<{ RESULT?: { CODE: string }; list_total_count?: number }> }>)?.[0]?.head
+    if (head) {
+      const resultCode = head.find(h => h.RESULT)?.RESULT?.CODE
+      if (resultCode === 'INFO-000') {
+        count = head.find(h => h.list_total_count)?.list_total_count ?? 0
+      }
     }
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      redirect: 'follow',
-      signal: AbortSignal.timeout(12000),
-      headers: { 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': 'no-cache' },
-      body: JSON.stringify({
-        action: 'neisQuery',
-        endpoint: 'SchoolSchedule',
-        params: { AA_YMD: ymd },
-      }),
-    })
-    if (!res.ok) throw new Error(`학교 공유 서비스 HTTP ${res.status}`)
-    const payload = await res.json() as { ok?: boolean; data?: unknown[]; error?: string }
-    if (!payload.ok) throw new Error(payload.error || 'NEIS 학사일정을 확인하지 못했습니다.')
-    const count = Array.isArray(payload.data) ? payload.data.length : 0
 
     return {
       neisPending: count,
@@ -60,7 +65,9 @@ async function checkNeis(schoolHubUrl: string): Promise<PortalResult> {
 export function startMonitoring(
   win: BrowserWindow,
   config: {
-    schoolHubUrl?: string
+    schoolCode?: string
+    officeCode?: string
+    apiKey?: string
     intervalMinutes: number
   }
 ) {
@@ -68,7 +75,11 @@ export function startMonitoring(
   isRunning = true
 
   const run = async () => {
-    const result = await checkNeis(config.schoolHubUrl ?? '')
+    const result = await checkNeis(
+      config.schoolCode ?? '',
+      config.officeCode ?? '',
+      config.apiKey ?? ''
+    )
     if (!win.isDestroyed()) win.webContents.send('notifier:result', result)
   }
 

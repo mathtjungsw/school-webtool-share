@@ -8,20 +8,24 @@ const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
 
 const NEIS_KEY_STEPS = [
   {
-    title: '1. 관리자만 인증키 발급',
-    detail: '학교 관리자가 아래 버튼으로 나이스 교육정보 개방 포털에 로그인하고 학교 공용으로 사용할 인증키 하나를 발급합니다.',
+    title: '1. 나이스 교육정보 개방 포털 로그인',
+    detail: '아래 ‘NEIS 인증키 발급·확인’ 버튼을 누르고 Google·카카오·네이버·Facebook 계정 중 하나로 로그인합니다.',
   },
   {
-    title: '2. 활용 목적 입력',
+    title: '2. 인증키 신청',
     detail: '활용가이드 → 인증키 신청으로 이동합니다. 활용 목적에는 “웅천고 업무도우미의 급식·학사일정·시간표 조회”처럼 실제 용도를 적습니다.',
   },
   {
-    title: '3. 관리자 모드에서 등록',
-    detail: '업무도우미 관리자 모드를 시작한 뒤 환경설정 → NEIS Open API에서 발급된 키를 등록합니다.',
+    title: '3. 발급 상태와 인증키 확인',
+    detail: '인증키 신청 화면에서 발급 상태를 확인하고, 발급된 인증키 문자열 전체를 복사합니다. NEIS 아이디나 비밀번호를 복사하는 것이 아닙니다.',
   },
   {
-    title: '4. 일반 사용자는 바로 이용',
-    detail: '등록된 키는 학교 공유 서버가 비공개로 보관합니다. 일반 교직원은 별도 발급이나 입력 없이 급식·학사일정·시간표를 조회합니다.',
+    title: '4. 프로그램에 입력',
+    detail: '웅천고 업무도우미 → 환경설정 → NEIS API 키에 붙여넣고 ‘설정 저장’을 누릅니다. 키 앞뒤에 공백이 들어가지 않도록 주의합니다.',
+  },
+  {
+    title: '5. 정상 작동 확인',
+    detail: '대시보드에서 새로고침을 눌러 급식·학사일정·시간표를 확인합니다. 방학·휴업일에는 데이터가 없을 수 있으므로 NEIS 정보에서 수업일 날짜로도 확인합니다.',
   },
 ]
 
@@ -33,7 +37,6 @@ const SECTIONS = [
       '환경설정에서 교사 이름과 담당 학년·반을 입력합니다.',
       '대시보드에서 웅천고 급식·학사일정·시간표가 표시되는지 확인합니다.',
       '공유 서비스 URL은 관리자가 Google Apps Script 배포 후 한 번만 안내합니다.',
-      'NEIS API 키도 관리자가 학교 공유 서버에 한 번만 등록하며 일반 사용자는 입력하지 않습니다.',
     ],
   },
   {
@@ -123,10 +126,10 @@ export default function UngcheonHelpPage() {
           <div>
             <h2 className="font-semibold text-white flex items-center gap-2">
               <KeyRound size={17} className="text-sky-400" />
-              학교 공용 NEIS Open API 인증키 설정
+              NEIS Open API 인증키 발급·입력
             </h2>
             <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-              학교 관리자가 한 번만 설정합니다. 일반 사용자는 인증키를 발급하거나 입력할 필요가 없습니다.
+              급식·학사일정·시간표 조회용 공개 API 키입니다. 업무포털·NEIS 로그인 비밀번호와는 전혀 다릅니다.
             </p>
           </div>
           <button
@@ -134,7 +137,7 @@ export default function UngcheonHelpPage() {
             onClick={() => window.electron?.openExternal(NEIS_KEY_URL)}
             className="px-3.5 py-2 rounded-lg bg-sky-500/15 text-sky-300 hover:bg-sky-500/25 text-xs font-semibold flex items-center gap-1.5 transition-colors"
           >
-            관리자용 NEIS 인증키 발급
+            NEIS 인증키 발급·확인
             <ExternalLink size={13} />
           </button>
         </div>
@@ -149,7 +152,7 @@ export default function UngcheonHelpPage() {
         </ol>
 
         <div className="mt-4 rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-xs text-amber-600 leading-relaxed">
-          인증키는 Google Apps Script의 비공개 속성에만 저장되고 사용자 PC로 전달되지 않습니다. 메신저·공지·공유 문서에는 인증키를 올리지 마세요.
+          인증키는 교직원에게 메신저나 공지로 공개하지 마세요. 이 프로그램에 저장한 키는 Windows 보안 저장소로 암호화되며 해당 PC에만 보관됩니다.
         </div>
       </section>
 
