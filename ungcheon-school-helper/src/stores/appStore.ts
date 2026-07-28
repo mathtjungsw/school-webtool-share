@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import type { AppConfig, MealInfo, ScheduleEvent, LogEntry } from '../types'
 
+const DEFAULT_SCHOOL_HUB_URL = ((import.meta.env.VITE_SCHOOL_HUB_URL as string) || '').trim()
+
 export const UNGCHEON_DEFAULT_CONFIG: AppConfig = {
   schoolName: '웅천고등학교',
   officeName: '경상남도교육청',
@@ -11,6 +13,7 @@ export const UNGCHEON_DEFAULT_CONFIG: AppConfig = {
   theme: 'auto',
   grade: '1',
   classNm: '1',
+  schoolHubUrl: DEFAULT_SCHOOL_HUB_URL,
   period1Start: '08:40',
   period2Start: '09:40',
   period3Start: '10:40',
@@ -92,7 +95,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!window.electron) return
     const newCfg = { ...get().config, ...patch }
 
-    // API 키는 safeStorage로 분리 저장
+    // 이전 버전의 로컬 NEIS 키 필드는 마이그레이션 호환용으로만 처리합니다.
     const API_KEY_FIELDS = ['neisApiKey'] as const
     type ApiKeyField = (typeof API_KEY_FIELDS)[number]
     const apiKeyUpdates = API_KEY_FIELDS
@@ -110,7 +113,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (Object.keys(batchPatch).length > 0) await window.electron.configSetMany(batchPatch)
 
-    // 로컬 상태에서는 API 키 값을 유지 (마스킹 안 함 — UI 표시 필요)
     set({ config: newCfg })
   },
 
@@ -125,19 +127,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     const all = (await window.electron.configGetAll()) as Record<string, unknown>
     const nested = ((all as Record<string, unknown>).config ?? {}) as Record<string, unknown>
 
-    // API 키는 safeStorage에서 별도 로드 (없으면 기존 plain 값 유지 — 마이그레이션)
+    // 이전 버전의 로컬 NEIS 키는 관리자 모드에서 학교 공유 서버로
+    // 한 번 이전한 뒤 삭제하므로, 마이그레이션 전까지만 메모리에 불러옵니다.
     const apiKeys = await window.electron.apiKeyGetAll()
     const cfg: AppConfig = { ...UNGCHEON_DEFAULT_CONFIG, ...nested, ...apiKeys } as AppConfig
 
     set({ config: cfg, isConfigLoaded: true })
 
-    // 최초 실행 시 웅천고 기본값을 사용자 데이터 폴더에 저장한다.
+    // 최초 실행 기본값과 배포에 포함된 학교 공유 URL을 사용자 데이터 폴더에 저장한다.
+    const patch: Record<string, unknown> = {}
     if (!nested.schoolCode) {
-      const patch: Record<string, unknown> = {}
       for (const [key, value] of Object.entries(UNGCHEON_DEFAULT_CONFIG)) {
         patch[`config.${key}`] = value
       }
-      await window.electron.configSetMany(patch)
     }
+    if (!nested.schoolHubUrl && DEFAULT_SCHOOL_HUB_URL) {
+      patch['config.schoolHubUrl'] = DEFAULT_SCHOOL_HUB_URL
+    }
+    if (Object.keys(patch).length) await window.electron.configSetMany(patch)
   },
 }))

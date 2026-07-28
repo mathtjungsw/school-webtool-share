@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { RefreshCw, Utensils, CalendarDays, Clock, School, AlertCircle, ChevronLeft, ChevronRight, ExternalLink, Search, Home } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
-import { getMeal, getSchedule, getTimetable, getSchoolDetail, getClassInfo, getDeptInfo, searchSchool, NEIS_API_KEY } from '../services/neis'
+import { getMeal, getSchedule, getTimetable, getSchoolDetail, getClassInfo, getDeptInfo, searchSchool } from '../services/neis'
 import type { MealInfo, ScheduleEvent, TimetableEntry, SchoolInfo, ClassEntry, DeptEntry } from '../types'
 import { format, addMonths, subMonths, addDays, subDays } from 'date-fns'
 import { ko } from 'date-fns/locale'
@@ -54,7 +54,6 @@ export default function NeisPage() {
   const hasSchool = !!(config.officeCode && config.schoolCode)
   const activeOffice = viewSchool?.officeCode ?? config.officeCode ?? ''
   const activeSchool = viewSchool?.schoolCode ?? config.schoolCode ?? ''
-  const neisKey = config.neisApiKey?.trim() || NEIS_API_KEY
 
   // ── 학교 검색 디바운스 (race condition 방지: cancelled 플래그) ──
   useEffect(() => {
@@ -69,7 +68,7 @@ export default function NeisPage() {
     debounceRef.current = setTimeout(async () => {
       setSearching(true)
       try {
-        const results = await searchSchool(neisKey, query.trim())
+        const results = await searchSchool(query.trim())
         if (!cancelled) {
           setSuggestions(results.slice(0, 8))
           setShowDrop(results.length > 0)
@@ -85,7 +84,7 @@ export default function NeisPage() {
       cancelled = true
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [query, neisKey])
+  }, [query])
 
   // 드롭다운 외부 클릭 + ESC 키 닫기
   useEffect(() => {
@@ -125,7 +124,7 @@ export default function NeisPage() {
     if (!activeOffice || !activeSchool) return
     setMealLoading(true); setMealError('')
     try {
-      const data = await getMeal(neisKey, activeOffice, activeSchool, date)
+      const data = await getMeal(activeOffice, activeSchool, date)
       setMeals(data)
     } catch { setMealError('급식 정보를 불러오지 못했습니다.') }
     finally { setMealLoading(false) }
@@ -135,7 +134,7 @@ export default function NeisPage() {
     if (!activeOffice || !activeSchool) return
     setScheduleLoading(true); setScheduleError('')
     try {
-      const data = await getSchedule(neisKey, activeOffice, activeSchool, date.getFullYear(), date.getMonth() + 1)
+      const data = await getSchedule(activeOffice, activeSchool, date.getFullYear(), date.getMonth() + 1)
       setScheduleEvents(data)
     } catch { setScheduleError('학사일정을 불러오지 못했습니다.') }
     finally { setScheduleLoading(false) }
@@ -147,7 +146,7 @@ export default function NeisPage() {
     if (!config.grade || !config.classNm || !schoolType) return
     setTimetableLoading(true); setTimetableError('')
     try {
-      const data = await getTimetable(neisKey, activeOffice, activeSchool, schoolType, config.grade, config.classNm, date)
+      const data = await getTimetable(activeOffice, activeSchool, schoolType, config.grade, config.classNm, date)
       setTimetable(data)
     } catch { setTimetableError('시간표를 불러오지 못했습니다.') }
     finally { setTimetableLoading(false) }
@@ -158,9 +157,9 @@ export default function NeisPage() {
     setSchoolLoading(true); setSchoolError('')
     try {
       const [data, classes, depts] = await Promise.all([
-        getSchoolDetail(neisKey, activeOffice, activeSchool),
-        getClassInfo(neisKey, activeOffice, activeSchool),
-        getDeptInfo(neisKey, activeOffice, activeSchool),
+        getSchoolDetail(activeOffice, activeSchool),
+        getClassInfo(activeOffice, activeSchool),
+        getDeptInfo(activeOffice, activeSchool),
       ])
       setSchoolInfo(data)
       setClassEntries(classes)
@@ -174,23 +173,23 @@ export default function NeisPage() {
     if (!hasSchool || !activeOffice || !activeSchool) return
     let cancelled = false
     setMealLoading(true); setMealError('')
-    getMeal(neisKey, activeOffice, activeSchool, mealDate)
+    getMeal(activeOffice, activeSchool, mealDate)
       .then(data => { if (!cancelled) setMeals(data) })
       .catch(() => { if (!cancelled) setMealError('급식 정보를 불러오지 못했습니다.') })
       .finally(() => { if (!cancelled) setMealLoading(false) })
     return () => { cancelled = true }
-  }, [mealDate, activeOffice, activeSchool, neisKey, hasSchool])
+  }, [mealDate, activeOffice, activeSchool, hasSchool])
 
   useEffect(() => {
     if (!hasSchool || !activeOffice || !activeSchool) return
     let cancelled = false
     setScheduleLoading(true); setScheduleError('')
-    getSchedule(neisKey, activeOffice, activeSchool, scheduleDate.getFullYear(), scheduleDate.getMonth() + 1)
+    getSchedule(activeOffice, activeSchool, scheduleDate.getFullYear(), scheduleDate.getMonth() + 1)
       .then(data => { if (!cancelled) setScheduleEvents(data) })
       .catch(() => { if (!cancelled) setScheduleError('학사일정을 불러오지 못했습니다.') })
       .finally(() => { if (!cancelled) setScheduleLoading(false) })
     return () => { cancelled = true }
-  }, [scheduleDate, activeOffice, activeSchool, neisKey, hasSchool])
+  }, [scheduleDate, activeOffice, activeSchool, hasSchool])
 
   useEffect(() => {
     if (!hasSchool || !activeOffice || !activeSchool) return
@@ -198,21 +197,21 @@ export default function NeisPage() {
     if (!config.grade || !config.classNm || !schoolType) return
     let cancelled = false
     setTimetableLoading(true); setTimetableError('')
-    getTimetable(neisKey, activeOffice, activeSchool, schoolType, config.grade, config.classNm, timetableDate)
+    getTimetable(activeOffice, activeSchool, schoolType, config.grade, config.classNm, timetableDate)
       .then(data => { if (!cancelled) setTimetable(data) })
       .catch(() => { if (!cancelled) setTimetableError('시간표를 불러오지 못했습니다.') })
       .finally(() => { if (!cancelled) setTimetableLoading(false) })
     return () => { cancelled = true }
-  }, [timetableDate, activeOffice, activeSchool, neisKey, hasSchool, config.grade, config.classNm, config.schoolType, viewSchool?.schoolType])
+  }, [timetableDate, activeOffice, activeSchool, hasSchool, config.grade, config.classNm, config.schoolType, viewSchool?.schoolType])
 
   useEffect(() => {
     if (!hasSchool || !activeOffice || !activeSchool) return
     let cancelled = false
     setSchoolLoading(true); setSchoolError('')
     Promise.all([
-      getSchoolDetail(neisKey, activeOffice, activeSchool),
-      getClassInfo(neisKey, activeOffice, activeSchool),
-      getDeptInfo(neisKey, activeOffice, activeSchool),
+      getSchoolDetail(activeOffice, activeSchool),
+      getClassInfo(activeOffice, activeSchool),
+      getDeptInfo(activeOffice, activeSchool),
     ])
       .then(([data, classes, depts]) => {
         if (!cancelled) { setSchoolInfo(data); setClassEntries(classes); setDeptEntries(depts) }
@@ -220,7 +219,7 @@ export default function NeisPage() {
       .catch(() => { if (!cancelled) setSchoolError('학교정보를 불러오지 못했습니다.') })
       .finally(() => { if (!cancelled) setSchoolLoading(false) })
     return () => { cancelled = true }
-  }, [activeOffice, activeSchool, neisKey, hasSchool])
+  }, [activeOffice, activeSchool, hasSchool])
 
   if (!hasSchool) {
     return (
