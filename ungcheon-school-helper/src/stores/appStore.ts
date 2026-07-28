@@ -11,13 +11,13 @@ export const UNGCHEON_DEFAULT_CONFIG: AppConfig = {
   theme: 'auto',
   grade: '1',
   classNm: '1',
-  period1Start: '08:50',
-  period2Start: '09:50',
-  period3Start: '10:50',
-  period4Start: '11:50',
-  period5Start: '13:40',
-  period6Start: '14:40',
-  period7Start: '15:40',
+  period1Start: '08:40',
+  period2Start: '09:40',
+  period3Start: '10:40',
+  period4Start: '11:40',
+  period5Start: '13:30',
+  period6Start: '14:30',
+  period7Start: '15:30',
 }
 
 interface AppState {

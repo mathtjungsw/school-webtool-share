@@ -2,38 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── 다크 테마 (기본) ── */
+/* ── 웅천고 브랜드 테마: 교표의 황금색 + 종이색 + 잉크색 ── */
 :root {
-  --surface-50:  #f8fafc;
-  --surface-100: #f1f5f9;
-  --surface-200: #e2e8f0;
-  --surface-700: #334155;
-  --surface-800: #1e293b;
-  --surface-850: #172033;
-  --surface-900: #0f172a;
-  --surface-950: #080f1e;
-  --text-primary:   #f1f5f9;
-  --text-secondary: #94a3b8;
-  --border-base:    rgba(255,255,255,0.07);
-  --scrollbar-thumb: #334155;
-  --scrollbar-thumb-hover: #475569;
+  --surface-50:  #fffdf4;
+  --surface-100: #f6f0cd;
+  --surface-200: #ded39b;
+  --surface-700: #404852;
+  --surface-800: #222a33;
+  --surface-850: #1b222b;
+  --surface-900: #151b22;
+  --surface-950: #0f141a;
+  --text-primary:   #f8f6ed;
+  --text-secondary: #aeb5bc;
+  --border-base:    rgba(235, 215, 107, 0.13);
+  --scrollbar-thumb: #665f36;
+  --scrollbar-thumb-hover: #9b8840;
+  --brand: #d9ba00;
+  --brand-strong: #b79a00;
+  --brand-soft: rgba(217, 186, 0, 0.14);
+  --brand-border: rgba(217, 186, 0, 0.34);
+  --ink: #19222c;
+  --paper-grid: rgba(217, 186, 0, 0.035);
+  --shadow-color: rgba(0, 0, 0, 0.24);
 }
 
-/* ── 라이트 테마 ── */
 [data-theme="light"] {
-  --surface-50:  #1e293b;
-  --surface-100: #334155;
-  --surface-200: #475569;
-  --surface-700: #e2e8f0;
-  --surface-800: #f1f5f9;
-  --surface-850: #f5f7fa;
-  --surface-900: #f8fafc;
-  --surface-950: #ffffff;
-  --text-primary:   #0f172a;
-  --text-secondary: #475569;
-  --border-base:    rgba(0,0,0,0.08);
-  --scrollbar-thumb: #cbd5e1;
-  --scrollbar-thumb-hover: #94a3b8;
+  --surface-50:  #17212b;
+  --surface-100: #2f3943;
+  --surface-200: #58616a;
+  --surface-700: #dfdccf;
+  --surface-800: #fbfaf5;
+  --surface-850: #f5f2e9;
+  --surface-900: #eeebe1;
+  --surface-950: #fffefa;
+  --text-primary:   #17212b;
+  --text-secondary: #5d6267;
+  --border-base:    rgba(61, 55, 26, 0.12);
+  --scrollbar-thumb: #c9bf8b;
+  --scrollbar-thumb-hover: #a8994f;
+  --brand-soft: rgba(217, 186, 0, 0.17);
+  --brand-border: rgba(173, 145, 0, 0.38);
+  --paper-grid: rgba(95, 81, 14, 0.045);
+  --shadow-color: rgba(60, 52, 18, 0.09);
 }
 
 @layer base {
@@ -52,6 +62,10 @@
 
   body {
     background-color: var(--surface-900);
+    background-image:
+      linear-gradient(var(--paper-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--paper-grid) 1px, transparent 1px);
+    background-size: 24px 24px;
     color: var(--text-primary);
     font-family: 'Noto Sans KR', system-ui, sans-serif;
     font-size: 14px;
@@ -84,21 +98,39 @@
 
 @layer components {
   .card {
-    @apply bg-surface-800 rounded-2xl border border-white/5 p-5;
+    @apply bg-surface-800 border p-5;
+    border-radius: 18px 18px 18px 6px;
+    border-color: var(--border-base);
+    box-shadow: 0 8px 22px var(--shadow-color), inset 0 1px 0 rgba(255,255,255,0.035);
   }
 
   .card-hover {
-    @apply card transition-all duration-200 hover:border-violet-500/30 hover:bg-surface-800/80 cursor-pointer;
+    @apply card transition-all duration-200 cursor-pointer;
+  }
+
+  .card-hover:hover {
+    border-color: var(--brand-border);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px var(--shadow-color), 0 0 0 1px var(--brand-soft);
   }
 
   .btn-primary {
-    @apply px-4 py-2 rounded-xl bg-gradient-to-r from-violet-500 to-sky-500 text-white font-medium text-sm
-           transition-all duration-200 hover:opacity-90 hover:shadow-lg hover:shadow-violet-500/20
+    @apply px-4 py-2 rounded-lg font-bold text-sm transition-all duration-200
            active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed;
+    color: var(--ink);
+    background: var(--brand);
+    border: 1px solid var(--brand-strong);
+    box-shadow: inset 0 -2px 0 rgba(83, 69, 0, 0.18), 0 4px 12px rgba(217, 186, 0, 0.16);
+  }
+
+  .btn-primary:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+    box-shadow: inset 0 -2px 0 rgba(83, 69, 0, 0.18), 0 7px 16px rgba(217, 186, 0, 0.23);
   }
 
   .btn-secondary {
-    @apply px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 font-medium text-sm
+    @apply px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-slate-300 font-semibold text-sm
            transition-all duration-200 hover:bg-white/10 hover:border-white/20
            active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed;
   }
@@ -110,17 +142,23 @@
   }
 
   .input {
-    @apply w-full bg-surface-900 border border-white/10 rounded-xl px-3.5 py-2.5
+    @apply w-full bg-surface-900 border border-white/10 rounded-lg px-3.5 py-2.5
            text-slate-200 text-sm placeholder:text-slate-500
-           focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50
+           focus:outline-none
            transition-all duration-200;
   }
 
   .input-field {
-    @apply w-full bg-surface-900 border border-white/10 rounded-xl px-3.5 py-2.5
+    @apply w-full bg-surface-900 border border-white/10 rounded-lg px-3.5 py-2.5
            text-slate-200 text-sm placeholder:text-slate-500
-           focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40
+           focus:outline-none
            transition-all duration-200;
+  }
+
+  .input:focus,
+  .input-field:focus {
+    border-color: var(--brand-border);
+    box-shadow: 0 0 0 3px var(--brand-soft);
   }
 
   .window-button {
@@ -149,11 +187,13 @@
   }
 
   .section-title {
-    @apply text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3;
+    @apply text-xs font-bold text-slate-500 uppercase mb-3;
+    letter-spacing: .16em;
   }
 
   .page-title {
-    @apply text-2xl font-bold text-white tracking-tight;
+    @apply text-2xl font-black text-white;
+    letter-spacing: -.035em;
   }
 
   .page-subtitle {
@@ -166,6 +206,36 @@
 
   .divider {
     @apply border-t border-white/5 my-4;
+  }
+
+  .app-shell {
+    background-color: var(--surface-900);
+  }
+
+  .app-main-surface {
+    background-image:
+      radial-gradient(circle at 100% 0, var(--brand-soft), transparent 28%),
+      linear-gradient(var(--paper-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--paper-grid) 1px, transparent 1px);
+    background-size: auto, 24px 24px, 24px 24px;
+  }
+
+  .app-titlebar {
+    background-color: color-mix(in srgb, var(--surface-950) 95%, var(--brand) 5%);
+    border-bottom-color: var(--brand-border);
+    box-shadow: 0 1px 0 rgba(0,0,0,.08);
+  }
+
+  .app-sidebar {
+    background-color: var(--surface-950);
+    border-right-color: var(--brand-border);
+    box-shadow: 8px 0 24px rgba(0,0,0,.08);
+  }
+
+  .school-logo-shell {
+    background: #fff;
+    border: 1px solid var(--brand-border);
+    box-shadow: 0 3px 10px rgba(120, 99, 0, .14);
   }
 
   /* Drag region for frameless window */
@@ -334,14 +404,15 @@
   }
 
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-sky-400;
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(90deg, #d9ba00, #f0d84b);
   }
 
   .glow-violet {
-    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+    box-shadow: 0 0 20px rgba(217, 186, 0, 0.25);
   }
 
   .glow-sky {
-    box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+    box-shadow: 0 0 20px rgba(217, 186, 0, 0.18);
   }
 }
