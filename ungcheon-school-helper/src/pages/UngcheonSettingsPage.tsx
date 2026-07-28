@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   CheckCircle2, KeyRound, Link2, Palette, Save, School,
   UserRound, Clock3, CalendarDays, Power, AlertCircle, ExternalLink, LockKeyhole,
@@ -6,27 +6,104 @@ import {
 import { useAppStore } from '../stores/appStore'
 import { useAdminStore } from '../stores/adminStore'
 import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
+import { getSchoolNeisStatus, setSchoolNeisApiKey } from '../services/schoolHub'
 
 const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
 
 export default function UngcheonSettingsPage() {
   const config = useAppStore(s => s.config)
   const saveConfig = useAppStore(s => s.saveConfig)
+  const patchConfig = useAppStore(s => s.patchConfig)
   const isAdmin = useAdminStore(s => s.isAdmin)
+  const adminPassword = useAdminStore(s => s.adminPassword)
   const [draft, setDraft] = useState(config)
   const [saved, setSaved] = useState(false)
   const [hubStatus, setHubStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
+  const [neisKeyDraft, setNeisKeyDraft] = useState('')
+  const [neisConfigured, setNeisConfigured] = useState<boolean | null>(null)
+  const [neisStatusMessage, setNeisStatusMessage] = useState('')
+  const [neisSaving, setNeisSaving] = useState(false)
   const [autoLaunch, setAutoLaunch] = useState(false)
+  const legacyMigrationStarted = useRef(false)
 
   useEffect(() => setDraft(config), [config])
   useEffect(() => {
     window.electron?.getAutoLaunch().then(setAutoLaunch).catch(() => undefined)
   }, [])
+  useEffect(() => {
+    if (!config.schoolHubUrl) {
+      setNeisConfigured(null)
+      setNeisStatusMessage('학교 공유 서비스 URL을 먼저 설정하세요.')
+      return
+    }
+    let cancelled = false
+    getSchoolNeisStatus()
+      .then(async status => {
+        if (cancelled) return
+        setNeisConfigured(status.configured)
+        setNeisStatusMessage(status.configured
+          ? '학교 공용 NEIS 키가 안전하게 등록되어 있습니다.'
+          : '관리자가 학교 공용 NEIS 키를 등록해야 합니다.')
+        if (status.configured && config.neisApiKey) {
+          await window.electron.apiKeyDelete('neisApiKey')
+          patchConfig({ neisApiKey: '' })
+        }
+      })
+      .catch(error => {
+        if (cancelled) return
+        setNeisConfigured(null)
+        setNeisStatusMessage(error instanceof Error ? error.message : 'NEIS 연동 상태를 확인하지 못했습니다.')
+      })
+    return () => { cancelled = true }
+  }, [config.schoolHubUrl, config.neisApiKey, patchConfig])
+
+  useEffect(() => {
+    const legacyKey = config.neisApiKey?.trim()
+    if (!isAdmin || !adminPassword || neisConfigured !== false || !legacyKey || legacyMigrationStarted.current) return
+    legacyMigrationStarted.current = true
+    setNeisSaving(true)
+    setNeisStatusMessage('이 PC에 저장된 기존 NEIS 키를 학교 공용 키로 안전하게 이전하고 있습니다.')
+    setSchoolNeisApiKey(legacyKey, adminPassword)
+      .then(async status => {
+        setNeisConfigured(status.configured)
+        await window.electron.apiKeyDelete('neisApiKey')
+        patchConfig({ neisApiKey: '' })
+        setNeisStatusMessage('기존 NEIS 키를 학교 공유 서버로 이전하고 이 PC의 키를 삭제했습니다.')
+      })
+      .catch(error => {
+        legacyMigrationStarted.current = false
+        setNeisStatusMessage(error instanceof Error ? error.message : '기존 NEIS 키를 이전하지 못했습니다.')
+      })
+      .finally(() => setNeisSaving(false))
+  }, [adminPassword, config.neisApiKey, isAdmin, neisConfigured, patchConfig])
 
   const save = async () => {
-    await saveConfig(isAdmin ? draft : { ...draft, schoolHubUrl: config.schoolHubUrl })
+    const safeDraft = { ...draft, neisApiKey: '' }
+    await saveConfig(isAdmin ? safeDraft : { ...safeDraft, schoolHubUrl: config.schoolHubUrl })
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
+  }
+
+  const saveSchoolNeisKey = async () => {
+    if (!isAdmin || !adminPassword || !neisKeyDraft.trim()) return
+    setNeisSaving(true)
+    setNeisStatusMessage('')
+    try {
+      if (draft.schoolHubUrl?.trim() !== config.schoolHubUrl) {
+        await saveConfig({ schoolHubUrl: draft.schoolHubUrl?.trim() })
+      }
+      const status = await setSchoolNeisApiKey(neisKeyDraft.trim(), adminPassword)
+      setNeisConfigured(status.configured)
+      setNeisKeyDraft('')
+      setNeisStatusMessage('학교 공용 NEIS 키를 등록했습니다. 일반 사용자에게 키는 공개되지 않습니다.')
+      await window.electron.apiKeyDelete('neisApiKey')
+      patchConfig({ neisApiKey: '' })
+    } catch (error) {
+      setNeisConfigured(false)
+      setNeisStatusMessage(error instanceof Error ? error.message : 'NEIS API 키를 등록하지 못했습니다.')
+    } finally {
+      setNeisSaving(false)
+    }
   }
 
   const testHub = async () => {
@@ -78,23 +155,57 @@ export default function UngcheonSettingsPage() {
       </Section>
 
       <Section icon={<KeyRound size={17} />} title="NEIS Open API">
-        <Field label="NEIS API 키" help="키는 Windows 보안 저장소로 암호화해 이 PC에만 저장합니다. 자세한 발급 방법은 사용 매뉴얼에서도 확인할 수 있습니다.">
-          <input
-            type="password"
-            value={draft.neisApiKey ?? ''}
-            onChange={e => setDraft({ ...draft, neisApiKey: e.target.value })}
-            placeholder="발급받은 NEIS API 키"
-            autoComplete="off"
-          />
-          <button
-            type="button"
-            onClick={() => window.electron?.openExternal(NEIS_KEY_URL)}
-            className="mt-2 text-xs text-sky-400 hover:text-sky-300 inline-flex items-center gap-1"
-          >
-            NEIS 인증키 발급·확인 페이지
-            <ExternalLink size={12} />
-          </button>
-        </Field>
+        <div className={`rounded-xl border px-4 py-3 ${
+          neisConfigured === true
+            ? 'border-emerald-500/25 bg-emerald-500/10'
+            : 'border-amber-500/25 bg-amber-500/10'
+        }`}>
+          <p className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+            {neisConfigured === true ? <CheckCircle2 size={15} className="text-emerald-400" /> : <AlertCircle size={15} className="text-amber-400" />}
+            {neisConfigured === true ? '학교 공용 NEIS 연동 사용 중' : '학교 공용 NEIS 연동 확인 필요'}
+          </p>
+          <p className="mt-1.5 text-xs text-slate-400">{neisStatusMessage || '연동 상태를 확인하고 있습니다.'}</p>
+        </div>
+
+        {isAdmin ? (
+          <div className="mt-4">
+            <Field
+              label={neisConfigured ? '학교 공용 NEIS API 키 교체' : '학교 공용 NEIS API 키 등록'}
+              help="키는 Google Apps Script의 비공개 속성에만 저장되며 사용자 PC와 서버 응답에는 포함되지 않습니다."
+            >
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={neisKeyDraft}
+                  onChange={e => setNeisKeyDraft(e.target.value)}
+                  placeholder="관리자가 발급받은 NEIS API 키"
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  onClick={saveSchoolNeisKey}
+                  disabled={!neisKeyDraft.trim() || neisSaving}
+                  className="btn-primary whitespace-nowrap px-4"
+                >
+                  {neisSaving ? '확인 중' : neisConfigured ? '키 교체' : '키 등록'}
+                </button>
+              </div>
+            </Field>
+            <button
+              type="button"
+              onClick={() => window.electron?.openExternal(NEIS_KEY_URL)}
+              className="mt-2 text-xs text-sky-400 hover:text-sky-300 inline-flex items-center gap-1"
+            >
+              관리자용 NEIS 인증키 발급·확인
+              <ExternalLink size={12} />
+            </button>
+          </div>
+        ) : (
+          <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+            <LockKeyhole size={12} />
+            일반 사용자는 API 키를 발급하거나 입력할 필요가 없습니다.
+          </p>
+        )}
       </Section>
 
       <Section icon={<Link2 size={17} />} title="학교 공유 서비스">

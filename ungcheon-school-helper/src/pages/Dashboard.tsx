@@ -31,7 +31,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useAppStore } from '../stores/appStore'
 import { WeatherTodayView, WeatherForecastView } from '../components/WeatherBar'
 import { useWeather } from '../components/useWeather'
-import { getMeal, getSchedule, getTimetableRange, getSchoolDetail, NEIS_API_KEY } from '../services/neis'
+import { getMeal, getSchedule, getTimetableRange, getSchoolDetail } from '../services/neis'
 import { getSchoolTimetable } from '../services/schoolHub'
 import type { TeacherTimetable } from '../services/schoolTimetable'
 import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
@@ -273,7 +273,6 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const prevMonthRef = useRef('')
 
   const hasSchool = !!(config.officeCode && config.schoolCode)
-  const neisApiKey = config.neisApiKey?.trim() || NEIS_API_KEY
   const periodRanges = UNGCHEON_PERIOD_RANGES
   const hasTeacher = !!(config.teacherClasses?.length)
 
@@ -300,7 +299,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   // schoolAddress 자동 보완
   useEffect(() => {
     if (hasSchool && !config.schoolAddress) {
-      getSchoolDetail(neisApiKey, config.officeCode!, config.schoolCode!).then(detail => {
+      getSchoolDetail(config.officeCode!, config.schoolCode!).then(detail => {
         if (detail?.address) saveConfig({ schoolAddress: detail.address })
       }).catch(() => {})
     }
@@ -327,16 +326,16 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       const nextDay = addDays(new Date(selectedDate), 1)
 
       const promises: Promise<unknown>[] = [
-        getMeal(neisApiKey, config.officeCode!, config.schoolCode!, new Date(selectedDate)),
-        getMeal(neisApiKey, config.officeCode!, config.schoolCode!, nextDay),
+        getMeal(config.officeCode!, config.schoolCode!, new Date(selectedDate)),
+        getMeal(config.officeCode!, config.schoolCode!, nextDay),
         prevMonthRef.current === `${year}-${month}`
           ? Promise.resolve(null)
-          : getSchedule(neisApiKey, config.officeCode!, config.schoolCode!, year, month),
+          : getSchedule(config.officeCode!, config.schoolCode!, year, month),
       ]
 
       if (config.grade && config.classNm && config.schoolType) {
         promises.push(
-          getTimetableRange(neisApiKey, config.officeCode!, config.schoolCode!, config.schoolType, config.grade, config.classNm, fromYmdStr, toYmdStr)
+          getTimetableRange(config.officeCode!, config.schoolCode!, config.schoolType, config.grade, config.classNm, fromYmdStr, toYmdStr)
         )
       } else {
         promises.push(Promise.resolve(null))
@@ -354,7 +353,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       if (hasTeacher && config.teacherClasses && config.schoolType) {
         const results = await Promise.all(
           config.teacherClasses.map(tc =>
-            getTimetableRange(neisApiKey, config.officeCode!, config.schoolCode!, config.schoolType!, tc.grade, tc.classNm, fromYmdStr, toYmdStr)
+            getTimetableRange(config.officeCode!, config.schoolCode!, config.schoolType!, tc.grade, tc.classNm, fromYmdStr, toYmdStr)
           )
         )
         setTeacherTT(results.flat())
@@ -364,7 +363,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     } finally {
       setLoading(false)
     }
-  }, [selectedDate, config.officeCode, config.schoolCode, config.grade, config.classNm, config.schoolType, config.neisApiKey, hasSchool, hasTeacher, config.teacherClasses, neisApiKey])
+  }, [selectedDate, config.officeCode, config.schoolCode, config.grade, config.classNm, config.schoolType, hasSchool, hasTeacher, config.teacherClasses])
 
   useEffect(() => { load() }, [load])
 

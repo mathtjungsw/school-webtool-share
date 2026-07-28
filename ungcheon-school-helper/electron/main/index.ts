@@ -597,6 +597,9 @@ const HUB_ACTIONS = new Set([
   'deleteFeatureRequest',
   'getTimetable',
   'replaceTimetable',
+  'getNeisStatus',
+  'setNeisApiKey',
+  'neisQuery',
 ])
 
 async function requestSchoolHub(payload: Record<string, unknown>) {
