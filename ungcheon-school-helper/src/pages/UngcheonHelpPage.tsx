@@ -77,7 +77,7 @@ const SECTIONS = [
     icon: BookOpen,
     items: [
       'NEIS 정보와 대시보드는 NEIS Open API를 사용하며 실제 NEIS 로그인 정보는 요구하지 않습니다.',
-      '출석부·학적업무·교육과정편제표의 작업자료는 각 교직원 PC에 저장됩니다.',
+      '교육과정 편제표 출력에서는 전학년·1학년·2학년·3학년 PDF와 과목선택 상담 기능을 이용할 수 있습니다.',
       '업무 알리미는 실제 미결 공문이 아니라 오늘의 학사일정과 학교 공지를 확인합니다.',
     ],
   },
@@ -172,7 +172,7 @@ export default function UngcheonHelpPage() {
           <h2 className="font-semibold text-white flex items-center gap-2 mb-4"><FileSpreadsheet size={16} className="text-violet-400" />선택된 도구</h2>
           <p className="text-sm text-slate-400 leading-relaxed">
             Excel 전처리, 대학 권장과목, 호봉획정, 방과후 점검, 인사기록 분석,
-            시간표 교체, 업무경감 도우미, 교육과정편제표, 사진대장, 학적업무, 출석부,
+            시간표 교체, 교육과정 편제표 출력, 과목선택 상담, 사진대장, 학적업무, 출석부,
             위원회·비치 장부, PDF 추출, 파일 파서가 포함되어 있습니다.
           </p>
         </section>

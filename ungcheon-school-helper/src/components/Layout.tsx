@@ -17,7 +17,6 @@ const RecommendedSubjectsPage = lazy(() => import('../pages/RecommendedSubjectsP
 const PayrollPage = lazy(() => import('../pages/PayrollPage'))
 const AfterSchoolCheckerPage = lazy(() => import('../pages/AfterSchoolCheckerPage'))
 const InsaAnalysisPage = lazy(() => import('../pages/InsaAnalysisPage'))
-const WorkReducerPage = lazy(() => import('../pages/WorkReducerPage'))
 const CurriculumPage = lazy(() => import('../pages/CurriculumPage'))
 const PhotoLedgerPage = lazy(() => import('../pages/PhotoLedgerPage'))
 const StudentRecordPage = lazy(() => import('../pages/StudentRecordPage'))
@@ -40,7 +39,6 @@ const PAGES: Record<string, React.ComponentType> = {
   payroll: PayrollPage,
   afterschool_checker: AfterSchoolCheckerPage,
   insa_analysis: InsaAnalysisPage,
-  work_reducer: WorkReducerPage,
   curriculum: CurriculumPage,
   photo_ledger: PhotoLedgerPage,
   student_record: StudentRecordPage,
