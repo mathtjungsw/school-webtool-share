@@ -9,6 +9,7 @@ import { promisify } from 'util'
 import { autoUpdater } from 'electron-updater'
 import Store from 'electron-store'
 import { startMonitoring, stopMonitoring, isMonitoringActive } from './notifier'
+import { getWeeklyPlanMonth } from './weekly-plan'
 
 const execFileAsync = promisify(execFile)
 
@@ -197,6 +198,16 @@ ipcMain.handle('app:resourcesPath', () =>
     ? join(__dirname, '../../resources')  // dev: project resources/
     : process.resourcesPath               // prod: unpacked extraResources
 )
+
+ipcMain.handle('weeklyPlan:getMonth', (_, year: number, month: number, force = false) => {
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+    throw new Error('주간계획 조회 연도가 올바르지 않습니다.')
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    throw new Error('주간계획 조회 월이 올바르지 않습니다.')
+  }
+  return getWeeklyPlanMonth(year, month, force === true)
+})
 
 const CURRICULUM_PDFS = {
   all: '2026-all-grades.pdf',

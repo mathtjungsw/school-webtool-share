@@ -35,7 +35,7 @@ import { getMeal, getSchedule, getTimetableRange, getSchoolDetail, NEIS_API_KEY 
 import { getSchoolTimetable } from '../services/schoolHub'
 import type { TeacherTimetable } from '../services/schoolTimetable'
 import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
-import type { MealInfo, ScheduleEvent, TimetableEntry } from '../types'
+import type { MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanResult } from '../types'
 import { format, addDays, startOfWeek } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import clsx from 'clsx'
@@ -52,6 +52,12 @@ const COLOR_MAP: Record<string, { bg: string; icon: string; dot: string }> = {
 }
 interface PortfolioItem { id: string; label: string; icon: LucideIcon; desc: string; badge?: string; hidden?: boolean }
 interface PortfolioGroup { group: string; color: string; items: PortfolioItem[] }
+interface DashboardScheduleEvent {
+  date: string
+  eventName: string
+  source: 'neis' | 'weekly'
+  department?: string
+}
 
 const PORTFOLIO_GROUPS: PortfolioGroup[] = [
   { group: '학교 공유', color: 'violet', items: [
@@ -215,6 +221,14 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const [meal, setMeal] = useState<MealInfo[]>([])
   const [nextMeal, setNextMeal] = useState<MealInfo[]>([])
   const [schedule, setSchedule] = useState<ScheduleEvent[]>([])
+  const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanResult>({
+    events: [],
+    notes: [],
+    sourceSheets: [],
+    fetchedAt: '',
+  })
+  const [weeklyPlanLoading, setWeeklyPlanLoading] = useState(false)
+  const [weeklyPlanError, setWeeklyPlanError] = useState('')
   const [timetable, setTimetable] = useState<TimetableEntry[]>([])
   const [teacherTT, setTeacherTT] = useState<TimetableEntry[]>([])
   const [sharedTeacher, setSharedTeacher] = useState<TeacherTimetable | null>(null)
@@ -367,6 +381,28 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
 
   useEffect(() => { load() }, [load])
 
+  const loadWeeklyPlan = useCallback(async (force = false) => {
+    if (!window.electron?.weeklyPlanGetMonth) return
+    const year = Number(selectedDate.slice(0, 4))
+    const month = Number(selectedDate.slice(5, 7))
+    setWeeklyPlanLoading(true)
+    setWeeklyPlanError('')
+    try {
+      const result = await window.electron.weeklyPlanGetMonth(year, month, force)
+      setWeeklyPlan(result)
+    } catch {
+      setWeeklyPlanError('주간계획을 불러오지 못했습니다.')
+    } finally {
+      setWeeklyPlanLoading(false)
+    }
+  }, [selectedDate])
+
+  useEffect(() => { loadWeeklyPlan() }, [loadWeeklyPlan])
+  useEffect(() => {
+    const id = window.setInterval(() => loadWeeklyPlan(true), 30 * 60 * 1000)
+    return () => window.clearInterval(id)
+  }, [loadWeeklyPlan])
+
   const goDay = (delta: number) => {
     const d = new Date(selectedDate)
     d.setDate(d.getDate() + delta)
@@ -375,6 +411,22 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
 
   const isToday = selectedDate === todayStr()
   const selYmd = toYmd(selectedDate)
+  const combinedSchedule: DashboardScheduleEvent[] = [
+    ...schedule.map(item => ({
+      date: item.date,
+      eventName: item.eventName,
+      source: 'neis' as const,
+    })),
+    ...weeklyPlan.events.map(item => ({
+      date: item.date,
+      eventName: item.eventName,
+      department: item.department,
+      source: 'weekly' as const,
+    })),
+  ].sort((a, b) => a.date.localeCompare(b.date) || a.eventName.localeCompare(b.eventName))
+  const selectedWeekNotes = weeklyPlan.notes.filter(note =>
+    note.weekStart <= selYmd && note.weekEnd >= selYmd,
+  )
 
   const todaySubjects: Record<string, string> = {}
   if (isToday) {
@@ -433,8 +485,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
               </button>
             )}
           </div>
-          <button onClick={load} disabled={loading || !hasSchool} className="btn-ghost flex items-center gap-1.5 disabled:opacity-40">
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+          <button
+            onClick={() => { load(); loadWeeklyPlan(true) }}
+            disabled={loading || weeklyPlanLoading || !hasSchool}
+            className="btn-ghost flex items-center gap-1.5 disabled:opacity-40"
+          >
+            <RefreshCw size={13} className={loading || weeklyPlanLoading ? 'animate-spin' : ''} />
             <span className="text-xs">새로고침</span>
           </button>
         </div>
@@ -512,27 +568,75 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
               )}
             </DashCard>
 
-            {/* 📅 학사일정 (월간) */}
-            <DashCard icon={<CalendarDays size={14} className="text-violet-400"/>} title="학사일정" badge={`${selectedDate.slice(0,7)} 월`} badgeColor="violet">
-              {loading && schedule.length === 0 ? <Skeleton rows={5}/> : schedule.length > 0 ? (
-                <div className="space-y-1.5 flex-1 min-h-0 overflow-y-auto scrollbar-none max-h-72 xl:max-h-none">
-                  {schedule.map((s, i) => (
-                    <div key={i} className={clsx(
-                      'flex items-start gap-2 px-2 py-1.5 rounded-lg transition-colors',
-                      s.date === selYmd ? 'bg-violet-500/15 border border-violet-500/30' : 'hover:bg-white/3'
-                    )}>
-                      <span className={clsx(
-                        'text-[10px] px-1.5 py-0.5 rounded font-mono flex-shrink-0 mt-0.5',
-                        s.date === selYmd ? 'bg-violet-500/30 text-violet-300' : 'bg-white/5 text-slate-400'
-                      )}>
-                        {s.date.slice(4,6)}/{s.date.slice(6,8)}
-                      </span>
-                      <span className="text-sm text-slate-200 leading-snug">{s.eventName}</span>
+            {/* 📅 학사일정 + 교무기획부 주간계획 */}
+            <DashCard icon={<CalendarDays size={14} className="text-violet-400"/>} title="학사일정 · 주간계획" badge={`${selectedDate.slice(0,7)} · 자동`} badgeColor="violet">
+              {(loading || weeklyPlanLoading) && combinedSchedule.length === 0 ? <Skeleton rows={5}/> : (
+                <div className="flex flex-col min-h-0">
+                  {combinedSchedule.length > 0 ? (
+                    <div className="space-y-1.5 flex-1 min-h-0 overflow-y-auto scrollbar-none max-h-72 xl:max-h-none">
+                      {combinedSchedule.map((item, i) => (
+                        <div key={`${item.source}-${item.date}-${item.department ?? ''}-${i}`} className={clsx(
+                          'flex items-start gap-2 px-2 py-1.5 rounded-lg transition-colors border',
+                          item.date === selYmd
+                            ? item.source === 'weekly'
+                              ? 'bg-sky-500/12 border-sky-400/30'
+                              : 'bg-violet-500/15 border-violet-500/30'
+                            : 'border-transparent hover:bg-white/3',
+                        )}>
+                          <span className={clsx(
+                            'text-[10px] px-1.5 py-0.5 rounded font-mono flex-shrink-0 mt-0.5',
+                            item.source === 'weekly'
+                              ? 'bg-sky-500/20 text-sky-300'
+                              : item.date === selYmd
+                                ? 'bg-violet-500/30 text-violet-300'
+                                : 'bg-white/5 text-slate-400',
+                          )}>
+                            {item.date.slice(4,6)}/{item.date.slice(6,8)}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className={clsx(
+                                'text-[9px] font-bold px-1.5 py-0.5 rounded-full',
+                                item.source === 'weekly'
+                                  ? 'bg-sky-500/15 text-sky-300'
+                                  : 'bg-violet-500/15 text-violet-300',
+                              )}>
+                                {item.source === 'weekly' ? item.department : 'NEIS'}
+                              </span>
+                            </div>
+                            <span className="text-sm text-slate-200 leading-snug whitespace-pre-line">{item.eventName}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <Empty text="이번 달 학사일정과 주간계획이 없습니다." />
+                  )}
+
+                  {selectedWeekNotes.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-sky-400/15">
+                      <p className="text-[10px] font-bold text-sky-300 mb-1.5">이번 주 기타·참고사항</p>
+                      <div className="space-y-1 max-h-24 overflow-y-auto scrollbar-none">
+                        {selectedWeekNotes.map((note, i) => (
+                          <div key={`${note.department}-${i}`} className="text-[11px] text-slate-400 leading-relaxed">
+                            <span className="text-sky-400/90 font-semibold">{note.department}</span>
+                            <span className="mx-1 text-slate-600">·</span>
+                            <span className="whitespace-pre-line">{note.content}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {weeklyPlanError && (
+                    <p className="text-[10px] text-amber-400 mt-2">{weeklyPlanError} NEIS 일정만 표시합니다.</p>
+                  )}
+                  {!weeklyPlanError && weeklyPlan.sourceSheets.length > 0 && (
+                    <p className="text-[9px] text-slate-600 mt-2">
+                      교무기획부 주간계획 {weeklyPlan.sourceSheets.length}개 시트 자동 반영
+                    </p>
+                  )}
                 </div>
-              ) : (
-                <Empty text="이번 달 학사일정이 없습니다." />
               )}
             </DashCard>
 

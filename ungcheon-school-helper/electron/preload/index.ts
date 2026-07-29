@@ -109,6 +109,10 @@ contextBridge.exposeInMainWorld('electron', {
   // Resources path (for bundled static HTML tools)
   getResourcesPath: (): Promise<string> => ipcRenderer.invoke('app:resourcesPath'),
 
+  // 교무기획부 웅천고 주간계획
+  weeklyPlanGetMonth: (year: number, month: number, force = false) =>
+    ipcRenderer.invoke('weeklyPlan:getMonth', year, month, force),
+
   // 교육과정 편제표 PDF
   curriculumGetPdfUrl: (id: 'all' | 'grade1' | 'grade2' | 'grade3') =>
     ipcRenderer.invoke('curriculum:getPdfUrl', id),
