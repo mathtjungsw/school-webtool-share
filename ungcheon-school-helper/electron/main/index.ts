@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog, safeStorage, session } from 'electron'
 import { join, resolve as pathResolve, basename } from 'path'
+import { pathToFileURL } from 'url'
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync, readdirSync, copyFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { execFile, spawn } from 'child_process'
@@ -196,6 +197,46 @@ ipcMain.handle('app:resourcesPath', () =>
     ? join(__dirname, '../../resources')  // dev: project resources/
     : process.resourcesPath               // prod: unpacked extraResources
 )
+
+const CURRICULUM_PDFS = {
+  all: '2026-all-grades.pdf',
+  grade1: '2026-grade-1.pdf',
+  grade2: '2026-grade-2.pdf',
+  grade3: '2026-grade-3.pdf',
+} as const
+type CurriculumPdfId = keyof typeof CURRICULUM_PDFS
+
+function curriculumPdfPath(id: CurriculumPdfId) {
+  const fileName = CURRICULUM_PDFS[id]
+  if (!fileName) throw new Error('등록되지 않은 교육과정 편제표입니다.')
+  const resourceRoot = process.env['ELECTRON_RENDERER_URL']
+    ? join(__dirname, '../../resources')
+    : process.resourcesPath
+  const filePath = join(resourceRoot, 'curriculum', fileName)
+  if (!existsSync(filePath)) throw new Error('교육과정 편제표 PDF를 찾을 수 없습니다.')
+  return filePath
+}
+
+ipcMain.handle('curriculum:getPdfUrl', (_, id: CurriculumPdfId) =>
+  pathToFileURL(curriculumPdfPath(id)).toString()
+)
+
+ipcMain.handle('curriculum:openPdf', (_, id: CurriculumPdfId) =>
+  shell.openPath(curriculumPdfPath(id))
+)
+
+ipcMain.handle('curriculum:savePdf', async (_, id: CurriculumPdfId, defaultName: string) => {
+  if (!mainWindow) return false
+  const sourcePath = curriculumPdfPath(id)
+  const safeName = basename(defaultName).replace(/[\\/:*?"<>|]/g, '_') || CURRICULUM_PDFS[id]
+  const result = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: safeName,
+    filters: [{ name: 'PDF 문서', extensions: ['pdf'] }],
+  })
+  if (result.canceled || !result.filePath) return false
+  copyFileSync(sourcePath, result.filePath)
+  return true
+})
 
 // Auto-launch (Windows 시작 프로그램)
 ipcMain.handle('app:getAutoLaunch', () => {

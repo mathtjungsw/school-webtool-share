@@ -9,7 +9,7 @@ import {
   DollarSign, Briefcase, ClipboardList, School, ShoppingCart,
   Landmark, BookCopy, Trophy, FileSearch, FileDown, FileText,
   FileSpreadsheet, HelpCircle, Waves, SquareStack, CircleDot, Star,
-  FileScan, Wand2, FileCode2,
+  FileScan, FileCode2,
   Clapperboard, SquarePen, MessagesSquare, BarChart3, Mic,
   type LucideIcon,
 } from 'lucide-react'
@@ -68,8 +68,7 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
   ]},
   { group: '학사·기록', color: 'amber', items: [
     { id: 'timetable_swap', label: '교환·대강 계획', icon: Shuffle, desc: '후보 시간표·연강 확인과 계획서 출력' },
-    { id: 'work_reducer', label: '업무경감 도우미', icon: Wand2, desc: '시간표·수업변경·명렬표 작업' },
-    { id: 'curriculum', label: '교육과정편제표', icon: FileText, desc: '학년·학기별 편제표 작성' },
+    { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText, desc: '4개 편제표 확인·PDF 출력과 과목선택 상담' },
     { id: 'photo_ledger', label: '사진대장', icon: Images, desc: '사진 배치·설명·출력' },
     { id: 'student_record', label: '학적업무', icon: Archive, desc: '전입·전출 등 학적 문서 작성' },
     { id: 'attendance', label: '출석부', icon: Users, desc: '출결 기록·통계·Excel 내보내기' },

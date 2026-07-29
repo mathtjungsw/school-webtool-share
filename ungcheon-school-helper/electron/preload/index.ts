@@ -108,4 +108,14 @@ contextBridge.exposeInMainWorld('electron', {
 
   // Resources path (for bundled static HTML tools)
   getResourcesPath: (): Promise<string> => ipcRenderer.invoke('app:resourcesPath'),
+
+  // 교육과정 편제표 PDF
+  curriculumGetPdfUrl: (id: 'all' | 'grade1' | 'grade2' | 'grade3') =>
+    ipcRenderer.invoke('curriculum:getPdfUrl', id),
+  curriculumOpenPdf: (id: 'all' | 'grade1' | 'grade2' | 'grade3') =>
+    ipcRenderer.invoke('curriculum:openPdf', id),
+  curriculumSavePdf: (
+    id: 'all' | 'grade1' | 'grade2' | 'grade3',
+    defaultName: string,
+  ): Promise<boolean> => ipcRenderer.invoke('curriculum:savePdf', id, defaultName),
 })

@@ -51,6 +51,12 @@ declare global {
       getAutoLaunch: () => Promise<boolean>
       setAutoLaunch: (enable: boolean) => Promise<void>
       getResourcesPath: () => Promise<string>
+      curriculumGetPdfUrl: (id: 'all' | 'grade1' | 'grade2' | 'grade3') => Promise<string>
+      curriculumOpenPdf: (id: 'all' | 'grade1' | 'grade2' | 'grade3') => Promise<string>
+      curriculumSavePdf: (
+        id: 'all' | 'grade1' | 'grade2' | 'grade3',
+        defaultName: string,
+      ) => Promise<boolean>
     }
   }
 }
