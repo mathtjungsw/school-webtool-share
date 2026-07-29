@@ -40,6 +40,28 @@ export interface ScheduleEvent {
   eventLevel: string
 }
 
+export interface WeeklyPlanEvent {
+  date: string
+  department: string
+  eventName: string
+  sheetName: string
+}
+
+export interface WeeklyPlanNote {
+  department: string
+  content: string
+  sheetName: string
+  weekStart: string
+  weekEnd: string
+}
+
+export interface WeeklyPlanResult {
+  events: WeeklyPlanEvent[]
+  notes: WeeklyPlanNote[]
+  sourceSheets: string[]
+  fetchedAt: string
+}
+
 export interface TimetableEntry {
   date?: string      // YYYYMMDD
   grade?: string

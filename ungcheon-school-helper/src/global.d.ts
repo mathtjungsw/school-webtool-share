@@ -51,6 +51,11 @@ declare global {
       getAutoLaunch: () => Promise<boolean>
       setAutoLaunch: (enable: boolean) => Promise<void>
       getResourcesPath: () => Promise<string>
+      weeklyPlanGetMonth: (
+        year: number,
+        month: number,
+        force?: boolean,
+      ) => Promise<import('./types').WeeklyPlanResult>
       curriculumGetPdfUrl: (id: 'all' | 'grade1' | 'grade2' | 'grade3') => Promise<string>
       curriculumOpenPdf: (id: 'all' | 'grade1' | 'grade2' | 'grade3') => Promise<string>
       curriculumSavePdf: (
