@@ -122,7 +122,7 @@ export default function SchoolHubPage() {
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="page-title">웅천고 학교 공유</h1>
+          <h1 className="page-title">웅천고 학교 공유 링크</h1>
           <p className="text-sm text-slate-400 mt-1">등록한 링크는 별도 승인 없이 모든 교직원에게 즉시 공유됩니다.</p>
         </div>
         <button onClick={load} disabled={loading} className="btn-ghost flex items-center gap-2">

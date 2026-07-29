@@ -54,7 +54,7 @@ export default function TitleBar({
 
       <div className="flex-1 flex items-center justify-center gap-1">
         <TopNav active={currentPage === 'dashboard'} onClick={() => onNavigate('dashboard')}>대시보드</TopNav>
-        <TopNav active={currentPage === 'school_hub'} onClick={() => onNavigate('school_hub')} icon={<Link2 size={11} />}>학교 공유</TopNav>
+        <TopNav active={currentPage === 'school_hub'} onClick={() => onNavigate('school_hub')} icon={<Link2 size={11} />}>학교 공유 링크</TopNav>
         <TopNav active={currentPage === 'feature_requests'} onClick={() => onNavigate('feature_requests')} icon={<MessageSquareText size={11} />}>기능개선</TopNav>
         <NoticeButton />
         <TopNav active={currentPage === 'settings'} onClick={() => onNavigate('settings')}>환경설정</TopNav>
