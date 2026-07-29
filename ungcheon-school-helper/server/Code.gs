@@ -2,7 +2,8 @@
  * 웅천고 업무도우미 학교 공유 서비스
  *
  * Google 스프레드시트에 바인딩된 Apps Script로 사용합니다.
- * 학생 개인정보를 저장하지 마세요. 교사 시간표는 학교 내부 공유용입니다.
+ * 교사·학생 시간표는 학교 내부 공유용입니다.
+ * 학생 시간표는 관리자 업로드 시 Excel 원본이 아닌 조회용 가공 결과만 저장합니다.
  */
 
 const LINKS_SHEET = '공유링크';
@@ -10,11 +11,26 @@ const NOTICES_SHEET = '공지';
 const FEATURE_REQUESTS_SHEET = '기능개선요청';
 const TIMETABLE_META_SHEET = '시간표정보';
 const TIMETABLE_SHEET = '시간표';
+const STUDENT_TIMETABLE_META_SHEET = '학생시간표정보';
+const STUDENT_TIMETABLE_SHEET = '학생시간표';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
+const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
+const NEIS_BASE_URL = 'https://open.neis.go.kr/hub/';
+const UNGCHEON_OFFICE_CODE = 'S10';
+const UNGCHEON_SCHOOL_CODE = '9010464';
 const TIMETABLE_SLOT_COUNT = 35;
+const NEIS_CACHE_SECONDS = 300;
+const NEIS_ENDPOINT_PARAMS = {
+  schoolInfo: ['SCHUL_NM'],
+  mealServiceDietInfo: ['MLSV_YMD'],
+  SchoolSchedule: ['AA_YMD', 'AA_FROM_YMD', 'AA_TO_YMD'],
+  hisTimetable: ['AY', 'SEM', 'ALL_TI_YMD', 'TI_FROM_YMD', 'TI_TO_YMD', 'GRADE', 'CLASS_NM'],
+  classInfo: ['AY'],
+  schoolMajorinfo: ['AY']
+};
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 3 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 5 } });
 }
 
 function doPost(e) {
@@ -23,7 +39,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 3 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 5 } });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: { verified: true } });
@@ -60,6 +76,21 @@ function doPost(e) {
     if (action === 'replaceTimetable') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: replaceTimetable_(body) });
+    }
+    if (action === 'getStudentTimetable') return json_({ ok: true, data: getStudentTimetable_() });
+    if (action === 'replaceStudentTimetable') {
+      requireAdmin_(body.adminPassword);
+      return json_({ ok: true, data: replaceStudentTimetable_(body) });
+    }
+    if (action === 'getNeisStatus') {
+      return json_({ ok: true, data: getNeisStatus_() });
+    }
+    if (action === 'setNeisApiKey') {
+      requireAdmin_(body.adminPassword);
+      return json_({ ok: true, data: setNeisApiKey_(body.apiKey) });
+    }
+    if (action === 'neisQuery') {
+      return json_({ ok: true, data: neisQuery_(body.endpoint, body.params) });
     }
     throw new Error('허용되지 않는 요청입니다.');
   } catch (error) {
@@ -131,6 +162,33 @@ function ensureSheets_() {
     timetable.insertColumnsAfter(timetable.getMaxColumns(), timetableHeaders.length - timetable.getMaxColumns());
   }
   timetable.getRange(1, 1, 1, timetableHeaders.length).setValues([timetableHeaders]);
+
+  let studentTimetableMeta = book.getSheetByName(STUDENT_TIMETABLE_META_SHEET);
+  if (!studentTimetableMeta) {
+    studentTimetableMeta = book.insertSheet(STUDENT_TIMETABLE_META_SHEET);
+    studentTimetableMeta.appendRow([
+      'version', 'title', 'semester', 'uploadedBy', 'uploadedAt',
+      'studentCount', 'classCount', 'courseCount'
+    ]);
+    studentTimetableMeta.setFrozenRows(1);
+  }
+
+  let studentTimetable = book.getSheetByName(STUDENT_TIMETABLE_SHEET);
+  const studentTimetableHeaders = [
+    'studentId', 'name', 'grade', 'className', 'number', 'enrollmentCount', 'payloadJson'
+  ];
+  if (!studentTimetable) {
+    studentTimetable = book.insertSheet(STUDENT_TIMETABLE_SHEET);
+    studentTimetable.setFrozenRows(1);
+  }
+  if (studentTimetable.getMaxColumns() < studentTimetableHeaders.length) {
+    studentTimetable.insertColumnsAfter(
+      studentTimetable.getMaxColumns(),
+      studentTimetableHeaders.length - studentTimetable.getMaxColumns()
+    );
+  }
+  studentTimetable.getRange(1, 1, 1, studentTimetableHeaders.length)
+    .setValues([studentTimetableHeaders]);
 }
 
 function listLinks_() {
@@ -349,6 +407,267 @@ function replaceTimetable_(body) {
     lock.releaseLock();
   }
   return { version: version, uploadedAt: uploadedAt };
+}
+
+function getStudentTimetable_() {
+  const metaRows = readObjects_(STUDENT_TIMETABLE_META_SHEET);
+  if (!metaRows.length) return null;
+  const meta = metaRows[0];
+  const students = readObjects_(STUDENT_TIMETABLE_SHEET)
+    .map(function(row) {
+      try {
+        return JSON.parse(String(row.payloadJson || ''));
+      } catch (error) {
+        return null;
+      }
+    })
+    .filter(function(student) {
+      return student && student.student && student.student.studentId;
+    });
+
+  return {
+    version: Number(meta.version) || 1,
+    title: String(meta.title || ''),
+    semester: String(meta.semester || ''),
+    uploadedBy: String(meta.uploadedBy || ''),
+    uploadedAt: iso_(meta.uploadedAt),
+    studentCount: students.length,
+    classCount: Number(meta.classCount) || 0,
+    courseCount: Number(meta.courseCount) || 0,
+    students: students
+  };
+}
+
+function replaceStudentTimetable_(body) {
+  const timetable = body.timetable || {};
+  const students = Array.isArray(timetable.students) ? timetable.students : [];
+  if (!students.length) throw new Error('업로드할 학생 시간표가 없습니다.');
+  if (students.length > 1500) throw new Error('학생 수는 1,500명을 초과할 수 없습니다.');
+
+  const title = clean_(timetable.title, 100) || '학생별 시간표';
+  const semester = clean_(timetable.semester, 30);
+  const uploadedBy = clean_(body.uploadedBy, 30) || '관리자';
+  const uploadedAt = new Date().toISOString();
+  const existing = readObjects_(STUDENT_TIMETABLE_META_SHEET);
+  const version = (existing.length ? Number(existing[0].version) || 0 : 0) + 1;
+  const seen = {};
+  const rows = students.map(function(item) {
+    const normalized = normalizeStudentTimetable_(item);
+    const student = normalized.student;
+    if (seen[student.studentId]) throw new Error('중복 학번이 있습니다: ' + student.studentId);
+    seen[student.studentId] = true;
+    const payloadJson = JSON.stringify(normalized);
+    if (payloadJson.length > 45000) {
+      throw new Error(student.studentId + ' 학생의 시간표 데이터가 너무 큽니다.');
+    }
+    return [
+      student.studentId,
+      student.name,
+      student.grade,
+      student.className,
+      student.number,
+      student.enrollmentCount,
+      payloadJson
+    ];
+  });
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const book = SpreadsheetApp.getActiveSpreadsheet();
+    const dataSheet = book.getSheetByName(STUDENT_TIMETABLE_SHEET);
+    const metaSheet = book.getSheetByName(STUDENT_TIMETABLE_META_SHEET);
+    if (dataSheet.getLastRow() > 1) {
+      dataSheet.getRange(2, 1, dataSheet.getLastRow() - 1, dataSheet.getLastColumn()).clearContent();
+    }
+    dataSheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+
+    if (metaSheet.getLastRow() > 1) {
+      metaSheet.getRange(2, 1, metaSheet.getLastRow() - 1, metaSheet.getLastColumn()).clearContent();
+    }
+    metaSheet.getRange(2, 1, 1, 8).setValues([[
+      version,
+      title,
+      semester,
+      uploadedBy,
+      uploadedAt,
+      rows.length,
+      Math.max(0, Number(timetable.classCount) || 0),
+      Math.max(0, Number(timetable.courseCount) || 0)
+    ]]);
+  } finally {
+    lock.releaseLock();
+  }
+  return { version: version, uploadedAt: uploadedAt };
+}
+
+function normalizeStudentTimetable_(item) {
+  const sourceStudent = item && item.student ? item.student : {};
+  const studentId = clean_(sourceStudent.studentId, 12);
+  const name = clean_(sourceStudent.name, 30);
+  if (!/^\d{4,12}$/.test(studentId)) throw new Error('학번 형식이 올바르지 않습니다.');
+  if (!name) throw new Error(studentId + ' 학생의 이름이 없습니다.');
+
+  const grade = clean_(sourceStudent.grade, 2);
+  const className = clean_(sourceStudent.className, 3);
+  const number = clean_(sourceStudent.number, 3);
+  const classLabel = clean_(sourceStudent.classLabel, 8) || grade + '-' + className;
+  const sourceSlots = item && item.slots && typeof item.slots === 'object' ? item.slots : {};
+  const days = ['월', '화', '수', '목', '금'];
+  const slots = {};
+  days.forEach(function(day) {
+    for (let period = 1; period <= 7; period++) {
+      const key = day + period;
+      const slot = sourceSlots[key] || {};
+      slots[key] = {
+        day: day,
+        period: period,
+        subject: clean_(slot.subject, 120),
+        teacher: clean_(slot.teacher, 100),
+        classroom: clean_(slot.classroom, 50),
+        raw: '',
+        selectedCourse: Boolean(slot.selectedCourse),
+        group: clean_(slot.group, 20)
+      };
+    }
+  });
+
+  const sourceSelections = Array.isArray(item && item.selections) ? item.selections : [];
+  const selections = sourceSelections.slice(0, 40).map(function(selection) {
+    const times = Array.isArray(selection.times) ? selection.times : [];
+    return {
+      grade: clean_(selection.grade, 2),
+      group: clean_(selection.group, 20),
+      times: times.slice(0, 10).map(function(time) { return clean_(time, 10); }),
+      courseName: clean_(selection.courseName, 120),
+      teacher: clean_(selection.teacher, 100),
+      classroom: clean_(selection.classroom, 50),
+      sourceFile: ''
+    };
+  });
+
+  return {
+    student: {
+      studentId: studentId,
+      name: name,
+      grade: grade,
+      className: className,
+      classLabel: classLabel,
+      number: number,
+      enrollmentCount: Math.max(0, Number(sourceStudent.enrollmentCount) || 0)
+    },
+    slots: slots,
+    selections: selections,
+    warnings: []
+  };
+}
+
+function getNeisStatus_() {
+  return {
+    configured: Boolean(PropertiesService.getScriptProperties().getProperty(NEIS_API_KEY_PROPERTY)),
+    schoolName: '웅천고등학교'
+  };
+}
+
+function setNeisApiKey_(value) {
+  const apiKey = clean_(value, 200);
+  if (!apiKey) throw new Error('저장할 NEIS API 키를 입력하세요.');
+  if (!/^[A-Za-z0-9_-]+$/.test(apiKey)) throw new Error('NEIS API 키 형식이 올바르지 않습니다.');
+
+  const rows = fetchNeisRows_('schoolInfo', {}, apiKey);
+  if (!rows.length || String(rows[0].SD_SCHUL_CODE || '') !== UNGCHEON_SCHOOL_CODE) {
+    throw new Error('NEIS API 키로 웅천고등학교 정보를 확인하지 못했습니다.');
+  }
+
+  PropertiesService.getScriptProperties().setProperty(NEIS_API_KEY_PROPERTY, apiKey);
+  return { configured: true, schoolName: '웅천고등학교' };
+}
+
+function neisQuery_(endpointValue, paramsValue) {
+  const endpoint = String(endpointValue || '');
+  if (!Object.prototype.hasOwnProperty.call(NEIS_ENDPOINT_PARAMS, endpoint)) {
+    throw new Error('허용되지 않는 NEIS 조회입니다.');
+  }
+
+  const apiKey = PropertiesService.getScriptProperties().getProperty(NEIS_API_KEY_PROPERTY);
+  if (!apiKey) throw new Error('관리자가 NEIS API 키를 아직 등록하지 않았습니다.');
+
+  const input = paramsValue && typeof paramsValue === 'object' ? paramsValue : {};
+  const params = {};
+  NEIS_ENDPOINT_PARAMS[endpoint].forEach(function(name) {
+    const value = clean_(input[name], 20);
+    if (value) params[name] = value;
+  });
+  validateNeisParams_(params);
+
+  const cacheKey = 'neis:' + sha256_(endpoint + ':' + JSON.stringify(params)).slice(0, 40);
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+
+  const rows = fetchNeisRows_(endpoint, params, apiKey);
+  try {
+    const serialized = JSON.stringify(rows);
+    if (serialized.length < 95000) cache.put(cacheKey, serialized, NEIS_CACHE_SECONDS);
+  } catch (ignore) {
+    // 캐시 실패는 실제 조회 결과에 영향을 주지 않습니다.
+  }
+  return rows;
+}
+
+function validateNeisParams_(params) {
+  const dateKeys = ['MLSV_YMD', 'AA_YMD', 'AA_FROM_YMD', 'AA_TO_YMD', 'ALL_TI_YMD', 'TI_FROM_YMD', 'TI_TO_YMD'];
+  dateKeys.forEach(function(key) {
+    if (params[key] && !/^\d{8}$/.test(params[key])) throw new Error('NEIS 날짜 형식이 올바르지 않습니다.');
+  });
+  if (params.AY && !/^\d{4}$/.test(params.AY)) throw new Error('NEIS 학년도 형식이 올바르지 않습니다.');
+  if (params.SEM && !/^[12]$/.test(params.SEM)) throw new Error('NEIS 학기 형식이 올바르지 않습니다.');
+  if (params.GRADE && !/^[1-3]$/.test(params.GRADE)) throw new Error('웅천고 학년 형식이 올바르지 않습니다.');
+  if (params.CLASS_NM && !/^\d{1,2}$/.test(params.CLASS_NM)) throw new Error('학급 형식이 올바르지 않습니다.');
+}
+
+function fetchNeisRows_(endpoint, params, apiKey) {
+  const query = {
+    KEY: apiKey,
+    Type: 'json',
+    pIndex: '1',
+    pSize: '200',
+    ATPT_OFCDC_SC_CODE: UNGCHEON_OFFICE_CODE,
+    SD_SCHUL_CODE: UNGCHEON_SCHOOL_CODE
+  };
+  Object.keys(params).forEach(function(key) { query[key] = params[key]; });
+  const queryString = Object.keys(query)
+    .map(function(key) { return encodeURIComponent(key) + '=' + encodeURIComponent(query[key]); })
+    .join('&');
+  const response = UrlFetchApp.fetch(NEIS_BASE_URL + endpoint + '?' + queryString, {
+    method: 'get',
+    muteHttpExceptions: true,
+    followRedirects: true
+  });
+  const status = response.getResponseCode();
+  if (status < 200 || status >= 300) throw new Error('NEIS 서버 응답 오류 (' + status + ')');
+
+  let payload;
+  try {
+    payload = JSON.parse(response.getContentText());
+  } catch (error) {
+    throw new Error('NEIS 서버 응답을 해석하지 못했습니다.');
+  }
+
+  if (payload.RESULT && payload.RESULT.CODE && payload.RESULT.CODE !== 'INFO-000' && payload.RESULT.CODE !== 'INFO-200') {
+    throw new Error(payload.RESULT.MESSAGE || 'NEIS API 오류 (' + payload.RESULT.CODE + ')');
+  }
+  const head = payload[endpoint] && payload[endpoint][0] && payload[endpoint][0].head;
+  const resultItem = Array.isArray(head)
+    ? head.filter(function(item) { return item && item.RESULT; })[0]
+    : null;
+  if (resultItem && resultItem.RESULT && resultItem.RESULT.CODE === 'INFO-200') return [];
+  if (resultItem && resultItem.RESULT && resultItem.RESULT.CODE !== 'INFO-000') {
+    throw new Error(resultItem.RESULT.MESSAGE || 'NEIS API 오류 (' + resultItem.RESULT.CODE + ')');
+  }
+  return payload[endpoint] && payload[endpoint][1] && Array.isArray(payload[endpoint][1].row)
+    ? payload[endpoint][1].row
+    : [];
 }
 
 function deleteRowById_(sheetName, id) {

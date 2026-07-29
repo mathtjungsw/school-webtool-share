@@ -1,22 +1,26 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   AlertCircle, CheckCircle2, FileSpreadsheet, FolderOpen, GraduationCap,
-  Printer, RotateCcw, Search, ShieldCheck, UsersRound,
+  Printer, RefreshCw, Search, ShieldCheck, UsersRound,
 } from 'lucide-react'
 import clsx from 'clsx'
+import { useAdminStore } from '../stores/adminStore'
+import { useAppStore } from '../stores/appStore'
+import {
+  getSharedStudentTimetable,
+  replaceSharedStudentTimetable,
+} from '../services/schoolHub'
 import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 import {
   STUDENT_TIMETABLE_DAYS,
-  buildPersonalTimetable,
   emptyStudentTimetableDataset,
-  getStudentSummaries,
   getStudentTimetableStats,
-  isStudentTimetableReady,
   mergeStudentTimetableImport,
   parseStudentTimetableWorkbook,
+  prepareSharedStudentTimetable,
   type PersonalTimetable,
-  type StudentTimetableDataset,
+  type SharedStudentTimetable,
 } from '../services/studentTimetable'
 
 interface ImportMessage {
@@ -137,16 +141,25 @@ function printPersonalTimetables(personals: PersonalTimetable[], title: string) 
 }
 
 export default function StudentTimetablePage() {
-  const [dataset, setDataset] = useState<StudentTimetableDataset>(() => emptyStudentTimetableDataset())
+  const config = useAppStore(state => state.config)
+  const isAdmin = useAdminStore(state => state.isAdmin)
+  const adminPassword = useAdminStore(state => state.adminPassword)
+  const [shared, setShared] = useState<SharedStudentTimetable | null>(null)
   const [messages, setMessages] = useState<ImportMessage[]>([])
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [grade, setGrade] = useState('2')
   const [className, setClassName] = useState('')
   const [query, setQuery] = useState('')
   const [selectedStudentId, setSelectedStudentId] = useState('')
+  const configured = Boolean(config.schoolHubUrl)
 
-  const stats = useMemo(() => getStudentTimetableStats(dataset), [dataset])
-  const students = useMemo(() => getStudentSummaries(dataset), [dataset])
+  const students = useMemo(
+    () => shared?.students.map(personal => personal.student) ?? [],
+    [shared],
+  )
   const classOptions = useMemo(() =>
     [...new Set(students.filter(student => student.grade === grade).map(student => student.className))]
       .sort((a, b) => Number(a) - Number(b)),
@@ -165,53 +178,84 @@ export default function StudentTimetablePage() {
     setSelectedStudentId(filteredStudents[0]?.studentId ?? '')
   }, [filteredStudents, selectedStudentId])
 
-  const personal = useMemo(() => {
-    if (!selectedStudentId || !isStudentTimetableReady(dataset)) return null
-    try {
-      return buildPersonalTimetable(dataset, selectedStudentId)
-    } catch {
-      return null
-    }
-  }, [dataset, selectedStudentId])
+  const personal = useMemo(
+    () => shared?.students.find(item => item.student.studentId === selectedStudentId) ?? null,
+    [shared, selectedStudentId],
+  )
 
-  const loadFiles = async () => {
+  const load = useCallback(async () => {
+    if (!configured) return
+    setLoading(true)
+    setError('')
+    try {
+      setShared(await getSharedStudentTimetable())
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : String(loadError))
+    } finally {
+      setLoading(false)
+    }
+  }, [configured])
+
+  useEffect(() => { load() }, [load])
+
+  const uploadFiles = async () => {
+    if (!isAdmin || !adminPassword) {
+      setError('관리자 모드에서만 학생 시간표 자료를 업로드할 수 있습니다.')
+      return
+    }
     const paths = await window.electron.openFilesDialog([
       { name: 'Excel 파일', extensions: ['xlsx', 'xlsm', 'xls'] },
     ])
     if (!paths.length) return
-    setLoading(true)
+    setUploading(true)
+    setError('')
+    setSuccess('')
     const nextMessages: ImportMessage[] = []
-    let nextDataset = dataset
-    for (const filePath of paths) {
-      const fileName = filePath.split(/[\\/]/).pop() ?? filePath
-      try {
-        const bytes = await window.electron.readFile(filePath)
-        const imported = parseStudentTimetableWorkbook(fileName, bytes)
-        nextDataset = mergeStudentTimetableImport(nextDataset, imported)
-        nextMessages.push({
-          fileName,
-          ok: true,
-          text: `${KIND_LABEL[imported.kind]}${imported.grades.length ? ` · ${imported.grades.join(',')}학년` : ''}`,
-        })
-      } catch (error) {
-        nextMessages.push({
-          fileName,
-          ok: false,
-          text: error instanceof Error ? error.message : '파일을 읽지 못했습니다.',
-        })
+    let nextDataset = emptyStudentTimetableDataset()
+    try {
+      for (const filePath of paths) {
+        const fileName = filePath.split(/[\\/]/).pop() ?? filePath
+        try {
+          const bytes = await window.electron.readFile(filePath)
+          const imported = parseStudentTimetableWorkbook(fileName, bytes)
+          nextDataset = mergeStudentTimetableImport(nextDataset, imported)
+          nextMessages.push({
+            fileName,
+            ok: true,
+            text: `${KIND_LABEL[imported.kind]}${imported.grades.length ? ` · ${imported.grades.join(',')}학년` : ''}`,
+          })
+        } catch (fileError) {
+          nextMessages.push({
+            fileName,
+            ok: false,
+            text: fileError instanceof Error ? fileError.message : '파일을 읽지 못했습니다.',
+          })
+        }
       }
-    }
-    setDataset(nextDataset)
-    setMessages(nextMessages)
-    setLoading(false)
-  }
+      setMessages(nextMessages)
+      if (nextMessages.some(message => !message.ok)) {
+        throw new Error('읽지 못한 파일이 있습니다. 파일 내용을 확인한 뒤 다시 업로드해 주세요.')
+      }
 
-  const reset = () => {
-    setDataset(emptyStudentTimetableDataset())
-    setMessages([])
-    setSelectedStudentId('')
-    setQuery('')
-    setClassName('')
+      const stats = getStudentTimetableStats(nextDataset)
+      const prepared = prepareSharedStudentTimetable(nextDataset)
+      const confirmed = confirm(
+        `학생별 시간표 공유 자료를 교체할까요?\n\n학생 ${stats.students}명 · 학급 ${stats.classes}개 · 강좌 ${stats.courses}개\n\nExcel 원본은 전송되지 않으며 조회용 시간표만 저장됩니다.`,
+      )
+      if (!confirmed) return
+
+      const result = await replaceSharedStudentTimetable(
+        prepared,
+        adminPassword,
+        config.teacherName?.trim() || '관리자',
+      )
+      setSuccess(`학생별 시간표 ${result.version}차 업로드가 완료되었습니다.`)
+      await load()
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : String(uploadError))
+    } finally {
+      setUploading(false)
+    }
   }
 
   const printSelected = () => {
@@ -219,14 +263,28 @@ export default function StudentTimetablePage() {
   }
 
   const printClass = () => {
-    if (!className) return
-    const personals = students
-      .filter(student => student.grade === grade && student.className === className)
-      .map(student => buildPersonalTimetable(dataset, student.studentId))
+    if (!className || !shared) return
+    const personals = shared.students.filter(
+      item => item.student.grade === grade && item.student.className === className,
+    )
     printPersonalTimetables(personals, `${grade}학년_${className}반_학생별시간표`)
   }
 
-  const ready = isStudentTimetableReady(dataset)
+  if (!configured) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto">
+        <div className="card p-10 text-center border-amber-500/20">
+          <FileSpreadsheet size={36} className="mx-auto text-amber-400 mb-3" />
+          <h1 className="text-xl font-bold text-white">학교 공유 서비스 설정이 필요합니다</h1>
+          <p className="text-sm text-slate-400 mt-2">
+            환경설정에 학교 공유 서비스 URL을 입력하면 관리자가 올린 학생별 시간표를 조회할 수 있습니다.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  const ready = Boolean(shared?.students.length)
 
   return (
     <div className="p-6 max-w-[1500px] mx-auto">
@@ -237,66 +295,55 @@ export default function StudentTimetablePage() {
             <h1 className="page-title">학생별 시간표</h1>
           </div>
           <p className="page-subtitle mt-1">
-            2학기 전체시간표·강좌·수강생 자료를 결합해 학생별 시간표를 조회하고 인쇄합니다.
+            관리자가 공유한 2학기 학생별 시간표를 조회하고 인쇄합니다.
           </p>
         </div>
         <div className="flex gap-2">
-          {(stats.classes > 0 || stats.students > 0) && (
-            <button onClick={reset} className="btn-ghost flex items-center gap-1.5">
-              <RotateCcw size={13} />초기화
+          <button onClick={load} disabled={loading || uploading} className="btn-ghost flex items-center gap-1.5 disabled:opacity-50">
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />새로고침
+          </button>
+          {isAdmin && (
+            <button onClick={uploadFiles} disabled={uploading || loading} className="btn-primary flex items-center gap-1.5 disabled:opacity-50">
+              <FolderOpen size={14} />{uploading ? '분석·업로드 중...' : '학생 시간표 자료 업로드'}
             </button>
           )}
-          <button onClick={loadFiles} disabled={loading} className="btn-primary flex items-center gap-1.5 disabled:opacity-50">
-            <FolderOpen size={14} />{loading ? '자료 읽는 중...' : 'Excel 자료 불러오기'}
-          </button>
         </div>
       </div>
 
       <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/7 px-4 py-3 mb-4 flex items-start gap-3">
         <ShieldCheck size={17} className="text-emerald-400 mt-0.5 flex-shrink-0" />
         <div>
-          <p className="text-xs font-semibold text-emerald-300">학생 자료는 이 PC에서만 처리됩니다</p>
+          <p className="text-xs font-semibold text-emerald-300">
+            {isAdmin ? '관리자는 자료를 교체하고, 사용자는 조회·인쇄만 할 수 있습니다' : '조회·인쇄 전용 공유 시간표입니다'}
+          </p>
           <p className="text-[11px] text-slate-400 mt-1">
-            전체시간표, 2·3학년 강좌 일괄개설, 2·3학년 수강생 일괄개설 파일을 한 번에 선택하세요.
-            과목 정식 명칭 파일은 선택사항이며, 서버로 전송하거나 원본을 수정하지 않습니다.
+            Excel 원본은 관리자 PC에서만 분석되고 서버에는 조회용 시간표만 저장됩니다.
+            일반 사용자 화면에는 자료 변경이나 원본 다운로드 기능이 제공되지 않습니다.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <ImportStatus
-          title="학급별 전체시간표"
-          file={dataset.classFile}
-          value={stats.classes}
-          unit="학급"
-          ready={stats.classes > 0}
-        />
-        <ImportStatus
-          title="강좌 일괄개설"
-          file={dataset.courseFiles.join(', ')}
-          value={stats.courses}
-          unit="강좌"
-          ready={stats.courses > 0}
-        />
-        <ImportStatus
-          title="학생 과목선택"
-          file={dataset.enrollmentFiles.join(', ')}
-          value={stats.students}
-          unit="명"
-          ready={stats.students > 0}
-        />
-        <ImportStatus
-          title="과목 정식 명칭"
-          file={dataset.subjectFile}
-          value={stats.subjectNames}
-          unit="과목"
-          ready={stats.subjectNames > 0}
-          optional
-        />
-      </div>
+      {shared && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          <SharedStatus title="공유 버전" value={`${shared.version}차`} />
+          <SharedStatus title="학생" value={`${shared.studentCount}명`} />
+          <SharedStatus title="학급" value={`${shared.classCount}학급`} />
+          <SharedStatus title="강좌" value={`${shared.courseCount}강좌`} />
+        </div>
+      )}
+
+      {shared && (
+        <div className="card px-4 py-3 mb-4 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+          <span className="text-slate-300 font-semibold">{shared.title}</span>
+          <span className="text-slate-500">
+            {shared.uploadedBy} 업로드 · {new Date(shared.uploadedAt).toLocaleString('ko-KR')}
+          </span>
+        </div>
+      )}
 
       {messages.length > 0 && (
         <div className="card p-3 mb-4">
+          <p className="text-[10px] font-semibold text-slate-500 mb-2">관리자 업로드 파일 확인 결과</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
             {messages.map(message => (
               <div key={`${message.fileName}-${message.text}`} className="flex items-start gap-2 text-[11px]">
@@ -311,19 +358,32 @@ export default function StudentTimetablePage() {
         </div>
       )}
 
-      {ready && (stats.unmatched > 0 || stats.missingClasses > 0) && (
-        <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 mb-4 text-xs text-amber-300 flex items-center gap-2">
+      {error && (
+        <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 mb-4 text-xs text-rose-300 flex items-center gap-2">
           <AlertCircle size={15} />
-          강좌 미매칭 {stats.unmatched}건 · 학급 시간표 없음 {stats.missingClasses}명 — 입력 파일을 확인해 주세요.
+          {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 mb-4 text-xs text-emerald-300 flex items-center gap-2">
+          <CheckCircle2 size={15} />
+          {success}
         </div>
       )}
 
       {!ready ? (
         <div className="card border-dashed border-white/10 py-16 text-center">
-          <FileSpreadsheet size={38} className="mx-auto text-slate-600 mb-3" />
-          <h2 className="text-base font-semibold text-slate-300">2학기 자료를 불러와 주세요</h2>
+          {loading
+            ? <RefreshCw size={38} className="mx-auto text-emerald-400 mb-3 animate-spin" />
+            : <FileSpreadsheet size={38} className="mx-auto text-slate-600 mb-3" />}
+          <h2 className="text-base font-semibold text-slate-300">
+            {loading ? '공유 시간표를 불러오는 중입니다' : '등록된 학생별 시간표가 없습니다'}
+          </h2>
           <p className="text-xs text-slate-500 mt-2">
-            파일명과 관계없이 표의 열 제목을 확인해 전체시간표·강좌·수강생 자료를 자동 구분합니다.
+            {isAdmin
+              ? '관리자 모드의 ‘학생 시간표 자료 업로드’에서 2학기 Excel 자료 전체를 선택해 주세요.'
+              : '관리자가 자료를 업로드하면 별도 Excel 파일 없이 이 화면에서 조회·인쇄할 수 있습니다.'}
           </p>
         </div>
       ) : (
@@ -513,37 +573,14 @@ export default function StudentTimetablePage() {
   )
 }
 
-function ImportStatus({
-  title,
-  file,
-  value,
-  unit,
-  ready,
-  optional,
-}: {
-  title: string
-  file: string
-  value: number
-  unit: string
-  ready: boolean
-  optional?: boolean
-}) {
+function SharedStatus({ title, value }: { title: string; value: string }) {
   return (
-    <div className={clsx(
-      'card p-3.5 border',
-      ready ? 'border-emerald-400/20' : 'border-white/5',
-    )}>
+    <div className="card p-3.5 border border-emerald-400/20">
       <div className="flex items-center gap-2 mb-2">
-        {ready
-          ? <CheckCircle2 size={14} className="text-emerald-400" />
-          : <FileSpreadsheet size={14} className="text-slate-600" />}
+        <CheckCircle2 size={14} className="text-emerald-400" />
         <p className="text-[11px] font-semibold text-slate-300">{title}</p>
-        {optional && <span className="ml-auto text-[8px] text-slate-600">선택</span>}
       </div>
-      <p className={clsx('text-lg font-bold', ready ? 'text-emerald-300' : 'text-slate-600')}>
-        {ready ? value : '—'} <span className="text-[10px] font-normal">{unit}</span>
-      </p>
-      <p className="text-[9px] text-slate-600 mt-1 truncate" title={file}>{file || '불러오지 않음'}</p>
+      <p className="text-lg font-bold text-emerald-300">{value}</p>
     </div>
   )
 }

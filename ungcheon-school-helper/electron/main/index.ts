@@ -649,13 +649,17 @@ const HUB_ACTIONS = new Set([
   'deleteFeatureRequest',
   'getTimetable',
   'replaceTimetable',
+  'getStudentTimetable',
+  'replaceStudentTimetable',
 ])
 
 async function requestSchoolHub(payload: Record<string, unknown>) {
   const endpoint = String(store.get('config.schoolHubUrl', '')).trim()
   if (!endpoint) return { ok: false, error: '학교 공유 서비스 URL이 설정되지 않았습니다.' }
-  if (JSON.stringify(payload).length > 500_000) return { ok: false, error: '요청 데이터가 너무 큽니다.' }
-  if (!HUB_ACTIONS.has(String(payload.action ?? ''))) return { ok: false, error: '허용되지 않는 요청입니다.' }
+  const action = String(payload.action ?? '')
+  const maxRequestLength = action === 'replaceStudentTimetable' ? 8_000_000 : 500_000
+  if (JSON.stringify(payload).length > maxRequestLength) return { ok: false, error: '요청 데이터가 너무 큽니다.' }
+  if (!HUB_ACTIONS.has(action)) return { ok: false, error: '허용되지 않는 요청입니다.' }
 
   let parsed: URL
   try { parsed = new URL(endpoint) } catch { return { ok: false, error: '공유 서비스 URL이 올바르지 않습니다.' } }
@@ -664,7 +668,9 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
   }
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 12_000)
+  const isStudentTimetableAction =
+    action === 'getStudentTimetable' || action === 'replaceStudentTimetable'
+  const timer = setTimeout(() => controller.abort(), isStudentTimetableAction ? 60_000 : 20_000)
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
