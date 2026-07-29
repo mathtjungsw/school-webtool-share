@@ -1,4 +1,8 @@
 import type { ParsedTimetable, SchoolTimetable } from './schoolTimetable'
+import type {
+  SharedStudentTimetable,
+  SharedStudentTimetableUpload,
+} from './studentTimetable'
 
 export type NoticeLevel = 'info' | 'important' | 'urgent'
 
@@ -55,6 +59,8 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
       'deleteFeatureRequest',
       'getTimetable',
       'replaceTimetable',
+      'getStudentTimetable',
+      'replaceStudentTimetable',
     ].includes(action)
     if (needsServerUpdate && message.includes('허용되지 않는 요청')) {
       throw new Error('학교 공유 서버 업데이트가 필요합니다. 관리자에게 문의하세요.')
@@ -78,6 +84,20 @@ export const replaceSchoolTimetable = (
   uploadedBy: string,
 ) => hubRequest<{ version: number; uploadedAt: string }>({
   action: 'replaceTimetable',
+  timetable,
+  adminPassword,
+  uploadedBy,
+})
+
+export const getSharedStudentTimetable = () =>
+  hubRequest<SharedStudentTimetable | null>({ action: 'getStudentTimetable' })
+
+export const replaceSharedStudentTimetable = (
+  timetable: SharedStudentTimetableUpload,
+  adminPassword: string,
+  uploadedBy: string,
+) => hubRequest<{ version: number; uploadedAt: string }>({
+  action: 'replaceStudentTimetable',
   timetable,
   adminPassword,
   uploadedBy,

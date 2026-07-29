@@ -76,6 +76,21 @@ export interface PersonalTimetable {
   warnings: string[]
 }
 
+export interface SharedStudentTimetableUpload {
+  title: string
+  semester: string
+  studentCount: number
+  classCount: number
+  courseCount: number
+  students: PersonalTimetable[]
+}
+
+export interface SharedStudentTimetable extends SharedStudentTimetableUpload {
+  version: number
+  uploadedBy: string
+  uploadedAt: string
+}
+
 type Cell = string | number | boolean | Date | null | undefined
 type Matrix = Cell[][]
 
@@ -500,4 +515,46 @@ export function isStudentTimetableReady(dataset: StudentTimetableDataset): boole
   return Object.keys(dataset.classes).length > 0 &&
     dataset.courses.length > 0 &&
     dataset.enrollments.length > 0
+}
+
+export function prepareSharedStudentTimetable(
+  dataset: StudentTimetableDataset,
+  title = '2026학년도 2학기 학생별 시간표',
+  semester = '2026-2',
+): SharedStudentTimetableUpload {
+  if (!isStudentTimetableReady(dataset)) {
+    throw new Error('전체시간표·강좌 일괄개설·수강생 일괄개설 자료를 모두 불러와 주세요.')
+  }
+
+  const stats = getStudentTimetableStats(dataset)
+  if (stats.unmatched > 0 || stats.missingClasses > 0) {
+    throw new Error(
+      `자료 연결을 확인해 주세요. 강좌 미매칭 ${stats.unmatched}건 · 학급 시간표 없음 ${stats.missingClasses}명`,
+    )
+  }
+
+  const students = getStudentSummaries(dataset).map(student => {
+    const personal = buildPersonalTimetable(dataset, student.studentId)
+    return {
+      ...personal,
+      slots: Object.fromEntries(
+        Object.entries(personal.slots).map(([key, slot]) => [key, { ...slot, raw: '' }]),
+      ),
+      selections: personal.selections.map(selection => ({ ...selection, sourceFile: '' })),
+      warnings: [],
+    }
+  })
+  const warningCount = students.reduce((sum, student) => sum + student.warnings.length, 0)
+  if (warningCount > 0) {
+    throw new Error(`학생별 시간표 생성 중 ${warningCount}건의 경고가 발견되었습니다. 입력 파일을 확인해 주세요.`)
+  }
+
+  return {
+    title,
+    semester,
+    studentCount: students.length,
+    classCount: stats.classes,
+    courseCount: stats.courses,
+    students,
+  }
 }
