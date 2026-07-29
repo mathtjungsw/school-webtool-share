@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Archive, ArrowLeftRight, Bell, BookCopy, BookOpen, Calculator, ChevronDown,
-  ChevronRight, Clock, FileCode2, FileDown, FileScan, HelpCircle,
-  Images, Landmark, LayoutDashboard, Link2, MessageSquareText, Radio, ScrollText,
-  Settings, Table2, UserCheck, FileText,
+  ArrowLeftRight, Bell, BookCopy, BookOpen, Calculator, ChevronDown,
+  ChevronRight, FileCode2, FileDown, FileScan, HelpCircle,
+  Landmark, LayoutDashboard, Link2, MessageSquareText, Radio, ScrollText,
+  Settings, Table2, FileText,
   type LucideIcon,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -29,7 +29,7 @@ const NAV: NavGroup[] = [
     defaultOpen: true,
     items: [
       { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
-      { id: 'school_hub', label: '학교 공유', icon: Link2 },
+      { id: 'school_hub', label: '학교 공유 링크', icon: Link2 },
       { id: 'feature_requests', label: '기능개선 요청', icon: MessageSquareText },
       { id: 'neis', label: 'NEIS 정보', icon: Radio },
       { id: 'settings', label: '환경설정', icon: Settings },
@@ -48,7 +48,6 @@ const NAV: NavGroup[] = [
     label: '인사행정',
     items: [
       { id: 'payroll', label: '호봉획정 계산기', icon: Calculator },
-      { id: 'afterschool_checker', label: '방과후 점검', icon: Clock },
       { id: 'insa_analysis', label: 'NEIS 인사기록 분석', icon: FileScan },
     ],
   },
@@ -57,9 +56,6 @@ const NAV: NavGroup[] = [
     items: [
       { id: 'timetable_swap', label: '교환·대강 계획', icon: ArrowLeftRight },
       { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText },
-      { id: 'photo_ledger', label: '사진대장', icon: Images },
-      { id: 'student_record', label: '학적업무', icon: Archive },
-      { id: 'attendance', label: '출석부', icon: UserCheck },
     ],
   },
   {

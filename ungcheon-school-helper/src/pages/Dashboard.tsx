@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   RefreshCw, ChevronLeft, ChevronRight, AlertCircle,
   Utensils, CalendarDays, BookOpen, Globe, CloudSun,
-  ShieldCheck, Brain, PenLine, Table2, Calculator, Users,
-  Shuffle, CalendarClock, ClipboardCheck, Images,
-  Shield, GraduationCap, Backpack, Archive, Clock,
+  ShieldCheck, Brain, PenLine, Table2, Calculator,
+  Shuffle, CalendarClock, ClipboardCheck,
+  Shield, GraduationCap, Backpack,
   DollarSign, Briefcase, ClipboardList, School, ShoppingCart,
   Landmark, BookCopy, Trophy, FileSearch, FileDown, FileText,
   FileSpreadsheet, HelpCircle, Waves, SquareStack, CircleDot, Star,
@@ -35,8 +35,11 @@ import { getMeal, getSchedule, getTimetableRange, getSchoolDetail, NEIS_API_KEY 
 import { getSchoolTimetable } from '../services/schoolHub'
 import type { TeacherTimetable } from '../services/schoolTimetable'
 import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
-import type { MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanResult } from '../types'
-import { format, addDays, startOfWeek } from 'date-fns'
+import type { MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
+import {
+  addDays, eachDayOfInterval, endOfMonth, endOfWeek, format,
+  isSameMonth, startOfMonth, startOfWeek,
+} from 'date-fns'
 import { ko } from 'date-fns/locale'
 import clsx from 'clsx'
 
@@ -60,7 +63,7 @@ interface DashboardScheduleEvent {
 }
 
 const PORTFOLIO_GROUPS: PortfolioGroup[] = [
-  { group: '학교 공유', color: 'violet', items: [
+  { group: '학교 공유 링크', color: 'violet', items: [
     { id: 'school_hub', label: '부서별 링크·공지', icon: Globe, desc: '교직원 공용 링크와 학교 공지' },
   ]},
   { group: '자료·진로', color: 'sky', items: [
@@ -69,15 +72,11 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
   ]},
   { group: '인사행정', color: 'emerald', items: [
     { id: 'payroll', label: '호봉획정 계산기', icon: Calculator, desc: '경력 인정과 초임 호봉 계산' },
-    { id: 'afterschool_checker', label: '방과후 점검', icon: Clock, desc: '방과후·근무상황·초과근무 비교' },
     { id: 'insa_analysis', label: 'NEIS 인사기록 분석', icon: FileScan, desc: '인사기록 PDF 분석과 법정연수 점검' },
   ]},
   { group: '학사·기록', color: 'amber', items: [
     { id: 'timetable_swap', label: '교환·대강 계획', icon: Shuffle, desc: '후보 시간표·연강 확인과 계획서 출력' },
     { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText, desc: '4개 편제표 확인·PDF 출력과 과목선택 상담' },
-    { id: 'photo_ledger', label: '사진대장', icon: Images, desc: '사진 배치·설명·출력' },
-    { id: 'student_record', label: '학적업무', icon: Archive, desc: '전입·전출 등 학적 문서 작성' },
-    { id: 'attendance', label: '출석부', icon: Users, desc: '출결 기록·통계·Excel 내보내기' },
   ]},
   { group: '학교운영', color: 'rose', items: [
     { id: 'committees', label: '각종 위원회 현황', icon: Landmark, desc: '교내 위원회 구성과 담당 관리' },
@@ -513,137 +512,95 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
 
       {hasSchool && (
         <>
-          {/* ── 상단: 좌(날씨 2×1 + 급식·학사일정) + 우 시간표(세로로 김) · 하단 정렬 ── */}
+          {/* ── 상단: 좌(날씨·급식 + 월간 일정) + 우 시간표 ── */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
-            {/* 좌측 2열: 날씨(2×1) 위 / 급식·학사일정 아래 — 하단을 시간표에 맞춤 */}
-            <div className="xl:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:grid-rows-[auto_1fr]">
-              {/* 🌤️ 날씨 (오늘 + 이후 기간 합침, 2×1) */}
-              <DashCard icon={<CloudSun size={14} className="text-sky-400"/>} title="날씨" badge="주간 예보" badgeColor="sky" className="sm:col-span-2">
-                {weatherLoading
-                  ? <Skeleton rows={3}/>
-                  : weather
-                    ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <WeatherTodayView data={weather} displayName={weatherPlace} label="학교" />
-                        {weather.weekly.length > 0 && (
-                          <div className="sm:col-span-2 sm:border-l border-white/10 sm:pl-4 min-w-0">
-                            <WeatherForecastView data={weather} />
+            <div className="xl:col-span-2 grid grid-cols-1 gap-4">
+              {/* 🌤️🍱 중요도가 낮은 정보는 한 카드의 절반씩 배치 */}
+              <DashCard
+                icon={<CloudSun size={14} className="text-sky-400"/>}
+                title="날씨 · 급식"
+                badge={`${selectedDate.slice(5).replace('-','/')}`}
+                badgeColor="sky"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                  <section className="min-w-0 md:pr-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <CloudSun size={14} className="text-sky-400" />
+                      <h3 className="text-xs font-bold text-sky-300">학교 날씨</h3>
+                      <span className="text-[9px] text-slate-600 ml-auto">주간 예보</span>
+                    </div>
+                    {weatherLoading
+                      ? <Skeleton rows={3}/>
+                      : weather
+                        ? (
+                          <div className="space-y-3">
+                            <WeatherTodayView data={weather} displayName={weatherPlace} label="학교" />
+                            {weather.weekly.length > 0 && (
+                              <div className="pt-3 border-t border-white/5 min-w-0">
+                                <WeatherForecastView data={weather} />
+                              </div>
+                            )}
+                            {config.secondLocationName && weather2 && (
+                              <div className="pt-3 border-t border-white/5">
+                                <WeatherTodayView data={weather2} displayName={weather2Place} label={config.secondLocationName} />
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    )
-                    : <Empty text="날씨 정보를 불러올 수 없습니다." />}
+                        )
+                        : <Empty text="날씨 정보를 불러올 수 없습니다." />}
+                  </section>
 
-                {/* 2번째 위치 날씨 — 학교 날씨 아래 칸에 함께 표시 */}
-                {config.secondLocationName && weather2 && (
-                  <div className="mt-2 pt-2 border-t border-white/5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <WeatherTodayView data={weather2} displayName={weather2Place} label={config.secondLocationName} />
-                    {weather2.weekly.length > 0 && (
-                      <div className="sm:col-span-2 sm:border-l border-white/10 sm:pl-4 min-w-0">
-                        <WeatherForecastView data={weather2} />
+                  <section className="min-w-0 mt-4 pt-4 border-t border-white/10 md:mt-0 md:pt-0 md:pl-4 md:border-t-0 md:border-l">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Utensils size={14} className="text-amber-400" />
+                      <h3 className="text-xs font-bold text-amber-300">오늘의 급식</h3>
+                      <span className="text-[9px] text-slate-600 ml-auto">{selectedDate.slice(5).replace('-','/')}</span>
+                    </div>
+                    {loading ? <Skeleton rows={4}/> : meal.length > 0 ? (
+                      <div className="space-y-3">
+                        {meal.map(m => <MealItem key={m.mealType} meal={m} />)}
+                      </div>
+                    ) : (
+                      <Empty text="해당 날짜 급식 정보가 없습니다." />
+                    )}
+                    {!loading && nextMeal.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-white/5">
+                        <p className="text-[10px] font-semibold text-amber-300/80 mb-2">
+                          다음날 {format(addDays(new Date(`${selectedDate}T00:00:00`), 1), 'M/d', { locale: ko })}
+                        </p>
+                        <div className="space-y-2">
+                          {nextMeal.map(m => <MealItem key={m.mealType} meal={m} compact />)}
+                        </div>
                       </div>
                     )}
-                  </div>
-                )}
+                  </section>
+                </div>
               </DashCard>
 
-              {/* 🍱 급식 */}
-            <DashCard icon={<Utensils size={14} className="text-amber-400"/>} title="급식" badge={`${selectedDate.slice(5).replace('-','/')}`} badgeColor="amber">
-              {loading ? <Skeleton rows={6}/> : meal.length > 0 ? (
-                <div className="space-y-3">
-                  {meal.map(m => <MealItem key={m.mealType} meal={m} />)}
-                </div>
-              ) : (
-                <Empty text="해당 날짜 급식 정보가 없습니다." />
-              )}
-              {!loading && nextMeal.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-white/5">
-                  <p className="text-[11px] font-semibold text-amber-300/90 mb-2">
-                    다음날 ({format(addDays(new Date(selectedDate), 1), 'M/d', { locale: ko })})
-                  </p>
-                  <div className="space-y-2">
-                    {nextMeal.map(m => <MealItem key={m.mealType} meal={m} compact />)}
-                  </div>
-                </div>
-              )}
-            </DashCard>
-
-            {/* 📅 학사일정 + 교무기획부 주간계획 */}
-            <DashCard icon={<CalendarDays size={14} className="text-violet-400"/>} title="학사일정 · 주간계획" badge={`${selectedDate.slice(0,7)} · 자동`} badgeColor="violet">
-              {(loading || weeklyPlanLoading) && combinedSchedule.length === 0 ? <Skeleton rows={5}/> : (
-                <div className="flex flex-col min-h-0">
-                  {combinedSchedule.length > 0 ? (
-                    <div className="space-y-1.5 flex-1 min-h-0 overflow-y-auto scrollbar-none max-h-72 xl:max-h-none">
-                      {combinedSchedule.map((item, i) => (
-                        <div key={`${item.source}-${item.date}-${item.department ?? ''}-${i}`} className={clsx(
-                          'flex items-start gap-2 px-2 py-1.5 rounded-lg transition-colors border',
-                          item.date === selYmd
-                            ? item.source === 'weekly'
-                              ? 'bg-sky-500/12 border-sky-400/30'
-                              : 'bg-violet-500/15 border-violet-500/30'
-                            : 'border-transparent hover:bg-white/3',
-                        )}>
-                          <span className={clsx(
-                            'text-[10px] px-1.5 py-0.5 rounded font-mono flex-shrink-0 mt-0.5',
-                            item.source === 'weekly'
-                              ? 'bg-sky-500/20 text-sky-300'
-                              : item.date === selYmd
-                                ? 'bg-violet-500/30 text-violet-300'
-                                : 'bg-white/5 text-slate-400',
-                          )}>
-                            {item.date.slice(4,6)}/{item.date.slice(6,8)}
-                          </span>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className={clsx(
-                                'text-[9px] font-bold px-1.5 py-0.5 rounded-full',
-                                item.source === 'weekly'
-                                  ? 'bg-sky-500/15 text-sky-300'
-                                  : 'bg-violet-500/15 text-violet-300',
-                              )}>
-                                {item.source === 'weekly' ? item.department : 'NEIS'}
-                              </span>
-                            </div>
-                            <span className="text-sm text-slate-200 leading-snug whitespace-pre-line">{item.eventName}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <Empty text="이번 달 학사일정과 주간계획이 없습니다." />
-                  )}
-
-                  {selectedWeekNotes.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-sky-400/15">
-                      <p className="text-[10px] font-bold text-sky-300 mb-1.5">이번 주 기타·참고사항</p>
-                      <div className="space-y-1 max-h-24 overflow-y-auto scrollbar-none">
-                        {selectedWeekNotes.map((note, i) => (
-                          <div key={`${note.department}-${i}`} className="text-[11px] text-slate-400 leading-relaxed">
-                            <span className="text-sky-400/90 font-semibold">{note.department}</span>
-                            <span className="mx-1 text-slate-600">·</span>
-                            <span className="whitespace-pre-line">{note.content}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {weeklyPlanError && (
-                    <p className="text-[10px] text-amber-400 mt-2">{weeklyPlanError} NEIS 일정만 표시합니다.</p>
-                  )}
-                  {!weeklyPlanError && weeklyPlan.sourceSheets.length > 0 && (
-                    <p className="text-[9px] text-slate-600 mt-2">
-                      교무기획부 주간계획 {weeklyPlan.sourceSheets.length}개 시트 자동 반영
-                    </p>
-                  )}
-                </div>
-              )}
-            </DashCard>
-
+              {/* 📅 월간 달력형 학사일정 + 교무기획부 주간계획 */}
+              <DashCard
+                icon={<CalendarDays size={14} className="text-violet-400"/>}
+                title="학사일정 · 주간계획"
+                badge={`${selectedDate.slice(0,7)} · 자동`}
+                badgeColor="violet"
+              >
+                {(loading || weeklyPlanLoading) && combinedSchedule.length === 0 ? (
+                  <Skeleton rows={8}/>
+                ) : (
+                  <MonthScheduleCalendar
+                    selectedDate={selectedDate}
+                    events={combinedSchedule}
+                    notes={selectedWeekNotes}
+                    weeklyPlanError={weeklyPlanError}
+                    sourceSheetCount={weeklyPlan.sourceSheets.length}
+                    onSelectDate={setSelectedDate}
+                  />
+                )}
+              </DashCard>
             </div>
 
             {/* 📚 시간표 (우측 · 세로로 긴 컬럼) */}
-            <DashCard icon={<BookOpen size={14} className="text-sky-400"/>} title="시간표" badge="주간" badgeColor="sky">
+            <DashCard icon={<BookOpen size={14} className="text-sky-400"/>} title="시간표" badge="주간" badgeColor="sky" className="self-start">
               <TimetableSection
                 timetable={timetable}
                 teacherTT={teacherTT}
@@ -777,6 +734,227 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// ─── 월간 학사일정 · 주간계획 달력 ───────────────────────────────
+function MonthScheduleCalendar({
+  selectedDate,
+  events,
+  notes,
+  weeklyPlanError,
+  sourceSheetCount,
+  onSelectDate,
+}: {
+  selectedDate: string
+  events: DashboardScheduleEvent[]
+  notes: WeeklyPlanNote[]
+  weeklyPlanError: string
+  sourceSheetCount: number
+  onSelectDate: (date: string) => void
+}) {
+  const viewDate = new Date(`${selectedDate}T00:00:00`)
+  const monthStart = startOfMonth(viewDate)
+  const monthEnd = endOfMonth(viewDate)
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 })
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 })
+  const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
+  const weeks = Array.from({ length: Math.ceil(days.length / 7) }, (_, index) =>
+    days.slice(index * 7, index * 7 + 7),
+  )
+  const selectedYmd = toYmd(selectedDate)
+  const todayYmd = toYmd(todayStr())
+  const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+  const selectedWeekStart = startOfWeek(viewDate, { weekStartsOn: 1 })
+  const currentWeekInGrid = currentWeekStart >= calendarStart && currentWeekStart <= calendarEnd
+  const focusWeekYmd = format(currentWeekInGrid ? currentWeekStart : selectedWeekStart, 'yyyyMMdd')
+  const currentWeekYmd = format(currentWeekStart, 'yyyyMMdd')
+
+  const eventsByDate = new Map<string, DashboardScheduleEvent[]>()
+  for (const event of events) {
+    const list = eventsByDate.get(event.date) ?? []
+    list.push(event)
+    eventsByDate.set(event.date, list)
+  }
+  const selectedEvents = eventsByDate.get(selectedYmd) ?? []
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-3 text-[10px]">
+          <span className="flex items-center gap-1 text-violet-300">
+            <span className="w-2 h-2 rounded-full bg-violet-400" />NEIS 학사일정
+          </span>
+          <span className="flex items-center gap-1 text-sky-300">
+            <span className="w-2 h-2 rounded-full bg-sky-400" />교무기획부 주간계획
+          </span>
+        </div>
+        <span className="text-[10px] text-amber-300/80">이번 주는 크게 표시됩니다</span>
+      </div>
+
+      <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5">
+        <div className="grid grid-cols-7 gap-px bg-white/5">
+          {['월', '화', '수', '목', '금', '토', '일'].map((day, index) => (
+            <div
+              key={day}
+              className={clsx(
+                'bg-surface-900/95 py-2 text-center text-[10px] font-bold',
+                index === 5 ? 'text-sky-400' : index === 6 ? 'text-rose-400' : 'text-slate-400',
+              )}
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-px bg-white/5">
+          {weeks.map(week => {
+            const weekStartYmd = format(week[0], 'yyyyMMdd')
+            const isFocusWeek = weekStartYmd === focusWeekYmd
+            const isCurrentWeek = weekStartYmd === currentWeekYmd
+            return (
+              <div
+                key={weekStartYmd}
+                className={clsx(
+                  'relative grid grid-cols-7 gap-px bg-white/5',
+                  isFocusWeek && 'ring-1 ring-inset ring-amber-400/45',
+                )}
+              >
+                {isCurrentWeek && (
+                  <span className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400 px-2 py-0.5 text-[8px] font-black text-slate-950 shadow">
+                    이번 주
+                  </span>
+                )}
+                {week.map((day, dayIndex) => {
+                  const dateYmd = format(day, 'yyyyMMdd')
+                  const dateValue = format(day, 'yyyy-MM-dd')
+                  const dayEvents = eventsByDate.get(dateYmd) ?? []
+                  const maxVisible = isFocusWeek ? 5 : 2
+                  const visibleEvents = dayEvents.slice(0, maxVisible)
+                  const moreCount = dayEvents.length - visibleEvents.length
+                  const isSelected = dateYmd === selectedYmd
+                  const isTodayCell = dateYmd === todayYmd
+                  const inMonth = isSameMonth(day, viewDate)
+
+                  return (
+                    <button
+                      key={dateYmd}
+                      type="button"
+                      onClick={() => onSelectDate(dateValue)}
+                      className={clsx(
+                        'min-w-0 text-left p-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-400/70',
+                        isFocusWeek ? 'min-h-[128px] bg-amber-400/5' : 'min-h-[82px] bg-surface-800/95',
+                        isSelected ? 'ring-2 ring-inset ring-violet-400/70 bg-violet-500/10' : 'hover:bg-white/5',
+                        !inMonth && 'opacity-40',
+                      )}
+                      aria-label={`${format(day, 'M월 d일')} 일정 ${dayEvents.length}개`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={clsx(
+                          'w-5 h-5 grid place-items-center rounded-full text-[10px] font-bold',
+                          isTodayCell
+                            ? 'bg-amber-400 text-slate-950'
+                            : dayIndex === 5
+                              ? 'text-sky-400'
+                              : dayIndex === 6
+                                ? 'text-rose-400'
+                                : inMonth ? 'text-slate-300' : 'text-slate-600',
+                        )}>
+                          {format(day, 'd')}
+                        </span>
+                        {dayEvents.length > 0 && (
+                          <span className="text-[8px] text-slate-600">{dayEvents.length}</span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        {visibleEvents.map((event, index) => (
+                          <div
+                            key={`${event.source}-${event.department ?? ''}-${index}`}
+                            title={`${event.source === 'weekly' ? event.department : 'NEIS'} · ${event.eventName}`}
+                            className={clsx(
+                              'rounded px-1 py-0.5 text-[9px] leading-tight',
+                              event.source === 'weekly'
+                                ? 'bg-sky-500/15 text-sky-200 border-l-2 border-sky-400'
+                                : 'bg-violet-500/15 text-violet-200 border-l-2 border-violet-400',
+                            )}
+                          >
+                            {isFocusWeek && (
+                              <span className="block truncate text-[8px] font-bold opacity-70">
+                                {event.source === 'weekly' ? event.department : 'NEIS'}
+                              </span>
+                            )}
+                            <span className="block truncate">{event.eventName.replace(/\s*\n\s*/g, ' · ')}</span>
+                          </div>
+                        ))}
+                        {moreCount > 0 && (
+                          <span className="block pl-1 text-[8px] font-semibold text-slate-500">+{moreCount}개 더보기</span>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="rounded-xl border border-violet-400/15 bg-violet-500/5 p-3">
+          <p className="text-[10px] font-bold text-violet-300 mb-2">
+            {format(viewDate, 'M월 d일 (EEE)', { locale: ko })} 선택 일정
+          </p>
+          {selectedEvents.length > 0 ? (
+            <div className="space-y-1.5">
+              {selectedEvents.map((event, index) => (
+                <div key={`${event.source}-${event.department ?? ''}-${index}`} className="flex items-start gap-2 text-[11px] leading-relaxed">
+                  <span className={clsx(
+                    'mt-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-bold flex-shrink-0',
+                    event.source === 'weekly'
+                      ? 'bg-sky-500/15 text-sky-300'
+                      : 'bg-violet-500/15 text-violet-300',
+                  )}>
+                    {event.source === 'weekly' ? event.department : 'NEIS'}
+                  </span>
+                  <span className="text-slate-300 whitespace-pre-line">{event.eventName}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] text-slate-500">선택한 날짜에 등록된 일정이 없습니다.</p>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-sky-400/15 bg-sky-500/5 p-3">
+          <p className="text-[10px] font-bold text-sky-300 mb-2">선택한 주의 기타·참고사항</p>
+          {notes.length > 0 ? (
+            <div className="space-y-1.5 max-h-28 overflow-y-auto scrollbar-none">
+              {notes.map((note, index) => (
+                <div key={`${note.department}-${index}`} className="text-[11px] text-slate-400 leading-relaxed">
+                  <span className="text-sky-400/90 font-semibold">{note.department}</span>
+                  <span className="mx-1 text-slate-600">·</span>
+                  <span className="whitespace-pre-line">{note.content}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[11px] text-slate-500">해당 주의 기타·참고사항이 없습니다.</p>
+          )}
+        </div>
+      </div>
+
+      {events.length === 0 && (
+        <p className="text-[10px] text-slate-500 mt-2">이번 달 학사일정과 주간계획이 없습니다.</p>
+      )}
+      {weeklyPlanError && (
+        <p className="text-[10px] text-amber-400 mt-2">{weeklyPlanError} NEIS 일정만 표시합니다.</p>
+      )}
+      {!weeklyPlanError && sourceSheetCount > 0 && (
+        <p className="text-[9px] text-slate-600 mt-2">
+          교무기획부 주간계획 {sourceSheetCount}개 시트 자동 반영
+        </p>
+      )}
     </div>
   )
 }
