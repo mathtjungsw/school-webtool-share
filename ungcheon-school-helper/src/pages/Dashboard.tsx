@@ -10,7 +10,7 @@ import {
   Landmark, BookCopy, Trophy, FileSearch, FileDown, FileText,
   FileSpreadsheet, HelpCircle, Waves, SquareStack, CircleDot, Star,
   FileScan, FileCode2,
-  Clapperboard, SquarePen, MessagesSquare, BarChart3, Mic,
+  Clapperboard, SquarePen, MessagesSquare, BarChart3, Mic, CalendarRange,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -76,6 +76,7 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
   ]},
   { group: '학사·기록', color: 'amber', items: [
     { id: 'timetable_swap', label: '교환·대강 계획', icon: Shuffle, desc: '후보 시간표·연강 확인과 계획서 출력' },
+    { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange, desc: '과목선택 자료를 반영한 개인 시간표 조회·인쇄' },
     { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText, desc: '4개 편제표 확인·PDF 출력과 과목선택 상담' },
   ]},
   { group: '학교운영', color: 'rose', items: [
