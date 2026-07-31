@@ -251,6 +251,7 @@ export function printTrainingRoster(
   const left = sorted.slice(0, splitAt)
   const right = sorted.slice(splitAt)
   const rowCount = Math.max(33, left.length, right.length)
+  const rowHeight = Math.max(4.6, Math.min(6.2, 238 / rowCount))
   const rows = Array.from({ length: rowCount }, (_, index) => {
     const first = left[index]
     const second = right[index]
@@ -266,7 +267,7 @@ export function printTrainingRoster(
       .format(new Date(`${date}T00:00:00`))
     : ''
   printHtml(
-    `<section class="training-sheet">
+    `<section class="training-sheet" style="--training-row-height:${rowHeight.toFixed(2)}mm">
       <h1>${escapeHtml(title || '연수')}</h1>
       <p class="training-date">${escapeHtml(formattedDate)}</p>
       <table>
@@ -278,17 +279,21 @@ export function printTrainingRoster(
       </table>
     </section>`,
     `
-      .sheet{padding:0}.training-sheet{width:210mm;min-height:297mm;padding:15mm 10mm 10mm;}
-      h1{text-align:center;font-size:24pt;line-height:1.2;margin:0 0 8mm;font-weight:800;}
-      .training-date{text-align:right;font-size:13pt;margin:0 1mm 3mm;}
-      table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10.5pt;}
-      th,td{border:1px solid #222;height:7mm;text-align:center;padding:1mm;}
+      .sheet{padding:0}
+      .training-sheet{
+        width:210mm;height:297mm;padding:8mm 8mm 6mm;overflow:hidden;
+        break-after:page;page-break-after:always;break-inside:avoid;
+      }
+      h1{text-align:center;font-size:20pt;line-height:1.15;margin:0 0 3mm;font-weight:800;}
+      .training-date{text-align:right;font-size:10pt;line-height:1.2;margin:0 1mm 1.5mm;}
+      table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9pt;line-height:1.05;}
+      th,td{border:1px solid #222;height:var(--training-row-height);text-align:center;padding:.45mm .6mm;}
       th{font-weight:700;background:#e8f0df;border-bottom:3px double #333;}
       th:nth-child(1),th:nth-child(5),td:nth-child(1),td:nth-child(5){width:8%;}
       th:nth-child(2),th:nth-child(6),td:nth-child(2),td:nth-child(6){width:14%;}
       th:nth-child(3),th:nth-child(7),td:nth-child(3),td:nth-child(7){width:15%;}
       th:nth-child(4),th:nth-child(8),td:nth-child(4),td:nth-child(8){width:13%;}
-      @media print{.training-sheet{break-after:page;}}
+      .training-sheet:last-child{break-after:auto;page-break-after:auto;}
     `,
   )
 }
@@ -307,6 +312,8 @@ export function printAttendanceRosters(groups: AttendanceRosterPrintGroup[]): vo
     const students = [...options.students].sort((a, b) =>
       Number(a.number) - Number(b.number) || a.studentId.localeCompare(b.studentId),
     )
+    const rowHeight = Math.max(3.8, Math.min(6.4, 238 / Math.max(students.length, 1)))
+    const rowFont = students.length > 45 ? 7.5 : students.length > 36 ? 8.5 : 9.5
     const rows = students.map((student, index) => `<tr>
       <td>${index + 1}</td>
       <td>${escapeHtml(student.studentId)}</td>
@@ -319,7 +326,7 @@ export function printAttendanceRosters(groups: AttendanceRosterPrintGroup[]): vo
       ? new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric' })
         .format(new Date(`${options.date}T00:00:00`))
       : ''
-    return `<section class="attendance-sheet">
+    return `<section class="attendance-sheet" style="--attendance-row-height:${rowHeight.toFixed(2)}mm;--attendance-font-size:${rowFont}pt">
         <h1>${escapeHtml(options.title)}</h1>
         <div class="meta"><span>${escapeHtml(options.subtitle)}</span><span>${escapeHtml(date)}</span></div>
         <table>
@@ -332,16 +339,20 @@ export function printAttendanceRosters(groups: AttendanceRosterPrintGroup[]): vo
   printHtml(
     sheets,
     `
-      .sheet{padding:0}.attendance-sheet{width:210mm;min-height:297mm;padding:14mm 14mm;}
-      .attendance-sheet{break-after:page}.attendance-sheet:last-child{break-after:auto}
-      h1{text-align:center;font-size:22pt;margin:0 0 7mm;}
-      .meta{display:flex;justify-content:space-between;font-size:11pt;margin-bottom:3mm;}
-      table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10pt;}
-      th,td{border:1px solid #222;text-align:center;height:7mm;padding:1mm;}
+      .sheet{padding:0}
+      .attendance-sheet{
+        width:210mm;height:297mm;padding:9mm 11mm 6mm;overflow:hidden;
+        break-after:page;page-break-after:always;break-inside:avoid;
+      }
+      .attendance-sheet:last-child{break-after:auto;page-break-after:auto}
+      h1{text-align:center;font-size:19pt;line-height:1.15;margin:0 0 4mm;}
+      .meta{display:flex;justify-content:space-between;font-size:9.5pt;line-height:1.2;margin-bottom:2mm;}
+      table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:var(--attendance-font-size);line-height:1.05;}
+      th,td{border:1px solid #222;text-align:center;height:var(--attendance-row-height);padding:.45mm .7mm;}
       th{background:#e8f0df;font-weight:700;border-bottom:2px solid #222;}
       th:nth-child(1){width:8%}th:nth-child(2){width:16%}th:nth-child(3){width:16%}
       th:nth-child(4){width:9%}th:nth-child(5){width:25%}th:nth-child(6){width:26%}
-      .count{text-align:right;font-size:10pt;margin-top:2mm;}
+      .count{text-align:right;font-size:9pt;line-height:1.2;margin-top:1mm;}
     `,
   )
 }
