@@ -27,6 +27,8 @@ const SchoolLedgerPage = lazy(() => import('../pages/SchoolLedgerPage'))
 const PdfExtractorPage = lazy(() => import('../pages/PdfExtractorPage'))
 const FileParserPage = lazy(() => import('../pages/FileParserPage'))
 const NotifierPage = lazy(() => import('../pages/NotifierPage'))
+const StaffTasksPage = lazy(() => import('../pages/StaffTasksPage'))
+const AttendancePrintPage = lazy(() => import('../pages/AttendancePrintPage'))
 
 const PAGES: Record<string, React.ComponentType> = {
   neis: NeisPage,
@@ -50,6 +52,8 @@ const PAGES: Record<string, React.ComponentType> = {
   pdf_extractor: PdfExtractorPage,
   file_parser: FileParserPage,
   notifier: NotifierPage,
+  staff_tasks: StaffTasksPage,
+  attendance_print: AttendancePrintPage,
 }
 
 const MAX_HISTORY = 40

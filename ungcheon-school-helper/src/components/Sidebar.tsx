@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeftRight, Bell, BookCopy, BookOpen, Calculator, CalendarRange, ChevronDown,
-  ChevronRight, FileCode2, FileDown, FileScan, HelpCircle,
+  ChevronRight, ClipboardCheck, FileCode2, FileDown, FileScan, HelpCircle,
   Landmark, LayoutDashboard, Link2, MessageSquareText, Radio, ScrollText,
-  Settings, Table2, FileText,
+  Settings, Table2, FileText, UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -56,6 +56,7 @@ const NAV: NavGroup[] = [
     items: [
       { id: 'timetable_swap', label: '교환·대강 계획', icon: ArrowLeftRight },
       { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange },
+      { id: 'attendance_print', label: '출석부 출력', icon: UsersRound },
       { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText },
     ],
   },
@@ -64,6 +65,7 @@ const NAV: NavGroup[] = [
     items: [
       { id: 'committees', label: '각종 위원회 현황', icon: Landmark },
       { id: 'school_ledger', label: '비치 장부 현황', icon: BookCopy },
+      { id: 'staff_tasks', label: '업무 체크리스트', icon: ClipboardCheck },
     ],
   },
   {

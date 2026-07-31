@@ -13,6 +13,12 @@ const TIMETABLE_META_SHEET = '시간표정보';
 const TIMETABLE_SHEET = '시간표';
 const STUDENT_TIMETABLE_META_SHEET = '학생시간표정보';
 const STUDENT_TIMETABLE_SHEET = '학생시간표';
+const STAFF_ROSTER_META_SHEET = '교원명렬정보';
+const STAFF_ROSTER_SHEET = '교원명렬';
+const STUDENT_ROSTER_META_SHEET = '학생명렬정보';
+const STUDENT_ROSTER_SHEET = '학생명렬';
+const STAFF_CHECKLISTS_SHEET = '업무체크리스트';
+const STAFF_CHECKLIST_RESPONSES_SHEET = '업무체크응답';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
 const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
 const NEIS_BASE_URL = 'https://open.neis.go.kr/hub/';
@@ -28,9 +34,24 @@ const NEIS_ENDPOINT_PARAMS = {
   classInfo: ['AY'],
   schoolMajorinfo: ['AY']
 };
+const RELEASE_NOTES = [
+  {
+    key: 'v1.0.20',
+    title: '[업데이트] 웅천고 업무도우미 v1.0.20',
+    body: [
+      '• 업무 체크리스트: 교원·부서별 업무 배부, 개인 체크, 배부자 완료 현황 확인',
+      '• 교원 명렬: 관리자 Excel 등록·수정, 교장·교감 우선/가나다순 정렬, 명렬 내려받기',
+      '• 연수등록부: 제목·날짜 입력 후 2단 서명 양식 인쇄 및 PDF 저장',
+      '• 학생 명렬: 관리자 일괄 등록·수정, 일반 사용자는 조회·출력 전용',
+      '• 출석부: 학급별 및 이동수업 강좌별 출력',
+      '• 묶음 출력: 교사 선택 시 담당 강좌 전체, 과목 선택 시 해당 과목 분반 전체를 연속 인쇄하거나 Excel로 저장'
+    ].join('\n'),
+    date: '2026-07-31'
+  }
+];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 5 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 6 } });
 }
 
 function doPost(e) {
@@ -39,7 +60,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 5 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 6 } });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: { verified: true } });
@@ -81,6 +102,29 @@ function doPost(e) {
     if (action === 'replaceStudentTimetable') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: replaceStudentTimetable_(body) });
+    }
+    if (action === 'getStaffRoster') return json_({ ok: true, data: getStaffRoster_() });
+    if (action === 'replaceStaffRoster') {
+      requireAdmin_(body.adminPassword);
+      return json_({ ok: true, data: replaceStaffRoster_(body) });
+    }
+    if (action === 'getStudentRoster') return json_({ ok: true, data: getStudentRoster_() });
+    if (action === 'replaceStudentRoster') {
+      requireAdmin_(body.adminPassword);
+      return json_({ ok: true, data: replaceStudentRoster_(body) });
+    }
+    if (action === 'listStaffChecklists') {
+      return json_({ ok: true, data: listStaffChecklists_(body) });
+    }
+    if (action === 'addStaffChecklist') {
+      return json_({ ok: true, data: addStaffChecklist_(body) });
+    }
+    if (action === 'submitStaffChecklist') {
+      return json_({ ok: true, data: submitStaffChecklist_(body) });
+    }
+    if (action === 'deleteStaffChecklist') {
+      deleteStaffChecklist_(body);
+      return json_({ ok: true });
     }
     if (action === 'getNeisStatus') {
       return json_({ ok: true, data: getNeisStatus_() });
@@ -189,6 +233,57 @@ function ensureSheets_() {
   }
   studentTimetable.getRange(1, 1, 1, studentTimetableHeaders.length)
     .setValues([studentTimetableHeaders]);
+
+  ensureDataSheet_(book, STAFF_ROSTER_META_SHEET, [
+    'version', 'sourceFileName', 'uploadedBy', 'uploadedAt', 'memberCount'
+  ]);
+  ensureDataSheet_(book, STAFF_ROSTER_SHEET, [
+    'id', 'name', 'position', 'department'
+  ]);
+  ensureDataSheet_(book, STUDENT_ROSTER_META_SHEET, [
+    'version', 'sourceFileName', 'uploadedBy', 'uploadedAt', 'studentCount'
+  ]);
+  ensureDataSheet_(book, STUDENT_ROSTER_SHEET, [
+    'studentId', 'name', 'gender', 'remark', 'grade', 'className', 'number',
+    'homeroomTeacher', 'assistantTeacher'
+  ]);
+  ensureDataSheet_(book, STAFF_CHECKLISTS_SHEET, [
+    'id', 'title', 'description', 'deadline', 'creatorName', 'createdAt',
+    'closed', 'itemsJson', 'targetNamesJson'
+  ]);
+  ensureDataSheet_(book, STAFF_CHECKLIST_RESPONSES_SHEET, [
+    'checklistId', 'teacherName', 'checkedItemIdsJson', 'memo', 'updatedAt'
+  ]);
+  ensureReleaseNotices_();
+}
+
+function ensureDataSheet_(book, name, headers) {
+  let sheet = book.getSheetByName(name);
+  if (!sheet) {
+    sheet = book.insertSheet(name);
+    sheet.setFrozenRows(1);
+  }
+  if (sheet.getMaxColumns() < headers.length) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
+  }
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+}
+
+function ensureReleaseNotices_() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTICES_SHEET);
+  const existing = readObjects_(NOTICES_SHEET);
+  const titles = {};
+  let maxId = 0;
+  existing.forEach(function(notice) {
+    titles[String(notice.title || '')] = true;
+    maxId = Math.max(maxId, Number(notice.id) || 0);
+  });
+  RELEASE_NOTES.forEach(function(note) {
+    if (titles[note.title]) return;
+    maxId += 1;
+    sheet.appendRow([maxId, note.title, note.body, 'important', note.date, '']);
+    titles[note.title] = true;
+  });
 }
 
 function listLinks_() {
@@ -562,6 +657,351 @@ function normalizeStudentTimetable_(item) {
   };
 }
 
+function getStaffRoster_() {
+  const metaRows = readObjects_(STAFF_ROSTER_META_SHEET);
+  if (!metaRows.length) return null;
+  const meta = metaRows[0];
+  const members = readObjects_(STAFF_ROSTER_SHEET)
+    .map(function(row) {
+      return {
+        id: String(row.id || ''),
+        name: String(row.name || ''),
+        position: String(row.position || ''),
+        department: String(row.department || '')
+      };
+    })
+    .filter(function(member) { return member.id && member.name; })
+    .sort(compareStaffMembers_);
+  return {
+    version: Number(meta.version) || 1,
+    sourceFileName: String(meta.sourceFileName || ''),
+    uploadedBy: String(meta.uploadedBy || ''),
+    uploadedAt: iso_(meta.uploadedAt),
+    members: members
+  };
+}
+
+function replaceStaffRoster_(body) {
+  const source = Array.isArray(body.members) ? body.members : [];
+  if (!source.length) throw new Error('저장할 교원 명렬이 없습니다.');
+  if (source.length > 200) throw new Error('교원 명렬은 200명을 초과할 수 없습니다.');
+  const seenNames = {};
+  const rows = source.map(function(member) {
+    const name = clean_(member && member.name, 30);
+    const position = clean_(member && member.position, 30) || '교사';
+    const department = clean_(member && member.department, 50);
+    if (!name) throw new Error('성명이 비어 있는 교원이 있습니다.');
+    if (seenNames[name]) throw new Error('교원 명렬에 같은 이름이 두 번 있습니다: ' + name);
+    seenNames[name] = true;
+    return [
+      clean_(member && member.id, 100) || Utilities.getUuid(),
+      name,
+      position,
+      department
+    ];
+  });
+  rows.sort(function(a, b) {
+    return compareStaffMembers_(
+      { name: a[1], position: a[2] },
+      { name: b[1], position: b[2] }
+    );
+  });
+
+  const existing = readObjects_(STAFF_ROSTER_META_SHEET);
+  const version = (existing.length ? Number(existing[0].version) || 0 : 0) + 1;
+  const sourceFileName = clean_(body.sourceFileName, 200);
+  const uploadedBy = clean_(body.uploadedBy, 30) || '관리자';
+  const uploadedAt = new Date().toISOString();
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    replaceSheetRows_(STAFF_ROSTER_SHEET, rows);
+    replaceSheetRows_(STAFF_ROSTER_META_SHEET, [[
+      version, sourceFileName, uploadedBy, uploadedAt, rows.length
+    ]]);
+  } finally {
+    lock.releaseLock();
+  }
+  return { version: version, uploadedAt: uploadedAt };
+}
+
+function compareStaffMembers_(a, b) {
+  function rank_(position) {
+    const value = String(position || '').replace(/\s/g, '');
+    if (value === '교장') return 0;
+    if (value === '교감') return 1;
+    return 2;
+  }
+  const rank = rank_(a.position) - rank_(b.position);
+  return rank || String(a.name || '').localeCompare(String(b.name || ''), 'ko');
+}
+
+function getStudentRoster_() {
+  const metaRows = readObjects_(STUDENT_ROSTER_META_SHEET);
+  if (!metaRows.length) return null;
+  const meta = metaRows[0];
+  const students = readObjects_(STUDENT_ROSTER_SHEET)
+    .map(function(row) {
+      return {
+        studentId: String(row.studentId || ''),
+        name: String(row.name || ''),
+        gender: String(row.gender || ''),
+        remark: String(row.remark || ''),
+        grade: String(row.grade || ''),
+        className: String(row.className || ''),
+        number: String(row.number || ''),
+        homeroomTeacher: String(row.homeroomTeacher || ''),
+        assistantTeacher: String(row.assistantTeacher || '')
+      };
+    })
+    .filter(function(student) { return student.studentId && student.name; })
+    .sort(function(a, b) { return a.studentId.localeCompare(b.studentId); });
+  return {
+    version: Number(meta.version) || 1,
+    sourceFileName: String(meta.sourceFileName || ''),
+    uploadedBy: String(meta.uploadedBy || ''),
+    uploadedAt: iso_(meta.uploadedAt),
+    students: students
+  };
+}
+
+function replaceStudentRoster_(body) {
+  const source = Array.isArray(body.students) ? body.students : [];
+  if (!source.length) throw new Error('저장할 학생 명렬이 없습니다.');
+  if (source.length > 2000) throw new Error('학생 명렬은 2,000명을 초과할 수 없습니다.');
+  const seen = {};
+  const rows = source.map(function(student) {
+    const studentId = clean_(student && student.studentId, 12);
+    const name = clean_(student && student.name, 30);
+    if (!/^\d{4,12}$/.test(studentId)) throw new Error('학번 형식이 올바르지 않습니다: ' + studentId);
+    if (!name) throw new Error(studentId + ' 학생의 이름이 없습니다.');
+    if (seen[studentId]) throw new Error('중복 학번이 있습니다: ' + studentId);
+    seen[studentId] = true;
+    const grade = clean_(student && student.grade, 2) || studentId.slice(0, 1);
+    const className = clean_(student && student.className, 3) ||
+      String(Number(studentId.length === 4 ? studentId.slice(1, 2) : studentId.slice(1, 3)));
+    const number = clean_(student && student.number, 3) ||
+      String(Number(studentId.length === 4 ? studentId.slice(2) : studentId.slice(3)));
+    return [
+      studentId,
+      name,
+      clean_(student && student.gender, 10),
+      clean_(student && student.remark, 100),
+      grade,
+      className,
+      number,
+      clean_(student && student.homeroomTeacher, 30),
+      clean_(student && student.assistantTeacher, 30)
+    ];
+  });
+  rows.sort(function(a, b) { return String(a[0]).localeCompare(String(b[0])); });
+
+  const existing = readObjects_(STUDENT_ROSTER_META_SHEET);
+  const version = (existing.length ? Number(existing[0].version) || 0 : 0) + 1;
+  const sourceFileName = clean_(body.sourceFileName, 200);
+  const uploadedBy = clean_(body.uploadedBy, 30) || '관리자';
+  const uploadedAt = new Date().toISOString();
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    replaceSheetRows_(STUDENT_ROSTER_SHEET, rows);
+    replaceSheetRows_(STUDENT_ROSTER_META_SHEET, [[
+      version, sourceFileName, uploadedBy, uploadedAt, rows.length
+    ]]);
+  } finally {
+    lock.releaseLock();
+  }
+  return { version: version, uploadedAt: uploadedAt };
+}
+
+function listStaffChecklists_(body) {
+  const viewerName = clean_(body.viewerName, 30);
+  if (!viewerName) throw new Error('환경설정에서 본인 이름을 입력하세요.');
+  const admin = isAdminPassword_(body.adminPassword);
+  const responses = readObjects_(STAFF_CHECKLIST_RESPONSES_SHEET);
+  return readObjects_(STAFF_CHECKLISTS_SHEET)
+    .map(function(row) {
+      const items = parseJsonArray_(row.itemsJson);
+      const targetNames = parseJsonArray_(row.targetNamesJson).map(String);
+      const canManage = admin || String(row.creatorName || '') === viewerName;
+      const visible = canManage || targetNames.indexOf(viewerName) >= 0;
+      if (!visible) return null;
+      const checklistResponses = responses
+        .filter(function(response) {
+          return String(response.checklistId || '') === String(row.id || '') &&
+            (canManage || String(response.teacherName || '') === viewerName);
+        })
+        .map(function(response) {
+          return {
+            teacherName: String(response.teacherName || ''),
+            checkedItemIds: parseJsonArray_(response.checkedItemIdsJson).map(String),
+            memo: String(response.memo || ''),
+            updatedAt: iso_(response.updatedAt)
+          };
+        });
+      return {
+        id: String(row.id || ''),
+        title: String(row.title || ''),
+        description: String(row.description || ''),
+        deadline: dateOnly_(row.deadline),
+        creatorName: String(row.creatorName || ''),
+        createdAt: iso_(row.createdAt),
+        closed: toBooleanValue_(row.closed),
+        items: items,
+        targetNames: targetNames,
+        responses: checklistResponses,
+        canManage: canManage
+      };
+    })
+    .filter(function(item) { return item && item.id && item.title; })
+    .sort(function(a, b) { return b.createdAt.localeCompare(a.createdAt); });
+}
+
+function addStaffChecklist_(body) {
+  const creatorName = clean_(body.creatorName, 30);
+  const title = clean_(body.title, 100);
+  const description = clean_(body.description, 1000);
+  const deadline = clean_(body.deadline, 10);
+  const sourceItems = Array.isArray(body.items) ? body.items : [];
+  const sourceTargets = Array.isArray(body.targetNames) ? body.targetNames : [];
+  if (!creatorName || !title) throw new Error('작성자와 제목을 입력하세요.');
+  if (deadline && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) throw new Error('마감일 형식이 올바르지 않습니다.');
+
+  const roster = getStaffRoster_();
+  if (!roster || !roster.members.some(function(member) { return member.name === creatorName; })) {
+    throw new Error('환경설정의 이름이 등록된 교원 명렬과 일치하지 않습니다.');
+  }
+  const allowedNames = {};
+  roster.members.forEach(function(member) { allowedNames[member.name] = true; });
+  const targetNames = uniqueStrings_(sourceTargets, 30, 200)
+    .filter(function(name) { return allowedNames[name]; });
+  if (!targetNames.length) throw new Error('배부 대상 교원을 한 명 이상 선택하세요.');
+  const itemLabels = uniqueStrings_(sourceItems, 200, 30);
+  if (!itemLabels.length) throw new Error('확인 항목을 한 개 이상 입력하세요.');
+  const items = itemLabels.map(function(label) {
+    return { id: Utilities.getUuid(), label: label };
+  });
+  const id = Utilities.getUuid();
+  const createdAt = new Date().toISOString();
+  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_CHECKLISTS_SHEET).appendRow([
+    id, title, description, deadline, creatorName, createdAt, false,
+    JSON.stringify(items), JSON.stringify(targetNames)
+  ]);
+  return { id: id };
+}
+
+function submitStaffChecklist_(body) {
+  const checklistId = clean_(body.checklistId, 100);
+  const teacherName = clean_(body.teacherName, 30);
+  const memo = clean_(body.memo, 300);
+  if (!checklistId || !teacherName) throw new Error('체크리스트와 교사 이름을 확인하세요.');
+  const checklist = findObjectByValue_(STAFF_CHECKLISTS_SHEET, 'id', checklistId);
+  if (!checklist) throw new Error('체크리스트를 찾지 못했습니다.');
+  if (toBooleanValue_(checklist.closed)) throw new Error('마감된 체크리스트입니다.');
+  const targetNames = parseJsonArray_(checklist.targetNamesJson).map(String);
+  if (targetNames.indexOf(teacherName) < 0) throw new Error('이 체크리스트의 배부 대상이 아닙니다.');
+  const itemIds = {};
+  parseJsonArray_(checklist.itemsJson).forEach(function(item) {
+    if (item && item.id) itemIds[String(item.id)] = true;
+  });
+  const checkedItemIds = uniqueStrings_(
+    Array.isArray(body.checkedItemIds) ? body.checkedItemIds : [],
+    100,
+    30
+  ).filter(function(id) { return itemIds[id]; });
+  const updatedAt = new Date().toISOString();
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_CHECKLIST_RESPONSES_SHEET);
+    const values = sheet.getDataRange().getValues();
+    for (let row = 1; row < values.length; row++) {
+      if (String(values[row][0]) === checklistId && String(values[row][1]) === teacherName) {
+        sheet.getRange(row + 1, 3, 1, 3).setValues([[
+          JSON.stringify(checkedItemIds), memo, updatedAt
+        ]]);
+        return { updatedAt: updatedAt };
+      }
+    }
+    sheet.appendRow([checklistId, teacherName, JSON.stringify(checkedItemIds), memo, updatedAt]);
+  } finally {
+    lock.releaseLock();
+  }
+  return { updatedAt: updatedAt };
+}
+
+function deleteStaffChecklist_(body) {
+  const checklistId = clean_(body.checklistId, 100);
+  const viewerName = clean_(body.viewerName, 30);
+  const checklist = findObjectByValue_(STAFF_CHECKLISTS_SHEET, 'id', checklistId);
+  if (!checklist) throw new Error('삭제할 체크리스트를 찾지 못했습니다.');
+  if (String(checklist.creatorName || '') !== viewerName && !isAdminPassword_(body.adminPassword)) {
+    throw new Error('작성자 또는 관리자만 삭제할 수 있습니다.');
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    deleteRowsByValue_(STAFF_CHECKLIST_RESPONSES_SHEET, 'checklistId', checklistId);
+    deleteRowsByValue_(STAFF_CHECKLISTS_SHEET, 'id', checklistId);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function replaceSheetRows_(sheetName, rows) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+  }
+  if (rows.length) sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+}
+
+function parseJsonArray_(value) {
+  try {
+    const parsed = JSON.parse(String(value || '[]'));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function uniqueStrings_(values, maxLength, maxCount) {
+  const seen = {};
+  return values.map(function(value) { return clean_(value, maxLength); })
+    .filter(function(value) {
+      if (!value || seen[value]) return false;
+      seen[value] = true;
+      return true;
+    })
+    .slice(0, maxCount);
+}
+
+function findObjectByValue_(sheetName, header, value) {
+  const rows = readObjects_(sheetName);
+  for (let index = 0; index < rows.length; index++) {
+    if (String(rows[index][header] || '') === value) return rows[index];
+  }
+  return null;
+}
+
+function deleteRowsByValue_(sheetName, header, value) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) return;
+  const column = values[0].map(String).indexOf(header);
+  if (column < 0) return;
+  for (let row = values.length - 1; row >= 1; row--) {
+    if (String(values[row][column]) === value) sheet.deleteRow(row + 1);
+  }
+}
+
+function toBooleanValue_(value) {
+  return value === true || String(value || '').toLowerCase() === 'true';
+}
+
 function getNeisStatus_() {
   return {
     configured: Boolean(PropertiesService.getScriptProperties().getProperty(NEIS_API_KEY_PROPERTY)),
@@ -687,6 +1127,11 @@ function requireAdmin_(password) {
   const stored = PropertiesService.getScriptProperties().getProperty(ADMIN_HASH_KEY);
   if (!stored) throw new Error('관리자 비밀번호가 아직 설정되지 않았습니다.');
   if (!password || sha256_(String(password)) !== stored) throw new Error('관리자 비밀번호가 올바르지 않습니다.');
+}
+
+function isAdminPassword_(password) {
+  const stored = PropertiesService.getScriptProperties().getProperty(ADMIN_HASH_KEY);
+  return Boolean(stored && password && sha256_(String(password)) === stored);
 }
 
 function readObjects_(sheetName) {
