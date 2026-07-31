@@ -121,7 +121,7 @@ jobs:
 
       - name: 배포 버전 적용
         shell: pwsh
-        run: npm version $env:RELEASE_VERSION --no-git-tag-version
+        run: npm version $env:RELEASE_VERSION --no-git-tag-version --allow-same-version
 
       - name: 타입 검사
         run: npm run typecheck

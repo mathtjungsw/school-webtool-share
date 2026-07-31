@@ -42,8 +42,8 @@ const RELEASE_NOTES = [
     title: '[업데이트] 웅천고 업무도우미 v1.0.22',
     body: [
       '· 학교 내 각종위원회: 2026학년도 경남교육청 고등학교 기준으로 교체',
-      '· 위원회 명단: 교원 명렬 선택 및 직접 입력, 역할 지정 기능 추가',
-      '· 위원회 캘린더: 개최 일시·장소·안건 등록과 개인 달력 표시',
+      '· 위원회 명단: 전체 교직원이 교원 명렬 선택·직접 입력·역할 지정 가능',
+      '· 위원회 캘린더: 전체 교직원이 일정을 등록·삭제하고 개인 달력에서 확인',
       '· 일정 충돌: 같은 위원이 같은 시간대 위원회에 중복될 때 경고 및 등록 차단',
       '· 대시보드: 이름·NEIS API 키 미설정 시 바로가기 안내 추가',
       '· 학교 운영: 학교비치장부현황 메뉴 제거'
@@ -78,7 +78,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 8 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 9 } });
 }
 
 function doPost(e) {
@@ -87,7 +87,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 8 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 9 } });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: { verified: true } });
@@ -157,15 +157,12 @@ function doPost(e) {
       return json_({ ok: true, data: listCommitteeState_() });
     }
     if (action === 'saveCommitteeMembers') {
-      requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: saveCommitteeMembers_(body) });
     }
     if (action === 'addCommitteeEvent') {
-      requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: addCommitteeEvent_(body) });
     }
     if (action === 'deleteCommitteeEvent') {
-      requireAdmin_(body.adminPassword);
       deleteRowById_(COMMITTEE_EVENTS_SHEET, String(body.id || ''));
       return json_({ ok: true });
     }
@@ -1060,7 +1057,7 @@ function saveCommitteeMembers_(body) {
   const committeeId = clean_(body.committeeId, 20);
   const committeeName = clean_(body.committeeName, 120);
   const members = normalizeCommitteeMembers_(body.members);
-  const updatedBy = clean_(body.updatedBy, 30) || '관리자';
+  const updatedBy = clean_(body.updatedBy, 30) || '사용자';
   if (!committeeId || !committeeName) throw new Error('위원회 정보를 확인해 주세요.');
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(COMMITTEE_MEMBERS_SHEET);
@@ -1098,7 +1095,7 @@ function addCommitteeEvent_(body) {
   const location = clean_(body.location, 100);
   const agenda = clean_(body.agenda, 1000);
   const memberNames = uniqueStrings_(body.memberNames, 30, 100);
-  const createdBy = clean_(body.createdBy, 30) || '관리자';
+  const createdBy = clean_(body.createdBy, 30) || '사용자';
 
   if (!committeeId || !committeeName) throw new Error('위원회를 선택해 주세요.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('개최 날짜를 확인해 주세요.');
