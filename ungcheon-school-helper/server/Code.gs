@@ -36,6 +36,18 @@ const NEIS_ENDPOINT_PARAMS = {
 };
 const RELEASE_NOTES = [
   {
+    key: 'v1.0.21',
+    title: '[업데이트] 웅천고 업무도우미 v1.0.21',
+    body: [
+      '• 연수등록부: 출력 미리보기를 실제 양식과 같은 열 우선 번호 순서로 수정',
+      '• 연수등록부·출석부: 명단이 각 양식 한 페이지에 들어가도록 인쇄 크기 자동 조정',
+      '• 수업 출석부: 기존 5자리 학번 시간표와 4자리 학생 명렬을 자동 연결',
+      '• 메뉴 구성: 업무 체크리스트와 교원 명렬·연수등록부를 분리',
+      '• 메뉴 순서: 학사·기록과 학교운영을 상단으로 이동하고 위원회·비치 장부를 하단 배치'
+    ].join('\n'),
+    date: '2026-07-31'
+  },
+  {
     key: 'v1.0.20',
     title: '[업데이트] 웅천고 업무도우미 v1.0.20',
     body: [
@@ -51,7 +63,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 6 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 7 } });
 }
 
 function doPost(e) {
@@ -60,7 +72,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 6 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 7 } });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: { verified: true } });

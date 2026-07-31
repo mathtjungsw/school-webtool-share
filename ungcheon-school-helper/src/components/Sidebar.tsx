@@ -37,8 +37,27 @@ const NAV: NavGroup[] = [
     ],
   },
   {
-    label: '자료·진로',
+    label: '학사·기록',
     defaultOpen: true,
+    items: [
+      { id: 'timetable_swap', label: '교환·대강 계획', icon: ArrowLeftRight },
+      { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange },
+      { id: 'attendance_print', label: '출석부 출력', icon: UsersRound },
+      { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText },
+    ],
+  },
+  {
+    label: '학교운영',
+    defaultOpen: true,
+    items: [
+      { id: 'staff_tasks', label: '업무 체크리스트', icon: ClipboardCheck },
+      { id: 'staff_roster', label: '교원 명렬', icon: UsersRound },
+      { id: 'committees', label: '각종 위원회 현황', icon: Landmark },
+      { id: 'school_ledger', label: '비치 장부 현황', icon: BookCopy },
+    ],
+  },
+  {
+    label: '자료·진로',
     items: [
       { id: 'excel_processor', label: 'Excel 전처리', icon: Table2 },
       { id: 'recommended_subjects', label: '대학 권장과목', icon: BookOpen },
@@ -49,23 +68,6 @@ const NAV: NavGroup[] = [
     items: [
       { id: 'payroll', label: '호봉획정 계산기', icon: Calculator },
       { id: 'insa_analysis', label: 'NEIS 인사기록 분석', icon: FileScan },
-    ],
-  },
-  {
-    label: '학사·기록',
-    items: [
-      { id: 'timetable_swap', label: '교환·대강 계획', icon: ArrowLeftRight },
-      { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange },
-      { id: 'attendance_print', label: '출석부 출력', icon: UsersRound },
-      { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText },
-    ],
-  },
-  {
-    label: '학교운영',
-    items: [
-      { id: 'committees', label: '각종 위원회 현황', icon: Landmark },
-      { id: 'school_ledger', label: '비치 장부 현황', icon: BookCopy },
-      { id: 'staff_tasks', label: '업무 체크리스트', icon: ClipboardCheck },
     ],
   },
   {

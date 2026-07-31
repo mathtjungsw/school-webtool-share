@@ -26,15 +26,24 @@ import {
 } from '../services/rosterAttendance'
 
 type Tab = 'checklists' | 'roster' | 'training'
+type StaffPageMode = 'checklists' | 'roster'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
 export default function StaffTasksPage() {
+  return <StaffPage mode="checklists" />
+}
+
+export function StaffRosterPage() {
+  return <StaffPage mode="roster" />
+}
+
+function StaffPage({ mode }: { mode: StaffPageMode }) {
   const config = useAppStore(state => state.config)
   const isAdmin = useAdminStore(state => state.isAdmin)
   const adminPassword = useAdminStore(state => state.adminPassword)
   const teacherName = config.teacherName?.trim() ?? ''
-  const [tab, setTab] = useState<Tab>('checklists')
+  const [tab, setTab] = useState<Tab>(mode === 'checklists' ? 'checklists' : 'roster')
   const [roster, setRoster] = useState<SharedStaffRoster | null>(null)
   const [checklists, setChecklists] = useState<StaffChecklist[]>([])
   const [loading, setLoading] = useState(false)
@@ -48,7 +57,9 @@ export default function StaffTasksPage() {
     try {
       const [nextRoster, nextChecklists] = await Promise.all([
         getSharedStaffRoster(),
-        teacherName ? listStaffChecklists(teacherName, isAdmin ? adminPassword : '') : Promise.resolve([]),
+        mode === 'checklists' && teacherName
+          ? listStaffChecklists(teacherName, isAdmin ? adminPassword : '')
+          : Promise.resolve([]),
       ])
       setRoster(nextRoster)
       setChecklists(nextChecklists)
@@ -57,7 +68,7 @@ export default function StaffTasksPage() {
     } finally {
       setLoading(false)
     }
-  }, [adminPassword, config.schoolHubUrl, isAdmin, teacherName])
+  }, [adminPassword, config.schoolHubUrl, isAdmin, mode, teacherName])
 
   useEffect(() => { load() }, [load])
 
@@ -66,57 +77,65 @@ export default function StaffTasksPage() {
   }
 
   const tabs: Array<{ id: Tab; label: string; icon: typeof ClipboardCheck }> = [
-    { id: 'checklists', label: '업무 체크리스트', icon: ClipboardCheck },
     { id: 'roster', label: '교원 명렬', icon: UsersRound },
     { id: 'training', label: '연수등록부', icon: GraduationCap },
   ]
+  const pageTitle = mode === 'checklists' ? '업무 체크리스트' : '교원 명렬'
+  const pageSubtitle = mode === 'checklists'
+    ? '교원별·부서별 업무를 배부하고 완료 현황을 확인합니다.'
+    : '공유 교원 명렬을 관리하고 연수등록부를 출력합니다.'
+  const PageIcon = mode === 'checklists' ? ClipboardCheck : UsersRound
 
   return (
     <div className="p-6 max-w-[1450px] mx-auto space-y-4">
       <header className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="page-title flex items-center gap-2"><ClipboardCheck size={22} className="text-amber-400" />업무 체크리스트</h1>
-          <p className="page-subtitle">교원별·부서별 업무를 배부하고 완료 현황을 확인합니다.</p>
+          <h1 className="page-title flex items-center gap-2"><PageIcon size={22} className="text-amber-400" />{pageTitle}</h1>
+          <p className="page-subtitle">{pageSubtitle}</p>
         </div>
         <button onClick={load} disabled={loading} className="btn-ghost flex items-center gap-1.5">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />새로고침
         </button>
       </header>
 
-      <div className="rounded-xl border border-sky-500/20 bg-sky-500/8 px-4 py-3 flex items-start gap-3">
-        <UserRoundCog size={17} className="text-sky-300 mt-0.5 flex-shrink-0" />
-        <div>
-          <p className="text-xs font-semibold text-sky-200">
-            현재 사용자: {teacherName || '환경설정에서 이름을 입력해 주세요'}
-          </p>
-          <p className="text-[11px] text-slate-400 mt-1">
-            로그인 도입 전까지 환경설정의 교사 이름을 본인 확인 기준으로 사용합니다. 다른 사람의 이름을 입력할 수 있으므로 공식 확인 자료보다는 업무 진행 확인용으로 사용해 주세요.
-          </p>
+      {mode === 'checklists' && (
+        <div className="rounded-xl border border-sky-500/20 bg-sky-500/8 px-4 py-3 flex items-start gap-3">
+          <UserRoundCog size={17} className="text-sky-300 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-sky-200">
+              현재 사용자: {teacherName || '환경설정에서 이름을 입력해 주세요'}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              로그인 도입 전까지 환경설정의 교사 이름을 본인 확인 기준으로 사용합니다. 다른 사람의 이름을 입력할 수 있으므로 공식 확인 자료보다는 업무 진행 확인용으로 사용해 주세요.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex gap-1 rounded-xl bg-surface-800 border border-white/5 p-1">
-        {tabs.map(item => {
-          const Icon = item.icon
-          return (
-            <button
-              key={item.id}
-              onClick={() => setTab(item.id)}
-              className={clsx(
-                'flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors',
-                tab === item.id ? 'bg-amber-400/15 text-amber-300' : 'text-slate-500 hover:text-slate-200',
-              )}
-            >
-              <Icon size={14} />{item.label}
-            </button>
-          )
-        })}
-      </div>
+      {mode === 'roster' && (
+        <div className="flex gap-1 rounded-xl bg-surface-800 border border-white/5 p-1">
+          {tabs.map(item => {
+            const Icon = item.icon
+            return (
+              <button
+                key={item.id}
+                onClick={() => setTab(item.id)}
+                className={clsx(
+                  'flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors',
+                  tab === item.id ? 'bg-amber-400/15 text-amber-300' : 'text-slate-500 hover:text-slate-200',
+                )}
+              >
+                <Icon size={14} />{item.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {error && <Notice tone="error" text={error} />}
       {success && <Notice tone="success" text={success} />}
 
-      {tab === 'checklists' && (
+      {mode === 'checklists' && (
         <ChecklistTab
           teacherName={teacherName}
           members={roster?.members ?? []}
@@ -128,7 +147,7 @@ export default function StaffTasksPage() {
           onSuccess={setSuccess}
         />
       )}
-      {tab === 'roster' && (
+      {mode === 'roster' && tab === 'roster' && (
         <RosterTab
           roster={roster}
           isAdmin={isAdmin}
@@ -139,7 +158,7 @@ export default function StaffTasksPage() {
           onSuccess={setSuccess}
         />
       )}
-      {tab === 'training' && <TrainingTab members={roster?.members ?? []} />}
+      {mode === 'roster' && tab === 'training' && <TrainingTab members={roster?.members ?? []} />}
     </div>
   )
 }
@@ -531,6 +550,14 @@ function RosterTab({
 function TrainingTab({ members }: { members: StaffMember[] }) {
   const [title, setTitle] = useState('교과학점제 연수')
   const [date, setDate] = useState(today())
+  const sortedMembers = useMemo(() => sortStaffMembers(members), [members])
+  const splitAt = Math.max(33, Math.ceil(sortedMembers.length / 2))
+  const leftMembers = sortedMembers.slice(0, splitAt)
+  const rightMembers = sortedMembers.slice(splitAt)
+  const previewRows = Array.from(
+    { length: Math.max(leftMembers.length, rightMembers.length) },
+    (_, index) => ({ left: leftMembers[index], right: rightMembers[index] }),
+  )
   return (
     <div className="grid lg:grid-cols-[380px_minmax(0,1fr)] gap-4 items-start">
       <div className="card space-y-4">
@@ -555,13 +582,26 @@ function TrainingTab({ members }: { members: StaffMember[] }) {
           <dt className="text-slate-500">대상 인원</dt><dd className="text-slate-200">{members.length}명</dd>
           <dt className="text-slate-500">정렬</dt><dd className="text-slate-200">교장, 교감, 나머지 교원 가나다순</dd>
         </dl>
-        <div className="grid grid-cols-2 gap-2 mt-4">
-          {sortStaffMembers(members).map((member, index) => (
-            <div key={member.id} className="rounded-lg bg-white/[0.03] px-3 py-2 text-xs flex gap-2">
-              <span className="text-slate-600 w-6">{index + 1}</span>
-              <span className="text-slate-300">{member.position} {member.name}</span>
-            </div>
-          ))}
+        <div className="mt-4 rounded-xl border border-white/5 overflow-hidden">
+          <div className="grid grid-cols-2 bg-white/[0.04] text-[10px] font-semibold text-slate-500">
+            <div className="px-3 py-2 border-r border-white/5">왼쪽 열 · 1번부터</div>
+            <div className="px-3 py-2">오른쪽 열 · {rightMembers.length ? `${splitAt + 1}번부터` : '계속'}</div>
+          </div>
+          <div className="max-h-[560px] overflow-y-auto">
+            {previewRows.map(({ left, right }, rowIndex) => (
+              <div key={rowIndex} className="grid grid-cols-2 border-t border-white/5 text-xs">
+                <div className="min-h-9 px-3 py-2 border-r border-white/5 flex gap-2">
+                  <span className="text-slate-600 w-7">{left ? rowIndex + 1 : ''}</span>
+                  <span className="text-slate-300">{left ? `${left.position} ${left.name}` : ''}</span>
+                </div>
+                <div className="min-h-9 px-3 py-2 flex gap-2">
+                  <span className="text-slate-600 w-7">{right ? splitAt + rowIndex + 1 : ''}</span>
+                  <span className="text-slate-300">{right ? `${right.position} ${right.name}` : ''}</span>
+                </div>
+              </div>
+            ))}
+            {!previewRows.length && <p className="py-12 text-center text-sm text-slate-500">등록된 교원이 없습니다.</p>}
+          </div>
         </div>
       </div>
     </div>

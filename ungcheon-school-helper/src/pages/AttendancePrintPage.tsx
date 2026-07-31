@@ -36,6 +36,23 @@ interface CourseRoster {
 
 const today = () => new Date().toISOString().slice(0, 10)
 
+function studentLookupKey(student: {
+  studentId: string
+  grade?: string
+  className?: string
+  number?: string
+}): string {
+  const grade = String(student.grade ?? '').replace(/\D/g, '')
+  const className = String(Number(String(student.className ?? '').replace(/\D/g, '')))
+  const number = String(student.number ?? '').replace(/\D/g, '').padStart(2, '0')
+  if (grade && className && className !== '0' && number !== '00') {
+    return `${grade}${className}${number}`
+  }
+  const digits = String(student.studentId ?? '').replace(/\D/g, '')
+  const padded = digits.match(/^([123])(\d{2})(\d{2})$/)
+  return padded ? `${padded[1]}${Number(padded[2])}${padded[3]}` : digits
+}
+
 export default function AttendancePrintPage() {
   const config = useAppStore(state => state.config)
   const isAdmin = useAdminStore(state => state.isAdmin)
@@ -214,7 +231,10 @@ function CourseAttendance({
   )
   const [offeringKey, setOfferingKey] = useState('')
   const selectedOffering = offerings.find(offering => offering.key === offeringKey) ?? filtered[0]
-  const rosterById = useMemo(() => new Map(students.map(student => [student.studentId, student])), [students])
+  const rosterById = useMemo(
+    () => new Map(students.map(student => [studentLookupKey(student), student])),
+    [students],
+  )
   const selectedStudents = useMemo(
     () => selectedOffering?.studentIds.map(studentId => rosterById.get(studentId)).filter((student): student is StudentRosterEntry => Boolean(student)) ?? [],
     [rosterById, selectedOffering],
@@ -528,7 +548,8 @@ function buildCourseRosters(timetable: SharedStudentTimetable | null): CourseRos
         classroom: selection.classroom,
         studentIds: [],
       }
-      if (!current.studentIds.includes(personal.student.studentId)) current.studentIds.push(personal.student.studentId)
+      const studentKey = studentLookupKey(personal.student)
+      if (!current.studentIds.includes(studentKey)) current.studentIds.push(studentKey)
       map.set(key, current)
     }
   }
