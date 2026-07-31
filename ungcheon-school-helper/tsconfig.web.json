@@ -59,6 +59,7 @@
     "src/services/studentTimetable.ts",
     "src/services/rosterAttendance.ts",
     "src/services/gradePreview.ts",
+    "src/services/achievementScenario.ts",
     "src/services/ungcheonSchedule.ts",
     "src/services/hobong.ts",
     "src/services/hobongExcel.ts",
