@@ -236,14 +236,12 @@ export const saveCommitteeMembers = (
   committeeName: string,
   members: CommitteeMember[],
   updatedBy: string,
-  adminPassword: string,
 ) => hubRequest<{ updatedAt: string }>({
   action: 'saveCommitteeMembers',
   committeeId,
   committeeName,
   members,
   updatedBy,
-  adminPassword,
 })
 
 export const addCommitteeEvent = (
@@ -259,18 +257,12 @@ export const addCommitteeEvent = (
     memberNames: string[]
     createdBy: string
   },
-  adminPassword: string,
 ) => hubRequest<CommitteeEvent>({
   action: 'addCommitteeEvent',
   ...input,
-  adminPassword,
 })
 
-export const deleteCommitteeEvent = (
-  id: string,
-  adminPassword: string,
-) => hubRequest<void>({
+export const deleteCommitteeEvent = (id: string) => hubRequest<void>({
   action: 'deleteCommitteeEvent',
   id,
-  adminPassword,
 })

@@ -659,6 +659,10 @@ const HUB_ACTIONS = new Set([
   'addStaffChecklist',
   'submitStaffChecklist',
   'deleteStaffChecklist',
+  'listCommitteeState',
+  'saveCommitteeMembers',
+  'addCommitteeEvent',
+  'deleteCommitteeEvent',
 ])
 
 async function requestSchoolHub(payload: Record<string, unknown>) {
@@ -682,7 +686,12 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
 
   const controller = new AbortController()
   const isLargeDataAction = largePayloadActions.has(action) ||
-    action === 'getStudentTimetable' || action === 'getStudentRoster'
+    action === 'getStudentTimetable' ||
+    action === 'getStudentRoster' ||
+    action === 'listCommitteeState' ||
+    action === 'saveCommitteeMembers' ||
+    action === 'addCommitteeEvent' ||
+    action === 'deleteCommitteeEvent'
   const timer = setTimeout(() => controller.abort(), isLargeDataAction ? 60_000 : 20_000)
   try {
     const res = await fetch(endpoint, {

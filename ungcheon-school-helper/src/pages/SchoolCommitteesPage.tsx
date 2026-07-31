@@ -30,7 +30,6 @@ import {
   type CommitteeMember,
 } from '../services/schoolHub'
 import type { StaffMember } from '../services/rosterAttendance'
-import { useAdminStore } from '../stores/adminStore'
 import { useAppStore } from '../stores/appStore'
 
 type Tab = 'directory' | 'calendar'
@@ -50,8 +49,6 @@ const emptyEventForm = (committeeId = '') => ({
 
 export default function SchoolCommitteesPage() {
   const config = useAppStore(state => state.config)
-  const isAdmin = useAdminStore(state => state.isAdmin)
-  const adminPassword = useAdminStore(state => state.adminPassword)
   const [tab, setTab] = useState<Tab>('directory')
   const [filter, setFilter] = useState<Filter>('전체')
   const [query, setQuery] = useState('')
@@ -123,10 +120,8 @@ export default function SchoolCommitteesPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                isAdmin ? 'bg-amber-300 text-amber-950' : 'bg-white/10 text-slate-300'
-              }`}>
-                {isAdmin ? '관리자 편집 가능' : '사용자 조회 전용'}
+              <span className="rounded-full bg-emerald-300 px-3 py-1.5 text-xs font-bold text-emerald-950">
+                명단·일정 공동 편집
               </span>
               <button
                 onClick={() => void load()}
@@ -174,7 +169,6 @@ export default function SchoolCommitteesPage() {
             selected={selected}
             assignment={selectedAssignment}
             staff={staff}
-            isAdmin={isAdmin}
             busy={busy}
             onSave={async members => {
               if (!selected) return
@@ -186,8 +180,7 @@ export default function SchoolCommitteesPage() {
                   selected.id,
                   selected.name,
                   members,
-                  config.teacherName?.trim() || '관리자',
-                  adminPassword,
+                  config.teacherName?.trim() || '사용자',
                 )
                 setAssignments(current => [
                   ...current.filter(item => item.committeeId !== selected.id),
@@ -195,7 +188,7 @@ export default function SchoolCommitteesPage() {
                     committeeId: selected.id,
                     committeeName: selected.name,
                     members,
-                    updatedBy: config.teacherName?.trim() || '관리자',
+                    updatedBy: config.teacherName?.trim() || '사용자',
                     updatedAt: result.updatedAt,
                   },
                 ])
@@ -211,7 +204,6 @@ export default function SchoolCommitteesPage() {
           <CalendarView
             assignments={assignments}
             events={events}
-            isAdmin={isAdmin}
             busy={busy}
             onAdd={async form => {
               const committee = GYEONGNAM_HIGH_SCHOOL_COMMITTEES_2026.find(item => item.id === form.committeeId)
@@ -231,8 +223,8 @@ export default function SchoolCommitteesPage() {
                   location: form.location.trim(),
                   agenda: form.agenda.trim(),
                   memberNames: assignment.members.map(member => member.name),
-                  createdBy: config.teacherName?.trim() || '관리자',
-                }, adminPassword)
+                  createdBy: config.teacherName?.trim() || '사용자',
+                })
                 setEvents(current => [...current, created].sort((a, b) =>
                   `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`),
                 ))
@@ -248,7 +240,7 @@ export default function SchoolCommitteesPage() {
               setBusy(true)
               setError('')
               try {
-                await deleteCommitteeEvent(event.id, adminPassword)
+                await deleteCommitteeEvent(event.id)
                 setEvents(current => current.filter(item => item.id !== event.id))
                 setMessage('위원회 일정을 삭제했습니다.')
               } catch (cause) {
@@ -298,7 +290,6 @@ function DirectoryView({
   selected,
   assignment,
   staff,
-  isAdmin,
   busy,
   onSave,
 }: {
@@ -312,7 +303,6 @@ function DirectoryView({
   selected: (typeof GYEONGNAM_HIGH_SCHOOL_COMMITTEES_2026)[number] | undefined
   assignment: CommitteeAssignment | undefined
   staff: StaffMember[]
-  isAdmin: boolean
   busy: boolean
   onSave: (members: CommitteeMember[]) => Promise<void>
 }) {
@@ -402,7 +392,7 @@ function DirectoryView({
             committeeName={selected.name}
             initialMembers={assignment?.members ?? []}
             staff={staff}
-            editable={isAdmin && selected.status !== '폐지'}
+            editable={selected.status !== '폐지'}
             busy={busy}
             updatedAt={assignment?.updatedAt}
             onSave={onSave}
@@ -472,7 +462,7 @@ function MemberEditor({
 
       {!editable && (
         <div className="mt-4 flex items-center gap-2 rounded-2xl bg-slate-100 p-3 text-xs font-semibold text-slate-600">
-          <ShieldCheck size={16} /> 관리자 모드에서만 명단을 편집할 수 있습니다.
+          <ShieldCheck size={16} /> 폐지된 위원회는 명단을 편집할 수 없습니다.
         </div>
       )}
 
@@ -576,14 +566,12 @@ function MemberEditor({
 function CalendarView({
   assignments,
   events,
-  isAdmin,
   busy,
   onAdd,
   onDelete,
 }: {
   assignments: CommitteeAssignment[]
   events: CommitteeEvent[]
-  isAdmin: boolean
   busy: boolean
   onAdd: (form: ReturnType<typeof emptyEventForm>) => Promise<void>
   onDelete: (event: CommitteeEvent) => Promise<void>
@@ -615,12 +603,7 @@ function CalendarView({
         <h2 className="flex items-center gap-2 text-lg font-black text-slate-900">
           <CalendarDays size={19} className="text-indigo-600" /> 개최 일정 등록
         </h2>
-        {!isAdmin ? (
-          <div className="mt-4 rounded-2xl bg-slate-100 p-4 text-sm text-slate-600">
-            관리자 모드에서 일정을 등록·삭제할 수 있습니다.
-          </div>
-        ) : (
-          <div className="mt-4 space-y-3">
+        <div className="mt-4 space-y-3">
             <Field label="위원회">
               <select
                 value={form.committeeId}
@@ -689,8 +672,7 @@ function CalendarView({
             >
               {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} 일정 등록
             </button>
-          </div>
-        )}
+        </div>
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -722,15 +704,13 @@ function CalendarView({
                     {event.location && <span className="flex items-center gap-1"><MapPin size={13} /> {event.location}</span>}
                   </div>
                 </div>
-                {isAdmin && (
-                  <button
-                    disabled={busy}
-                    onClick={() => void onDelete(event)}
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
+                <button
+                  disabled={busy}
+                  onClick={() => void onDelete(event)}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
               {event.agenda && <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">{event.agenda}</p>}
               <p className="mt-3 text-xs text-slate-500"><strong>위원:</strong> {event.memberNames.join(', ')}</p>
