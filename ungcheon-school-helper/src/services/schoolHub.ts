@@ -3,6 +3,13 @@ import type {
   SharedStudentTimetable,
   SharedStudentTimetableUpload,
 } from './studentTimetable'
+import type {
+  SharedStaffRoster,
+  SharedStudentRoster,
+  StaffChecklist,
+  StaffMember,
+  StudentRosterEntry,
+} from './rosterAttendance'
 
 export type NoticeLevel = 'info' | 'important' | 'urgent'
 
@@ -61,6 +68,14 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
       'replaceTimetable',
       'getStudentTimetable',
       'replaceStudentTimetable',
+      'getStaffRoster',
+      'replaceStaffRoster',
+      'getStudentRoster',
+      'replaceStudentRoster',
+      'listStaffChecklists',
+      'addStaffChecklist',
+      'submitStaffChecklist',
+      'deleteStaffChecklist',
     ].includes(action)
     if (needsServerUpdate && message.includes('허용되지 않는 요청')) {
       throw new Error('학교 공유 서버 업데이트가 필요합니다. 관리자에게 문의하세요.')
@@ -101,4 +116,76 @@ export const replaceSharedStudentTimetable = (
   timetable,
   adminPassword,
   uploadedBy,
+})
+
+export const getSharedStaffRoster = () =>
+  hubRequest<SharedStaffRoster | null>({ action: 'getStaffRoster' })
+
+export const replaceSharedStaffRoster = (
+  members: StaffMember[],
+  adminPassword: string,
+  uploadedBy: string,
+  sourceFileName = '',
+) => hubRequest<{ version: number; uploadedAt: string }>({
+  action: 'replaceStaffRoster',
+  members,
+  adminPassword,
+  uploadedBy,
+  sourceFileName,
+})
+
+export const getSharedStudentRoster = () =>
+  hubRequest<SharedStudentRoster | null>({ action: 'getStudentRoster' })
+
+export const replaceSharedStudentRoster = (
+  students: StudentRosterEntry[],
+  adminPassword: string,
+  uploadedBy: string,
+  sourceFileName = '',
+) => hubRequest<{ version: number; uploadedAt: string }>({
+  action: 'replaceStudentRoster',
+  students,
+  adminPassword,
+  uploadedBy,
+  sourceFileName,
+})
+
+export const listStaffChecklists = (viewerName: string, adminPassword = '') =>
+  hubRequest<StaffChecklist[]>({
+    action: 'listStaffChecklists',
+    viewerName,
+    adminPassword,
+  })
+
+export const addStaffChecklist = (input: {
+  title: string
+  description: string
+  deadline: string
+  creatorName: string
+  items: string[]
+  targetNames: string[]
+}) => hubRequest<{ id: string }>({ action: 'addStaffChecklist', ...input })
+
+export const submitStaffChecklist = (
+  checklistId: string,
+  teacherName: string,
+  checkedItemIds: string[],
+  memo: string,
+) => hubRequest<{ updatedAt: string }>({
+  action: 'submitStaffChecklist',
+  checklistId,
+  teacherName,
+  checkedItemIds,
+  memo,
+})
+
+export const deleteStaffChecklist = (
+  checklistId: string,
+  viewerName: string,
+  adminPassword = '',
+) => hubRequest<void>({
+  action: 'deleteStaffChecklist',
+  checklistId,
+  viewerName,
+  adminPassword,
 })

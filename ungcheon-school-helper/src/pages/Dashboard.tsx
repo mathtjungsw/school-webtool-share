@@ -77,11 +77,13 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
   { group: '학사·기록', color: 'amber', items: [
     { id: 'timetable_swap', label: '교환·대강 계획', icon: Shuffle, desc: '후보 시간표·연강 확인과 계획서 출력' },
     { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange, desc: '과목선택 자료를 반영한 개인 시간표 조회·인쇄' },
+    { id: 'attendance_print', label: '출석부 출력', icon: ClipboardList, desc: '학급·수업·교사·과목별 출석부 묶음 출력' },
     { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText, desc: '4개 편제표 확인·PDF 출력과 과목선택 상담' },
   ]},
   { group: '학교운영', color: 'rose', items: [
     { id: 'committees', label: '각종 위원회 현황', icon: Landmark, desc: '교내 위원회 구성과 담당 관리' },
     { id: 'school_ledger', label: '비치 장부 현황', icon: BookCopy, desc: '법정·비법정 장부 검색' },
+    { id: 'staff_tasks', label: '업무 체크리스트', icon: ClipboardCheck, desc: '교원·부서별 업무 배부와 완료 현황 확인' },
   ]},
   { group: '파일·알림', color: 'slate', items: [
     { id: 'pdf_extractor', label: 'PDF 텍스트 추출', icon: FileDown, desc: '일반·스캔 PDF 텍스트 추출' },
