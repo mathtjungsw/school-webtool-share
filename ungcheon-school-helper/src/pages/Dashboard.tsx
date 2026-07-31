@@ -7,7 +7,7 @@ import {
   Shuffle, CalendarClock, ClipboardCheck,
   Shield, GraduationCap, Backpack,
   DollarSign, Briefcase, ClipboardList, School, ShoppingCart,
-  Landmark, BookCopy, Trophy, FileSearch, FileDown, FileText,
+  Landmark, Trophy, FileSearch, FileDown, FileText,
   FileSpreadsheet, HelpCircle, Waves, SquareStack, CircleDot, Star,
   FileScan, FileCode2,
   Clapperboard, SquarePen, MessagesSquare, BarChart3, Mic, CalendarRange, UsersRound,
@@ -32,7 +32,7 @@ import { useAppStore } from '../stores/appStore'
 import { WeatherTodayView, WeatherForecastView } from '../components/WeatherBar'
 import { useWeather } from '../components/useWeather'
 import { getMeal, getSchedule, getTimetableRange, getSchoolDetail, NEIS_API_KEY } from '../services/neis'
-import { getSchoolTimetable } from '../services/schoolHub'
+import { getSchoolTimetable, listCommitteeState, type CommitteeEvent } from '../services/schoolHub'
 import type { TeacherTimetable } from '../services/schoolTimetable'
 import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
 import type { MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
@@ -58,7 +58,7 @@ interface PortfolioGroup { group: string; color: string; items: PortfolioItem[] 
 interface DashboardScheduleEvent {
   date: string
   eventName: string
-  source: 'neis' | 'weekly'
+  source: 'neis' | 'weekly' | 'committee'
   department?: string
 }
 
@@ -72,8 +72,7 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
   { group: '학교운영', color: 'rose', items: [
     { id: 'staff_tasks', label: '업무 체크리스트', icon: ClipboardCheck, desc: '교원·부서별 업무 배부와 완료 현황 확인' },
     { id: 'staff_roster', label: '교원 명렬', icon: UsersRound, desc: '교원 명렬 관리와 연수등록부 출력' },
-    { id: 'committees', label: '각종 위원회 현황', icon: Landmark, desc: '교내 위원회 구성과 담당 관리' },
-    { id: 'school_ledger', label: '비치 장부 현황', icon: BookCopy, desc: '법정·비법정 장부 검색' },
+    { id: 'committees', label: '각종 위원회 현황', icon: Landmark, desc: '위원 명단·개최 일정과 중복 확인' },
   ]},
   { group: '학교 공유 링크', color: 'violet', items: [
     { id: 'school_hub', label: '부서별 링크·공지', icon: Globe, desc: '교직원 공용 링크와 학교 공지' },
@@ -235,6 +234,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const [timetable, setTimetable] = useState<TimetableEntry[]>([])
   const [teacherTT, setTeacherTT] = useState<TimetableEntry[]>([])
   const [sharedTeacher, setSharedTeacher] = useState<TeacherTimetable | null>(null)
+  const [committeeEvents, setCommitteeEvents] = useState<CommitteeEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -289,6 +289,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const prevMonthRef = useRef('')
 
   const hasSchool = !!(config.officeCode && config.schoolCode)
+  const hasNeisApiKey = Boolean(config.neisApiKey?.trim())
   const neisApiKey = config.neisApiKey?.trim() || NEIS_API_KEY
   const periodRanges = UNGCHEON_PERIOD_RANGES
   const hasTeacher = !!(config.teacherClasses?.length)
@@ -296,32 +297,66 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   useEffect(() => {
     if (!config.schoolHubUrl || !config.teacherName?.trim()) {
       setSharedTeacher(null)
+      setCommitteeEvents([])
       return
     }
     let cancelled = false
-    getSchoolTimetable()
-      .then(shared => {
+    Promise.all([
+      getSchoolTimetable().catch(() => null),
+      listCommitteeState().catch(() => ({ assignments: [], events: [] })),
+    ])
+      .then(([shared, committeeState]) => {
         if (cancelled) return
         const name = config.teacherName!.trim()
         setSharedTeacher(shared?.teachers.find(teacher =>
           teacher.name === name || teacher.label.startsWith(name),
         ) ?? null)
+        setCommitteeEvents(committeeState.events.filter(event => event.memberNames.includes(name)))
       })
       .catch(() => {
-        if (!cancelled) setSharedTeacher(null)
+        if (!cancelled) {
+          setSharedTeacher(null)
+          setCommitteeEvents([])
+        }
       })
     return () => { cancelled = true }
   }, [config.schoolHubUrl, config.teacherName])
 
   // schoolAddress 자동 보완
   useEffect(() => {
-    if (hasSchool && !config.schoolAddress) {
+    if (hasSchool && hasNeisApiKey && !config.schoolAddress) {
       getSchoolDetail(neisApiKey, config.officeCode!, config.schoolCode!).then(detail => {
         if (detail?.address) saveConfig({ schoolAddress: detail.address })
       }).catch(() => {})
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.officeCode, config.schoolCode])
+  }, [config.officeCode, config.schoolCode, hasNeisApiKey])
+
+  useEffect(() => {
+    if (!committeeEvents.length || !config.teacherName?.trim() || !('Notification' in window)) return
+    const today = todayStr()
+    const tomorrow = format(addDays(new Date(`${today}T00:00:00`), 1), 'yyyy-MM-dd')
+    const alerts = committeeEvents.filter(event => event.date === today || event.date === tomorrow)
+    if (!alerts.length) return
+    void (async () => {
+      const permission = Notification.permission === 'default'
+        ? await Notification.requestPermission()
+        : Notification.permission
+      if (permission !== 'granted') return
+      const saved = await window.electron?.configGet('committee.notifications.seen')
+      const seen = new Set(Array.isArray(saved) ? saved.map(String) : [])
+      const nextSeen = [...seen]
+      for (const event of alerts) {
+        const key = `${event.id}:${event.date}`
+        if (seen.has(key)) continue
+        new Notification(`${event.date === today ? '오늘' : '내일'} 위원회 일정`, {
+          body: `${event.startTime} ${event.committeeName}${event.location ? ` · ${event.location}` : ''}`,
+        })
+        nextSeen.push(key)
+      }
+      await window.electron?.configSet('committee.notifications.seen', nextSeen.slice(-200))
+    })()
+  }, [committeeEvents, config.teacherName])
 
   // clock tick
   useEffect(() => {
@@ -330,7 +365,15 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   }, [])
 
   const load = useCallback(async () => {
-    if (!hasSchool) return
+    if (!hasSchool || !hasNeisApiKey) {
+      setMeal([])
+      setNextMeal([])
+      setSchedule([])
+      setTimetable([])
+      setTeacherTT([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError('')
     try {
@@ -380,7 +423,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     } finally {
       setLoading(false)
     }
-  }, [selectedDate, config.officeCode, config.schoolCode, config.grade, config.classNm, config.schoolType, config.neisApiKey, hasSchool, hasTeacher, config.teacherClasses, neisApiKey])
+  }, [selectedDate, config.officeCode, config.schoolCode, config.grade, config.classNm, config.schoolType, config.neisApiKey, hasSchool, hasTeacher, config.teacherClasses, neisApiKey, hasNeisApiKey])
 
   useEffect(() => { load() }, [load])
 
@@ -426,7 +469,16 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       department: item.department,
       source: 'weekly' as const,
     })),
+    ...committeeEvents.map(item => ({
+      date: toYmd(item.date),
+      eventName: `${item.startTime} ${item.title}`,
+      department: item.committeeName,
+      source: 'committee' as const,
+    })),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.eventName.localeCompare(b.eventName))
+  const upcomingCommitteeEvents = committeeEvents
+    .filter(item => item.date >= todayStr() && item.date <= format(addDays(new Date(), 7), 'yyyy-MM-dd'))
+    .sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`))
   const selectedWeekNotes = weeklyPlan.notes.filter(note =>
     note.weekStart <= selYmd && note.weekEnd >= selYmd,
   )
@@ -516,6 +568,33 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
 
       {hasSchool && (
         <>
+          {upcomingCommitteeEvents.length > 0 && (
+            <div className="mb-4 rounded-2xl border border-amber-400/25 bg-amber-400/10 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-bold text-amber-200">
+                    <Landmark size={16} /> 내 위원회 일정
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">환경설정의 이름과 위원 명단이 일치하는 일정만 표시됩니다.</p>
+                </div>
+                <button onClick={() => onNavigate('committees')} className="btn-ghost text-xs">일정 보기</button>
+              </div>
+              <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {upcomingCommitteeEvents.slice(0, 3).map(event => (
+                  <button
+                    key={event.id}
+                    onClick={() => onNavigate('committees')}
+                    className="rounded-xl border border-white/10 bg-surface-800/70 p-3 text-left hover:border-amber-400/35"
+                  >
+                    <p className="text-xs font-bold text-white">{event.committeeName}</p>
+                    <p className="mt-1 text-[11px] text-amber-300">{event.date} · {event.startTime}~{event.endTime}</p>
+                    {event.location && <p className="mt-1 text-[10px] text-slate-500">{event.location}</p>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ── 상단: 좌(날씨·급식 + 월간 일정) + 우 시간표 ── */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
             <div className="xl:col-span-2 grid grid-cols-1 gap-4">
@@ -560,7 +639,13 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                       <h3 className="text-xs font-bold text-amber-300">오늘의 급식</h3>
                       <span className="text-[9px] text-slate-600 ml-auto">{selectedDate.slice(5).replace('-','/')}</span>
                     </div>
-                    {loading ? <Skeleton rows={4}/> : meal.length > 0 ? (
+                    {!hasNeisApiKey ? (
+                      <SetupGuide
+                        title="NEIS API 키를 입력하면 급식을 볼 수 있습니다."
+                        buttonLabel="사용 매뉴얼에서 입력 방법 보기"
+                        onClick={() => onNavigate('help')}
+                      />
+                    ) : loading ? <Skeleton rows={4}/> : meal.length > 0 ? (
                       <div className="space-y-3">
                         {meal.map(m => <MealItem key={m.mealType} meal={m} />)}
                       </div>
@@ -598,6 +683,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                     weeklyPlanError={weeklyPlanError}
                     sourceSheetCount={weeklyPlan.sourceSheets.length}
                     onSelectDate={setSelectedDate}
+                    neisConfigured={hasNeisApiKey}
+                    onOpenHelp={() => onNavigate('help')}
                   />
                 )}
               </DashCard>
@@ -614,6 +701,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                 periodRanges={periodRanges}
                 currentTime={currentTime}
                 classStatus={classStatus}
+                onNavigate={onNavigate}
               />
             </DashCard>
           </div>
@@ -750,6 +838,8 @@ function MonthScheduleCalendar({
   weeklyPlanError,
   sourceSheetCount,
   onSelectDate,
+  neisConfigured,
+  onOpenHelp,
 }: {
   selectedDate: string
   events: DashboardScheduleEvent[]
@@ -757,6 +847,8 @@ function MonthScheduleCalendar({
   weeklyPlanError: string
   sourceSheetCount: number
   onSelectDate: (date: string) => void
+  neisConfigured: boolean
+  onOpenHelp: () => void
 }) {
   const viewDate = new Date(`${selectedDate}T00:00:00`)
   const monthStart = startOfMonth(viewDate)
@@ -786,16 +878,28 @@ function MonthScheduleCalendar({
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-3">
-        <div className="flex items-center gap-3 text-[10px]">
-          <span className="flex items-center gap-1 text-violet-300">
+        <div className="flex flex-wrap items-center gap-3 text-[10px]">
+          <span className={clsx('flex items-center gap-1', neisConfigured ? 'text-violet-300' : 'text-slate-600')}>
             <span className="w-2 h-2 rounded-full bg-violet-400" />NEIS 학사일정
           </span>
           <span className="flex items-center gap-1 text-sky-300">
             <span className="w-2 h-2 rounded-full bg-sky-400" />교무기획부 주간계획
           </span>
+          <span className="flex items-center gap-1 text-amber-300">
+            <span className="w-2 h-2 rounded-full bg-amber-400" />내 위원회
+          </span>
         </div>
         <span className="text-[10px] text-amber-300/80">이번 주는 크게 표시됩니다</span>
       </div>
+
+      {!neisConfigured && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2.5">
+          <p className="text-[11px] text-violet-200">NEIS API 키를 입력하면 학사일정도 함께 볼 수 있습니다.</p>
+          <button onClick={onOpenHelp} className="text-[10px] font-bold text-violet-300 underline underline-offset-2">
+            사용 매뉴얼 바로가기
+          </button>
+        </div>
+      )}
 
       <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5">
         <div className="grid grid-cols-7 gap-px bg-white/5">
@@ -875,17 +979,19 @@ function MonthScheduleCalendar({
                         {visibleEvents.map((event, index) => (
                           <div
                             key={`${event.source}-${event.department ?? ''}-${index}`}
-                            title={`${event.source === 'weekly' ? event.department : 'NEIS'} · ${event.eventName}`}
+                            title={`${event.source === 'weekly' ? event.department : event.source === 'committee' ? event.department : 'NEIS'} · ${event.eventName}`}
                             className={clsx(
                               'rounded px-1 py-0.5 text-[9px] leading-tight',
                               event.source === 'weekly'
                                 ? 'bg-sky-500/15 text-sky-200 border-l-2 border-sky-400'
+                                : event.source === 'committee'
+                                  ? 'bg-amber-500/15 text-amber-200 border-l-2 border-amber-400'
                                 : 'bg-violet-500/15 text-violet-200 border-l-2 border-violet-400',
                             )}
                           >
                             {isFocusWeek && (
                               <span className="block truncate text-[8px] font-bold opacity-70">
-                                {event.source === 'weekly' ? event.department : 'NEIS'}
+                                {event.source === 'weekly' ? event.department : event.source === 'committee' ? event.department : 'NEIS'}
                               </span>
                             )}
                             <span className="block truncate">{event.eventName.replace(/\s*\n\s*/g, ' · ')}</span>
@@ -917,9 +1023,11 @@ function MonthScheduleCalendar({
                     'mt-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-bold flex-shrink-0',
                     event.source === 'weekly'
                       ? 'bg-sky-500/15 text-sky-300'
+                      : event.source === 'committee'
+                        ? 'bg-amber-500/15 text-amber-300'
                       : 'bg-violet-500/15 text-violet-300',
                   )}>
-                    {event.source === 'weekly' ? event.department : 'NEIS'}
+                    {event.source === 'weekly' ? event.department : event.source === 'committee' ? event.department : 'NEIS'}
                   </span>
                   <span className="text-slate-300 whitespace-pre-line">{event.eventName}</span>
                 </div>
@@ -1021,7 +1129,7 @@ function ClassStatusBanner({ status }: { status: ClassStatus }) {
 
 // ─── TimetableSection ─────────────────────────────────────────────
 function TimetableSection({
-  timetable, teacherTT, sharedTeacher, selectedDate, config, periodRanges, currentTime, classStatus
+  timetable, teacherTT, sharedTeacher, selectedDate, config, periodRanges, currentTime, classStatus, onNavigate
 }: {
   timetable: TimetableEntry[]
   teacherTT: TimetableEntry[]
@@ -1031,6 +1139,7 @@ function TimetableSection({
   periodRanges: [number, number, string][]
   currentTime: Date
   classStatus: ClassStatus | null
+  onNavigate: (id: string) => void
 }) {
   const weekDates = getWeekDates(selectedDate)
   const DAY = ['월','화','수','목','금']
@@ -1042,6 +1151,16 @@ function TimetableSection({
 
   // 점심시간 — 설정값 우선, 없으면 4교시 종료~5교시 시작으로 자동 계산
   const lunch = UNGCHEON_LUNCH
+
+  if (!config.teacherName?.trim()) {
+    return (
+      <SetupGuide
+        title="환경설정에서 이름을 설정하면 내 교사 시간표가 표시됩니다."
+        buttonLabel="이름 설정 바로가기"
+        onClick={() => onNavigate('settings')}
+      />
+    )
+  }
 
   if (!config.grade && !config.classNm && !hasTeacher && !sharedTeacher) {
     return (
@@ -1342,6 +1461,30 @@ function DashCard({ icon, title, badge, badgeColor, className, children }: {
 
 function Empty({ text }: { text: string }) {
   return <p className="text-center text-slate-500 text-sm py-6">{text}</p>
+}
+
+function SetupGuide({
+  title,
+  buttonLabel,
+  onClick,
+}: {
+  title: string
+  buttonLabel: string
+  onClick: () => void
+}) {
+  return (
+    <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 px-4 py-5 text-center">
+      <AlertCircle size={20} className="mx-auto text-amber-300" />
+      <p className="mt-2 text-xs font-semibold leading-relaxed text-amber-100">{title}</p>
+      <button
+        type="button"
+        onClick={onClick}
+        className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-300 px-3 py-2 text-[11px] font-black text-slate-950 hover:bg-amber-200"
+      >
+        <HelpCircle size={13} /> {buttonLabel}
+      </button>
+    </div>
+  )
 }
 
 function Skeleton({ rows }: { rows: number }) {

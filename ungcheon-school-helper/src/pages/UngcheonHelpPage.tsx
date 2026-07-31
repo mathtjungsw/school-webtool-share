@@ -188,7 +188,7 @@ export default function UngcheonHelpPage() {
           <p className="text-sm text-slate-400 leading-relaxed">
             Excel 전처리, 대학 권장과목, 호봉획정, 방과후 점검, 인사기록 분석,
             시간표 교체, 교육과정 편제표 출력, 과목선택 상담, 사진대장, 학적업무, 출석부,
-            위원회·비치 장부, PDF 추출, 파일 파서가 포함되어 있습니다.
+            위원회 명단·캘린더, PDF 추출, 파일 파서가 포함되어 있습니다.
           </p>
         </section>
       </div>
