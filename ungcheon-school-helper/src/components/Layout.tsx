@@ -31,6 +31,7 @@ const StaffRosterPage = lazy(() =>
   import('../pages/StaffTasksPage').then(module => ({ default: module.StaffRosterPage })),
 )
 const AttendancePrintPage = lazy(() => import('../pages/AttendancePrintPage'))
+const GradePreviewPage = lazy(() => import('../pages/GradePreviewPage'))
 
 const PAGES: Record<string, React.ComponentType> = {
   neis: NeisPage,
@@ -56,6 +57,7 @@ const PAGES: Record<string, React.ComponentType> = {
   staff_tasks: StaffTasksPage,
   staff_roster: StaffRosterPage,
   attendance_print: AttendancePrintPage,
+  grade_preview: GradePreviewPage,
 }
 
 const MAX_HISTORY = 40
