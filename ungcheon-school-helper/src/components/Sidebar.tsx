@@ -43,6 +43,7 @@ const NAV: NavGroup[] = [
       { id: 'timetable_swap', label: '교환·대강 계획', icon: ArrowLeftRight },
       { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange },
       { id: 'attendance_print', label: '출석부 출력', icon: UsersRound },
+      { id: 'grade_preview', label: '성적 산출 미리보기', icon: Calculator },
       { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText },
     ],
   },
