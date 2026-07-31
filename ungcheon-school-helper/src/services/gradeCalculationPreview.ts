@@ -1,8 +1,4 @@
 import * as XLSX from 'xlsx'
-import {
-  activeSplitBoundaries, defaultSplitScores, emptySplitScores,
-  type SplitScores,
-} from './achievementScenario'
 
 export type CalculationMode = 'term' | 'firstExam'
 export type GradeSystem = '5' | '9' | 'none'
@@ -13,11 +9,10 @@ export interface GradePreviewConfig {
   gradeYear: '1' | '2' | '3'
   gradeSystem: GradeSystem
   achievementScale: AchievementScale
-  includeNonattainment: boolean
   missingPolicy: 'zero' | 'exclude'
   splitMethod: 'fixed' | 'estimated'
   fixedBasis: 'general' | 'common'
-  thresholds: SplitScores
+  thresholds: Record<'A' | 'B' | 'C' | 'D', number | null>
 }
 
 export interface ScoreEntry {
@@ -34,7 +29,6 @@ export interface GradeComponent {
   type: 'exam' | 'performance'
   weight: number
   maxScore: number
-  splitScores: SplitScores
   scores: Record<string, ScoreEntry>
 }
 
@@ -69,7 +63,7 @@ export interface GradePreviewState {
 
 export type Matrix = { name: string; rows: unknown[][] }
 
-export const STORAGE_KEY = 'ungcheon-estimated-split-helper-v1'
+export const STORAGE_KEY = 'ungcheon-grade-preview-v1'
 export const cumulativeRates: Record<'5' | '9', number[]> = {
   '5': [10, 34, 66, 90, 100],
   '9': [4, 11, 23, 40, 60, 77, 89, 96, 100],
@@ -81,21 +75,20 @@ export function uid() {
 
 export function defaultComponents(mode: CalculationMode): GradeComponent[] {
   if (mode === 'firstExam') {
-    return [{ id: uid(), name: '1차 시험', type: 'exam', weight: 100, maxScore: 100, splitScores: defaultSplitScores(true), scores: {} }]
+    return [{ id: uid(), name: '1차 시험', type: 'exam', weight: 100, maxScore: 100, scores: {} }]
   }
   return [
-    { id: uid(), name: '1차 지필평가', type: 'exam', weight: 30, maxScore: 100, splitScores: defaultSplitScores(true), scores: {} },
-    { id: uid(), name: '2차 지필평가', type: 'exam', weight: 30, maxScore: 100, splitScores: defaultSplitScores(true), scores: {} },
-    { id: uid(), name: '수행평가1', type: 'performance', weight: 40, maxScore: 100, splitScores: emptySplitScores({ A: 100, B: 90, C: 80, D: 70, E: 60 }), scores: {} },
+    { id: uid(), name: '1차 지필평가', type: 'exam', weight: 50, maxScore: 100, scores: {} },
+    { id: uid(), name: '수행평가1', type: 'performance', weight: 50, maxScore: 100, scores: {} },
   ]
 }
 
 export function defaultGradePreviewState(): GradePreviewState {
   return {
     config: {
-      calculationMode: 'term', gradeYear: '1', gradeSystem: '5', achievementScale: 'ABCDE', includeNonattainment: true,
-      missingPolicy: 'zero', splitMethod: 'estimated', fixedBasis: 'general',
-      thresholds: emptySplitScores(),
+      calculationMode: 'term', gradeYear: '1', gradeSystem: '5', achievementScale: 'ABCDE',
+      missingPolicy: 'zero', splitMethod: 'fixed', fixedBasis: 'general',
+      thresholds: { A: null, B: null, C: null, D: null },
     },
     components: defaultComponents('term'), componentCache: {}, results: [], calculatedAt: null,
   }
@@ -231,15 +224,9 @@ export function validateGradePreviewState(state: GradePreviewState): string[] {
   state.components.forEach(component => {
     if (!component.name.trim()) errors.push('평가 항목 이름을 입력해 주세요.')
     if (!((numberValue(component.maxScore) ?? 0) > 0)) errors.push(`${component.name || '평가 항목'}의 만점은 0보다 커야 합니다.`)
-    if (state.config.splitMethod === 'estimated' && state.config.achievementScale !== 'none' && component.weight > 0) {
-      const keys = activeSplitBoundaries(state.config.includeNonattainment, state.config.achievementScale)
-      const values = keys.map(key => component.splitScores?.[key])
-      if (values.some(value => numberValue(value) === null)) errors.push(`${component.name || '평가 항목'}의 분할점수를 모두 입력해 주세요.`)
-      if (values.some((value, index) => index > 0 && Number(values[index - 1]) <= Number(value))) errors.push(`${component.name || '평가 항목'}의 분할점수는 A부터 내림차순이어야 합니다.`)
-    }
   })
   if (state.config.splitMethod === 'estimated' && state.config.achievementScale !== 'none') {
-    const keys = activeSplitBoundaries(state.config.includeNonattainment, state.config.achievementScale)
+    const keys: Array<'A' | 'B' | 'C' | 'D'> = state.config.achievementScale === 'ABCDE' ? ['A', 'B', 'C', 'D'] : ['A', 'B']
     const values = keys.map(key => state.config.thresholds[key])
     const any = values.some(value => value !== null)
     if (any && values.some(value => numberValue(value) === null)) errors.push('추정분할 점수는 모두 입력하거나 모두 비워 주세요.')
@@ -310,7 +297,7 @@ export function calculateAchievement(row: GradeResult, config: GradePreviewConfi
   if (config.achievementScale === 'none') return null
   let thresholds: Array<[string, number]>
   if (config.splitMethod === 'estimated') {
-    const keys = activeSplitBoundaries(config.includeNonattainment, config.achievementScale)
+    const keys: Array<'A' | 'B' | 'C' | 'D'> = config.achievementScale === 'ABCDE' ? ['A', 'B', 'C', 'D'] : ['A', 'B']
     if (keys.some(key => numberValue(config.thresholds[key]) === null)) return null
     thresholds = keys.map(key => [key, Number(config.thresholds[key])])
   } else if (config.achievementScale === 'ABC') thresholds = [['A', 80], ['B', 60]]
@@ -319,8 +306,7 @@ export function calculateAchievement(row: GradeResult, config: GradePreviewConfi
   if (config.achievementScale === 'ABCDE' && config.fixedBasis === 'common' && row.integerScore < 40) {
     row.notes.push('40점 미만: 학교 규정에 따른 최저 성취수준 처리 확인')
   }
-  if (config.achievementScale === 'ABC') return 'C'
-  return config.includeNonattainment ? '미도달' : 'E'
+  return config.achievementScale === 'ABC' ? 'C' : 'E'
 }
 
 export function buildGradeCutSummary(rows: GradeResult[], system: GradeSystem) {
@@ -342,7 +328,7 @@ export function buildGradeCutSummary(rows: GradeResult[], system: GradeSystem) {
 export function exportRestoreWorkbook(state: GradePreviewState) {
   const workbook = XLSX.utils.book_new()
   const readme = [
-    ['추정분할점수 도우미 복원 파일'],
+    ['성적 산출 미리 해보기 복원 파일'],
     ['이 파일은 설정·점수·현재 계산 결과를 다른 PC에서 복원하기 위한 파일입니다.'],
     ['학생 개인정보와 점수정보가 포함될 수 있으므로 안전하게 보관하세요.'],
     ['생성 시각', new Date().toLocaleString('ko-KR')],
@@ -352,12 +338,12 @@ export function exportRestoreWorkbook(state: GradePreviewState) {
     ...Object.entries(state.config).filter(([key]) => key !== 'thresholds').map(([key, value]) => [key, value]),
     ...Object.entries(state.config.thresholds).map(([key, value]) => [`threshold_${key}`, value ?? '']),
   ]
-  const components = [['id', 'name', 'type', 'weight', 'maxScore', 'splitA', 'splitB', 'splitC', 'splitD', 'splitE'], ...state.components.map(component => [component.id, component.name, component.type, component.weight, component.maxScore, component.splitScores.A ?? '', component.splitScores.B ?? '', component.splitScores.C ?? '', component.splitScores.D ?? '', component.splitScores.E ?? ''])]
+  const components = [['id', 'name', 'type', 'weight', 'maxScore'], ...state.components.map(component => [component.id, component.name, component.type, component.weight, component.maxScore])]
   const scores: unknown[][] = [['classNo', 'studentNo', 'studentName', 'componentId', 'rawScore', 'status']]
   state.components.forEach(component => Object.values(component.scores).forEach(score => scores.push([score.classNo, score.studentNo, score.studentName, component.id, score.rawScore, score.status])))
   const results = [['classNo', 'studentNo', 'studentName', 'total', 'integerScore', 'rank', 'tieCount', 'midRank', 'midPct', 'grade', 'achievement', 'notes'], ...state.results.map(row => [row.classNo, row.studentNo, row.studentName, row.total, row.integerScore, row.rank, row.tieCount, row.midRank, row.midPct, row.grade ?? '', row.achievement ?? '', row.notes.join(', ')])]
   ;([['README', readme], ['CONFIG', config], ['COMPONENTS', components], ['SCORES', scores], ['RESULTS', results]] as Array<[string, unknown[][]]>).forEach(([name, data]) => XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), name))
-  XLSX.writeFile(workbook, `추정분할점수_도우미_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  XLSX.writeFile(workbook, `성적_산출_미리보기_${new Date().toISOString().slice(0, 10)}.xlsx`)
 }
 
 export async function importRestoreWorkbook(file: File): Promise<GradePreviewState> {
@@ -368,14 +354,11 @@ export async function importRestoreWorkbook(file: File): Promise<GradePreviewSta
   configRows.forEach(row => {
     const key = String(row.key)
     if (key.startsWith('threshold_')) config.thresholds[key.slice(10) as keyof typeof config.thresholds] = numberValue(row.value)
-    else if (key === 'includeNonattainment') config.includeNonattainment = String(row.value).toLowerCase() === 'true'
     else if (key in config && key !== 'thresholds') (config as unknown as Record<string, unknown>)[key] = String(row.value)
   })
   const components = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.COMPONENTS, { defval: '' }).map(row => ({
     id: String(row.id), name: String(row.name), type: String(row.type) as GradeComponent['type'],
-    weight: Number(row.weight), maxScore: Number(row.maxScore),
-    splitScores: emptySplitScores({ A: numberValue(row.splitA), B: numberValue(row.splitB), C: numberValue(row.splitC), D: numberValue(row.splitD), E: numberValue(row.splitE) }),
-    scores: {} as Record<string, ScoreEntry>,
+    weight: Number(row.weight), maxScore: Number(row.maxScore), scores: {} as Record<string, ScoreEntry>,
   }))
   XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.SCORES, { defval: '' }).forEach(row => {
     const component = components.find(item => item.id === String(row.componentId))

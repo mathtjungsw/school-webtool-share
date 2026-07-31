@@ -68,6 +68,7 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
     { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange, desc: '과목선택 자료를 반영한 개인 시간표 조회·인쇄' },
     { id: 'attendance_print', label: '출석부 출력', icon: ClipboardList, desc: '학급·수업·교사·과목별 출석부 묶음 출력' },
     { id: 'grade_preview', label: '성적 산출 미리보기', icon: BarChart3, desc: '평가 점수 합산·석차등급·성취도 사전 확인' },
+    { id: 'estimated_split_score', label: '추정분할점수 도우미', icon: SquareStack, desc: '분할점수 구성·성취도 분포 예측과 목표 분포 역산' },
     { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText, desc: '4개 편제표 확인·PDF 출력과 과목선택 상담' },
   ]},
   { group: '학교운영', color: 'rose', items: [
