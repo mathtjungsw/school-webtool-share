@@ -8,6 +8,7 @@ import { useAdminStore } from '../stores/adminStore'
 import {
   hubRequest,
   listFeatureRequests,
+  subscribeHubResource,
   type FeatureRequest,
   type FeatureRequestStatus,
   type FeatureRequestType,
@@ -61,6 +62,7 @@ export default function FeatureRequestsPage() {
   }, [configured])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => subscribeHubResource<FeatureRequest[]>('featureRequests', data => setRequests(data)), [])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()

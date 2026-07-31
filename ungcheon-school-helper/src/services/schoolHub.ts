@@ -87,6 +87,111 @@ interface HubResponse<T> {
   error?: string
 }
 
+export type HubResource =
+  | 'links'
+  | 'notices'
+  | 'featureRequests'
+  | 'timetable'
+  | 'studentTimetable'
+  | 'staffRoster'
+  | 'studentRoster'
+  | 'staffChecklists'
+  | 'committees'
+
+interface SyncManifest {
+  generatedAt: string
+  resources: Partial<Record<HubResource, string>>
+}
+
+interface CacheEntry<T = unknown> {
+  resource: HubResource
+  data: T
+  revision: string
+  signature: string
+  loadedAt: number
+}
+
+type CacheListener = (data: unknown, cacheKey: string) => void
+
+const sessionCache = new Map<string, CacheEntry>()
+const inflight = new Map<string, Promise<unknown>>()
+const listeners = new Map<HubResource, Set<CacheListener>>()
+const resourceEpoch = new Map<HubResource, number>()
+const MANIFEST_TTL_MS = 5_000
+let manifest: SyncManifest | null = null
+let manifestLoadedAt = 0
+let manifestInflight: Promise<SyncManifest | null> | null = null
+let manifestSupported: boolean | null = null
+let preloadInflight: Promise<void> | null = null
+let cacheGeneration = 0
+
+const MUTATION_RESOURCE: Record<string, HubResource | undefined> = {
+  addLink: 'links', deleteLink: 'links',
+  addNotice: 'notices', deleteNotice: 'notices',
+  addFeatureRequest: 'featureRequests', updateFeatureRequest: 'featureRequests', deleteFeatureRequest: 'featureRequests',
+  replaceTimetable: 'timetable', replaceStudentTimetable: 'studentTimetable',
+  replaceStaffRoster: 'staffRoster', replaceStudentRoster: 'studentRoster',
+  addStaffChecklist: 'staffChecklists', submitStaffChecklist: 'staffChecklists', deleteStaffChecklist: 'staffChecklists',
+  saveCommitteeMembers: 'committees', addCommitteeEvent: 'committees', deleteCommitteeEvent: 'committees',
+}
+
+function dataSignature(data: unknown) {
+  try { return JSON.stringify(data) }
+  catch { return String(data) }
+}
+
+function revisionFromData(data: unknown) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return ''
+  const record = data as Record<string, unknown>
+  if (record.version !== undefined) return `v:${String(record.version)}`
+  if (record.uploadedAt) return `at:${String(record.uploadedAt)}`
+  return ''
+}
+
+function notifyResource(resource: HubResource, data: unknown, cacheKey: string) {
+  listeners.get(resource)?.forEach(listener => listener(data, cacheKey))
+}
+
+export function subscribeHubResource<T>(resource: HubResource, listener: (data: T, cacheKey: string) => void) {
+  const wrapped: CacheListener = (data, cacheKey) => listener(data as T, cacheKey)
+  const resourceListeners = listeners.get(resource) ?? new Set<CacheListener>()
+  resourceListeners.add(wrapped)
+  listeners.set(resource, resourceListeners)
+  return () => {
+    resourceListeners.delete(wrapped)
+    if (!resourceListeners.size) listeners.delete(resource)
+  }
+}
+
+export function clearSchoolHubSessionCache() {
+  cacheGeneration += 1
+  sessionCache.clear()
+  inflight.clear()
+  manifest = null
+  manifestLoadedAt = 0
+  manifestInflight = null
+  manifestSupported = null
+  preloadInflight = null
+  resourceEpoch.clear()
+}
+
+export function invalidateHubResource(resource: HubResource) {
+  for (const [key, entry] of sessionCache) {
+    if (entry.resource === resource) sessionCache.delete(key)
+  }
+  resourceEpoch.set(resource, (resourceEpoch.get(resource) ?? 0) + 1)
+  manifestLoadedAt = 0
+}
+
+export function getSchoolHubCacheStatus() {
+  const entries = [...sessionCache.values()]
+  return {
+    count: entries.length,
+    newestAt: entries.length ? Math.max(...entries.map(entry => entry.loadedAt)) : null,
+    resources: [...new Set(entries.map(entry => entry.resource))],
+  }
+}
+
 export async function hubRequest<T>(request: Record<string, unknown>): Promise<T> {
   const response = await window.electron.schoolHubRequest(request) as HubResponse<T>
   if (!response?.ok) {
@@ -120,17 +225,104 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
     }
     throw new Error(message)
   }
+  const resource = MUTATION_RESOURCE[String(request.action ?? '')]
+  if (resource) invalidateHubResource(resource)
   return response.data as T
 }
 
-export const listLinks = () => hubRequest<SharedLink[]>({ action: 'listLinks' })
-export const listNotices = () => hubRequest<SchoolNotice[]>({ action: 'listNotices' })
+async function refreshSyncManifest(force = false): Promise<SyncManifest | null> {
+  if (manifestSupported === false) return null
+  if (!force && manifest && Date.now() - manifestLoadedAt < MANIFEST_TTL_MS) return manifest
+  if (manifestInflight) return manifestInflight
+  const generation = cacheGeneration
+  let nextRequest: Promise<SyncManifest | null>
+  nextRequest = hubRequest<SyncManifest>({ action: 'getSyncManifest' })
+    .then(next => {
+      if (cacheGeneration !== generation) return null
+      manifest = next
+      manifestLoadedAt = Date.now()
+      manifestSupported = true
+      return next
+    })
+    .catch(() => {
+      if (cacheGeneration !== generation) return null
+      manifestSupported = false
+      return null
+    })
+    .finally(() => {
+      if (manifestInflight === nextRequest) manifestInflight = null
+    })
+  manifestInflight = nextRequest
+  return nextRequest
+}
+
+async function fetchAndStore<T>(
+  cacheKey: string,
+  resource: HubResource,
+  request: Record<string, unknown>,
+  knownRevision = '',
+): Promise<T> {
+  const existingRequest = inflight.get(cacheKey)
+  if (existingRequest) return existingRequest as Promise<T>
+  const epoch = resourceEpoch.get(resource) ?? 0
+  const generation = cacheGeneration
+  let requestPromise: Promise<T>
+  requestPromise = hubRequest<T>(request).then(data => {
+    if (cacheGeneration !== generation || (resourceEpoch.get(resource) ?? 0) !== epoch) return data
+    const revision = knownRevision || revisionFromData(data)
+    const signature = revision || dataSignature(data)
+    const previous = sessionCache.get(cacheKey)
+    const changed = !previous || previous.signature !== signature
+    sessionCache.set(cacheKey, { resource, data, revision, signature, loadedAt: Date.now() })
+    if (changed) notifyResource(resource, data, cacheKey)
+    return data
+  }).finally(() => {
+    if (inflight.get(cacheKey) === requestPromise) inflight.delete(cacheKey)
+  })
+  inflight.set(cacheKey, requestPromise)
+  return requestPromise
+}
+
+async function revalidateCachedResource<T>(
+  cacheKey: string,
+  resource: HubResource,
+  request: Record<string, unknown>,
+) {
+  if (inflight.has(cacheKey)) return
+  const entry = sessionCache.get(cacheKey)
+  if (!entry) return
+  const nextManifest = await refreshSyncManifest()
+  const serverRevision = nextManifest?.resources?.[resource] ?? ''
+  if (serverRevision && entry.revision === serverRevision) return
+  try { await fetchAndStore<T>(cacheKey, resource, request, serverRevision) }
+  catch { /* 캐시가 있으면 네트워크 오류는 화면을 막지 않는다. */ }
+}
+
+async function cachedHubRequest<T>(
+  cacheKey: string,
+  resource: HubResource,
+  request: Record<string, unknown>,
+  force = false,
+): Promise<T> {
+  const cached = sessionCache.get(cacheKey)
+  if (cached && !force) {
+    void revalidateCachedResource<T>(cacheKey, resource, request)
+    return cached.data as T
+  }
+  const nextManifest = await refreshSyncManifest()
+  return fetchAndStore<T>(cacheKey, resource, request, nextManifest?.resources?.[resource] ?? '')
+}
+
+export const listLinks = (force = false) =>
+  cachedHubRequest<SharedLink[]>('links', 'links', { action: 'listLinks' }, force)
+export const listNotices = (force = false) =>
+  cachedHubRequest<SchoolNotice[]>('notices', 'notices', { action: 'listNotices' }, force)
 export const verifyAdmin = (adminPassword: string) =>
   hubRequest<{ verified: boolean }>({ action: 'verifyAdmin', adminPassword })
-export const listFeatureRequests = () =>
-  hubRequest<FeatureRequest[]>({ action: 'listFeatureRequests' })
-export const getSchoolTimetable = () =>
-  hubRequest<SchoolTimetable | null>({ action: 'getTimetable' })
+export const listFeatureRequests = (force = false) =>
+  cachedHubRequest<FeatureRequest[]>('featureRequests', 'featureRequests', { action: 'listFeatureRequests' }, force)
+export const getSchoolTimetable = (force = false) =>
+  cachedHubRequest<SchoolTimetable | null>('timetable', 'timetable', { action: 'getTimetable' }, force)
 export const replaceSchoolTimetable = (
   timetable: ParsedTimetable,
   adminPassword: string,
@@ -142,8 +334,8 @@ export const replaceSchoolTimetable = (
   uploadedBy,
 })
 
-export const getSharedStudentTimetable = () =>
-  hubRequest<SharedStudentTimetable | null>({ action: 'getStudentTimetable' })
+export const getSharedStudentTimetable = (force = false) =>
+  cachedHubRequest<SharedStudentTimetable | null>('studentTimetable', 'studentTimetable', { action: 'getStudentTimetable' }, force)
 
 export const replaceSharedStudentTimetable = (
   timetable: SharedStudentTimetableUpload,
@@ -156,8 +348,8 @@ export const replaceSharedStudentTimetable = (
   uploadedBy,
 })
 
-export const getSharedStaffRoster = () =>
-  hubRequest<SharedStaffRoster | null>({ action: 'getStaffRoster' })
+export const getSharedStaffRoster = (force = false) =>
+  cachedHubRequest<SharedStaffRoster | null>('staffRoster', 'staffRoster', { action: 'getStaffRoster' }, force)
 
 export const replaceSharedStaffRoster = (
   members: StaffMember[],
@@ -172,8 +364,8 @@ export const replaceSharedStaffRoster = (
   sourceFileName,
 })
 
-export const getSharedStudentRoster = () =>
-  hubRequest<SharedStudentRoster | null>({ action: 'getStudentRoster' })
+export const getSharedStudentRoster = (force = false) =>
+  cachedHubRequest<SharedStudentRoster | null>('studentRoster', 'studentRoster', { action: 'getStudentRoster' }, force)
 
 export const replaceSharedStudentRoster = (
   students: StudentRosterEntry[],
@@ -188,12 +380,12 @@ export const replaceSharedStudentRoster = (
   sourceFileName,
 })
 
-export const listStaffChecklists = (viewerName: string, adminPassword = '') =>
-  hubRequest<StaffChecklist[]>({
+export const listStaffChecklists = (viewerName: string, adminPassword = '', force = false) =>
+  cachedHubRequest<StaffChecklist[]>(`staffChecklists:${viewerName}:${adminPassword ? 'admin' : 'user'}`, 'staffChecklists', {
     action: 'listStaffChecklists',
     viewerName,
     adminPassword,
-  })
+  }, force)
 
 export const addStaffChecklist = (input: {
   title: string
@@ -228,8 +420,8 @@ export const deleteStaffChecklist = (
   adminPassword,
 })
 
-export const listCommitteeState = () =>
-  hubRequest<CommitteeState>({ action: 'listCommitteeState' })
+export const listCommitteeState = (force = false) =>
+  cachedHubRequest<CommitteeState>('committees', 'committees', { action: 'listCommitteeState' }, force)
 
 export const saveCommitteeMembers = (
   committeeId: string,
@@ -266,3 +458,27 @@ export const deleteCommitteeEvent = (id: string) => hubRequest<void>({
   action: 'deleteCommitteeEvent',
   id,
 })
+
+export function preloadSchoolHubCache(viewerName = '') {
+  if (preloadInflight) return preloadInflight
+  let nextPreload: Promise<void>
+  nextPreload = (async () => {
+    await refreshSyncManifest(true)
+    const requests: Array<Promise<unknown>> = [
+      listLinks(),
+      listNotices(),
+      listFeatureRequests(),
+      getSchoolTimetable(),
+      getSharedStudentTimetable(),
+      getSharedStaffRoster(),
+      getSharedStudentRoster(),
+      listCommitteeState(),
+    ]
+    if (viewerName.trim()) requests.push(listStaffChecklists(viewerName.trim()))
+    await Promise.allSettled(requests)
+  })().finally(() => {
+    if (preloadInflight === nextPreload) preloadInflight = null
+  })
+  preloadInflight = nextPreload
+  return nextPreload
+}

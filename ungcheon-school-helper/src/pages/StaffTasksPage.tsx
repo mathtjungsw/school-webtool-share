@@ -13,6 +13,7 @@ import {
   getSharedStaffRoster,
   listStaffChecklists,
   replaceSharedStaffRoster,
+  subscribeHubResource,
   submitStaffChecklist,
 } from '../services/schoolHub'
 import {
@@ -71,6 +72,14 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
   }, [adminPassword, config.schoolHubUrl, isAdmin, mode, teacherName])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => subscribeHubResource<SharedStaffRoster | null>('staffRoster', data => setRoster(data)), [])
+  useEffect(() => {
+    if (!teacherName) return
+    const expectedKey = `staffChecklists:${teacherName}:${isAdmin && adminPassword ? 'admin' : 'user'}`
+    return subscribeHubResource<StaffChecklist[]>('staffChecklists', (data, cacheKey) => {
+      if (cacheKey === expectedKey) setChecklists(data)
+    })
+  }, [adminPassword, isAdmin, teacherName])
 
   if (!config.schoolHubUrl) {
     return <SetupNeeded />

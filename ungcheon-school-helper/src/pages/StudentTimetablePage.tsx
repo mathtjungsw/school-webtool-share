@@ -10,6 +10,7 @@ import { useAppStore } from '../stores/appStore'
 import {
   getSharedStudentTimetable,
   replaceSharedStudentTimetable,
+  subscribeHubResource,
 } from '../services/schoolHub'
 import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 import {
@@ -197,6 +198,10 @@ export default function StudentTimetablePage() {
   }, [configured])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => subscribeHubResource<SharedStudentTimetable | null>(
+    'studentTimetable',
+    data => setShared(data),
+  ), [])
 
   const uploadFiles = async () => {
     if (!isAdmin || !adminPassword) {

@@ -25,11 +25,13 @@ import {
   getSharedStaffRoster,
   listCommitteeState,
   saveCommitteeMembers,
+  subscribeHubResource,
   type CommitteeAssignment,
   type CommitteeEvent,
   type CommitteeMember,
+  type CommitteeState,
 } from '../services/schoolHub'
-import type { StaffMember } from '../services/rosterAttendance'
+import type { SharedStaffRoster, StaffMember } from '../services/rosterAttendance'
 import { useAppStore } from '../stores/appStore'
 
 type Tab = 'directory' | 'calendar'
@@ -86,6 +88,13 @@ export default function SchoolCommitteesPage() {
       setLoading(false)
     }
   }, [config.schoolHubUrl])
+  useEffect(() => subscribeHubResource<CommitteeState>('committees', data => {
+    setAssignments(data.assignments)
+    setEvents(data.events)
+  }), [])
+  useEffect(() => subscribeHubResource<SharedStaffRoster | null>('staffRoster', data => {
+    setStaff(data?.members ?? [])
+  }), [])
 
   const selected = GYEONGNAM_HIGH_SCHOOL_COMMITTEES_2026.find(item => item.id === selectedId)
   const selectedAssignment = assignments.find(item => item.committeeId === selectedId)

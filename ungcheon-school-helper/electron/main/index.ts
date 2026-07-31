@@ -636,6 +636,7 @@ ipcMain.handle('fs:readFileBase64', (_, filePath: string) => {
 // 렌더러에는 임의 URL fetch 권한을 주지 않고, 환경설정에 저장된 Google 호스트만 허용한다.
 const HUB_ACTIONS = new Set([
   'health',
+  'getSyncManifest',
   'verifyAdmin',
   'listLinks',
   'addLink',

@@ -32,8 +32,14 @@ import { useAppStore } from '../stores/appStore'
 import { WeatherTodayView, WeatherForecastView } from '../components/WeatherBar'
 import { useWeather } from '../components/useWeather'
 import { getMeal, getSchedule, getTimetableRange, getSchoolDetail, NEIS_API_KEY } from '../services/neis'
-import { getSchoolTimetable, listCommitteeState, type CommitteeEvent } from '../services/schoolHub'
-import type { TeacherTimetable } from '../services/schoolTimetable'
+import {
+  getSchoolTimetable,
+  listCommitteeState,
+  subscribeHubResource,
+  type CommitteeEvent,
+  type CommitteeState,
+} from '../services/schoolHub'
+import type { SchoolTimetable, TeacherTimetable } from '../services/schoolTimetable'
 import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
 import type { MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
 import {
@@ -322,6 +328,20 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
         }
       })
     return () => { cancelled = true }
+  }, [config.schoolHubUrl, config.teacherName])
+
+  useEffect(() => {
+    const name = config.teacherName?.trim()
+    if (!config.schoolHubUrl || !name) return
+    const unsubscribeTimetable = subscribeHubResource<SchoolTimetable | null>('timetable', shared => {
+      setSharedTeacher(shared?.teachers.find(teacher =>
+        teacher.name === name || teacher.label.startsWith(name),
+      ) ?? null)
+    })
+    const unsubscribeCommittees = subscribeHubResource<CommitteeState>('committees', state => {
+      setCommitteeEvents(state.events.filter(event => event.memberNames.includes(name)))
+    })
+    return () => { unsubscribeTimetable(); unsubscribeCommittees() }
   }, [config.schoolHubUrl, config.teacherName])
 
   // schoolAddress 자동 보완

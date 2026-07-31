@@ -103,7 +103,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 9 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 10 } });
 }
 
 function doPost(e) {
@@ -112,7 +112,8 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 9 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 10 } });
+    if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: { verified: true } });
@@ -205,6 +206,22 @@ function doPost(e) {
   } catch (error) {
     return json_({ ok: false, error: String(error && error.message ? error.message : error) });
   }
+}
+
+function getSyncManifest_() {
+  function versionOf_(sheetName) {
+    const rows = readObjects_(sheetName);
+    return 'v:' + String(rows.length ? Number(rows[0].version) || 0 : 0);
+  }
+  return {
+    generatedAt: new Date().toISOString(),
+    resources: {
+      timetable: versionOf_(TIMETABLE_META_SHEET),
+      studentTimetable: versionOf_(STUDENT_TIMETABLE_META_SHEET),
+      staffRoster: versionOf_(STAFF_ROSTER_META_SHEET),
+      studentRoster: versionOf_(STUDENT_ROSTER_META_SHEET)
+    }
+  };
 }
 
 /**

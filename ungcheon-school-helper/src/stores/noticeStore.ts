@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { listNotices } from '../services/schoolHub'
 
 export interface Notice {
   id: number
@@ -85,7 +86,7 @@ export const useNoticeStore = create<NoticeState>((set, get) => ({
   // 진입 시 자동 확인(On-Load Verification)
   fetchNotices: async () => {
     try {
-      const raw = await window.electron?.fetchNotices?.()
+      const raw = await listNotices()
       const notices = sanitize(raw)
       set({ notices, loaded: true })
 
