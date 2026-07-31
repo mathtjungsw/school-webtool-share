@@ -6,7 +6,7 @@ import {
   ClipboardList, School, ShoppingCart, FileSearch, Bell,
   Settings, ChevronDown, ChevronRight, ExternalLink, Zap,
   MessageCircle, Globe, Info, Star, RefreshCw,
-  Landmark, BookCopy, Cloud, CircleDot, FileSpreadsheet
+  Landmark, Cloud, CircleDot, FileSpreadsheet
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -236,17 +236,6 @@ const SECTIONS: Section[] = [
     steps: [
       '위원회 종류를 선택하여 현황을 확인합니다.',
       '위원 추가/수정/삭제 기능으로 정보를 관리합니다.',
-    ],
-  },
-  {
-    id: 'school_ledger',
-    icon: BookCopy,
-    color: 'text-teal-400',
-    title: '비치 장부 현황',
-    description: '법정·비법정 장부 91개를 검색하고 비치 현황을 관리합니다.',
-    steps: [
-      '검색창에 장부명을 입력하면 해당 장부 정보가 표시됩니다.',
-      '법정/비법정 필터로 종류별로 조회할 수 있습니다.',
     ],
   },
   // ── 공문서·업무 ──

@@ -23,7 +23,6 @@ const PhotoLedgerPage = lazy(() => import('../pages/PhotoLedgerPage'))
 const StudentRecordPage = lazy(() => import('../pages/StudentRecordPage'))
 const AttendancePage = lazy(() => import('../pages/AttendancePage'))
 const SchoolCommitteesPage = lazy(() => import('../pages/SchoolCommitteesPage'))
-const SchoolLedgerPage = lazy(() => import('../pages/SchoolLedgerPage'))
 const PdfExtractorPage = lazy(() => import('../pages/PdfExtractorPage'))
 const FileParserPage = lazy(() => import('../pages/FileParserPage'))
 const NotifierPage = lazy(() => import('../pages/NotifierPage'))
@@ -51,7 +50,6 @@ const PAGES: Record<string, React.ComponentType> = {
   student_record: StudentRecordPage,
   attendance: AttendancePage,
   committees: SchoolCommitteesPage,
-  school_ledger: SchoolLedgerPage,
   pdf_extractor: PdfExtractorPage,
   file_parser: FileParserPage,
   notifier: NotifierPage,

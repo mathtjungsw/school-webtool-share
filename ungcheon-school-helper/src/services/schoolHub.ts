@@ -47,6 +47,40 @@ export interface FeatureRequest {
   updatedAt?: string
 }
 
+export interface CommitteeMember {
+  name: string
+  role: string
+  source: 'staff' | 'direct'
+}
+
+export interface CommitteeAssignment {
+  committeeId: string
+  committeeName: string
+  members: CommitteeMember[]
+  updatedBy: string
+  updatedAt: string
+}
+
+export interface CommitteeEvent {
+  id: string
+  committeeId: string
+  committeeName: string
+  title: string
+  date: string
+  startTime: string
+  endTime: string
+  location: string
+  agenda: string
+  memberNames: string[]
+  createdBy: string
+  createdAt: string
+}
+
+export interface CommitteeState {
+  assignments: CommitteeAssignment[]
+  events: CommitteeEvent[]
+}
+
 interface HubResponse<T> {
   ok: boolean
   data?: T
@@ -76,6 +110,10 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
       'addStaffChecklist',
       'submitStaffChecklist',
       'deleteStaffChecklist',
+      'listCommitteeState',
+      'saveCommitteeMembers',
+      'addCommitteeEvent',
+      'deleteCommitteeEvent',
     ].includes(action)
     if (needsServerUpdate && message.includes('허용되지 않는 요청')) {
       throw new Error('학교 공유 서버 업데이트가 필요합니다. 관리자에게 문의하세요.')
@@ -187,5 +225,52 @@ export const deleteStaffChecklist = (
   action: 'deleteStaffChecklist',
   checklistId,
   viewerName,
+  adminPassword,
+})
+
+export const listCommitteeState = () =>
+  hubRequest<CommitteeState>({ action: 'listCommitteeState' })
+
+export const saveCommitteeMembers = (
+  committeeId: string,
+  committeeName: string,
+  members: CommitteeMember[],
+  updatedBy: string,
+  adminPassword: string,
+) => hubRequest<{ updatedAt: string }>({
+  action: 'saveCommitteeMembers',
+  committeeId,
+  committeeName,
+  members,
+  updatedBy,
+  adminPassword,
+})
+
+export const addCommitteeEvent = (
+  input: {
+    committeeId: string
+    committeeName: string
+    title: string
+    date: string
+    startTime: string
+    endTime: string
+    location: string
+    agenda: string
+    memberNames: string[]
+    createdBy: string
+  },
+  adminPassword: string,
+) => hubRequest<CommitteeEvent>({
+  action: 'addCommitteeEvent',
+  ...input,
+  adminPassword,
+})
+
+export const deleteCommitteeEvent = (
+  id: string,
+  adminPassword: string,
+) => hubRequest<void>({
+  action: 'deleteCommitteeEvent',
+  id,
   adminPassword,
 })

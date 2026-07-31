@@ -19,6 +19,8 @@ const STUDENT_ROSTER_META_SHEET = '학생명렬정보';
 const STUDENT_ROSTER_SHEET = '학생명렬';
 const STAFF_CHECKLISTS_SHEET = '업무체크리스트';
 const STAFF_CHECKLIST_RESPONSES_SHEET = '업무체크응답';
+const COMMITTEE_MEMBERS_SHEET = '위원회명단';
+const COMMITTEE_EVENTS_SHEET = '위원회일정';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
 const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
 const NEIS_BASE_URL = 'https://open.neis.go.kr/hub/';
@@ -35,6 +37,19 @@ const NEIS_ENDPOINT_PARAMS = {
   schoolMajorinfo: ['AY']
 };
 const RELEASE_NOTES = [
+  {
+    key: 'v1.0.22',
+    title: '[업데이트] 웅천고 업무도우미 v1.0.22',
+    body: [
+      '· 학교 내 각종위원회: 2026학년도 경남교육청 고등학교 기준으로 교체',
+      '· 위원회 명단: 교원 명렬 선택 및 직접 입력, 역할 지정 기능 추가',
+      '· 위원회 캘린더: 개최 일시·장소·안건 등록과 개인 달력 표시',
+      '· 일정 충돌: 같은 위원이 같은 시간대 위원회에 중복될 때 경고 및 등록 차단',
+      '· 대시보드: 이름·NEIS API 키 미설정 시 바로가기 안내 추가',
+      '· 학교 운영: 학교비치장부현황 메뉴 제거'
+    ].join('\n'),
+    date: '2026-07-31'
+  },
   {
     key: 'v1.0.21',
     title: '[업데이트] 웅천고 업무도우미 v1.0.21',
@@ -63,7 +78,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 7 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 8 } });
 }
 
 function doPost(e) {
@@ -72,7 +87,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 7 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 8 } });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: { verified: true } });
@@ -136,6 +151,22 @@ function doPost(e) {
     }
     if (action === 'deleteStaffChecklist') {
       deleteStaffChecklist_(body);
+      return json_({ ok: true });
+    }
+    if (action === 'listCommitteeState') {
+      return json_({ ok: true, data: listCommitteeState_() });
+    }
+    if (action === 'saveCommitteeMembers') {
+      requireAdmin_(body.adminPassword);
+      return json_({ ok: true, data: saveCommitteeMembers_(body) });
+    }
+    if (action === 'addCommitteeEvent') {
+      requireAdmin_(body.adminPassword);
+      return json_({ ok: true, data: addCommitteeEvent_(body) });
+    }
+    if (action === 'deleteCommitteeEvent') {
+      requireAdmin_(body.adminPassword);
+      deleteRowById_(COMMITTEE_EVENTS_SHEET, String(body.id || ''));
       return json_({ ok: true });
     }
     if (action === 'getNeisStatus') {
@@ -265,6 +296,13 @@ function ensureSheets_() {
   ]);
   ensureDataSheet_(book, STAFF_CHECKLIST_RESPONSES_SHEET, [
     'checklistId', 'teacherName', 'checkedItemIdsJson', 'memo', 'updatedAt'
+  ]);
+  ensureDataSheet_(book, COMMITTEE_MEMBERS_SHEET, [
+    'committeeId', 'committeeName', 'membersJson', 'updatedBy', 'updatedAt'
+  ]);
+  ensureDataSheet_(book, COMMITTEE_EVENTS_SHEET, [
+    'id', 'committeeId', 'committeeName', 'title', 'date', 'startTime', 'endTime',
+    'location', 'agenda', 'memberNamesJson', 'createdBy', 'createdAt'
   ]);
   ensureReleaseNotices_();
 }
@@ -963,6 +1001,156 @@ function deleteStaffChecklist_(body) {
   }
 }
 
+function normalizeCommitteeMembers_(values) {
+  const source = Array.isArray(values) ? values : [];
+  const seen = {};
+  return source.slice(0, 100).map(function(member) {
+    const name = clean_(member && member.name, 30);
+    const role = clean_(member && member.role, 30) || '위원';
+    const sourceType = String(member && member.source || '') === 'staff' ? 'staff' : 'direct';
+    if (!name || seen[name]) return null;
+    seen[name] = true;
+    return { name: name, role: role, source: sourceType };
+  }).filter(function(member) { return member; });
+}
+
+function listCommitteeState_() {
+  const assignments = readObjects_(COMMITTEE_MEMBERS_SHEET)
+    .map(function(row) {
+      return {
+        committeeId: String(row.committeeId || ''),
+        committeeName: String(row.committeeName || ''),
+        members: normalizeCommitteeMembers_(parseJsonArray_(row.membersJson)),
+        updatedBy: String(row.updatedBy || ''),
+        updatedAt: iso_(row.updatedAt)
+      };
+    })
+    .filter(function(item) { return item.committeeId && item.committeeName; })
+    .sort(function(a, b) { return Number(a.committeeId) - Number(b.committeeId); });
+
+  const events = readObjects_(COMMITTEE_EVENTS_SHEET)
+    .map(function(row) {
+      return {
+        id: String(row.id || ''),
+        committeeId: String(row.committeeId || ''),
+        committeeName: String(row.committeeName || ''),
+        title: String(row.title || ''),
+        date: dateOnly_(row.date),
+        startTime: String(row.startTime || ''),
+        endTime: String(row.endTime || ''),
+        location: String(row.location || ''),
+        agenda: String(row.agenda || ''),
+        memberNames: uniqueStrings_(parseJsonArray_(row.memberNamesJson), 30, 100),
+        createdBy: String(row.createdBy || ''),
+        createdAt: iso_(row.createdAt)
+      };
+    })
+    .filter(function(item) {
+      return item.id && item.committeeId && item.committeeName && item.date &&
+        item.startTime && item.endTime;
+    })
+    .sort(function(a, b) {
+      return (a.date + a.startTime).localeCompare(b.date + b.startTime);
+    });
+
+  return { assignments: assignments, events: events };
+}
+
+function saveCommitteeMembers_(body) {
+  const committeeId = clean_(body.committeeId, 20);
+  const committeeName = clean_(body.committeeName, 120);
+  const members = normalizeCommitteeMembers_(body.members);
+  const updatedBy = clean_(body.updatedBy, 30) || '관리자';
+  if (!committeeId || !committeeName) throw new Error('위원회 정보를 확인해 주세요.');
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(COMMITTEE_MEMBERS_SHEET);
+  const updatedAt = new Date().toISOString();
+  const rowValues = [committeeId, committeeName, JSON.stringify(members), updatedBy, updatedAt];
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const lastRow = sheet.getLastRow();
+    let targetRow = 0;
+    if (lastRow > 1) {
+      const ids = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
+      for (let index = 0; index < ids.length; index++) {
+        if (String(ids[index][0]) === committeeId) {
+          targetRow = index + 2;
+          break;
+        }
+      }
+    }
+    if (targetRow) sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
+    else sheet.appendRow(rowValues);
+  } finally {
+    lock.releaseLock();
+  }
+  return { updatedAt: updatedAt };
+}
+
+function addCommitteeEvent_(body) {
+  const committeeId = clean_(body.committeeId, 20);
+  const committeeName = clean_(body.committeeName, 120);
+  const title = clean_(body.title, 120) || committeeName;
+  const date = clean_(body.date, 10);
+  const startTime = clean_(body.startTime, 5);
+  const endTime = clean_(body.endTime, 5);
+  const location = clean_(body.location, 100);
+  const agenda = clean_(body.agenda, 1000);
+  const memberNames = uniqueStrings_(body.memberNames, 30, 100);
+  const createdBy = clean_(body.createdBy, 30) || '관리자';
+
+  if (!committeeId || !committeeName) throw new Error('위원회를 선택해 주세요.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('개최 날짜를 확인해 주세요.');
+  if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime) || startTime >= endTime) {
+    throw new Error('시작·종료 시간을 확인해 주세요.');
+  }
+  if (!memberNames.length) throw new Error('위원회 명단을 먼저 등록해 주세요.');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const conflicts = listCommitteeState_().events.filter(function(event) {
+      if (event.date !== date || startTime >= event.endTime || event.startTime >= endTime) return false;
+      return event.memberNames.some(function(name) { return memberNames.indexOf(name) >= 0; });
+    });
+    if (conflicts.length) {
+      const conflict = conflicts[0];
+      const overlapping = conflict.memberNames.filter(function(name) {
+        return memberNames.indexOf(name) >= 0;
+      });
+      throw new Error(
+        '같은 시간에 다른 위원회 일정이 겹칩니다: ' + conflict.committeeName +
+        ' ' + conflict.startTime + '~' + conflict.endTime +
+        ' (겹치는 위원: ' + overlapping.join(', ') + ')'
+      );
+    }
+
+    const id = Utilities.getUuid();
+    const createdAt = new Date().toISOString();
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(COMMITTEE_EVENTS_SHEET).appendRow([
+      id, committeeId, committeeName, title, date, startTime, endTime,
+      location, agenda, JSON.stringify(memberNames), createdBy, createdAt
+    ]);
+    return {
+      id: id,
+      committeeId: committeeId,
+      committeeName: committeeName,
+      title: title,
+      date: date,
+      startTime: startTime,
+      endTime: endTime,
+      location: location,
+      agenda: agenda,
+      memberNames: memberNames,
+      createdBy: createdBy,
+      createdAt: createdAt
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function replaceSheetRows_(sheetName, rows) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (sheet.getLastRow() > 1) {
@@ -982,7 +1170,8 @@ function parseJsonArray_(value) {
 
 function uniqueStrings_(values, maxLength, maxCount) {
   const seen = {};
-  return values.map(function(value) { return clean_(value, maxLength); })
+  const source = Array.isArray(values) ? values : [];
+  return source.map(function(value) { return clean_(value, maxLength); })
     .filter(function(value) {
       if (!value || seen[value]) return false;
       seen[value] = true;

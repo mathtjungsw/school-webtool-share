@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  ArrowLeftRight, Bell, BookCopy, BookOpen, Calculator, CalendarRange, ChevronDown,
+  ArrowLeftRight, Bell, BookOpen, Calculator, CalendarRange, ChevronDown,
   ChevronRight, ClipboardCheck, FileCode2, FileDown, FileScan, HelpCircle,
   Landmark, LayoutDashboard, Link2, MessageSquareText, Radio, ScrollText,
   Settings, Table2, FileText, UsersRound,
@@ -53,7 +53,6 @@ const NAV: NavGroup[] = [
       { id: 'staff_tasks', label: '업무 체크리스트', icon: ClipboardCheck },
       { id: 'staff_roster', label: '교원 명렬', icon: UsersRound },
       { id: 'committees', label: '각종 위원회 현황', icon: Landmark },
-      { id: 'school_ledger', label: '비치 장부 현황', icon: BookCopy },
     ],
   },
   {
