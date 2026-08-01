@@ -9,4 +9,5 @@ src/**/*.d.ts
 !src/global.d.ts
 !src/vite-env.d.ts
 .env
+.clasp.json
 .DS_Store
