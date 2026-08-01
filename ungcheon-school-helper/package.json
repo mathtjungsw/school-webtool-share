@@ -7,7 +7,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",
-    "typecheck": "tsc -p tsconfig.node.json --noEmit --pretty false && tsc -p tsconfig.web.json --noEmit --pretty false",
+    "typecheck": "node scripts/check-work-assistant-coverage.cjs && tsc -p tsconfig.node.json --noEmit --pretty false && tsc -p tsconfig.web.json --noEmit --pretty false",
     "build": "electron-vite build",
     "package": "npm run build && electron-builder --win --dir && node scripts/package-windows.cjs && electron-builder --win nsis --prepackaged release/win-unpacked",
     "package:dir": "npm run build && electron-builder --win --dir"

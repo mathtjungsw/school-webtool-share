@@ -128,6 +128,12 @@ export const WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
     keywords: ['나이스 키', 'NEIS API 키', '인증키', '급식', '나이스 급식', '급식이 안 나와', '급식 안나옴', '학사일정 안나옴', '호출 권한', '나이스 정보'],
   },
   {
+    id: 'neis-information', title: 'NEIS 급식·학사일정·시간표 조회', page: 'neis', category: '학사·기록',
+    summary: '웅천고 급식, 학사일정과 학급 시간표를 날짜별로 조회합니다.',
+    steps: ['NEIS 정보 메뉴를 엽니다.', '조회할 날짜와 급식·학사일정·시간표 탭을 선택합니다.', '정보가 없으면 API 키와 조회 날짜를 확인합니다.'],
+    keywords: ['NEIS 정보', '나이스 조회', '급식 조회', '학사일정 조회', '학급 시간표', '오늘 급식', '학교 일정'],
+  },
+  {
     id: 'school-link', title: '학교 공유 링크 등록', page: 'school_hub', category: '학교 공유',
     summary: '부서별 자료·사이트 URL을 등록해 전체 교직원과 공유합니다.',
     steps: ['학교 공유 링크 메뉴를 엽니다.', '부서·제목·URL·등록자 이름을 입력합니다.', '등록하면 모든 사용자에게 바로 표시됩니다.'],
@@ -144,6 +150,12 @@ export const WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
     summary: 'Excel의 공백·날짜·중복·빈 셀 등을 점검하고 정리된 새 파일을 만듭니다.',
     steps: ['Excel 전처리 메뉴를 엽니다.', '원본 Excel 파일을 선택합니다.', '필요한 정리 항목을 선택한 뒤 새 파일로 저장합니다.'],
     keywords: ['엑셀 정리', '명단 정리', '중복 검사', '빈셀 검사', '공백 제거', '엑셀 전처리'],
+  },
+  {
+    id: 'recommended-subjects', title: '대학·학과별 권장과목 검색', page: 'recommended_subjects', category: '자료·진로',
+    summary: '2028학년도 대학과 학과별 권장 이수과목을 검색해 과목선택 상담에 활용합니다.',
+    steps: ['대학 권장과목 메뉴를 엽니다.', '대학 또는 모집단위·학과를 검색합니다.', '권장과목과 핵심과목을 확인해 상담에 활용합니다.'],
+    keywords: ['대학 권장과목', '학과 권장과목', '권장 이수과목', '대입 과목', '과목선택 상담', '2028 대입'],
   },
   {
     id: 'pdf-text', title: 'PDF 텍스트 추출', page: 'pdf_extractor', category: '파일 처리',
@@ -168,6 +180,12 @@ export const WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
     summary: 'NEIS 인사기록 PDF를 PC에서 분석해 경력과 법정연수 등을 점검합니다.',
     steps: ['NEIS 인사기록 분석 메뉴를 엽니다.', '인사기록 PDF를 선택합니다.', '분석 결과와 점검 항목을 확인합니다.'],
     keywords: ['인사기록', '나이스 인사기록', '법정 연수', '경력 분석', '인사 PDF'],
+  },
+  {
+    id: 'notifier', title: '업무 알리미 설정', page: 'notifier', category: '알림',
+    summary: '오늘의 학사일정과 학교 공지를 일정한 간격으로 확인하도록 알림을 설정합니다.',
+    steps: ['업무 알리미 메뉴를 엽니다.', '확인 간격과 알림 조건을 설정합니다.', '알리미를 시작하고 실행 상태를 확인합니다.'],
+    keywords: ['업무 알리미', '일정 알림', '공지 알림', '알림 설정', '오늘 일정 알림', '알리미 시작'],
   },
   {
     id: 'settings-name', title: '교사 이름·학교 설정', page: 'settings', category: '설정·도움말',
