@@ -10,6 +10,7 @@ import {
   getSharedStudentRoster,
   getSharedStudentTimetable,
   replaceSharedStudentRoster,
+  subscribeHubResource,
 } from '../services/schoolHub'
 import {
   downloadAttendanceRosters,
@@ -83,6 +84,8 @@ export default function AttendancePrintPage() {
   }, [config.schoolHubUrl])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => subscribeHubResource<SharedStudentRoster | null>('studentRoster', data => setRoster(data)), [])
+  useEffect(() => subscribeHubResource<SharedStudentTimetable | null>('studentTimetable', data => setTimetable(data)), [])
 
   if (!config.schoolHubUrl) {
     return (

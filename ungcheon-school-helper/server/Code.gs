@@ -38,6 +38,18 @@ const NEIS_ENDPOINT_PARAMS = {
 };
 const RELEASE_NOTES = [
   {
+    key: 'v1.0.25',
+    title: '[업데이트] 웅천고 업무도우미 v1.0.25',
+    body: [
+      '· 공유자료 속도 개선: 앱 실행 시 시간표·명렬·위원회 자료를 미리 불러오기',
+      '· 즉시 화면 표시: 메뉴를 열면 세션 캐시를 먼저 표시하여 대기시간 단축',
+      '· 자동 동기화: 서버 자료가 변경된 경우 변경된 자료만 백그라운드에서 갱신',
+      '· 개인정보 보호: 임시 자료는 메모리에만 보관하고 앱 종료 시 자동 삭제',
+      '· 캐시 관리: 환경설정에서 임시 저장자료 현황 확인 및 즉시 삭제 지원'
+    ].join('\n'),
+    date: '2026-08-01'
+  },
+  {
     key: 'v1.0.24',
     title: '[업데이트] 웅천고 업무도우미 v1.0.24',
     body: [
@@ -103,7 +115,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 9 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 10 } });
 }
 
 function doPost(e) {
@@ -112,7 +124,8 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 9 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 10 } });
+    if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: { verified: true } });
@@ -205,6 +218,22 @@ function doPost(e) {
   } catch (error) {
     return json_({ ok: false, error: String(error && error.message ? error.message : error) });
   }
+}
+
+function getSyncManifest_() {
+  function versionOf_(sheetName) {
+    const rows = readObjects_(sheetName);
+    return 'v:' + String(rows.length ? Number(rows[0].version) || 0 : 0);
+  }
+  return {
+    generatedAt: new Date().toISOString(),
+    resources: {
+      timetable: versionOf_(TIMETABLE_META_SHEET),
+      studentTimetable: versionOf_(STUDENT_TIMETABLE_META_SHEET),
+      staffRoster: versionOf_(STAFF_ROSTER_META_SHEET),
+      studentRoster: versionOf_(STUDENT_ROSTER_META_SHEET)
+    }
+  };
 }
 
 /**

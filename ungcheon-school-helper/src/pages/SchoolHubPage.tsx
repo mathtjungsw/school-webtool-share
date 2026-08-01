@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useAdminStore } from '../stores/adminStore'
-import { hubRequest, listLinks, listNotices, type SchoolNotice, type SharedLink } from '../services/schoolHub'
+import { hubRequest, listLinks, listNotices, subscribeHubResource, type SchoolNotice, type SharedLink } from '../services/schoolHub'
 import { useNoticeStore } from '../stores/noticeStore'
 
 export default function SchoolHubPage() {
@@ -43,6 +43,8 @@ export default function SchoolHubPage() {
   }, [configured])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => subscribeHubResource<SharedLink[]>('links', data => setLinks(data)), [])
+  useEffect(() => subscribeHubResource<SchoolNotice[]>('notices', data => setNotices(data)), [])
 
   const filteredLinks = useMemo(() => {
     const q = search.trim().toLowerCase()

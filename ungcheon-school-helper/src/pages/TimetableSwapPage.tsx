@@ -8,7 +8,7 @@ import { useAdminStore } from '../stores/adminStore'
 import { useAppStore } from '../stores/appStore'
 import TeacherSchedulePreview from '../components/timetable/TeacherSchedulePreview'
 import TimetablePlanEditor from '../components/timetable/TimetablePlanEditor'
-import { getSchoolTimetable, replaceSchoolTimetable } from '../services/schoolHub'
+import { getSchoolTimetable, replaceSchoolTimetable, subscribeHubResource } from '../services/schoolHub'
 import {
   chooseAndParseTimetable,
   findSwapCandidates,
@@ -74,6 +74,11 @@ export default function TimetableSwapPage() {
   }, [configured])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => subscribeHubResource<SchoolTimetable | null>('timetable', data => {
+    setTimetable(data)
+    setSelectedSlot(null)
+    setPreview(null)
+  }), [])
 
   useEffect(() => {
     loadTimetablePlanDraft(config.teacherName?.trim() || '').then(draft => {

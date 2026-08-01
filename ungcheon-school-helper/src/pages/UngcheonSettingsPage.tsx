@@ -2,10 +2,16 @@ import { useEffect, useState } from 'react'
 import {
   CheckCircle2, KeyRound, Link2, Palette, Save, School,
   UserRound, Clock3, CalendarDays, Power, AlertCircle, ExternalLink, LockKeyhole,
+  Database, Trash2,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useAdminStore } from '../stores/adminStore'
 import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
+import {
+  clearSchoolHubSessionCache,
+  getSchoolHubCacheStatus,
+  preloadSchoolHubCache,
+} from '../services/schoolHub'
 
 const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
 
@@ -17,21 +23,35 @@ export default function UngcheonSettingsPage() {
   const [saved, setSaved] = useState(false)
   const [hubStatus, setHubStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
   const [autoLaunch, setAutoLaunch] = useState(false)
+  const [cacheStatus, setCacheStatus] = useState(() => getSchoolHubCacheStatus())
+  const [cacheMessage, setCacheMessage] = useState('')
 
   useEffect(() => setDraft(config), [config])
   useEffect(() => {
     window.electron?.getAutoLaunch().then(setAutoLaunch).catch(() => undefined)
   }, [])
+  useEffect(() => {
+    const timer = window.setInterval(() => setCacheStatus(getSchoolHubCacheStatus()), 1_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const save = async () => {
+    const hubChanged = isAdmin && draft.schoolHubUrl?.trim() !== config.schoolHubUrl?.trim()
     await saveConfig(isAdmin ? draft : { ...draft, schoolHubUrl: config.schoolHubUrl })
+    if (hubChanged) {
+      clearSchoolHubSessionCache()
+      if (draft.schoolHubUrl?.trim()) void preloadSchoolHubCache(draft.teacherName ?? '')
+      setCacheStatus(getSchoolHubCacheStatus())
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
 
   const testHub = async () => {
     if (isAdmin) {
+      const hubChanged = draft.schoolHubUrl?.trim() !== config.schoolHubUrl?.trim()
       await saveConfig({ schoolHubUrl: draft.schoolHubUrl?.trim() })
+      if (hubChanged) clearSchoolHubSessionCache()
     }
     setHubStatus('testing')
     try {
@@ -128,6 +148,27 @@ export default function UngcheonSettingsPage() {
           {hubStatus === 'ok' && <p className="text-xs text-emerald-400 flex items-center gap-1 mt-2"><CheckCircle2 size={12} /> 연결되었습니다.</p>}
           {hubStatus === 'error' && <p className="text-xs text-rose-400 flex items-center gap-1 mt-2"><AlertCircle size={12} /> 연결하지 못했습니다. 배포 URL과 권한을 확인하세요.</p>}
         </Field>
+      </Section>
+
+      <Section icon={<Database size={17} />} title="공유자료 임시 캐시">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-slate-300">현재 실행 중인 프로그램에서 {cacheStatus.count}개 자료를 임시 보관 중입니다.</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">시간표·명렬 등은 메모리에만 저장되어 앱을 종료하면 자동 삭제됩니다. 메뉴에서는 임시자료를 즉시 표시하고 서버 변경 여부를 백그라운드에서 확인합니다.</p>
+            {cacheMessage && <p className="mt-2 text-xs text-emerald-400">{cacheMessage}</p>}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              clearSchoolHubSessionCache()
+              setCacheStatus(getSchoolHubCacheStatus())
+              setCacheMessage('임시 공유자료를 모두 삭제했습니다. 다음 메뉴 진입 시 다시 내려받습니다.')
+            }}
+            className="btn-ghost inline-flex shrink-0 items-center gap-2 text-rose-300"
+          >
+            <Trash2 size={14} />임시 저장자료 모두 삭제
+          </button>
+        </div>
       </Section>
 
       <Section icon={<CalendarDays size={17} />} title="Google 캘린더">
