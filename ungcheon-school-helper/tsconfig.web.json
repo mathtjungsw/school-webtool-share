@@ -52,6 +52,8 @@
     "src/pages/AttendancePrintPage.tsx",
     "src/pages/GradePreviewPage.tsx",
     "src/pages/EstimatedSplitScorePage.tsx",
+    "src/pages/FormCenterPage.tsx",
+    "src/pages/TeacherToolsPage.tsx",
     "src/services/neis.ts",
     "src/services/workAssistantSearch.ts",
     "src/services/schoolHub.ts",

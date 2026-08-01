@@ -3,8 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeftRight, Bell, BookOpen, Calculator, CalendarDays, CalendarRange, ChevronDown,
   ChevronRight, ClipboardCheck, FileCode2, FileDown, FileScan, HelpCircle,
-  Landmark, LayoutDashboard, Link2, MessageSquareText, ScrollText,
-  Settings, Table2, FileText, UsersRound,
+  FilePenLine, Landmark, LayoutDashboard, Link2, MessageSquareText, ScrollText,
+  Settings, Table2, FileText, UsersRound, Wrench,
   type LucideIcon,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -54,6 +54,8 @@ const NAV: NavGroup[] = [
     items: [
       { id: 'staff_tasks', label: '업무센터', icon: ClipboardCheck },
       { id: 'staff_roster', label: '교원 명렬', icon: UsersRound },
+      { id: 'form_center', label: '서식센터', icon: FilePenLine },
+      { id: 'teacher_tools', label: '교사용 도구', icon: Wrench },
       { id: 'committees', label: '각종 위원회 현황', icon: Landmark },
     ],
   },
