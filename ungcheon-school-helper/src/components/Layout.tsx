@@ -37,6 +37,7 @@ const GradePreviewPage = lazy(() => import('../pages/GradePreviewPage'))
 const EstimatedSplitScorePage = lazy(() => import('../pages/EstimatedSplitScorePage'))
 const FormCenterPage = lazy(() => import('../pages/FormCenterPage'))
 const TeacherToolsPage = lazy(() => import('../pages/TeacherToolsPage'))
+const TeacherTransferScorePage = lazy(() => import('../pages/TeacherTransferScorePage'))
 
 const PAGES: Record<string, React.ComponentType> = {
   neis: NeisPage,
@@ -67,6 +68,7 @@ const PAGES: Record<string, React.ComponentType> = {
   estimated_split_score: EstimatedSplitScorePage,
   form_center: FormCenterPage,
   teacher_tools: TeacherToolsPage,
+  transfer_score: TeacherTransferScorePage,
 }
 
 const MAX_HISTORY = 40

@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeftRight, Bell, BookOpen, Calculator, CalendarDays, CalendarRange, ChevronDown,
   ChevronRight, ClipboardCheck, FileCode2, FileDown, FileScan, HelpCircle,
-  FilePenLine, Landmark, LayoutDashboard, Link2, MessageSquareText, ScrollText,
+  FilePenLine, Landmark, LayoutDashboard, Link2, MapPinned, MessageSquareText, ScrollText,
   Settings, Table2, FileText, UsersRound, Wrench,
   type LucideIcon,
 } from 'lucide-react'
@@ -70,6 +70,7 @@ const NAV: NavGroup[] = [
     label: '인사행정',
     items: [
       { id: 'payroll', label: '호봉획정 계산기', icon: Calculator },
+      { id: 'transfer_score', label: '전보내신점수 계산기', icon: MapPinned },
       { id: 'insa_analysis', label: 'NEIS 인사기록 분석', icon: FileScan },
     ],
   },

@@ -9,7 +9,7 @@ import {
   DollarSign, Briefcase, ClipboardList, School, ShoppingCart,
   Landmark, Trophy, FileSearch, FileDown, FileText,
   FileSpreadsheet, HelpCircle, Waves, SquareStack, CircleDot, Star,
-  FileScan, FileCode2,
+  FileScan, FileCode2, MapPinned,
   Clapperboard, SquarePen, MessagesSquare, BarChart3, Mic, CalendarRange, UsersRound,
   ArrowUpRight, BellRing, Check, ListTodo, StickyNote,
   type LucideIcon,
@@ -105,6 +105,7 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
   ]},
   { group: '인사행정', color: 'emerald', items: [
     { id: 'payroll', label: '호봉획정 계산기', icon: Calculator, desc: '경력 인정과 초임 호봉 계산' },
+    { id: 'transfer_score', label: '전보내신점수 계산기', icon: MapPinned, desc: '2027 경남 일반교사 전보 점수 자동 계산' },
     { id: 'insa_analysis', label: 'NEIS 인사기록 분석', icon: FileScan, desc: '인사기록 PDF 분석과 법정연수 점검' },
   ]},
   { group: '파일·알림', color: 'slate', items: [

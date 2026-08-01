@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   ArrowLeftRight, Bell, BookOpen, CalendarDays, ExternalLink, FileSpreadsheet, Files, HelpCircle,
-  KeyRound, Link2, MessageSquareText, RefreshCw, School, Search, ShieldCheck,
+  KeyRound, Link2, MapPinned, MessageSquareText, RefreshCw, School, Search, ShieldCheck,
 } from 'lucide-react'
 
 const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
@@ -151,6 +151,18 @@ const SECTIONS = [
     ],
   },
   {
+    title: '전보내신점수 계산기',
+    icon: MapPinned,
+    items: [
+      '2027 경상남도교육청 중등 일반교사 기준의 근무경력점·교육활동경력점·가산점을 합산합니다.',
+      '웅천고등학교는 라급지·연 5.5점으로 기본 설정되며, 최근 3년 근무경력점과 최근 5년 교육활동 경력을 자동 반영합니다.',
+      '휴직·정직·직위해제와 평정 제외 파견 기간은 빼고 실제 근무 구간만 입력하며, 급지가 바뀐 경력은 구간을 나누어 입력합니다.',
+      '담임·부장·공동교육과정 등은 인정받을 실제 월수만 입력하고, 표창·상장·대회지도는 동일 실적과 동일 학년도 중복 여부를 확인합니다.',
+      '입력 내용은 현재 PC에만 자동 저장되고, 결과 산출표는 인쇄하거나 PDF로 저장할 수 있습니다.',
+      '자동 계산은 참고용이므로 증빙 인정, 제외 기간과 예외 규정은 학교 인사 담당자에게 최종 확인합니다.',
+    ],
+  },
+  {
     title: '파일 처리',
     icon: Files,
     items: [
@@ -241,7 +253,7 @@ export default function UngcheonHelpPage() {
         <section className="card p-5">
           <h2 className="font-semibold text-white flex items-center gap-2 mb-4"><FileSpreadsheet size={16} className="text-violet-400" />선택된 도구</h2>
           <p className="text-sm text-slate-400 leading-relaxed">
-            Excel 전처리, 대학 권장과목, 호봉획정, 방과후 점검, 인사기록 분석,
+            Excel 전처리, 대학 권장과목, 호봉획정, 전보내신점수 계산, 방과후 점검, 인사기록 분석,
             시간표 교체, 교육과정 편제표 출력, 과목선택 상담, 사진대장, 학적업무, 출석부,
             위원회 명단·캘린더, PDF 추출, 파일 파서가 포함되어 있습니다.
           </p>
