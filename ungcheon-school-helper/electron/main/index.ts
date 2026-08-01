@@ -116,6 +116,7 @@ const ALLOWED_CONFIG_KEY_PREFIXES = [
   'special_remarks:', 'exam_supervisor:', 'newSemClass:',
   'wr:', 'club:', 'photo:', 'insa:',
   'assessment:', 'feedback.', 'timetable_plan:',
+  'personal.',
 ]
 function isAllowedConfigKey(key: string): boolean {
   return ALLOWED_CONFIG_KEY_PREFIXES.some(p => key.startsWith(p))

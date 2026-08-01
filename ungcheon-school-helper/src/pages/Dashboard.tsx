@@ -11,6 +11,7 @@ import {
   FileSpreadsheet, HelpCircle, Waves, SquareStack, CircleDot, Star,
   FileScan, FileCode2,
   Clapperboard, SquarePen, MessagesSquare, BarChart3, Mic, CalendarRange, UsersRound,
+  ArrowUpRight, Check, ListTodo, StickyNote,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -40,6 +41,10 @@ import {
   type CommitteeState,
 } from '../services/schoolHub'
 import type { SchoolTimetable, TeacherTimetable } from '../services/schoolTimetable'
+import {
+  loadPersonalMemo, loadPersonalTasks, savePersonalMemo, savePersonalTasks,
+  subscribePersonalOrganizer, type PersonalTask,
+} from '../services/personalOrganizer'
 import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
 import type { MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
 import {
@@ -64,8 +69,10 @@ interface PortfolioGroup { group: string; color: string; items: PortfolioItem[] 
 interface DashboardScheduleEvent {
   date: string
   eventName: string
-  source: 'neis' | 'weekly' | 'committee'
+  source: 'neis' | 'weekly' | 'committee' | 'personal'
   department?: string
+  completed?: boolean
+  taskId?: string
 }
 
 const PORTFOLIO_GROUPS: PortfolioGroup[] = [
@@ -243,6 +250,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const [teacherTT, setTeacherTT] = useState<TimetableEntry[]>([])
   const [sharedTeacher, setSharedTeacher] = useState<TeacherTimetable | null>(null)
   const [committeeEvents, setCommitteeEvents] = useState<CommitteeEvent[]>([])
+  const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>([])
+  const [personalMemo, setPersonalMemo] = useState('')
+  const [memoLoaded, setMemoLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -252,12 +262,6 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   // ── 2번째 위치 날씨 (설정 시 날씨 카드 하단에 함께 표시) ──
   const { data: weather2, displayName: weather2Place } = useWeather(undefined, config.secondLocationName)
 
-  // ── 구글 캘린더 URL 검증 (M-1: IIFE → useMemo) ──
-  const isValidCalendarUrl = useMemo(() => {
-    if (!config.googleCalendarUrl) return false
-    try { return new URL(config.googleCalendarUrl).hostname === 'calendar.google.com' } catch { return false }
-  }, [config.googleCalendarUrl])
-
   // ── 즐겨찾기 상태 ──
   const [favorites, setFavorites] = useState<string[]>([])
 
@@ -266,6 +270,27 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       if (Array.isArray(saved)) setFavorites(saved as string[])
     })
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([loadPersonalTasks(), loadPersonalMemo()]).then(([tasks, memo]) => {
+      if (cancelled) return
+      setPersonalTasks(tasks)
+      setPersonalMemo(memo)
+      setMemoLoaded(true)
+    })
+    const unsubscribe = subscribePersonalOrganizer(change => {
+      if (change.kind === 'tasks') setPersonalTasks(change.value)
+      if (change.kind === 'memo') setPersonalMemo(change.value)
+    })
+    return () => { cancelled = true; unsubscribe() }
+  }, [])
+
+  useEffect(() => {
+    if (!memoLoaded) return
+    const timer = window.setTimeout(() => { void savePersonalMemo(personalMemo) }, 450)
+    return () => window.clearTimeout(timer)
+  }, [memoLoaded, personalMemo])
 
   const toggleFavorite = useCallback((id: string) => {
     setFavorites(prev => {
@@ -293,8 +318,6 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     Object.fromEntries(
       PORTFOLIO_GROUPS.flatMap(g => g.items).map(i => [i.id, i])
     ), [])
-
-  const prevMonthRef = useRef('')
 
   const hasSchool = !!(config.officeCode && config.schoolCode)
   const hasNeisApiKey = Boolean(config.neisApiKey?.trim())
@@ -399,20 +422,25 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     setLoading(true)
     setError('')
     try {
-      const year = parseInt(selectedDate.slice(0, 4))
-      const month = parseInt(selectedDate.slice(5, 7))
       const weekDates = getWeekDates(selectedDate)
       const fromYmdStr = weekDates[0]
       const toYmdStr = weekDates[4]
 
       const nextDay = addDays(new Date(selectedDate), 1)
+      const dashboardWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+      const scheduleMonths = Array.from(new Set([
+        selectedDate.slice(0, 7),
+        format(dashboardWeekStart, 'yyyy-MM'),
+        format(addDays(dashboardWeekStart, 13), 'yyyy-MM'),
+      ]))
 
       const promises: Promise<unknown>[] = [
         getMeal(neisApiKey, config.officeCode!, config.schoolCode!, new Date(selectedDate)),
         getMeal(neisApiKey, config.officeCode!, config.schoolCode!, nextDay),
-        prevMonthRef.current === `${year}-${month}`
-          ? Promise.resolve(null)
-          : getSchedule(neisApiKey, config.officeCode!, config.schoolCode!, year, month),
+        Promise.all(scheduleMonths.map(value => {
+          const [year, month] = value.split('-').map(Number)
+          return getSchedule(neisApiKey, config.officeCode!, config.schoolCode!, year, month)
+        })).then(results => results.flat()),
       ]
 
       if (config.grade && config.classNm && config.schoolType) {
@@ -423,13 +451,10 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
         promises.push(Promise.resolve(null))
       }
 
-      const [meals, nxtMeals, sched, tt] = await Promise.all(promises) as [MealInfo[], MealInfo[], ScheduleEvent[] | null, TimetableEntry[] | null]
+      const [meals, nxtMeals, sched, tt] = await Promise.all(promises) as [MealInfo[], MealInfo[], ScheduleEvent[], TimetableEntry[] | null]
       setMeal(meals ?? [])
       setNextMeal(nxtMeals ?? [])
-      if (sched !== null) {
-        setSchedule(sched)
-        prevMonthRef.current = `${year}-${month}`
-      }
+      setSchedule(sched)
       setTimetable(tt ?? [])
 
       if (hasTeacher && config.teacherClasses && config.schoolType) {
@@ -451,13 +476,29 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
 
   const loadWeeklyPlan = useCallback(async (force = false) => {
     if (!window.electron?.weeklyPlanGetMonth) return
-    const year = Number(selectedDate.slice(0, 4))
-    const month = Number(selectedDate.slice(5, 7))
+    const dashboardWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+    const months = Array.from(new Set([
+      selectedDate.slice(0, 7),
+      format(dashboardWeekStart, 'yyyy-MM'),
+      format(addDays(dashboardWeekStart, 13), 'yyyy-MM'),
+    ]))
     setWeeklyPlanLoading(true)
     setWeeklyPlanError('')
     try {
-      const result = await window.electron.weeklyPlanGetMonth(year, month, force)
-      setWeeklyPlan(result)
+      const results = await Promise.all(months.map(value => {
+        const [year, month] = value.split('-').map(Number)
+        return window.electron.weeklyPlanGetMonth(year, month, force)
+      }))
+      setWeeklyPlan({
+        events: results.flatMap(result => result.events).filter((event, index, all) =>
+          all.findIndex(item => item.date === event.date && item.department === event.department && item.eventName === event.eventName) === index,
+        ),
+        notes: results.flatMap(result => result.notes).filter((note, index, all) =>
+          all.findIndex(item => item.weekStart === note.weekStart && item.department === note.department && item.content === note.content) === index,
+        ),
+        sourceSheets: [...new Set(results.flatMap(result => result.sourceSheets))],
+        fetchedAt: results.map(result => result.fetchedAt).filter(Boolean).sort().at(-1) ?? '',
+      })
     } catch {
       setWeeklyPlanError('주간계획을 불러오지 못했습니다.')
     } finally {
@@ -496,6 +537,14 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       eventName: `${item.startTime} ${item.title}`,
       department: item.committeeName,
       source: 'committee' as const,
+    })),
+    ...personalTasks.map(task => ({
+      date: toYmd(task.date),
+      eventName: `${task.time ? `${task.time} ` : ''}${task.title}`,
+      department: '개인 업무',
+      source: 'personal' as const,
+      completed: task.completed,
+      taskId: task.id,
     })),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.eventName.localeCompare(b.eventName))
   const upcomingCommitteeEvents = committeeEvents
@@ -688,17 +737,17 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                 </div>
               </DashCard>
 
-              {/* 📅 월간 달력형 학사일정 + 교무기획부 주간계획 */}
+              {/* 📅 이번 주·다음 주 일정 */}
               <DashCard
                 icon={<CalendarDays size={14} className="text-violet-400"/>}
-                title="학사일정 · 주간계획"
-                badge={`${selectedDate.slice(0,7)} · 자동`}
+                title="이번 주 · 다음 주 일정"
+                badge="2주 보기"
                 badgeColor="violet"
               >
                 {(loading || weeklyPlanLoading) && combinedSchedule.length === 0 ? (
                   <Skeleton rows={8}/>
                 ) : (
-                  <MonthScheduleCalendar
+                  <TwoWeekScheduleCalendar
                     selectedDate={selectedDate}
                     events={combinedSchedule}
                     notes={selectedWeekNotes}
@@ -707,6 +756,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                     onSelectDate={setSelectedDate}
                     neisConfigured={hasNeisApiKey}
                     onOpenHelp={() => onNavigate('help')}
+                    onOpenCalendar={() => onNavigate('calendar')}
                   />
                 )}
               </DashCard>
@@ -727,36 +777,23 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
               />
             </DashCard>
           </div>
-
-          {/* ── 구글 캘린더 ── */}
-          {isValidCalendarUrl ? (
-            <div className="card overflow-hidden p-0">
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
-                <div className="w-7 h-7 rounded-lg bg-sky-500/20 flex items-center justify-center">
-                  <Globe size={14} className="text-sky-400" />
-                </div>
-                <span className="font-semibold text-white">구글 캘린더</span>
-              </div>
-              <iframe
-                src={config.googleCalendarUrl}
-                style={{ border: 0 }}
-                width="100%"
-                height="560"
-                frameBorder="0"
-                scrolling="no"
-                title="구글 캘린더"
-                className="block"
-              />
-            </div>
-          ) : (
-            <div className="card border-dashed border-white/10 p-6 text-center">
-              <Globe size={28} className="text-slate-600 mx-auto mb-2" />
-              <p className="text-sm text-slate-500">구글 캘린더가 연동되지 않았습니다.</p>
-              <p className="text-xs text-slate-600 mt-1">환경설정 → 구글 캘린더 연동에서 URL을 입력하세요.</p>
-            </div>
-          )}
         </>
       )}
+
+      {/* ── 개인 업무 · 개인 메모 ── */}
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <PersonalTasksWidget
+          tasks={personalTasks}
+          onOpenCalendar={() => onNavigate('calendar')}
+          onToggle={async task => {
+            const updated = personalTasks.map(item => item.id === task.id
+              ? { ...item, completed: !item.completed, updatedAt: new Date().toISOString() }
+              : item)
+            setPersonalTasks(await savePersonalTasks(updated))
+          }}
+        />
+        <PersonalMemoWidget value={personalMemo} onChange={setPersonalMemo} loaded={memoLoaded} />
+      </div>
 
       {/* ── 즐겨찾기 섹션 ── */}
       {favorites.length > 0 && (
@@ -852,7 +889,182 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   )
 }
 
-// ─── 월간 학사일정 · 주간계획 달력 ───────────────────────────────
+// ─── 이번 주 · 다음 주 일정 ─────────────────────────────────────
+function TwoWeekScheduleCalendar({
+  selectedDate,
+  events,
+  notes,
+  weeklyPlanError,
+  sourceSheetCount,
+  onSelectDate,
+  neisConfigured,
+  onOpenHelp,
+  onOpenCalendar,
+}: {
+  selectedDate: string
+  events: DashboardScheduleEvent[]
+  notes: WeeklyPlanNote[]
+  weeklyPlanError: string
+  sourceSheetCount: number
+  onSelectDate: (date: string) => void
+  neisConfigured: boolean
+  onOpenHelp: () => void
+  onOpenCalendar: () => void
+}) {
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+  const weeks = [0, 1].map(week => Array.from({ length: 7 }, (_, day) => addDays(weekStart, week * 7 + day)))
+  const selectedYmd = toYmd(selectedDate)
+  const todayYmd = toYmd(todayStr())
+  const eventsByDate = new Map<string, DashboardScheduleEvent[]>()
+  for (const event of events) {
+    const list = eventsByDate.get(event.date) ?? []
+    list.push(event)
+    eventsByDate.set(event.date, list)
+  }
+  const selectedEvents = eventsByDate.get(selectedYmd) ?? []
+
+  const sourceLabel = (event: DashboardScheduleEvent) => event.source === 'weekly'
+    ? event.department
+    : event.source === 'committee'
+      ? event.department
+      : event.source === 'personal'
+        ? '개인'
+        : 'NEIS'
+  const sourceClass = (event: DashboardScheduleEvent) => event.source === 'weekly'
+    ? 'border-sky-400 bg-sky-500/15 text-sky-200'
+    : event.source === 'committee'
+      ? 'border-amber-400 bg-amber-500/15 text-amber-200'
+      : event.source === 'personal'
+        ? 'border-emerald-400 bg-emerald-500/15 text-emerald-200'
+        : 'border-violet-400 bg-violet-500/15 text-violet-200'
+
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 text-[10px]">
+          <span className={clsx('flex items-center gap-1', neisConfigured ? 'text-violet-300' : 'text-slate-600')}><span className="h-2 w-2 rounded-full bg-violet-400" />NEIS 학사일정</span>
+          <span className="flex items-center gap-1 text-sky-300"><span className="h-2 w-2 rounded-full bg-sky-400" />주간계획</span>
+          <span className="flex items-center gap-1 text-amber-300"><span className="h-2 w-2 rounded-full bg-amber-400" />내 위원회</span>
+          <span className="flex items-center gap-1 text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400" />개인 업무</span>
+        </div>
+        <button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />월간 캘린더<ArrowUpRight size={11} /></button>
+      </div>
+
+      {!neisConfigured && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2.5">
+          <p className="text-[11px] text-violet-200">NEIS API 키를 입력하면 학사일정도 함께 볼 수 있습니다.</p>
+          <button onClick={onOpenHelp} className="text-[10px] font-bold text-violet-300 underline underline-offset-2">사용 매뉴얼 바로가기</button>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {weeks.map((week, weekIndex) => (
+          <div key={format(week[0], 'yyyyMMdd')} className="overflow-hidden rounded-xl border border-white/10 bg-white/5">
+            <div className={clsx('flex items-center justify-between border-b px-3 py-2', weekIndex === 0 ? 'border-amber-400/20 bg-amber-400/10' : 'border-sky-400/15 bg-sky-400/5')}>
+              <p className={clsx('text-[11px] font-black', weekIndex === 0 ? 'text-amber-300' : 'text-sky-300')}>{weekIndex === 0 ? '이번 주' : '다음 주'}</p>
+              <p className="text-[10px] text-slate-500">{format(week[0], 'M월 d일')} – {format(week[6], 'M월 d일')}</p>
+            </div>
+            <div className="grid grid-cols-7 gap-px bg-white/5">
+              {week.map((day, dayIndex) => {
+                const ymd = format(day, 'yyyyMMdd')
+                const dateValue = format(day, 'yyyy-MM-dd')
+                const dayEvents = eventsByDate.get(ymd) ?? []
+                const isTodayCell = ymd === todayYmd
+                const isSelected = ymd === selectedYmd
+                return (
+                  <button
+                    key={ymd}
+                    type="button"
+                    onClick={() => onSelectDate(dateValue)}
+                    className={clsx(
+                      'min-h-[142px] min-w-0 bg-surface-800/95 p-2 text-left transition-colors hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-400/70',
+                      isSelected && 'bg-violet-500/10 ring-2 ring-inset ring-violet-400/70',
+                    )}
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-1">
+                      <span className={clsx('text-[9px] font-semibold', dayIndex === 5 ? 'text-sky-400' : dayIndex === 6 ? 'text-rose-400' : 'text-slate-500')}>{format(day, 'EEE', { locale: ko })}</span>
+                      <span className={clsx('grid h-6 w-6 place-items-center rounded-full text-[11px] font-black', isTodayCell ? 'bg-amber-400 text-slate-950' : dayIndex === 5 ? 'text-sky-300' : dayIndex === 6 ? 'text-rose-300' : 'text-slate-200')}>{format(day, 'd')}</span>
+                    </div>
+                    <div className="space-y-1">
+                      {dayEvents.slice(0, 5).map((event, index) => (
+                        <div key={`${event.source}-${event.department ?? ''}-${index}`} className={clsx('rounded border-l-2 px-1.5 py-1 text-[9px] leading-tight', sourceClass(event), event.completed && 'line-through opacity-50')} title={`${sourceLabel(event)} · ${event.eventName}`}>
+                          <span className="block truncate text-[8px] font-bold opacity-70">{sourceLabel(event)}</span>
+                          <span className="block truncate">{event.eventName.replace(/\s*\n\s*/g, ' · ')}</span>
+                        </div>
+                      ))}
+                      {dayEvents.length > 5 && <span className="block pl-1 text-[8px] font-semibold text-slate-500">+{dayEvents.length - 5}개 더보기</span>}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <div className="rounded-xl border border-violet-400/15 bg-violet-500/5 p-3">
+          <p className="mb-2 text-[10px] font-bold text-violet-300">{format(new Date(`${selectedDate}T00:00:00`), 'M월 d일 (EEE)', { locale: ko })} 선택 일정</p>
+          {selectedEvents.length > 0 ? <div className="max-h-28 space-y-1.5 overflow-y-auto">
+            {selectedEvents.map((event, index) => <div key={`${event.source}-${event.department ?? ''}-${index}`} className="flex items-start gap-2 text-[11px] leading-relaxed"><span className={clsx('mt-0.5 flex-shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold', sourceClass(event))}>{sourceLabel(event)}</span><span className={clsx('whitespace-pre-line text-slate-300', event.completed && 'line-through text-slate-500')}>{event.eventName}</span></div>)}
+          </div> : <p className="text-[11px] text-slate-500">선택한 날짜에 등록된 일정이 없습니다.</p>}
+        </div>
+        <div className="rounded-xl border border-sky-400/15 bg-sky-500/5 p-3">
+          <p className="mb-2 text-[10px] font-bold text-sky-300">선택한 주의 기타·참고사항</p>
+          {notes.length > 0 ? <div className="max-h-28 space-y-1.5 overflow-y-auto">{notes.map((note, index) => <div key={`${note.department}-${index}`} className="text-[11px] leading-relaxed text-slate-400"><span className="font-semibold text-sky-400/90">{note.department}</span><span className="mx-1 text-slate-600">·</span><span className="whitespace-pre-line">{note.content}</span></div>)}</div> : <p className="text-[11px] text-slate-500">해당 주의 기타·참고사항이 없습니다.</p>}
+        </div>
+      </div>
+
+      {weeklyPlanError && <p className="mt-2 text-[10px] text-amber-400">{weeklyPlanError} NEIS·개인 일정만 표시합니다.</p>}
+      {!weeklyPlanError && sourceSheetCount > 0 && <p className="mt-2 text-[9px] text-slate-600">교무기획부 주간계획 {sourceSheetCount}개 시트 자동 반영</p>}
+    </div>
+  )
+}
+
+function PersonalTasksWidget({
+  tasks,
+  onOpenCalendar,
+  onToggle,
+}: {
+  tasks: PersonalTask[]
+  onOpenCalendar: () => void
+  onToggle: (task: PersonalTask) => Promise<void>
+}) {
+  const today = todayStr()
+  const end = format(addDays(new Date(), 13), 'yyyy-MM-dd')
+  const visible = tasks.filter(task => !task.completed && task.date <= end).slice(0, 7)
+  const overdue = tasks.filter(task => !task.completed && task.date < today).length
+
+  return (
+    <section className="card p-4 xl:col-span-2">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2"><div className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-500/15"><ListTodo size={14} className="text-emerald-400" /></div><div><p className="text-sm font-bold text-white">개인 업무</p><p className="text-[10px] text-slate-500">오늘부터 2주 안에 확인할 업무</p></div></div>
+        <button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />등록·관리<ArrowUpRight size={11} /></button>
+      </div>
+      {overdue > 0 && <p className="mb-2 rounded-lg bg-rose-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-rose-300">기한이 지난 업무가 {overdue}개 있습니다.</p>}
+      {visible.length ? <div className="grid gap-2 md:grid-cols-2">
+        {visible.map(task => (
+          <div key={task.id} className="flex items-start gap-2 rounded-xl border border-white/5 bg-white/[0.025] p-2.5">
+            <button onClick={() => void onToggle(task)} className="group mt-0.5 grid h-4 w-4 flex-shrink-0 place-items-center rounded border border-slate-600 text-emerald-300 hover:border-emerald-400" aria-label="업무 완료"><Check size={11} className="opacity-0 transition-opacity group-hover:opacity-100" /></button>
+            <button onClick={onOpenCalendar} className="min-w-0 flex-1 text-left"><p className="truncate text-[11px] font-semibold text-slate-200">{task.title}</p><p className={clsx('mt-0.5 text-[9px]', task.date < today ? 'text-rose-400' : task.date === today ? 'text-amber-300' : 'text-slate-500')}>{task.date}{task.time ? ` · ${task.time}` : ''}{task.priority === 'high' ? ' · 중요' : ''}</p></button>
+          </div>
+        ))}
+      </div> : <button onClick={onOpenCalendar} className="w-full rounded-xl border border-dashed border-white/10 py-6 text-center text-[11px] text-slate-500 hover:border-emerald-400/30 hover:text-emerald-300">등록된 개인 업무가 없습니다. 캘린더에서 첫 업무를 등록해보세요.</button>}
+    </section>
+  )
+}
+
+function PersonalMemoWidget({ value, onChange, loaded }: { value: string; onChange: (value: string) => void; loaded: boolean }) {
+  return (
+    <section className="card p-4">
+      <div className="mb-3 flex items-center gap-2"><div className="grid h-7 w-7 place-items-center rounded-lg bg-amber-500/15"><StickyNote size={14} className="text-amber-400" /></div><div><p className="text-sm font-bold text-white">개인 메모</p><p className="text-[10px] text-emerald-400">이 PC에만 자동 저장</p></div></div>
+      <textarea value={value} onChange={event => onChange(event.target.value)} onBlur={() => { void savePersonalMemo(value) }} rows={7} disabled={!loaded} placeholder="잠깐 기억해둘 내용을 적으세요. 학교 공유 서버에는 전송되지 않습니다." className="w-full resize-none text-[11px] leading-relaxed" />
+      <p className="mt-2 text-right text-[9px] text-slate-600">{loaded ? '입력 후 자동 저장됩니다.' : '메모 불러오는 중...'}</p>
+    </section>
+  )
+}
+
+// ─── 이전 월간 달력 구현(대시보드에서는 2주 보기로 대체) ─────────
 function MonthScheduleCalendar({
   selectedDate,
   events,

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  ArrowLeftRight, Bell, BookOpen, ExternalLink, FileSpreadsheet, Files, HelpCircle,
+  ArrowLeftRight, Bell, BookOpen, CalendarDays, ExternalLink, FileSpreadsheet, Files, HelpCircle,
   KeyRound, Link2, MessageSquareText, RefreshCw, School, ShieldCheck,
 } from 'lucide-react'
 
@@ -97,6 +97,18 @@ const SECTIONS = [
       '일반 사용자는 공유된 시간표를 변경하거나 Excel 원본을 내려받을 수 없습니다.',
       '교육과정 편제표 출력에서는 전학년·1학년·2학년·3학년 PDF와 과목선택 상담 기능을 이용할 수 있습니다.',
       '업무 알리미는 실제 미결 공문이 아니라 오늘의 학사일정과 학교 공지를 확인합니다.',
+    ],
+  },
+  {
+    title: '캘린더·개인 업무·메모',
+    icon: CalendarDays,
+    items: [
+      '대시보드에서는 이번 주와 다음 주 일정만 크게 표시하며, “월간 캘린더” 버튼으로 전체 달력을 엽니다.',
+      '캘린더에는 NEIS 학사일정·교무기획부 주간계획·내 위원회 일정·개인 업무가 색상별로 함께 표시됩니다.',
+      '날짜를 선택해 개인 업무의 마감일·시간·중요도·메모를 등록하고 완료 처리하거나 수정·삭제할 수 있습니다.',
+      '개인 업무와 개인 메모는 현재 Windows 사용자 PC에만 저장되며 학교 공유 서버와 관리자에게 전송되지 않습니다.',
+      '대시보드 개인 메모는 입력 후 자동 저장되고, 개인 업무는 대시보드에서도 바로 완료 처리할 수 있습니다.',
+      '같은 Windows 계정을 여러 사람이 함께 사용한다면 개인 메모도 서로 보일 수 있으므로 공용 PC에는 민감한 내용을 기록하지 않습니다.',
     ],
   },
   {

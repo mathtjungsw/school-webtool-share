@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  ArrowLeftRight, Bell, BookOpen, Calculator, CalendarRange, ChevronDown,
+  ArrowLeftRight, Bell, BookOpen, Calculator, CalendarDays, CalendarRange, ChevronDown,
   ChevronRight, ClipboardCheck, FileCode2, FileDown, FileScan, HelpCircle,
   Landmark, LayoutDashboard, Link2, MessageSquareText, Radio, ScrollText,
   Settings, Table2, FileText, UsersRound,
@@ -29,6 +29,7 @@ const NAV: NavGroup[] = [
     defaultOpen: true,
     items: [
       { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
+      { id: 'calendar', label: '캘린더', icon: CalendarDays },
       { id: 'school_hub', label: '학교 공유 링크', icon: Link2 },
       { id: 'feature_requests', label: '기능개선 요청', icon: MessageSquareText },
       { id: 'neis', label: 'NEIS 정보', icon: Radio },
