@@ -53,7 +53,7 @@ const NAV: NavGroup[] = [
     label: '학교운영',
     defaultOpen: true,
     items: [
-      { id: 'staff_tasks', label: '업무 체크리스트', icon: ClipboardCheck },
+      { id: 'staff_tasks', label: '업무센터', icon: ClipboardCheck },
       { id: 'staff_roster', label: '교원 명렬', icon: UsersRound },
       { id: 'committees', label: '각종 위원회 현황', icon: Landmark },
     ],

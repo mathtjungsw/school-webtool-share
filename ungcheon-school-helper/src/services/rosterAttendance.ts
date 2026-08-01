@@ -9,6 +9,8 @@ export interface StaffMember {
   name: string
   position: string
   department: string
+  subject: string
+  homeroom: string
 }
 
 export interface SharedStaffRoster {
@@ -46,13 +48,22 @@ export interface StaffChecklistResponse {
   updatedAt: string
 }
 
+export type StaffTaskPriority = 'low' | 'normal' | 'high'
+export type StaffTaskStatus = 'planned' | 'in_progress' | 'completed' | 'hold'
+
 export interface StaffChecklist {
   id: string
   title: string
   description: string
   deadline: string
+  startDate: string
+  priority: StaffTaskPriority
+  status: StaffTaskStatus
+  linkUrl: string
+  departmentNames: string[]
   creatorName: string
   createdAt: string
+  updatedAt: string
   closed: boolean
   items: Array<{ id: string; label: string }>
   targetNames: string[]
@@ -129,6 +140,10 @@ export function parseStaffRosterWorkbook(bytes: number[]): StaffMember[] {
         const departmentColumn = nearbyColumns.find(column =>
           ['부서', '부서명', '소속부서'].includes(compact(header[column])),
         )
+        const subjectColumn = nearbyColumns.find(column =>
+          ['교과', '과목', '담당교과'].includes(compact(header[column])),
+        )
+        const homeroomColumn = nearbyColumns.find(column => compact(header[column]) === '담임')
 
         for (let rowIndex = headerIndex + 1; rowIndex < rows.length; rowIndex += 1) {
           const name = clean(rows[rowIndex]?.[nameColumn])
@@ -136,6 +151,8 @@ export function parseStaffRosterWorkbook(bytes: number[]): StaffMember[] {
           const department = departmentColumn === undefined
             ? ''
             : clean(rows[rowIndex]?.[departmentColumn])
+          const subject = subjectColumn === undefined ? '' : clean(rows[rowIndex]?.[subjectColumn])
+          const homeroom = homeroomColumn === undefined ? '' : clean(rows[rowIndex]?.[homeroomColumn])
           if (!name || !position || name === '성명' || position === '직책') continue
           if (!/^[가-힣A-Za-z][가-힣A-Za-z·.\s]{1,29}$/.test(name)) continue
           const existing = byName.get(name)
@@ -144,6 +161,8 @@ export function parseStaffRosterWorkbook(bytes: number[]): StaffMember[] {
             name,
             position,
             department: department || existing?.department || '',
+            subject: subject || existing?.subject || '',
+            homeroom: homeroom || existing?.homeroom || '',
           })
         }
       })
@@ -230,9 +249,11 @@ export async function downloadStaffRoster(members: StaffMember[]): Promise<boole
     직책: member.position,
     성명: member.name,
     부서: member.department,
+    교과: member.subject,
+    담임: member.homeroom,
   }))
   const sheet = XLSX.utils.json_to_sheet(rows)
-  sheet['!cols'] = [{ wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 22 }]
+  sheet['!cols'] = [{ wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 22 }, { wch: 18 }, { wch: 14 }]
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, sheet, '교원명렬')
   return window.electron.saveFileDialog(

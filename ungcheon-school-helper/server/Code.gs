@@ -22,12 +22,44 @@ const STAFF_CHECKLIST_RESPONSES_SHEET = '업무체크응답';
 const COMMITTEE_MEMBERS_SHEET = '위원회명단';
 const COMMITTEE_EVENTS_SHEET = '위원회일정';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
+const STAFF_ASSIGNMENTS_2026_APPLIED_KEY = 'UNG_STAFF_ASSIGNMENTS_2026_APPLIED';
 const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
 const NEIS_BASE_URL = 'https://open.neis.go.kr/hub/';
 const UNGCHEON_OFFICE_CODE = 'S10';
 const UNGCHEON_SCHOOL_CODE = '9010464';
 const TIMETABLE_SLOT_COUNT = 35;
 const NEIS_CACHE_SECONDS = 300;
+// 2026학년도 업무분장 원문에서 담임·교과·부서만 선별한 자료입니다.
+// 업무, 세부업무, 부담임 등 나머지 원문 정보는 저장하지 않습니다.
+const STAFF_ASSIGNMENTS_2026 = [
+  ['강수경', '교무기획부', '영어', ''], ['공혜진', '교무기획부', '역사', ''],
+  ['배병희', '교무기획부', '국어', ''], ['이혜원', '교무기획부', '영어', '1-6'],
+  ['김윤미', '교무기획부', '일본어', '3-7'],
+  ['김혜경', '인성안전부', '생명과학', ''], ['박은실', '인성안전부', '수학', ''],
+  ['최대식', '인성안전부', '물리', ''], ['김성혜', '인성안전부', '윤리', '3-4'],
+  ['박선욱', '인성안전부', '음악', '1-4'], ['이찬희', '인성안전부', '', ''],
+  ['정승원', '교육과정부', '수학', ''], ['이송은', '교육과정부', '일반사회', ''],
+  ['김소영', '교육과정부', '수학', ''], ['김해주', '교육과정부', '수학', '2-6'],
+  ['이정용', '교육연구부', '지구과학', ''], ['황수란', '교육연구부', '국어', ''],
+  ['안소정', '교육연구부', '체육', ''],
+  ['이환필', '진로교육부', '진로', ''], ['최희경', '진로교육부', '역사', ''],
+  ['김진영', '진로교육부', '특수', '특수 담임'],
+  ['김민우', '미래정보부', '영어', ''], ['전영희', '미래정보부', '국어', ''],
+  ['이승현', '미래정보부', '정보', '2-2'],
+  ['최경희', '평가혁신부', '지리', ''], ['이미경', '평가혁신부', '수학', ''],
+  ['황혜진', '평가혁신부', '화학', ''],
+  ['박민자', '문화건강부', '국어', ''], ['안효정', '문화건강부', '미술', ''],
+  ['김미주', '문화건강부', '보건', ''],
+  ['이원철', '1학년부', '생명과학', '1-1'], ['조승현', '1학년부', '국어', '1-2'],
+  ['민진호', '1학년부', '미술', '1-7'], ['변수옥', '1학년부', '일반사회', '1-3'],
+  ['표명준', '1학년부', '수학', '1-5'],
+  ['김중오', '2학년부', '윤리', '2-7'], ['박진우', '2학년부', '영어', '2-5'],
+  ['이기성', '2학년부', '체육', '2-3'], ['장규빈', '2학년부', '영어', '2-4'],
+  ['이승언', '2학년부', '지리', '2-1'],
+  ['이영재', '3학년부', '체육', '3-3'], ['전우석', '3학년부', '지구과학', '3-5'],
+  ['이경민', '3학년부', '영어', '3-1'], ['신숙자', '3학년부', '수학', '3-2'],
+  ['정유현', '3학년부', '국어', '3-6']
+];
 const NEIS_ENDPOINT_PARAMS = {
   schoolInfo: ['SCHUL_NM'],
   mealServiceDietInfo: ['MLSV_YMD'],
@@ -37,6 +69,20 @@ const NEIS_ENDPOINT_PARAMS = {
   schoolMajorinfo: ['AY']
 };
 const RELEASE_NOTES = [
+  {
+    key: 'v1.0.30',
+    title: '[업데이트] 웅천고 업무도우미 v1.0.30',
+    body: [
+      '· 업무센터: 기존 업무 체크리스트를 내 업무·공유 업무·개인 업무 중심 화면으로 확장',
+      '· 업무 관리: 상태·우선순위·시작일·마감일·관련 링크·세부 확인 항목 지원',
+      '· 부서 업무: 교원 명렬의 부서 단위 배부, 업무 복제, 미완료자 명단 복사 지원',
+      '· 일정 연동: 공유 업무 마감일을 대시보드 2주 일정과 통합 캘린더에 표시',
+      '· 진행 현황: 작성자가 대상자별 진행 상태와 완료율을 한눈에 확인',
+      '· 개인 업무: 업무센터에서도 현재 PC 전용 개인 업무를 등록·완료·삭제 가능',
+      '· 교원 명렬: 2026 업무분장에서 부서·교과·담임 정보만 선별해 이름 기준으로 반영'
+    ].join('\n'),
+    date: '2026-08-01'
+  },
   {
     key: 'v1.0.28',
     title: '[업데이트] 웅천고 업무도우미 v1.0.28',
@@ -152,7 +198,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 10 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 11 } });
 }
 
 function doPost(e) {
@@ -161,7 +207,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 10 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 11 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
@@ -221,6 +267,9 @@ function doPost(e) {
     if (action === 'addStaffChecklist') {
       return json_({ ok: true, data: addStaffChecklist_(body) });
     }
+    if (action === 'updateStaffChecklist') {
+      return json_({ ok: true, data: updateStaffChecklist_(body) });
+    }
     if (action === 'submitStaffChecklist') {
       return json_({ ok: true, data: submitStaffChecklist_(body) });
     }
@@ -262,13 +311,26 @@ function getSyncManifest_() {
     const rows = readObjects_(sheetName);
     return 'v:' + String(rows.length ? Number(rows[0].version) || 0 : 0);
   }
+  function activityOf_(sheetNames) {
+    let count = 0;
+    let latest = '';
+    sheetNames.forEach(function(sheetName) {
+      readObjects_(sheetName).forEach(function(row) {
+        count += 1;
+        const changed = iso_(row.updatedAt || row.createdAt);
+        if (changed > latest) latest = changed;
+      });
+    });
+    return 'a:' + String(count) + ':' + latest;
+  }
   return {
     generatedAt: new Date().toISOString(),
     resources: {
       timetable: versionOf_(TIMETABLE_META_SHEET),
       studentTimetable: versionOf_(STUDENT_TIMETABLE_META_SHEET),
       staffRoster: versionOf_(STAFF_ROSTER_META_SHEET),
-      studentRoster: versionOf_(STUDENT_ROSTER_META_SHEET)
+      studentRoster: versionOf_(STUDENT_ROSTER_META_SHEET),
+      staffChecklists: activityOf_([STAFF_CHECKLISTS_SHEET, STAFF_CHECKLIST_RESPONSES_SHEET])
     }
   };
 }
@@ -369,8 +431,9 @@ function ensureSheets_() {
     'version', 'sourceFileName', 'uploadedBy', 'uploadedAt', 'memberCount'
   ]);
   ensureDataSheet_(book, STAFF_ROSTER_SHEET, [
-    'id', 'name', 'position', 'department'
+    'id', 'name', 'position', 'department', 'subject', 'homeroom'
   ]);
+  ensureStaffAssignments2026_(book);
   ensureDataSheet_(book, STUDENT_ROSTER_META_SHEET, [
     'version', 'sourceFileName', 'uploadedBy', 'uploadedAt', 'studentCount'
   ]);
@@ -380,7 +443,8 @@ function ensureSheets_() {
   ]);
   ensureDataSheet_(book, STAFF_CHECKLISTS_SHEET, [
     'id', 'title', 'description', 'deadline', 'creatorName', 'createdAt',
-    'closed', 'itemsJson', 'targetNamesJson'
+    'closed', 'itemsJson', 'targetNamesJson', 'startDate', 'priority', 'status',
+    'linkUrl', 'departmentNamesJson', 'updatedAt'
   ]);
   ensureDataSheet_(book, STAFF_CHECKLIST_RESPONSES_SHEET, [
     'checklistId', 'teacherName', 'checkedItemIdsJson', 'memo', 'updatedAt'
@@ -405,6 +469,41 @@ function ensureDataSheet_(book, name, headers) {
     sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
   }
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+}
+
+function ensureStaffAssignments2026_(book) {
+  const properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty(STAFF_ASSIGNMENTS_2026_APPLIED_KEY) === 'true') return;
+  const sheet = book.getSheetByName(STAFF_ROSTER_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return;
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
+  const byName = {};
+  STAFF_ASSIGNMENTS_2026.forEach(function(item) { byName[item[0]] = item; });
+  let matched = 0;
+  let changed = false;
+  values.forEach(function(row) {
+    const assignment = byName[String(row[1] || '').trim()];
+    if (!assignment) return;
+    matched += 1;
+    const next = [assignment[1], assignment[2], assignment[3]];
+    for (let index = 0; index < 3; index++) {
+      if (String(row[index + 3] || '') !== next[index]) changed = true;
+      row[index + 3] = next[index];
+    }
+  });
+  if (!matched) return;
+  if (changed) {
+    sheet.getRange(2, 1, values.length, 6).setValues(values);
+    const meta = readObjects_(STAFF_ROSTER_META_SHEET)[0] || {};
+    replaceSheetRows_(STAFF_ROSTER_META_SHEET, [[
+      (Number(meta.version) || 0) + 1,
+      String(meta.sourceFileName || ''),
+      '2026 업무분장 반영',
+      new Date().toISOString(),
+      values.length
+    ]]);
+  }
+  properties.setProperty(STAFF_ASSIGNMENTS_2026_APPLIED_KEY, 'true');
 }
 
 function ensureReleaseNotices_() {
@@ -805,7 +904,9 @@ function getStaffRoster_() {
         id: String(row.id || ''),
         name: String(row.name || ''),
         position: String(row.position || ''),
-        department: String(row.department || '')
+        department: String(row.department || ''),
+        subject: String(row.subject || ''),
+        homeroom: String(row.homeroom || '')
       };
     })
     .filter(function(member) { return member.id && member.name; })
@@ -828,6 +929,8 @@ function replaceStaffRoster_(body) {
     const name = clean_(member && member.name, 30);
     const position = clean_(member && member.position, 30) || '교사';
     const department = clean_(member && member.department, 50);
+    const subject = clean_(member && member.subject, 50);
+    const homeroom = clean_(member && member.homeroom, 30);
     if (!name) throw new Error('성명이 비어 있는 교원이 있습니다.');
     if (seenNames[name]) throw new Error('교원 명렬에 같은 이름이 두 번 있습니다: ' + name);
     seenNames[name] = true;
@@ -835,7 +938,9 @@ function replaceStaffRoster_(body) {
       clean_(member && member.id, 100) || Utilities.getUuid(),
       name,
       position,
-      department
+      department,
+      subject,
+      homeroom
     ];
   });
   rows.sort(function(a, b) {
@@ -987,6 +1092,14 @@ function listStaffChecklists_(body) {
         creatorName: String(row.creatorName || ''),
         createdAt: iso_(row.createdAt),
         closed: toBooleanValue_(row.closed),
+        startDate: dateOnly_(row.startDate) || dateOnly_(row.createdAt),
+        priority: ['low', 'normal', 'high'].indexOf(String(row.priority || '')) >= 0
+          ? String(row.priority) : 'normal',
+        status: ['planned', 'in_progress', 'completed', 'hold'].indexOf(String(row.status || '')) >= 0
+          ? String(row.status) : (toBooleanValue_(row.closed) ? 'completed' : 'in_progress'),
+        linkUrl: String(row.linkUrl || ''),
+        departmentNames: parseJsonArray_(row.departmentNamesJson).map(String),
+        updatedAt: iso_(row.updatedAt || row.createdAt),
         items: items,
         targetNames: targetNames,
         responses: checklistResponses,
@@ -1002,10 +1115,22 @@ function addStaffChecklist_(body) {
   const title = clean_(body.title, 100);
   const description = clean_(body.description, 1000);
   const deadline = clean_(body.deadline, 10);
+  const startDate = clean_(body.startDate, 10) || new Date().toISOString().slice(0, 10);
+  const priority = ['low', 'normal', 'high'].indexOf(String(body.priority || '')) >= 0
+    ? String(body.priority) : 'normal';
+  const status = ['planned', 'in_progress', 'completed', 'hold'].indexOf(String(body.status || '')) >= 0
+    ? String(body.status) : 'in_progress';
+  const linkUrl = clean_(body.linkUrl, 500);
+  const departmentNames = uniqueStrings_(
+    Array.isArray(body.departmentNames) ? body.departmentNames : [], 40, 30
+  );
   const sourceItems = Array.isArray(body.items) ? body.items : [];
   const sourceTargets = Array.isArray(body.targetNames) ? body.targetNames : [];
   if (!creatorName || !title) throw new Error('작성자와 제목을 입력하세요.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) throw new Error('시작일 형식이 올바르지 않습니다.');
   if (deadline && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) throw new Error('마감일 형식이 올바르지 않습니다.');
+  if (deadline && deadline < startDate) throw new Error('마감일은 시작일보다 빠를 수 없습니다.');
+  if (linkUrl && !/^https?:\/\//i.test(linkUrl)) throw new Error('관련 링크는 http 또는 https 주소로 입력하세요.');
 
   const roster = getStaffRoster_();
   if (!roster || !roster.members.some(function(member) { return member.name === creatorName; })) {
@@ -1024,10 +1149,68 @@ function addStaffChecklist_(body) {
   const id = Utilities.getUuid();
   const createdAt = new Date().toISOString();
   SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_CHECKLISTS_SHEET).appendRow([
-    id, title, description, deadline, creatorName, createdAt, false,
-    JSON.stringify(items), JSON.stringify(targetNames)
+    id, title, description, deadline, creatorName, createdAt, status === 'completed',
+    JSON.stringify(items), JSON.stringify(targetNames), startDate, priority, status,
+    linkUrl, JSON.stringify(departmentNames), createdAt
   ]);
   return { id: id };
+}
+
+function updateStaffChecklist_(body) {
+  const checklistId = clean_(body.checklistId, 100);
+  const viewerName = clean_(body.viewerName, 30);
+  const checklist = findObjectByValue_(STAFF_CHECKLISTS_SHEET, 'id', checklistId);
+  if (!checklist) throw new Error('수정할 업무를 찾지 못했습니다.');
+  if (String(checklist.creatorName || '') !== viewerName && !isAdminPassword_(body.adminPassword)) {
+    throw new Error('작성자 또는 관리자만 업무를 수정할 수 있습니다.');
+  }
+
+  const title = clean_(body.title, 100);
+  const description = clean_(body.description, 1000);
+  const startDate = clean_(body.startDate, 10);
+  const deadline = clean_(body.deadline, 10);
+  const priority = ['low', 'normal', 'high'].indexOf(String(body.priority || '')) >= 0
+    ? String(body.priority) : 'normal';
+  const status = ['planned', 'in_progress', 'completed', 'hold'].indexOf(String(body.status || '')) >= 0
+    ? String(body.status) : 'in_progress';
+  const linkUrl = clean_(body.linkUrl, 500);
+  if (!title) throw new Error('업무 제목을 입력하세요.');
+  if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) throw new Error('시작일 형식이 올바르지 않습니다.');
+  if (deadline && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) throw new Error('마감일 형식이 올바르지 않습니다.');
+  if (startDate && deadline && deadline < startDate) throw new Error('마감일은 시작일보다 빠를 수 없습니다.');
+  if (linkUrl && !/^https?:\/\//i.test(linkUrl)) throw new Error('관련 링크는 http 또는 https 주소로 입력하세요.');
+
+  const roster = getStaffRoster_();
+  const allowedNames = {};
+  (roster && roster.members || []).forEach(function(member) { allowedNames[member.name] = true; });
+  const targetNames = uniqueStrings_(Array.isArray(body.targetNames) ? body.targetNames : [], 30, 200)
+    .filter(function(name) { return allowedNames[name]; });
+  if (!targetNames.length) throw new Error('배부 대상 교원을 한 명 이상 선택하세요.');
+  const sourceItems = Array.isArray(body.items) ? body.items : [];
+  const previousItems = parseJsonArray_(checklist.itemsJson);
+  const previousByLabel = {};
+  previousItems.forEach(function(item) { if (item && item.label) previousByLabel[String(item.label)] = String(item.id); });
+  const items = uniqueStrings_(sourceItems, 200, 30).map(function(label) {
+    return { id: previousByLabel[label] || Utilities.getUuid(), label: label };
+  });
+  if (!items.length) throw new Error('확인 항목을 한 개 이상 입력하세요.');
+  const departmentNames = uniqueStrings_(
+    Array.isArray(body.departmentNames) ? body.departmentNames : [], 40, 30
+  );
+  const updatedAt = new Date().toISOString();
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_CHECKLISTS_SHEET);
+  const values = sheet.getDataRange().getValues();
+  for (let row = 1; row < values.length; row++) {
+    if (String(values[row][0]) !== checklistId) continue;
+    sheet.getRange(row + 1, 2, 1, 14).setValues([[
+      title, description, deadline, String(checklist.creatorName || ''), iso_(checklist.createdAt),
+      status === 'completed', JSON.stringify(items), JSON.stringify(targetNames),
+      startDate, priority, status, linkUrl, JSON.stringify(departmentNames), updatedAt
+    ]]);
+    return { updatedAt: updatedAt };
+  }
+  throw new Error('수정할 업무 행을 찾지 못했습니다.');
 }
 
 function submitStaffChecklist_(body) {
