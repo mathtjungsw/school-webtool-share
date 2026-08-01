@@ -35,6 +35,8 @@ const StaffRosterPage = lazy(() =>
 const AttendancePrintPage = lazy(() => import('../pages/AttendancePrintPage'))
 const GradePreviewPage = lazy(() => import('../pages/GradePreviewPage'))
 const EstimatedSplitScorePage = lazy(() => import('../pages/EstimatedSplitScorePage'))
+const FormCenterPage = lazy(() => import('../pages/FormCenterPage'))
+const TeacherToolsPage = lazy(() => import('../pages/TeacherToolsPage'))
 
 const PAGES: Record<string, React.ComponentType> = {
   neis: NeisPage,
@@ -63,6 +65,8 @@ const PAGES: Record<string, React.ComponentType> = {
   attendance_print: AttendancePrintPage,
   grade_preview: GradePreviewPage,
   estimated_split_score: EstimatedSplitScorePage,
+  form_center: FormCenterPage,
+  teacher_tools: TeacherToolsPage,
 }
 
 const MAX_HISTORY = 40
@@ -94,6 +98,15 @@ export default function Layout() {
     window.addEventListener('keydown', openAssistant)
     return () => window.removeEventListener('keydown', openAssistant)
   }, [])
+
+  useEffect(() => {
+    const handleNavigate = (event: Event) => {
+      const pageId = (event as CustomEvent<string>).detail
+      if (pageId) navigate(pageId)
+    }
+    window.addEventListener('app:navigate', handleNavigate)
+    return () => window.removeEventListener('app:navigate', handleNavigate)
+  })
 
   return (
     <div className="app-shell h-screen bg-surface-900 flex flex-col overflow-hidden">
