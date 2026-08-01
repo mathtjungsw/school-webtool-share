@@ -12,15 +12,16 @@ import clsx from 'clsx'
 import { useAppStore } from '../stores/appStore'
 import { getSchedule, NEIS_API_KEY } from '../services/neis'
 import {
-  listCommitteeState, subscribeHubResource, type CommitteeEvent, type CommitteeState,
+  listCommitteeState, listStaffChecklists, subscribeHubResource, type CommitteeEvent, type CommitteeState,
 } from '../services/schoolHub'
+import type { StaffChecklist } from '../services/rosterAttendance'
 import {
   createPersonalTaskId, loadPersonalTasks, savePersonalTasks, sortPersonalTasks,
   subscribePersonalOrganizer, type PersonalTask, type PersonalTaskPriority,
 } from '../services/personalOrganizer'
 import type { ScheduleEvent, WeeklyPlanResult } from '../types'
 
-type CalendarSource = 'neis' | 'weekly' | 'committee' | 'personal'
+type CalendarSource = 'neis' | 'weekly' | 'committee' | 'sharedWork' | 'personal'
 
 interface CalendarEvent {
   id: string
@@ -38,6 +39,7 @@ const SOURCE_STYLE: Record<CalendarSource, string> = {
   neis: 'border-violet-400 bg-violet-500/15 text-violet-200',
   weekly: 'border-sky-400 bg-sky-500/15 text-sky-200',
   committee: 'border-amber-400 bg-amber-500/15 text-amber-200',
+  sharedWork: 'border-rose-400 bg-rose-500/15 text-rose-200',
   personal: 'border-emerald-400 bg-emerald-500/15 text-emerald-200',
 }
 
@@ -65,6 +67,7 @@ export default function CalendarPage() {
   const [schedule, setSchedule] = useState<ScheduleEvent[]>([])
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanResult>(EMPTY_WEEKLY_PLAN)
   const [committeeEvents, setCommitteeEvents] = useState<CommitteeEvent[]>([])
+  const [sharedTasks, setSharedTasks] = useState<StaffChecklist[]>([])
   const [tasks, setTasks] = useState<PersonalTask[]>([])
   const [draft, setDraft] = useState<TaskDraft>(() => emptyDraft(today()))
   const [loading, setLoading] = useState(false)
@@ -81,7 +84,7 @@ export default function CalendarPage() {
     const neisKey = config.neisApiKey?.trim() || NEIS_API_KEY
     const teacherName = config.teacherName?.trim() ?? ''
     try {
-      const [nextTasks, nextSchedule, nextWeekly, committees] = await Promise.all([
+      const [nextTasks, nextSchedule, nextWeekly, committees, workTasks] = await Promise.all([
         loadPersonalTasks(),
         hasNeis
           ? getSchedule(neisKey, config.officeCode!, config.schoolCode!, year, month).catch(() => [])
@@ -92,11 +95,15 @@ export default function CalendarPage() {
         config.schoolHubUrl && teacherName
           ? listCommitteeState().catch(() => ({ assignments: [], events: [] }))
           : Promise.resolve({ assignments: [], events: [] }),
+        config.schoolHubUrl && teacherName
+          ? listStaffChecklists(teacherName).catch(() => [])
+          : Promise.resolve([]),
       ])
       setTasks(nextTasks)
       setSchedule(nextSchedule)
       setWeeklyPlan(nextWeekly)
       setCommitteeEvents(committees.events.filter(event => event.memberNames.includes(teacherName)))
+      setSharedTasks(workTasks)
     } finally {
       setLoading(false)
     }
@@ -113,6 +120,15 @@ export default function CalendarPage() {
     if (!teacherName) return
     return subscribeHubResource<CommitteeState>('committees', state => {
       setCommitteeEvents(state.events.filter(event => event.memberNames.includes(teacherName)))
+    })
+  }, [config.teacherName])
+
+  useEffect(() => {
+    const teacherName = config.teacherName?.trim()
+    if (!teacherName) return
+    const expectedKey = `staffChecklists:${teacherName}:user`
+    return subscribeHubResource<StaffChecklist[]>('staffChecklists', (tasks, cacheKey) => {
+      if (cacheKey === expectedKey) setSharedTasks(tasks)
     })
   }, [config.teacherName])
 
@@ -140,6 +156,22 @@ export default function CalendarPage() {
       source: 'committee' as const,
       label: item.committeeName,
     })),
+    ...sharedTasks.filter(task => {
+      if (!task.deadline) return false
+      const own = task.responses.find(response => response.teacherName === config.teacherName?.trim())
+      const completed = task.status === 'completed' || task.closed || (task.items.length > 0 && task.items.every(item => own?.checkedItemIds.includes(item.id)))
+      return !hideCompleted || !completed
+    }).map(task => {
+      const own = task.responses.find(response => response.teacherName === config.teacherName?.trim())
+      const completed = task.status === 'completed' || task.closed || (task.items.length > 0 && task.items.every(item => own?.checkedItemIds.includes(item.id)))
+      return ({
+      id: `shared-work-${task.id}`,
+      date: task.deadline,
+      title: task.title,
+      source: 'sharedWork' as const,
+      label: task.departmentNames.length ? task.departmentNames.join(' · ') : '공유 업무',
+      completed,
+    })}),
     ...tasks.filter(task => !hideCompleted || !task.completed).map(task => ({
       id: `personal-${task.id}`,
       date: task.date,
@@ -152,7 +184,7 @@ export default function CalendarPage() {
     }))]
     return combined.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '') || a.title.localeCompare(b.title, 'ko'))
   },
-  [committeeEvents, hideCompleted, schedule, tasks, weeklyPlan.events])
+  [committeeEvents, config.teacherName, hideCompleted, schedule, sharedTasks, tasks, weeklyPlan.events])
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>()
@@ -224,7 +256,7 @@ export default function CalendarPage() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-black text-white"><CalendarDays className="text-emerald-400" />통합 캘린더</h1>
-          <p className="mt-1 text-sm text-slate-400">학사일정·주간계획·내 위원회·개인 업무를 한 달 단위로 확인합니다.</p>
+          <p className="mt-1 text-sm text-slate-400">학사일정·주간계획·내 위원회·공유 업무·개인 업무를 한 달 단위로 확인합니다.</p>
         </div>
         <div className="flex items-center gap-2">
           <button className="btn-ghost" onClick={() => void loadMonth(true)} disabled={loading}><RotateCcw size={13} className={loading ? 'animate-spin' : ''} />새로고침</button>
@@ -250,6 +282,7 @@ export default function CalendarPage() {
               <Legend color="bg-violet-400" label="NEIS" />
               <Legend color="bg-sky-400" label="주간계획" />
               <Legend color="bg-amber-400" label="내 위원회" />
+              <Legend color="bg-rose-400" label="공유 업무" />
               <Legend color="bg-emerald-400" label="개인 업무" />
               <label className="flex cursor-pointer items-center gap-1.5 text-slate-400">
                 <input type="checkbox" checked={hideCompleted} onChange={event => setHideCompleted(event.target.checked)} />완료 숨김

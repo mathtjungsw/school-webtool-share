@@ -35,12 +35,15 @@ import { useWeather } from '../components/useWeather'
 import { getMeal, getSchedule, getTimetableRange, getSchoolDetail, NEIS_API_KEY } from '../services/neis'
 import {
   getSchoolTimetable,
+  listStaffChecklists,
   listCommitteeState,
+  submitStaffChecklist,
   subscribeHubResource,
   type CommitteeEvent,
   type CommitteeState,
 } from '../services/schoolHub'
 import type { SchoolTimetable, TeacherTimetable } from '../services/schoolTimetable'
+import type { StaffChecklist } from '../services/rosterAttendance'
 import {
   loadPersonalMemo, loadPersonalTasks, savePersonalMemo, savePersonalTasks,
   subscribePersonalOrganizer, type PersonalTask,
@@ -69,7 +72,7 @@ interface PortfolioGroup { group: string; color: string; items: PortfolioItem[] 
 interface DashboardScheduleEvent {
   date: string
   eventName: string
-  source: 'neis' | 'weekly' | 'committee' | 'personal'
+  source: 'neis' | 'weekly' | 'committee' | 'sharedWork' | 'personal'
   department?: string
   completed?: boolean
   taskId?: string
@@ -85,7 +88,7 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
     { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText, desc: '4개 편제표 확인·PDF 출력과 과목선택 상담' },
   ]},
   { group: '학교운영', color: 'rose', items: [
-    { id: 'staff_tasks', label: '업무 체크리스트', icon: ClipboardCheck, desc: '교원·부서별 업무 배부와 완료 현황 확인' },
+    { id: 'staff_tasks', label: '업무센터', icon: ClipboardCheck, desc: '내 업무·부서 업무·개인 업무와 완료 현황 관리' },
     { id: 'staff_roster', label: '교원 명렬', icon: UsersRound, desc: '교원 명렬 관리와 연수등록부 출력' },
     { id: 'committees', label: '각종 위원회 현황', icon: Landmark, desc: '위원 명단·개최 일정과 중복 확인' },
   ]},
@@ -250,6 +253,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const [teacherTT, setTeacherTT] = useState<TimetableEntry[]>([])
   const [sharedTeacher, setSharedTeacher] = useState<TeacherTimetable | null>(null)
   const [committeeEvents, setCommitteeEvents] = useState<CommitteeEvent[]>([])
+  const [sharedTasks, setSharedTasks] = useState<StaffChecklist[]>([])
   const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>([])
   const [personalMemo, setPersonalMemo] = useState('')
   const [memoLoaded, setMemoLoaded] = useState(false)
@@ -329,25 +333,29 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     if (!config.schoolHubUrl || !config.teacherName?.trim()) {
       setSharedTeacher(null)
       setCommitteeEvents([])
+      setSharedTasks([])
       return
     }
     let cancelled = false
     Promise.all([
       getSchoolTimetable().catch(() => null),
       listCommitteeState().catch(() => ({ assignments: [], events: [] })),
+      listStaffChecklists(config.teacherName!.trim()).catch(() => []),
     ])
-      .then(([shared, committeeState]) => {
+      .then(([shared, committeeState, tasks]) => {
         if (cancelled) return
         const name = config.teacherName!.trim()
         setSharedTeacher(shared?.teachers.find(teacher =>
           teacher.name === name || teacher.label.startsWith(name),
         ) ?? null)
         setCommitteeEvents(committeeState.events.filter(event => event.memberNames.includes(name)))
+        setSharedTasks(tasks)
       })
       .catch(() => {
         if (!cancelled) {
           setSharedTeacher(null)
           setCommitteeEvents([])
+          setSharedTasks([])
         }
       })
     return () => { cancelled = true }
@@ -364,7 +372,10 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     const unsubscribeCommittees = subscribeHubResource<CommitteeState>('committees', state => {
       setCommitteeEvents(state.events.filter(event => event.memberNames.includes(name)))
     })
-    return () => { unsubscribeTimetable(); unsubscribeCommittees() }
+    const unsubscribeTasks = subscribeHubResource<StaffChecklist[]>('staffChecklists', (tasks, cacheKey) => {
+      if (cacheKey.includes(`staffChecklists:${name}:`)) setSharedTasks(tasks)
+    })
+    return () => { unsubscribeTimetable(); unsubscribeCommittees(); unsubscribeTasks() }
   }, [config.schoolHubUrl, config.teacherName])
 
   // schoolAddress 자동 보완
@@ -537,6 +548,16 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       eventName: `${item.startTime} ${item.title}`,
       department: item.committeeName,
       source: 'committee' as const,
+    })),
+    ...sharedTasks.filter(task => task.deadline).map(task => ({
+      date: toYmd(task.deadline),
+      eventName: task.title,
+      department: task.departmentNames.length ? task.departmentNames.join('·') : '공유 업무',
+      source: 'sharedWork' as const,
+      completed: task.status === 'completed' || task.closed || task.items.every(item =>
+        task.responses.find(response => response.teacherName === config.teacherName?.trim())?.checkedItemIds.includes(item.id),
+      ),
+      taskId: task.id,
     })),
     ...personalTasks.map(task => ({
       date: toYmd(task.date),
@@ -780,8 +801,21 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
         </>
       )}
 
-      {/* ── 개인 업무 · 개인 메모 ── */}
+      {/* ── 공유 업무 · 개인 업무 · 개인 메모 ── */}
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <SharedTasksWidget
+          tasks={sharedTasks}
+          teacherName={config.teacherName?.trim() ?? ''}
+          onOpen={() => onNavigate('staff_tasks')}
+          onSettings={() => onNavigate('settings')}
+          onComplete={async task => {
+            const teacherName = config.teacherName?.trim()
+            if (!teacherName) return
+            const own = task.responses.find(response => response.teacherName === teacherName)
+            await submitStaffChecklist(task.id, teacherName, task.items.map(item => item.id), own?.memo ?? '')
+            setSharedTasks(await listStaffChecklists(teacherName, '', true))
+          }}
+        />
         <PersonalTasksWidget
           tasks={personalTasks}
           onOpenCalendar={() => onNavigate('calendar')}
@@ -927,6 +961,8 @@ function TwoWeekScheduleCalendar({
     ? event.department
     : event.source === 'committee'
       ? event.department
+      : event.source === 'sharedWork'
+        ? '공유 업무'
       : event.source === 'personal'
         ? '개인'
         : 'NEIS'
@@ -934,6 +970,8 @@ function TwoWeekScheduleCalendar({
     ? 'border-sky-400 bg-sky-500/15 text-sky-200'
     : event.source === 'committee'
       ? 'border-amber-400 bg-amber-500/15 text-amber-200'
+      : event.source === 'sharedWork'
+        ? 'border-fuchsia-400 bg-fuchsia-500/15 text-fuchsia-200'
       : event.source === 'personal'
         ? 'border-emerald-400 bg-emerald-500/15 text-emerald-200'
         : 'border-violet-400 bg-violet-500/15 text-violet-200'
@@ -945,6 +983,7 @@ function TwoWeekScheduleCalendar({
           <span className={clsx('flex items-center gap-1', neisConfigured ? 'text-violet-300' : 'text-slate-600')}><span className="h-2 w-2 rounded-full bg-violet-400" />NEIS 학사일정</span>
           <span className="flex items-center gap-1 text-sky-300"><span className="h-2 w-2 rounded-full bg-sky-400" />주간계획</span>
           <span className="flex items-center gap-1 text-amber-300"><span className="h-2 w-2 rounded-full bg-amber-400" />내 위원회</span>
+          <span className="flex items-center gap-1 text-fuchsia-300"><span className="h-2 w-2 rounded-full bg-fuchsia-400" />공유 업무</span>
           <span className="flex items-center gap-1 text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400" />개인 업무</span>
         </div>
         <button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />월간 캘린더<ArrowUpRight size={11} /></button>
@@ -1021,6 +1060,42 @@ function TwoWeekScheduleCalendar({
   )
 }
 
+function SharedTasksWidget({
+  tasks,
+  teacherName,
+  onOpen,
+  onSettings,
+  onComplete,
+}: {
+  tasks: StaffChecklist[]
+  teacherName: string
+  onOpen: () => void
+  onSettings: () => void
+  onComplete: (task: StaffChecklist) => Promise<void>
+}) {
+  const today = todayStr()
+  const isCompleted = (task: StaffChecklist) => {
+    const own = task.responses.find(response => response.teacherName === teacherName)
+    return task.status === 'completed' || task.closed || (task.items.length > 0 && task.items.every(item => own?.checkedItemIds.includes(item.id)))
+  }
+  const visible = tasks.filter(task => !isCompleted(task)).sort((a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999')).slice(0, 6)
+  const overdue = tasks.filter(task => !isCompleted(task) && task.deadline && task.deadline < today).length
+
+  return (
+    <section className="card p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2"><div className="grid h-7 w-7 place-items-center rounded-lg bg-violet-500/15"><ClipboardCheck size={14} className="text-violet-400" /></div><div><p className="text-sm font-bold text-white">내 공유 업무</p><p className="text-[10px] text-slate-500">교원·부서로 배부된 업무</p></div></div>
+        <button onClick={onOpen} className="btn-ghost flex items-center gap-1.5 text-[10px]">업무센터<ArrowUpRight size={11} /></button>
+      </div>
+      {!teacherName ? <button onClick={onSettings} className="w-full rounded-xl border border-dashed border-violet-400/20 py-6 text-center text-[11px] text-violet-300">환경설정에서 이름을 등록하면 배부된 업무를 볼 수 있습니다.</button>
+        : visible.length ? <div className="space-y-2">
+          {overdue > 0 && <p className="rounded-lg bg-rose-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-rose-300">기한이 지난 공유 업무가 {overdue}개 있습니다.</p>}
+          {visible.map(task => <div key={task.id} className="flex items-start gap-2 rounded-xl border border-white/5 bg-white/[0.025] p-2.5"><button onClick={() => void onComplete(task)} className="group mt-0.5 grid h-4 w-4 flex-shrink-0 place-items-center rounded border border-slate-600 text-violet-300 hover:border-violet-400" aria-label="업무 전체 완료"><Check size={11} className="opacity-0 transition-opacity group-hover:opacity-100" /></button><button onClick={onOpen} className="min-w-0 flex-1 text-left"><p className="truncate text-[11px] font-semibold text-slate-200">{task.title}</p><p className={clsx('mt-0.5 text-[9px]', task.deadline && task.deadline < today ? 'text-rose-400' : task.deadline === today ? 'text-amber-300' : 'text-slate-500')}>{task.deadline || '기한 없음'}{task.departmentNames.length ? ` · ${task.departmentNames.join('·')}` : ''}{task.priority === 'high' ? ' · 중요' : ''}</p></button></div>)}
+        </div> : <button onClick={onOpen} className="w-full rounded-xl border border-dashed border-white/10 py-6 text-center text-[11px] text-slate-500 hover:border-violet-400/30 hover:text-violet-300">현재 확인할 공유 업무가 없습니다.</button>}
+    </section>
+  )
+}
+
 function PersonalTasksWidget({
   tasks,
   onOpenCalendar,
@@ -1036,7 +1111,7 @@ function PersonalTasksWidget({
   const overdue = tasks.filter(task => !task.completed && task.date < today).length
 
   return (
-    <section className="card p-4 xl:col-span-2">
+    <section className="card p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2"><div className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-500/15"><ListTodo size={14} className="text-emerald-400" /></div><div><p className="text-sm font-bold text-white">개인 업무</p><p className="text-[10px] text-slate-500">오늘부터 2주 안에 확인할 업무</p></div></div>
         <button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />등록·관리<ArrowUpRight size={11} /></button>

@@ -131,7 +131,7 @@ const MUTATION_RESOURCE: Record<string, HubResource | undefined> = {
   addFeatureRequest: 'featureRequests', updateFeatureRequest: 'featureRequests', deleteFeatureRequest: 'featureRequests',
   replaceTimetable: 'timetable', replaceStudentTimetable: 'studentTimetable',
   replaceStaffRoster: 'staffRoster', replaceStudentRoster: 'studentRoster',
-  addStaffChecklist: 'staffChecklists', submitStaffChecklist: 'staffChecklists', deleteStaffChecklist: 'staffChecklists',
+  addStaffChecklist: 'staffChecklists', updateStaffChecklist: 'staffChecklists', submitStaffChecklist: 'staffChecklists', deleteStaffChecklist: 'staffChecklists',
   saveCommitteeMembers: 'committees', addCommitteeEvent: 'committees', deleteCommitteeEvent: 'committees',
 }
 
@@ -213,6 +213,7 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
       'replaceStudentRoster',
       'listStaffChecklists',
       'addStaffChecklist',
+      'updateStaffChecklist',
       'submitStaffChecklist',
       'deleteStaffChecklist',
       'listCommitteeState',
@@ -390,11 +391,32 @@ export const listStaffChecklists = (viewerName: string, adminPassword = '', forc
 export const addStaffChecklist = (input: {
   title: string
   description: string
+  startDate: string
   deadline: string
+  priority: StaffChecklist['priority']
+  status: StaffChecklist['status']
+  linkUrl: string
   creatorName: string
   items: string[]
   targetNames: string[]
+  departmentNames: string[]
 }) => hubRequest<{ id: string }>({ action: 'addStaffChecklist', ...input })
+
+export const updateStaffChecklist = (input: {
+  checklistId: string
+  viewerName: string
+  adminPassword?: string
+  title: string
+  description: string
+  startDate: string
+  deadline: string
+  priority: StaffChecklist['priority']
+  status: StaffChecklist['status']
+  linkUrl: string
+  items: string[]
+  targetNames: string[]
+  departmentNames: string[]
+}) => hubRequest<{ updatedAt: string }>({ action: 'updateStaffChecklist', ...input })
 
 export const submitStaffChecklist = (
   checklistId: string,
