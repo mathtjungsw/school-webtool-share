@@ -1,6 +1,6 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertCircle, CalendarDays, Check, CheckCircle2, ClipboardCheck,
+  AlertCircle, BellRing, CalendarDays, Check, CheckCircle2, ClipboardCheck,
   ClipboardCopy, Clock3, Download, ExternalLink, FileSpreadsheet, GraduationCap,
   LayoutList, Link2, Pencil, Plus, Printer, RefreshCw, Save,
   ShieldCheck, Trash2, Upload, UserRoundCog, UsersRound,
@@ -38,6 +38,10 @@ import {
   createPersonalTaskId, loadPersonalTasks, savePersonalTasks, subscribePersonalOrganizer,
   type PersonalTask, type PersonalTaskPriority,
 } from '../services/personalOrganizer'
+import {
+  classifySharedWorkDeadline, isNewSharedWork, isSharedWorkComplete,
+  loadSharedWorkLastViewedAt, markSharedWorkViewed,
+} from '../services/sharedWorkNotifications'
 
 type Tab = 'checklists' | 'roster' | 'training'
 type StaffPageMode = 'checklists' | 'roster'
@@ -187,6 +191,7 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
 
 type WorkView = 'assigned' | 'created' | 'department' | 'personal'
 type SharedLayout = 'list' | 'calendar'
+type AssignedFilter = 'all' | 'new' | 'today' | 'dueSoon' | 'overdue'
 
 interface SharedTaskDraft {
   id?: string
@@ -237,11 +242,14 @@ function ChecklistTab(props: {
 }) {
   const { teacherName, members, checklists, isAdmin, adminPassword, onChanged, onError, onSuccess } = props
   const [view, setView] = useState<WorkView>('assigned')
+  const [assignedFilter, setAssignedFilter] = useState<AssignedFilter>('all')
   const [layout, setLayout] = useState<SharedLayout>('list')
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()))
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<SharedTaskDraft>(emptySharedTask)
   const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>([])
+  const [lastViewedAt, setLastViewedAt] = useState<string | null>(null)
+  const notificationInitializedFor = useRef('')
   const departments = useMemo(
     () => [...new Set(members.map(member => member.department.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')),
     [members],
@@ -252,26 +260,44 @@ function ChecklistTab(props: {
     if (change.kind === 'tasks') setPersonalTasks(change.value)
   }), [])
 
+  useEffect(() => {
+    if (!teacherName || !checklists.length || notificationInitializedFor.current === teacherName) return
+    notificationInitializedFor.current = teacherName
+    void loadSharedWorkLastViewedAt(teacherName).then(value => {
+      setLastViewedAt(value)
+      return markSharedWorkViewed(teacherName)
+    })
+  }, [checklists.length, teacherName])
+
   const assigned = checklists.filter(task => task.targetNames.includes(teacherName))
   const created = checklists.filter(task => task.canManage)
-  const myIncomplete = assigned.filter(task => task.status !== 'completed' && !isTaskResponseComplete(task, teacherName))
-  const todayDeadline = myIncomplete.filter(task => task.deadline === today()).length
-  const overdue = myIncomplete.filter(task => task.deadline && task.deadline < today()).length
+  const myIncomplete = assigned.filter(task => !isSharedWorkComplete(task, teacherName))
+  const newTaskIds = useMemo(() => new Set(
+    lastViewedAt === null ? [] : myIncomplete.filter(task => isNewSharedWork(task, lastViewedAt)).map(task => task.id),
+  ), [lastViewedAt, myIncomplete])
+  const todayDeadline = myIncomplete.filter(task => classifySharedWorkDeadline(task, teacherName) === 'today').length
+  const dueSoon = myIncomplete.filter(task => classifySharedWorkDeadline(task, teacherName) === 'dueSoon').length
+  const overdue = myIncomplete.filter(task => classifySharedWorkDeadline(task, teacherName) === 'overdue').length
   const activeCreated = created.filter(task => task.status !== 'completed').length
 
   const visible = useMemo(() => {
-    const source = view === 'created'
+    let source = view === 'created'
       ? created
       : view === 'department'
         ? checklists.filter(task => task.departmentNames.length > 0)
         : assigned
+    if (view === 'assigned' && assignedFilter !== 'all') {
+      source = source.filter(task => assignedFilter === 'new'
+        ? newTaskIds.has(task.id)
+        : classifySharedWorkDeadline(task, teacherName) === assignedFilter)
+    }
     return [...source].sort((a, b) => {
       const completeDiff = Number(a.status === 'completed') - Number(b.status === 'completed')
       if (completeDiff) return completeDiff
       const priorityDiff = ({ high: 0, normal: 1, low: 2 }[a.priority] - { high: 0, normal: 1, low: 2 }[b.priority])
       return priorityDiff || (a.deadline || '9999').localeCompare(b.deadline || '9999') || b.createdAt.localeCompare(a.createdAt)
     })
-  }, [assigned, checklists, created, view])
+  }, [assigned, assignedFilter, checklists, created, newTaskIds, teacherName, view])
 
   const resetForm = () => setForm(emptySharedTask())
   const selectDepartment = (department: string) => {
@@ -337,11 +363,12 @@ function ChecklistTab(props: {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <WorkSummary label="내 미완료 업무" value={myIncomplete.length} tone="sky" icon={ClipboardCheck} />
-        <WorkSummary label="오늘 마감" value={todayDeadline} tone="amber" icon={Clock3} />
-        <WorkSummary label="기한 초과" value={overdue} tone="rose" icon={AlertCircle} />
-        <WorkSummary label="내가 배부한 진행 업무" value={activeCreated} tone="emerald" icon={UsersRound} />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <WorkSummary label="새로 배부된 업무" value={newTaskIds.size} tone="violet" icon={BellRing} onClick={() => { setView('assigned'); setAssignedFilter('new') }} />
+        <WorkSummary label="오늘 마감" value={todayDeadline} tone="amber" icon={Clock3} onClick={() => { setView('assigned'); setAssignedFilter('today') }} />
+        <WorkSummary label="마감 임박 · 3일" value={dueSoon} tone="sky" icon={CalendarDays} onClick={() => { setView('assigned'); setAssignedFilter('dueSoon') }} />
+        <WorkSummary label="기한 초과" value={overdue} tone="rose" icon={AlertCircle} onClick={() => { setView('assigned'); setAssignedFilter('overdue') }} />
+        <WorkSummary label="내가 배부한 진행 업무" value={activeCreated} tone="emerald" icon={UsersRound} onClick={() => setView('created')} />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-surface-800 p-1.5">
@@ -349,7 +376,7 @@ function ChecklistTab(props: {
           {([
             ['assigned', '내 업무'], ['created', '내가 만든 업무'], ['department', '부서 업무'], ['personal', '개인 업무'],
           ] as Array<[WorkView, string]>).map(([id, label]) => (
-            <button key={id} onClick={() => setView(id)} className={clsx('rounded-lg px-3 py-2 text-xs font-semibold', view === id ? 'bg-amber-400/15 text-amber-300' : 'text-slate-500 hover:text-slate-200')}>{label}</button>
+            <button key={id} onClick={() => { setView(id); if (id === 'assigned') setAssignedFilter('all') }} className={clsx('rounded-lg px-3 py-2 text-xs font-semibold', view === id ? 'bg-amber-400/15 text-amber-300' : 'text-slate-500 hover:text-slate-200')}>{label}</button>
           ))}
         </div>
         {view !== 'personal' && <div className="flex gap-1"><button onClick={() => setLayout('list')} className={clsx('btn-ghost p-2', layout === 'list' && 'text-amber-300')} title="목록 보기"><LayoutList size={14} /></button><button onClick={() => setLayout('calendar')} className={clsx('btn-ghost p-2', layout === 'calendar' && 'text-amber-300')} title="달력 보기"><CalendarDays size={14} /></button></div>}
@@ -377,24 +404,24 @@ function ChecklistTab(props: {
 
           {layout === 'calendar'
             ? <SharedWorkCalendar tasks={visible} month={viewMonth} onMonthChange={setViewMonth} />
-            : <div className="space-y-3">{visible.map(task => <SharedTaskCard key={task.id} checklist={task} teacherName={teacherName} isAdmin={isAdmin} adminPassword={adminPassword} onEdit={editTask} onDuplicate={duplicateTask} onChanged={onChanged} onError={onError} onSuccess={onSuccess} />)}{visible.length === 0 && <div className="card py-14 text-center text-sm text-slate-500">해당하는 업무가 없습니다.</div>}</div>}
+            : <div className="space-y-3">{view === 'assigned' && assignedFilter !== 'all' && <div className="flex items-center justify-between rounded-xl border border-violet-500/15 bg-violet-500/5 px-4 py-2.5 text-xs text-violet-200"><span>자동 분류: {{ new: '새로 배부', today: '오늘 마감', dueSoon: '마감 임박', overdue: '기한 초과' }[assignedFilter]}</span><button onClick={() => setAssignedFilter('all')} className="text-[10px] text-slate-400 hover:text-white">전체 보기</button></div>}{visible.map(task => <SharedTaskCard key={task.id} checklist={task} teacherName={teacherName} isNew={newTaskIds.has(task.id)} isAdmin={isAdmin} adminPassword={adminPassword} onEdit={editTask} onDuplicate={duplicateTask} onChanged={onChanged} onError={onError} onSuccess={onSuccess} />)}{visible.length === 0 && <div className="card py-14 text-center text-sm text-slate-500">해당하는 업무가 없습니다.</div>}</div>}
         </div>
       )}
     </div>
   )
 }
 
-function WorkSummary({ label, value, tone, icon: Icon }: { label: string; value: number; tone: 'sky' | 'amber' | 'rose' | 'emerald'; icon: typeof ClipboardCheck }) {
-  const styles = { sky: 'border-sky-500/20 text-sky-300', amber: 'border-amber-500/20 text-amber-300', rose: 'border-rose-500/20 text-rose-300', emerald: 'border-emerald-500/20 text-emerald-300' }
-  return <div className={clsx('card flex items-center gap-3 border', styles[tone])}><div className="grid h-9 w-9 place-items-center rounded-xl bg-white/5"><Icon size={17} /></div><div><p className="text-[10px] text-slate-500">{label}</p><p className="text-xl font-black">{value}</p></div></div>
+function WorkSummary({ label, value, tone, icon: Icon, onClick }: { label: string; value: number; tone: 'violet' | 'sky' | 'amber' | 'rose' | 'emerald'; icon: typeof ClipboardCheck; onClick?: () => void }) {
+  const styles = { violet: 'border-violet-500/20 text-violet-300', sky: 'border-sky-500/20 text-sky-300', amber: 'border-amber-500/20 text-amber-300', rose: 'border-rose-500/20 text-rose-300', emerald: 'border-emerald-500/20 text-emerald-300' }
+  return <button type="button" onClick={onClick} className={clsx('card flex items-center gap-3 border text-left transition-colors hover:bg-white/[0.04]', styles[tone])}><div className="grid h-9 w-9 place-items-center rounded-xl bg-white/5"><Icon size={17} /></div><div><p className="text-[10px] text-slate-500">{label}</p><p className="text-xl font-black">{value}</p></div></button>
 }
 
 function SharedTaskCard(props: {
-  checklist: StaffChecklist; teacherName: string; isAdmin: boolean; adminPassword: string
+  checklist: StaffChecklist; teacherName: string; isNew: boolean; isAdmin: boolean; adminPassword: string
   onEdit: (task: StaffChecklist) => void; onDuplicate: (task: StaffChecklist) => void
   onChanged: () => Promise<void>; onError: (value: string) => void; onSuccess: (value: string) => void
 }) {
-  const { checklist, teacherName, isAdmin, adminPassword, onEdit, onDuplicate, onChanged, onError, onSuccess } = props
+  const { checklist, teacherName, isNew, isAdmin, adminPassword, onEdit, onDuplicate, onChanged, onError, onSuccess } = props
   const own = checklist.responses.find(response => response.teacherName === teacherName)
   const [checked, setChecked] = useState<string[]>(own?.checkedItemIds ?? [])
   const [memo, setMemo] = useState(own?.memo ?? '')
@@ -422,7 +449,7 @@ function SharedTaskCard(props: {
   }
   return (
     <article className={clsx('card p-5', checklist.priority === 'high' && checklist.status !== 'completed' && 'border-rose-500/20')}>
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-white">{checklist.title}</h2><span className={clsx('rounded-full px-2 py-0.5 text-[10px]', STATUS_STYLE[checklist.status])}>{STATUS_LABEL[checklist.status]}</span><span className={clsx('rounded-full px-2 py-0.5 text-[10px]', checklist.priority === 'high' ? 'bg-rose-500/12 text-rose-300' : 'bg-white/5 text-slate-500')}>우선순위 {PRIORITY_LABEL[checklist.priority]}</span></div><p className="mt-1 text-[10px] text-slate-600">{checklist.creatorName} 작성 · {checklist.startDate || '-'} 시작 · {checklist.deadline || '마감 미지정'}</p>{checklist.departmentNames.length > 0 && <p className="mt-1 text-[10px] text-sky-400">{checklist.departmentNames.join(' · ')}</p>}{checklist.description && <p className="mt-3 whitespace-pre-wrap text-xs text-slate-400">{checklist.description}</p>}{checklist.linkUrl && <a href={checklist.linkUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] text-sky-300 hover:underline"><ExternalLink size={11} />관련 자료 열기</a>}</div><div className="flex flex-shrink-0 gap-1">{canManage && <button onClick={() => onEdit(checklist)} className="btn-ghost p-2" title="수정"><Pencil size={13} /></button>}<button onClick={() => onDuplicate(checklist)} className="btn-ghost p-2" title="복제"><ClipboardCopy size={13} /></button>{canManage && <button onClick={remove} className="btn-ghost p-2 text-rose-400" title="삭제"><Trash2 size={13} /></button>}</div></div>
+      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-white">{checklist.title}</h2>{isNew && <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-bold text-violet-200">새 업무</span>}<span className={clsx('rounded-full px-2 py-0.5 text-[10px]', STATUS_STYLE[checklist.status])}>{STATUS_LABEL[checklist.status]}</span><span className={clsx('rounded-full px-2 py-0.5 text-[10px]', checklist.priority === 'high' ? 'bg-rose-500/12 text-rose-300' : 'bg-white/5 text-slate-500')}>우선순위 {PRIORITY_LABEL[checklist.priority]}</span></div><p className="mt-1 text-[10px] text-slate-600">{checklist.creatorName} 작성 · {checklist.startDate || '-'} 시작 · {checklist.deadline || '마감 미지정'}</p>{checklist.departmentNames.length > 0 && <p className="mt-1 text-[10px] text-sky-400">{checklist.departmentNames.join(' · ')}</p>}{checklist.description && <p className="mt-3 whitespace-pre-wrap text-xs text-slate-400">{checklist.description}</p>}{checklist.linkUrl && <a href={checklist.linkUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] text-sky-300 hover:underline"><ExternalLink size={11} />관련 자료 열기</a>}</div><div className="flex flex-shrink-0 gap-1">{canManage && <button onClick={() => onEdit(checklist)} className="btn-ghost p-2" title="수정"><Pencil size={13} /></button>}<button onClick={() => onDuplicate(checklist)} className="btn-ghost p-2" title="복제"><ClipboardCopy size={13} /></button>{canManage && <button onClick={remove} className="btn-ghost p-2 text-rose-400" title="삭제"><Trash2 size={13} /></button>}</div></div>
       {assigned && <div className="mt-4 space-y-2 rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-3">{checklist.items.map(item => <label key={item.id} className="flex items-start gap-2 text-xs text-slate-300"><input type="checkbox" className="mt-0.5" checked={checked.includes(item.id)} disabled={checklist.closed} onChange={event => setChecked(current => event.target.checked ? [...new Set([...current, item.id])] : current.filter(id => id !== item.id))} /><span className={checked.includes(item.id) ? 'text-slate-500 line-through' : ''}>{item.label}</span></label>)}<div className="flex gap-2 pt-1"><input className="input-field flex-1 text-xs" maxLength={300} placeholder="진행 메모(선택)" value={memo} onChange={event => setMemo(event.target.value)} disabled={checklist.closed} /><button onClick={save} disabled={saving || checklist.closed} className="btn-primary flex items-center gap-1.5 px-4"><Save size={13} />{saving ? '저장 중' : '저장'}</button></div></div>}
       {checklist.canManage && <div className="mt-4"><div className="mb-2 flex items-center justify-between text-xs"><span className="font-semibold text-slate-300">대상자 진행 현황</span><div className="flex items-center gap-2"><button onClick={copyIncomplete} disabled={!incompleteNames.length} className="text-[10px] text-sky-300 disabled:text-slate-600">미완료자 복사</button><span className="text-emerald-300">{doneCount}/{checklist.targetNames.length}명 완료</span></div></div><div className="mb-3 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-emerald-500" style={{ width: `${checklist.targetNames.length ? doneCount / checklist.targetNames.length * 100 : 0}%` }} /></div><div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{checklist.targetNames.map(name => { const response = checklist.responses.find(item => item.teacherName === name); const itemCount = response?.checkedItemIds.filter(id => checklist.items.some(item => item.id === id)).length ?? 0; const complete = itemCount === checklist.items.length; return <div key={name} className={clsx('rounded-lg border px-2.5 py-2 text-[11px]', complete ? 'border-emerald-500/20 bg-emerald-500/7' : 'border-white/5 bg-white/[0.02]')}><div className="flex justify-between gap-2"><span className="text-slate-300">{name}</span><span className={complete ? 'text-emerald-300' : 'text-slate-600'}>{itemCount}/{checklist.items.length}</span></div>{response?.memo && <p className="mt-1 truncate text-[9px] text-slate-600" title={response.memo}>{response.memo}</p>}</div>})}</div></div>}
     </article>

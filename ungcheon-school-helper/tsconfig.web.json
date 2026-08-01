@@ -57,6 +57,7 @@
     "src/services/schoolHub.ts",
     "src/services/committeeCalendar.ts",
     "src/services/personalOrganizer.ts",
+    "src/services/sharedWorkNotifications.ts",
     "src/services/schoolTimetable.ts",
     "src/services/timetablePlan.ts",
     "src/services/timetablePlanDocument.ts",

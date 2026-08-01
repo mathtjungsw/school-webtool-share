@@ -11,7 +11,7 @@ import {
   FileSpreadsheet, HelpCircle, Waves, SquareStack, CircleDot, Star,
   FileScan, FileCode2,
   Clapperboard, SquarePen, MessagesSquare, BarChart3, Mic, CalendarRange, UsersRound,
-  ArrowUpRight, Check, ListTodo, StickyNote,
+  ArrowUpRight, BellRing, Check, ListTodo, StickyNote,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -48,6 +48,10 @@ import {
   loadPersonalMemo, loadPersonalTasks, savePersonalMemo, savePersonalTasks,
   subscribePersonalOrganizer, type PersonalTask,
 } from '../services/personalOrganizer'
+import {
+  classifySharedWorkDeadline, isNewSharedWork, isSharedWorkComplete,
+  loadSharedWorkLastViewedAt, subscribeSharedWorkViewed,
+} from '../services/sharedWorkNotifications'
 import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
 import type { MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
 import {
@@ -1075,24 +1079,45 @@ function SharedTasksWidget({
   onSettings: () => void
   onComplete: (task: StaffChecklist) => Promise<void>
 }) {
-  const today = todayStr()
-  const isCompleted = (task: StaffChecklist) => {
-    const own = task.responses.find(response => response.teacherName === teacherName)
-    return task.status === 'completed' || task.closed || (task.items.length > 0 && task.items.every(item => own?.checkedItemIds.includes(item.id)))
+  const [lastViewedAt, setLastViewedAt] = useState<string | null>(null)
+  useEffect(() => {
+    if (!teacherName) { setLastViewedAt(''); return }
+    void loadSharedWorkLastViewedAt(teacherName).then(setLastViewedAt)
+    return subscribeSharedWorkViewed((name, viewedAt) => {
+      if (name === teacherName) setLastViewedAt(viewedAt)
+    })
+  }, [teacherName])
+
+  const incomplete = tasks.filter(task => !isSharedWorkComplete(task, teacherName))
+  const newCount = lastViewedAt === null ? 0 : incomplete.filter(task => isNewSharedWork(task, lastViewedAt)).length
+  const todayCount = incomplete.filter(task => classifySharedWorkDeadline(task, teacherName) === 'today').length
+  const dueSoonCount = incomplete.filter(task => classifySharedWorkDeadline(task, teacherName) === 'dueSoon').length
+  const overdueCount = incomplete.filter(task => classifySharedWorkDeadline(task, teacherName) === 'overdue').length
+  const rank = { overdue: 0, today: 1, dueSoon: 2, later: 3, complete: 4 }
+  const visible = [...incomplete].sort((a, b) => {
+    const newDiff = Number(!(lastViewedAt !== null && isNewSharedWork(a, lastViewedAt))) - Number(!(lastViewedAt !== null && isNewSharedWork(b, lastViewedAt)))
+    return newDiff || rank[classifySharedWorkDeadline(a, teacherName)] - rank[classifySharedWorkDeadline(b, teacherName)] || (a.deadline || '9999').localeCompare(b.deadline || '9999')
+  }).slice(0, 6)
+
+  const alertLabel = (task: StaffChecklist) => {
+    if (lastViewedAt !== null && isNewSharedWork(task, lastViewedAt)) return { label: '새 업무', className: 'bg-violet-500/15 text-violet-300' }
+    const category = classifySharedWorkDeadline(task, teacherName)
+    if (category === 'overdue') return { label: '기한 초과', className: 'bg-rose-500/15 text-rose-300' }
+    if (category === 'today') return { label: '오늘 마감', className: 'bg-amber-500/15 text-amber-300' }
+    if (category === 'dueSoon') return { label: '마감 임박', className: 'bg-sky-500/15 text-sky-300' }
+    return null
   }
-  const visible = tasks.filter(task => !isCompleted(task)).sort((a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999')).slice(0, 6)
-  const overdue = tasks.filter(task => !isCompleted(task) && task.deadline && task.deadline < today).length
 
   return (
     <section className="card p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2"><div className="grid h-7 w-7 place-items-center rounded-lg bg-violet-500/15"><ClipboardCheck size={14} className="text-violet-400" /></div><div><p className="text-sm font-bold text-white">내 공유 업무</p><p className="text-[10px] text-slate-500">교원·부서로 배부된 업무</p></div></div>
+        <div className="flex items-center gap-2"><div className="grid h-7 w-7 place-items-center rounded-lg bg-violet-500/15"><BellRing size={14} className="text-violet-400" /></div><div><p className="text-sm font-bold text-white">업무 알림</p><p className="text-[10px] text-slate-500">새 업무와 마감 상태 자동 분류</p></div></div>
         <button onClick={onOpen} className="btn-ghost flex items-center gap-1.5 text-[10px]">업무센터<ArrowUpRight size={11} /></button>
       </div>
       {!teacherName ? <button onClick={onSettings} className="w-full rounded-xl border border-dashed border-violet-400/20 py-6 text-center text-[11px] text-violet-300">환경설정에서 이름을 등록하면 배부된 업무를 볼 수 있습니다.</button>
         : visible.length ? <div className="space-y-2">
-          {overdue > 0 && <p className="rounded-lg bg-rose-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-rose-300">기한이 지난 공유 업무가 {overdue}개 있습니다.</p>}
-          {visible.map(task => <div key={task.id} className="flex items-start gap-2 rounded-xl border border-white/5 bg-white/[0.025] p-2.5"><button onClick={() => void onComplete(task)} className="group mt-0.5 grid h-4 w-4 flex-shrink-0 place-items-center rounded border border-slate-600 text-violet-300 hover:border-violet-400" aria-label="업무 전체 완료"><Check size={11} className="opacity-0 transition-opacity group-hover:opacity-100" /></button><button onClick={onOpen} className="min-w-0 flex-1 text-left"><p className="truncate text-[11px] font-semibold text-slate-200">{task.title}</p><p className={clsx('mt-0.5 text-[9px]', task.deadline && task.deadline < today ? 'text-rose-400' : task.deadline === today ? 'text-amber-300' : 'text-slate-500')}>{task.deadline || '기한 없음'}{task.departmentNames.length ? ` · ${task.departmentNames.join('·')}` : ''}{task.priority === 'high' ? ' · 중요' : ''}</p></button></div>)}
+          <div className="flex flex-wrap gap-1.5 text-[9px] font-bold"><span className="rounded-full bg-violet-500/12 px-2 py-1 text-violet-300">새 업무 {newCount}</span><span className="rounded-full bg-amber-500/12 px-2 py-1 text-amber-300">오늘 {todayCount}</span><span className="rounded-full bg-sky-500/12 px-2 py-1 text-sky-300">임박 {dueSoonCount}</span><span className="rounded-full bg-rose-500/12 px-2 py-1 text-rose-300">초과 {overdueCount}</span></div>
+          {visible.map(task => { const alert = alertLabel(task); return <div key={task.id} className="flex items-start gap-2 rounded-xl border border-white/5 bg-white/[0.025] p-2.5"><button onClick={() => void onComplete(task)} className="group mt-0.5 grid h-4 w-4 flex-shrink-0 place-items-center rounded border border-slate-600 text-violet-300 hover:border-violet-400" aria-label="업무 전체 완료"><Check size={11} className="opacity-0 transition-opacity group-hover:opacity-100" /></button><button onClick={onOpen} className="min-w-0 flex-1 text-left"><div className="flex min-w-0 items-center gap-1.5"><p className="truncate text-[11px] font-semibold text-slate-200">{task.title}</p>{alert && <span className={clsx('flex-shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold', alert.className)}>{alert.label}</span>}</div><p className="mt-0.5 text-[9px] text-slate-500">{task.deadline || '기한 없음'}{task.departmentNames.length ? ` · ${task.departmentNames.join('·')}` : ''}{task.priority === 'high' ? ' · 중요' : ''}</p></button></div>})}
         </div> : <button onClick={onOpen} className="w-full rounded-xl border border-dashed border-white/10 py-6 text-center text-[11px] text-slate-500 hover:border-violet-400/30 hover:text-violet-300">현재 확인할 공유 업무가 없습니다.</button>}
     </section>
   )
