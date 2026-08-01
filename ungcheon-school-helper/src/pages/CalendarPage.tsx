@@ -36,6 +36,7 @@ interface CalendarEvent {
 
 const EMPTY_WEEKLY_PLAN: WeeklyPlanResult = { events: [], notes: [], sourceSheets: [], fetchedAt: '' }
 const CALENDAR_SESSION_CACHE_PREFIX = 'ungcheon.calendar.session.v1'
+const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'] as const
 const SOURCE_STYLE: Record<CalendarSource, string> = {
   neis: 'border-violet-400 bg-violet-500/15 text-violet-200',
   weekly: 'border-sky-400 bg-sky-500/15 text-sky-200',
@@ -277,8 +278,8 @@ export default function CalendarPage() {
 
   const monthStart = startOfMonth(viewDate)
   const days = eachDayOfInterval({
-    start: startOfWeek(monthStart, { weekStartsOn: 1 }),
-    end: endOfWeek(endOfMonth(viewDate), { weekStartsOn: 1 }),
+    start: startOfWeek(monthStart, { weekStartsOn: 0 }),
+    end: endOfWeek(endOfMonth(viewDate), { weekStartsOn: 0 }),
   })
   const selectedEvents = eventsByDate.get(selectedDate) ?? []
   const incomplete = tasks.filter(task => !task.completed)
@@ -377,7 +378,7 @@ export default function CalendarPage() {
 
           <div className="overflow-hidden rounded-xl border border-white/10">
             <div className="grid grid-cols-7 gap-px bg-white/5">
-              {['월', '화', '수', '목', '금', '토', '일'].map((day, index) => <div key={day} className={clsx('bg-surface-900 py-2 text-center text-[10px] font-bold', index === 5 ? 'text-sky-400' : index === 6 ? 'text-rose-400' : 'text-slate-400')}>{day}</div>)}
+              {WEEKDAY_LABELS.map((day, index) => <div key={day} className={clsx('bg-surface-900 py-2 text-center text-[10px] font-bold', index === 0 ? 'text-rose-400' : index === 6 ? 'text-sky-400' : 'text-slate-400')}>{day}</div>)}
             </div>
             <div className="grid grid-cols-7 gap-px bg-white/5">
               {days.map((day, index) => {
@@ -390,7 +391,7 @@ export default function CalendarPage() {
                     selectedDate === date && 'ring-2 ring-inset ring-emerald-400/70 bg-emerald-500/5',
                     !currentMonth && 'opacity-35',
                   )}>
-                    <span className={clsx('mb-1 grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold', date === today() ? 'bg-amber-400 text-slate-950' : index % 7 === 5 ? 'text-sky-400' : index % 7 === 6 ? 'text-rose-400' : 'text-slate-300')}>{format(day, 'd')}</span>
+                    <span className={clsx('mb-1 grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold', date === today() ? 'bg-amber-400 text-slate-950' : index % 7 === 0 ? 'text-rose-400' : index % 7 === 6 ? 'text-sky-400' : 'text-slate-300')}>{format(day, 'd')}</span>
                     <div className="space-y-1">
                       {dayEvents.slice(0, 4).map(event => <div key={event.id} className={clsx('truncate rounded border-l-2 px-1 py-0.5 text-[9px]', SOURCE_STYLE[event.source], event.completed && 'line-through opacity-50')} title={`${event.label} · ${event.title}`}>{event.time && <span className="mr-1 opacity-70">{event.time}</span>}{event.title}</div>)}
                       {dayEvents.length > 4 && <span className="block pl-1 text-[8px] font-bold text-slate-500">+{dayEvents.length - 4}개</span>}
