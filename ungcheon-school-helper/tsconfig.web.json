@@ -73,6 +73,7 @@
     "src/services/hobong.ts",
     "src/services/hobongExcel.ts",
     "src/services/teacherTransferScore.ts",
+    "src/services/neisAppointmentImport.ts",
     "src/services/insa/**/*",
     "src/services/workReducer/**/*",
     "src/services/photoLedger.ts",

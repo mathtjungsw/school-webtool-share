@@ -692,106 +692,94 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
             </div>
           )}
 
-          {/* 📅 핵심 일정은 날씨·급식보다 먼저 표시 */}
-          <DashCard
-            icon={<CalendarDays size={14} className="text-violet-400"/>}
-            title="이번 주 · 다음 주 일정"
-            badge="2주 보기"
-            badgeColor="violet"
-            className="mb-4"
-          >
-            {(loading || weeklyPlanLoading) && combinedSchedule.length === 0 ? (
-              <Skeleton rows={8}/>
-            ) : (
-              <TwoWeekScheduleCalendar
-                selectedDate={selectedDate}
-                events={combinedSchedule}
-                notes={selectedWeekNotes}
-                weeklyPlanError={weeklyPlanError}
-                sourceSheetCount={weeklyPlan.sourceSheets.length}
-                onSelectDate={setSelectedDate}
-                neisConfigured={hasNeisApiKey}
-                onOpenHelp={() => onNavigate('help')}
-                onOpenCalendar={() => onNavigate('calendar')}
-              />
-            )}
-          </DashCard>
-
-          {/* ── 하단: 좌 날씨·급식 + 우 시간표 ── */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
-            <div className="xl:col-span-2 grid grid-cols-1 gap-4">
-              {/* 🌤️🍱 중요도가 낮은 정보는 한 카드의 절반씩 배치 */}
+          {/* ── 좌측: 2주 달력·선택 일정·날씨·급식 / 우측: 주간 시간표 ── */}
+          <div className="mb-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,2.25fr)_minmax(380px,0.85fr)]">
+            <div className="min-w-0 space-y-4">
               <DashCard
-                icon={<CloudSun size={14} className="text-sky-400"/>}
-                title="날씨 · 급식"
-                badge={`${selectedDate.slice(5).replace('-','/')}`}
-                badgeColor="sky"
+                icon={<CalendarDays size={14} className="text-violet-400"/>}
+                title="이번 주 · 다음 주 일정"
+                badge="2주 보기"
+                badgeColor="violet"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-                  <section className="min-w-0 md:pr-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <CloudSun size={14} className="text-sky-400" />
-                      <h3 className="text-xs font-bold text-sky-300">학교 날씨</h3>
-                      <span className="text-[9px] text-slate-600 ml-auto">주간 예보</span>
-                    </div>
-                    {weatherLoading
-                      ? <Skeleton rows={3}/>
-                      : weather
-                        ? (
-                          <div className="space-y-3">
-                            <WeatherTodayView data={weather} displayName={weatherPlace} label="학교" />
-                            {weather.weekly.length > 0 && (
-                              <div className="pt-3 border-t border-white/5 min-w-0">
-                                <WeatherForecastView data={weather} />
-                              </div>
-                            )}
-                            {config.secondLocationName && weather2 && (
-                              <div className="pt-3 border-t border-white/5">
-                                <WeatherTodayView data={weather2} displayName={weather2Place} label={config.secondLocationName} />
-                              </div>
-                            )}
-                          </div>
-                        )
-                        : <Empty text="날씨 정보를 불러올 수 없습니다." />}
-                  </section>
-
-                  <section className="min-w-0 mt-4 pt-4 border-t border-white/10 md:mt-0 md:pt-0 md:pl-4 md:border-t-0 md:border-l">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Utensils size={14} className="text-amber-400" />
-                      <h3 className="text-xs font-bold text-amber-300">오늘의 급식</h3>
-                      <span className="text-[9px] text-slate-600 ml-auto">{selectedDate.slice(5).replace('-','/')}</span>
-                    </div>
-                    {!hasNeisApiKey ? (
-                      <SetupGuide
-                        title="NEIS API 키를 입력하면 급식을 볼 수 있습니다."
-                        buttonLabel="사용 매뉴얼에서 입력 방법 보기"
-                        onClick={() => onNavigate('help')}
-                      />
-                    ) : loading ? <Skeleton rows={4}/> : meal.length > 0 ? (
-                      <div className="space-y-3">
-                        {meal.map(m => <MealItem key={m.mealType} meal={m} />)}
-                      </div>
-                    ) : (
-                      <Empty text="해당 날짜 급식 정보가 없습니다." />
-                    )}
-                    {!loading && nextMeal.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-white/5">
-                        <p className="text-[10px] font-semibold text-amber-300/80 mb-2">
-                          다음날 {format(addDays(new Date(`${selectedDate}T00:00:00`), 1), 'M/d', { locale: ko })}
-                        </p>
-                        <div className="space-y-2">
-                          {nextMeal.map(m => <MealItem key={m.mealType} meal={m} compact />)}
-                        </div>
-                      </div>
-                    )}
-                  </section>
-                </div>
+                {(loading || weeklyPlanLoading) && combinedSchedule.length === 0 ? (
+                  <Skeleton rows={8}/>
+                ) : (
+                  <TwoWeekScheduleCalendar
+                    selectedDate={selectedDate}
+                    events={combinedSchedule}
+                    notes={selectedWeekNotes}
+                    weeklyPlanError={weeklyPlanError}
+                    sourceSheetCount={weeklyPlan.sourceSheets.length}
+                    onSelectDate={setSelectedDate}
+                    neisConfigured={hasNeisApiKey}
+                    onOpenHelp={() => onNavigate('help')}
+                    onOpenCalendar={() => onNavigate('calendar')}
+                  />
+                )}
               </DashCard>
 
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <DashCard
+                  icon={<CloudSun size={14} className="text-sky-400"/>}
+                  title="날씨"
+                  badge="주간 예보"
+                  badgeColor="sky"
+                >
+                  {weatherLoading
+                    ? <Skeleton rows={3}/>
+                    : weather
+                      ? (
+                        <div className="space-y-3">
+                          <WeatherTodayView data={weather} displayName={weatherPlace} label="학교" />
+                          {weather.weekly.length > 0 && (
+                            <div className="pt-3 border-t border-white/5 min-w-0">
+                              <WeatherForecastView data={weather} />
+                            </div>
+                          )}
+                          {config.secondLocationName && weather2 && (
+                            <div className="pt-3 border-t border-white/5">
+                              <WeatherTodayView data={weather2} displayName={weather2Place} label={config.secondLocationName} />
+                            </div>
+                          )}
+                        </div>
+                      )
+                      : <Empty text="날씨 정보를 불러올 수 없습니다." />}
+                </DashCard>
+
+                <DashCard
+                  icon={<Utensils size={14} className="text-amber-400"/>}
+                  title="급식"
+                  badge={selectedDate.slice(5).replace('-','/')}
+                  badgeColor="amber"
+                >
+                  {!hasNeisApiKey ? (
+                    <SetupGuide
+                      title="NEIS API 키를 입력하면 급식을 볼 수 있습니다."
+                      buttonLabel="사용 매뉴얼에서 입력 방법 보기"
+                      onClick={() => onNavigate('help')}
+                    />
+                  ) : loading ? <Skeleton rows={4}/> : meal.length > 0 ? (
+                    <div className="space-y-3">
+                      {meal.map(m => <MealItem key={m.mealType} meal={m} />)}
+                    </div>
+                  ) : (
+                    <Empty text="해당 날짜 급식 정보가 없습니다." />
+                  )}
+                  {!loading && nextMeal.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-white/5">
+                      <p className="text-[10px] font-semibold text-amber-300/80 mb-2">
+                        다음날 {format(addDays(new Date(`${selectedDate}T00:00:00`), 1), 'M/d', { locale: ko })}
+                      </p>
+                      <div className="space-y-2">
+                        {nextMeal.map(m => <MealItem key={m.mealType} meal={m} compact />)}
+                      </div>
+                    </div>
+                  )}
+                </DashCard>
+              </div>
             </div>
 
-            {/* 📚 시간표 (우측 · 세로로 긴 컬럼) */}
-            <DashCard icon={<BookOpen size={14} className="text-sky-400"/>} title="시간표" badge="주간" badgeColor="sky" className="self-start">
+            <DashCard icon={<BookOpen size={14} className="text-sky-400"/>} title="시간표" badge="주간" badgeColor="sky" className="h-full self-stretch">
               <TimetableSection
                 timetable={timetable}
                 teacherTT={teacherTT}
