@@ -7,6 +7,7 @@ import Dashboard from '../pages/Dashboard'
 import { useAppStore } from '../stores/appStore'
 
 const NeisPage = lazy(() => import('../pages/NeisPage'))
+const CalendarPage = lazy(() => import('../pages/CalendarPage'))
 const SettingsPage = lazy(() => import('../pages/UngcheonSettingsPage'))
 const HelpPage = lazy(() => import('../pages/UngcheonHelpPage'))
 const SchoolHubPage = lazy(() => import('../pages/SchoolHubPage'))
@@ -36,6 +37,7 @@ const EstimatedSplitScorePage = lazy(() => import('../pages/EstimatedSplitScoreP
 
 const PAGES: Record<string, React.ComponentType> = {
   neis: NeisPage,
+  calendar: CalendarPage,
   settings: SettingsPage,
   help: HelpPage,
   school_hub: SchoolHubPage,

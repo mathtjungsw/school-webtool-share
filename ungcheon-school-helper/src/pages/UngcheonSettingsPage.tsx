@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   CheckCircle2, KeyRound, Link2, Palette, Save, School,
-  UserRound, Clock3, CalendarDays, Power, AlertCircle, ExternalLink, LockKeyhole,
+  UserRound, Clock3, Power, AlertCircle, ExternalLink, LockKeyhole,
   Database, Trash2,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
@@ -169,16 +169,6 @@ export default function UngcheonSettingsPage() {
             <Trash2 size={14} />임시 저장자료 모두 삭제
           </button>
         </div>
-      </Section>
-
-      <Section icon={<CalendarDays size={17} />} title="Google 캘린더">
-        <Field label="공개 캘린더 임베드 URL" help="Google 캘린더 설정의 통합 코드에서 iframe 주소를 복사해 입력합니다.">
-          <input
-            value={draft.googleCalendarUrl ?? ''}
-            onChange={e => setDraft({ ...draft, googleCalendarUrl: e.target.value })}
-            placeholder="https://calendar.google.com/calendar/embed?..."
-          />
-        </Field>
       </Section>
 
       <Section icon={<Clock3 size={17} />} title="웅천고 고정 수업시간">
