@@ -32,7 +32,7 @@ export default function TitleBar({
   const updateError = useAppStore(state => state.updateError)
   const clearUpdateError = useAppStore(state => state.clearUpdateError)
 
-  useEffect(() => { window.electron.getVersion().then(setVersion) }, [])
+  useEffect(() => { window.electron?.getVersion().then(setVersion) }, [])
 
   const theme = config.theme ?? 'auto'
   const cycleTheme = () => {
@@ -83,9 +83,9 @@ export default function TitleBar({
           {logErrorCount > 0 && <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-rose-500 rounded-full" />}
         </button>
         <span className="w-px h-4 bg-white/10 mx-1" />
-        <button onClick={() => window.electron.minimize()} className="window-button"><Minus size={13} /></button>
-        <button onClick={() => window.electron.maximize()} className="window-button"><Square size={11} /></button>
-        <button onClick={() => window.electron.close()} className="window-button hover:!text-rose-400 hover:!bg-rose-500/10"><X size={14} /></button>
+        <button onClick={() => window.electron?.minimize()} className="window-button"><Minus size={13} /></button>
+        <button onClick={() => window.electron?.maximize()} className="window-button"><Square size={11} /></button>
+        <button onClick={() => window.electron?.close()} className="window-button hover:!text-rose-400 hover:!bg-rose-500/10"><X size={14} /></button>
       </div>
     </div>
   )
