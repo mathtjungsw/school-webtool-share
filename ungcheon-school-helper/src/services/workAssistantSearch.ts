@@ -51,8 +51,8 @@ export const WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
   {
     id: 'monthly-calendar', title: '월간 통합 캘린더 보기', page: 'calendar', category: '일정',
     summary: 'NEIS 학사일정·주간계획·내 위원회·개인 업무를 한 달 단위로 확인합니다.',
-    steps: ['캘린더 메뉴를 엽니다.', '이전 달·다음 달 버튼으로 월을 이동합니다.', '날짜를 선택하면 그날의 전체 일정이 표시됩니다.'],
-    keywords: ['월간 캘린더', '한달 일정', '학교 일정', '이번달 일정', '학사 일정', '주간 계획', '달력 보기'],
+    steps: ['캘린더 메뉴를 엽니다. 앱 실행 중 한 번 불러온 월은 임시 캐시에서 먼저 표시됩니다.', '이전 달·다음 달 버튼으로 월을 이동합니다.', '날짜를 선택하면 그날의 전체 일정이 표시되며 서버 변경 내용은 뒤에서 갱신됩니다.'],
+    keywords: ['월간 캘린더', '한달 일정', '학교 일정', '이번달 일정', '학사 일정', '주간 계획', '달력 보기', '캘린더 새로고침', '일정 캐시', '일정이 늦게 떠요'],
   },
   {
     id: 'timetable-swap', title: '수업 교환 계획', page: 'timetable_swap', category: '학사·기록',
@@ -128,10 +128,10 @@ export const WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
     keywords: ['나이스 키', 'NEIS API 키', '인증키', '급식', '나이스 급식', '급식이 안 나와', '급식 안나옴', '학사일정 안나옴', '호출 권한', '나이스 정보'],
   },
   {
-    id: 'neis-information', title: 'NEIS 급식·학사일정·시간표 조회', page: 'neis', category: '학사·기록',
-    summary: '웅천고 급식, 학사일정과 학급 시간표를 날짜별로 조회합니다.',
-    steps: ['NEIS 정보 메뉴를 엽니다.', '조회할 날짜와 급식·학사일정·시간표 탭을 선택합니다.', '정보가 없으면 API 키와 조회 날짜를 확인합니다.'],
-    keywords: ['NEIS 정보', '나이스 조회', '급식 조회', '학사일정 조회', '학급 시간표', '오늘 급식', '학교 일정'],
+    id: 'neis-information', title: 'NEIS 급식·학사일정 확인', page: 'dashboard', category: '학사·기록',
+    summary: '웅천고 급식은 대시보드에서, 학사일정은 대시보드 2주 일정과 통합 캘린더에서 확인합니다.',
+    steps: ['대시보드를 엽니다.', '상단 2주 일정에서 NEIS 학사일정을 확인합니다.', '그 아래 날씨·급식 카드에서 급식을 확인하거나 월간 캘린더로 이동합니다.', '정보가 없으면 사용 매뉴얼에서 NEIS API 키 입력 상태를 확인합니다.'],
+    keywords: ['NEIS 정보', '나이스 조회', '급식 조회', '학사일정 조회', '오늘 급식', '학교 일정', '대시보드 급식', '통합 캘린더'],
   },
   {
     id: 'school-link', title: '학교 공유 링크 등록', page: 'school_hub', category: '학교 공유',

@@ -687,7 +687,32 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
             </div>
           )}
 
-          {/* ── 상단: 좌(날씨·급식 + 월간 일정) + 우 시간표 ── */}
+          {/* 📅 핵심 일정은 날씨·급식보다 먼저 표시 */}
+          <DashCard
+            icon={<CalendarDays size={14} className="text-violet-400"/>}
+            title="이번 주 · 다음 주 일정"
+            badge="2주 보기"
+            badgeColor="violet"
+            className="mb-4"
+          >
+            {(loading || weeklyPlanLoading) && combinedSchedule.length === 0 ? (
+              <Skeleton rows={8}/>
+            ) : (
+              <TwoWeekScheduleCalendar
+                selectedDate={selectedDate}
+                events={combinedSchedule}
+                notes={selectedWeekNotes}
+                weeklyPlanError={weeklyPlanError}
+                sourceSheetCount={weeklyPlan.sourceSheets.length}
+                onSelectDate={setSelectedDate}
+                neisConfigured={hasNeisApiKey}
+                onOpenHelp={() => onNavigate('help')}
+                onOpenCalendar={() => onNavigate('calendar')}
+              />
+            )}
+          </DashCard>
+
+          {/* ── 하단: 좌 날씨·급식 + 우 시간표 ── */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
             <div className="xl:col-span-2 grid grid-cols-1 gap-4">
               {/* 🌤️🍱 중요도가 낮은 정보는 한 카드의 절반씩 배치 */}
@@ -758,29 +783,6 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                 </div>
               </DashCard>
 
-              {/* 📅 이번 주·다음 주 일정 */}
-              <DashCard
-                icon={<CalendarDays size={14} className="text-violet-400"/>}
-                title="이번 주 · 다음 주 일정"
-                badge="2주 보기"
-                badgeColor="violet"
-              >
-                {(loading || weeklyPlanLoading) && combinedSchedule.length === 0 ? (
-                  <Skeleton rows={8}/>
-                ) : (
-                  <TwoWeekScheduleCalendar
-                    selectedDate={selectedDate}
-                    events={combinedSchedule}
-                    notes={selectedWeekNotes}
-                    weeklyPlanError={weeklyPlanError}
-                    sourceSheetCount={weeklyPlan.sourceSheets.length}
-                    onSelectDate={setSelectedDate}
-                    neisConfigured={hasNeisApiKey}
-                    onOpenHelp={() => onNavigate('help')}
-                    onOpenCalendar={() => onNavigate('calendar')}
-                  />
-                )}
-              </DashCard>
             </div>
 
             {/* 📚 시간표 (우측 · 세로로 긴 컬럼) */}
