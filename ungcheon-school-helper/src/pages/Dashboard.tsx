@@ -443,7 +443,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       const toYmdStr = weekDates[4]
 
       const nextDay = addDays(new Date(selectedDate), 1)
-      const dashboardWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+      const dashboardWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
       const scheduleMonths = Array.from(new Set([
         selectedDate.slice(0, 7),
         format(dashboardWeekStart, 'yyyy-MM'),
@@ -492,7 +492,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
 
   const loadWeeklyPlan = useCallback(async (force = false) => {
     if (!window.electron?.weeklyPlanGetMonth) return
-    const dashboardWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+    const dashboardWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
     const months = Array.from(new Set([
       selectedDate.slice(0, 7),
       format(dashboardWeekStart, 'yyyy-MM'),
@@ -940,7 +940,7 @@ function TwoWeekScheduleCalendar({
   onOpenHelp: () => void
   onOpenCalendar: () => void
 }) {
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
   const weeks = [0, 1].map(week => Array.from({ length: 7 }, (_, day) => addDays(weekStart, week * 7 + day)))
   const selectedYmd = toYmd(selectedDate)
   const todayYmd = toYmd(todayStr())
@@ -1016,8 +1016,8 @@ function TwoWeekScheduleCalendar({
                     )}
                   >
                     <div className="mb-2 flex items-center justify-between gap-1">
-                      <span className={clsx('text-[9px] font-semibold', dayIndex === 5 ? 'text-sky-400' : dayIndex === 6 ? 'text-rose-400' : 'text-slate-500')}>{format(day, 'EEE', { locale: ko })}</span>
-                      <span className={clsx('grid h-6 w-6 place-items-center rounded-full text-[11px] font-black', isTodayCell ? 'bg-amber-400 text-slate-950' : dayIndex === 5 ? 'text-sky-300' : dayIndex === 6 ? 'text-rose-300' : 'text-slate-200')}>{format(day, 'd')}</span>
+                      <span className={clsx('text-[9px] font-semibold', dayIndex === 0 ? 'text-rose-400' : dayIndex === 6 ? 'text-sky-400' : 'text-slate-500')}>{format(day, 'EEE', { locale: ko })}</span>
+                      <span className={clsx('grid h-6 w-6 place-items-center rounded-full text-[11px] font-black', isTodayCell ? 'bg-amber-400 text-slate-950' : dayIndex === 0 ? 'text-rose-300' : dayIndex === 6 ? 'text-sky-300' : 'text-slate-200')}>{format(day, 'd')}</span>
                     </div>
                     <div className="space-y-1">
                       {dayEvents.slice(0, 5).map((event, index) => (
@@ -1178,16 +1178,16 @@ function MonthScheduleCalendar({
   const viewDate = new Date(`${selectedDate}T00:00:00`)
   const monthStart = startOfMonth(viewDate)
   const monthEnd = endOfMonth(viewDate)
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 })
-  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 })
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 })
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 })
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
   const weeks = Array.from({ length: Math.ceil(days.length / 7) }, (_, index) =>
     days.slice(index * 7, index * 7 + 7),
   )
   const selectedYmd = toYmd(selectedDate)
   const todayYmd = toYmd(todayStr())
-  const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
-  const selectedWeekStart = startOfWeek(viewDate, { weekStartsOn: 1 })
+  const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
+  const selectedWeekStart = startOfWeek(viewDate, { weekStartsOn: 0 })
   const currentWeekInGrid = currentWeekStart >= calendarStart && currentWeekStart <= calendarEnd
   const focusWeekYmd = format(currentWeekInGrid ? currentWeekStart : selectedWeekStart, 'yyyyMMdd')
   const currentWeekYmd = format(currentWeekStart, 'yyyyMMdd')
@@ -1228,12 +1228,12 @@ function MonthScheduleCalendar({
 
       <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5">
         <div className="grid grid-cols-7 gap-px bg-white/5">
-          {['월', '화', '수', '목', '금', '토', '일'].map((day, index) => (
+          {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
             <div
               key={day}
               className={clsx(
                 'bg-surface-900/95 py-2 text-center text-[10px] font-bold',
-                index === 5 ? 'text-sky-400' : index === 6 ? 'text-rose-400' : 'text-slate-400',
+                index === 0 ? 'text-rose-400' : index === 6 ? 'text-sky-400' : 'text-slate-400',
               )}
             >
               {day}
@@ -1288,10 +1288,10 @@ function MonthScheduleCalendar({
                           'w-5 h-5 grid place-items-center rounded-full text-[10px] font-bold',
                           isTodayCell
                             ? 'bg-amber-400 text-slate-950'
-                            : dayIndex === 5
-                              ? 'text-sky-400'
+                            : dayIndex === 0
+                              ? 'text-rose-400'
                               : dayIndex === 6
-                                ? 'text-rose-400'
+                                ? 'text-sky-400'
                                 : inMonth ? 'text-slate-300' : 'text-slate-600',
                         )}>
                           {format(day, 'd')}
