@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  AlertTriangle, Calculator, CheckCircle2, Info, Plus, Printer, RotateCcw,
-  ShieldCheck, Trash2,
+  AlertTriangle, Calculator, CheckCircle2, FileSpreadsheet, Info, LoaderCircle, Plus, Printer, RotateCcw,
+  ShieldCheck, Trash2, Upload,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { escapeHtml, printHtml } from '../utils/printHtml'
@@ -18,6 +18,10 @@ import {
   type CareerPeriodInput,
   type TransferGrade,
 } from '../services/teacherTransferScore'
+import {
+  parseNeisAppointmentWorkbook,
+  type NeisAppointmentImportResult,
+} from '../services/neisAppointmentImport'
 
 const STORAGE_KEY = 'ungcheon.teacher-transfer-score.v1'
 const GRADES = Object.keys(TRANSFER_GRADE_POINTS) as TransferGrade[]
@@ -94,6 +98,9 @@ function formatMonths(months: number): string {
 export default function TeacherTransferScorePage() {
   const teacherName = useAppStore(state => state.config.teacherName ?? '')
   const [draft, setDraft] = useState<TransferScoreDraft>(() => loadDraft(teacherName))
+  const [importingNeis, setImportingNeis] = useState(false)
+  const [neisImport, setNeisImport] = useState<NeisAppointmentImportResult | null>(null)
+  const [neisImportError, setNeisImportError] = useState('')
 
   useEffect(() => {
     if (!draft.applicantName && teacherName) {
@@ -133,10 +140,48 @@ export default function TeacherTransferScorePage() {
     setDraft(current => ({ ...current, additional: { ...current.additional, [key]: value } }))
   }
 
+  const importNeisAppointments = async () => {
+    setNeisImportError('')
+    const path = await window.electron?.openFileDialog([
+      { name: '나이스 인사발령 Excel data', extensions: ['xlsx', 'xls'] },
+    ])
+    if (!path) return
+
+    setImportingNeis(true)
+    try {
+      const currentGrade = draft.careerPeriods.find(period => period.schoolName === '웅천고등학교')?.grade
+        ?? draft.careerPeriods[0]?.grade
+        ?? '라'
+      const imported = parseNeisAppointmentWorkbook(
+        await window.electron.readFile(path),
+        draft.evaluationDate,
+        currentGrade,
+      )
+      setDraft(current => ({
+        ...current,
+        applicantName: imported.applicantName || current.applicantName,
+        careerPeriods: imported.careerPeriods.length ? imported.careerPeriods : current.careerPeriods,
+        educationActivityMonths: {
+          ...current.educationActivityMonths,
+          homeroom: imported.educationActivityMonths.homeroom,
+          department_head: imported.educationActivityMonths.department_head,
+        },
+      }))
+      setNeisImport(imported)
+    } catch (error) {
+      setNeisImport(null)
+      setNeisImportError(error instanceof Error ? error.message : '나이스 인사발령 파일을 읽지 못했습니다.')
+    } finally {
+      setImportingNeis(false)
+    }
+  }
+
   const reset = () => {
     if (!window.confirm('입력한 전보 점수 자료를 모두 지울까요?')) return
     localStorage.removeItem(STORAGE_KEY)
     setDraft(createDefaultDraft(teacherName))
+    setNeisImport(null)
+    setNeisImportError('')
   }
 
   const printReport = () => {
@@ -182,6 +227,61 @@ export default function TeacherTransferScorePage() {
           <button type="button" className="btn-primary flex items-center gap-1.5" onClick={printReport}><Printer size={14} />결과 인쇄·PDF</button>
         </div>
       </header>
+
+      <section className="rounded-2xl border border-sky-500/25 bg-gradient-to-br from-sky-500/10 to-emerald-500/[0.04] p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex gap-3 min-w-0">
+            <span className="w-10 h-10 rounded-xl bg-sky-500/15 text-sky-300 grid place-items-center flex-shrink-0"><FileSpreadsheet size={20} /></span>
+            <div>
+              <h2 className="text-sm font-bold text-white">나이스 인사발령 이력으로 기본 경력 자동 입력</h2>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">현임교 근무 시작일과 휴직·정직·직위해제 구간을 분석하고, 확인되는 담임·보직교사 월수까지 채웁니다. 기존 표창·자격·우대조건 등 가산점은 그대로 유지됩니다.</p>
+            </div>
+          </div>
+          <button type="button" className="btn-primary flex items-center gap-1.5" disabled={importingNeis} onClick={importNeisAppointments}>
+            {importingNeis ? <LoaderCircle size={14} className="animate-spin" /> : <Upload size={14} />}
+            파일 선택
+          </button>
+        </div>
+        <details className="mt-3 rounded-xl border border-white/[0.06] bg-slate-950/25 px-3.5 py-2.5">
+          <summary className="text-xs font-semibold text-sky-200 cursor-pointer">나이스에서 파일 내려받는 방법</summary>
+          <ol className="mt-2 ml-4 list-decimal text-xs text-slate-400 leading-6">
+            <li>나이스에 로그인하고 <b className="text-slate-300">인사기록</b>으로 이동합니다.</li>
+            <li><b className="text-slate-300">출력 → 인사발령상황(전체)</b>를 선택합니다.</li>
+            <li><b className="text-slate-300">Excel data</b>를 눌러 내려받은 .xlsx 파일을 위의 파일 선택으로 불러옵니다.</li>
+          </ol>
+          <p className="mt-2 text-[11px] text-emerald-300/75">파일은 현재 PC에서만 분석합니다. 주민등록번호와 계산에 필요 없는 개인정보는 계산에 사용하거나 저장하지 않으며 원본 파일도 보관·전송하지 않습니다.</p>
+        </details>
+        {neisImportError && <p className="mt-3 rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">{neisImportError}</p>}
+      </section>
+
+      {neisImport && (
+        <section className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.07] p-4 space-y-3">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 size={18} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <h2 className="text-sm font-bold text-emerald-200">나이스 경력을 계산기에 반영했습니다.</h2>
+              <p className="text-xs text-emerald-100/65 mt-1">{neisImport.currentSchool} · 현임교 {neisImport.tenureStartDate}부터 · 실제 근무 {formatMonths(neisImport.workMonths)}{neisImport.sourceDate ? ` · 파일 기준일 ${neisImport.sourceDate}` : ''}</p>
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-2">
+            <ResultMini label="자동 생성 근무 구간" value={`${neisImport.careerPeriods.length}개`} />
+            <ResultMini label="담임교사 자동 반영" value={formatMonths(neisImport.educationActivityMonths.homeroom)} />
+            <ResultMini label="보직교사 자동 반영" value={formatMonths(neisImport.educationActivityMonths.department_head)} />
+          </div>
+          {neisImport.excludedPeriods.length > 0 && (
+            <div className="rounded-xl bg-slate-950/25 px-3 py-2.5">
+              <p className="text-xs font-semibold text-slate-300">근무기간에서 제외한 이력</p>
+              <ul className="mt-1.5 space-y-1">{neisImport.excludedPeriods.map(period => <li key={`${period.startDate}-${period.endDate}`} className="text-xs text-slate-400">• {period.reason} · {period.startDate} ~ {period.endDate} ({period.months}개월)</li>)}</ul>
+            </div>
+          )}
+          {neisImport.warnings.length > 0 && (
+            <ul className="rounded-xl border border-amber-500/15 bg-amber-500/[0.06] px-3 py-2 space-y-1">
+              {neisImport.warnings.map(warning => <li key={warning} className="text-[11px] text-amber-100/65 leading-relaxed">• {warning}</li>)}
+            </ul>
+          )}
+          <p className="text-[11px] text-slate-500">자동 반영 결과와 학교 급지를 확인한 뒤, 나이스 파일에 없는 가산점은 아래에서 직접 입력하세요.</p>
+        </section>
+      )}
 
       <section className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 flex gap-3">
         <Info size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
