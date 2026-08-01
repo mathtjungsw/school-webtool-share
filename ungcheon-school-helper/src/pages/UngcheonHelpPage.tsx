@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   ArrowLeftRight, Bell, BookOpen, CalendarDays, ExternalLink, FileSpreadsheet, Files, HelpCircle,
-  KeyRound, Link2, MessageSquareText, RefreshCw, School, ShieldCheck,
+  KeyRound, Link2, MessageSquareText, RefreshCw, School, Search, ShieldCheck,
 } from 'lucide-react'
 
 const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
@@ -37,6 +37,17 @@ const SECTIONS = [
       '환경설정에서 교사 이름과 담당 학년·반을 입력합니다.',
       '대시보드에서 웅천고 급식·학사일정·시간표가 표시되는지 확인합니다.',
       '공유 서비스 URL은 관리자가 Google Apps Script 배포 후 한 번만 안내합니다.',
+    ],
+  },
+  {
+    title: '업무 도우미 검색',
+    icon: Search,
+    items: [
+      '상단 “업무 검색”을 누르거나 Ctrl+K를 누른 뒤 “내 수업 출석부 출력하고 싶어”처럼 평소 말하듯 입력합니다.',
+      '검색 결과에서 관련 메뉴, 단계별 사용법과 현재 설정된 교사 이름을 확인하고 “바로가기”로 이동합니다.',
+      '최근 질문은 현재 PC에만 저장하며 “모두 지우기”로 삭제할 수 있습니다.',
+      '외부 AI나 유료 API를 사용하지 않아 별도 비용이 없고, 입력한 질문도 PC 밖으로 전송되지 않습니다.',
+      '도우미는 메뉴 안내와 이동만 수행하며 등록·삭제·출력 같은 작업은 사용자가 해당 화면에서 최종 확인합니다.',
     ],
   },
   {

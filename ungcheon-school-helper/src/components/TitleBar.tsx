@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   AlertCircle, Check, ChevronLeft, Link2, Megaphone, MessageSquareText,
-  Minus, Moon, ScrollText, Square, Sun, SunMoon, X,
+  Minus, Moon, Search, ScrollText, Square, Sun, SunMoon, X,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useNoticeStore } from '../stores/noticeStore'
@@ -14,6 +14,7 @@ export default function TitleBar({
   onGoBack,
   canGoBack,
   onOpenLog,
+  onOpenAssistant,
   logErrorCount,
 }: {
   currentPage: string
@@ -21,6 +22,7 @@ export default function TitleBar({
   onGoBack: () => void
   canGoBack: boolean
   onOpenLog: () => void
+  onOpenAssistant: () => void
   logErrorCount: number
 }) {
   const [version, setVersion] = useState('')
@@ -54,6 +56,11 @@ export default function TitleBar({
 
       <div className="flex-1 flex items-center justify-center gap-1">
         <TopNav active={currentPage === 'dashboard'} onClick={() => onNavigate('dashboard')}>대시보드</TopNav>
+        <button type="button" onClick={onOpenAssistant} className="no-drag mx-1 flex items-center gap-2 px-3 py-1 rounded-md border border-violet-400/20 bg-violet-500/10 text-[11px] text-violet-200 hover:bg-violet-500/20 hover:border-violet-400/35 transition-colors" title="업무 도우미 검색 (Ctrl+K)">
+          <Search size={12} />
+          <span>업무 검색</span>
+          <kbd className="hidden xl:inline rounded border border-white/10 bg-black/15 px-1 text-[9px] text-violet-300/70">Ctrl K</kbd>
+        </button>
         <TopNav active={currentPage === 'school_hub'} onClick={() => onNavigate('school_hub')} icon={<Link2 size={11} />}>학교 공유 링크</TopNav>
         <TopNav active={currentPage === 'feature_requests'} onClick={() => onNavigate('feature_requests')} icon={<MessageSquareText size={11} />}>기능개선</TopNav>
         <NoticeButton />

@@ -1,8 +1,9 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import TitleBar from './TitleBar'
 import Sidebar from './Sidebar'
 import LogPanel from './LogPanel'
+import WorkAssistantSearch from './WorkAssistantSearch'
 import Dashboard from '../pages/Dashboard'
 import { useAppStore } from '../stores/appStore'
 
@@ -70,6 +71,7 @@ export default function Layout() {
   const [history, setHistory] = useState(['dashboard'])
   const [historyIndex, setHistoryIndex] = useState(0)
   const [logOpen, setLogOpen] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
   const page = history[historyIndex]
   const logs = useAppStore(state => state.logs)
   const logErrorCount = logs.filter(log => log.level === 'error').length
@@ -82,6 +84,17 @@ export default function Layout() {
     setHistoryIndex(next.length - 1)
   }
 
+  useEffect(() => {
+    const openAssistant = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setAssistantOpen(true)
+      }
+    }
+    window.addEventListener('keydown', openAssistant)
+    return () => window.removeEventListener('keydown', openAssistant)
+  }, [])
+
   return (
     <div className="app-shell h-screen bg-surface-900 flex flex-col overflow-hidden">
       <TitleBar
@@ -90,6 +103,7 @@ export default function Layout() {
         onGoBack={() => historyIndex > 0 && setHistoryIndex(index => index - 1)}
         canGoBack={historyIndex > 0}
         onOpenLog={() => setLogOpen(open => !open)}
+        onOpenAssistant={() => setAssistantOpen(true)}
         logErrorCount={logErrorCount}
       />
       <div className="flex flex-1 min-h-0">
@@ -117,6 +131,7 @@ export default function Layout() {
         </main>
       </div>
       <LogPanel open={logOpen} onClose={() => setLogOpen(false)} />
+      <WorkAssistantSearch open={assistantOpen} onClose={() => setAssistantOpen(false)} onNavigate={navigate} />
     </div>
   )
 }
