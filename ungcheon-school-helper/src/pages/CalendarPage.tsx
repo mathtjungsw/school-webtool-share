@@ -35,6 +35,7 @@ interface CalendarEvent {
 }
 
 const EMPTY_WEEKLY_PLAN: WeeklyPlanResult = { events: [], notes: [], sourceSheets: [], fetchedAt: '' }
+const CALENDAR_SESSION_CACHE_PREFIX = 'ungcheon.calendar.session.v1'
 const SOURCE_STYLE: Record<CalendarSource, string> = {
   neis: 'border-violet-400 bg-violet-500/15 text-violet-200',
   weekly: 'border-sky-400 bg-sky-500/15 text-sky-200',
@@ -46,6 +47,57 @@ const SOURCE_STYLE: Record<CalendarSource, string> = {
 function today() { return format(new Date(), 'yyyy-MM-dd') }
 function toYmd(date: string) { return date.replace(/-/g, '') }
 function fromYmd(date: string) { return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}` }
+
+interface CalendarSessionSnapshot {
+  schedule: ScheduleEvent[]
+  weeklyPlan: WeeklyPlanResult
+  committeeEvents: CommitteeEvent[]
+  sharedTasks: StaffChecklist[]
+  savedAt: string
+}
+
+function calendarSessionCacheKey(input: {
+  monthKey: string
+  officeCode?: string
+  schoolCode?: string
+  teacherName?: string
+  schoolHubUrl?: string
+}) {
+  return [
+    CALENDAR_SESSION_CACHE_PREFIX,
+    input.monthKey,
+    input.officeCode ?? '',
+    input.schoolCode ?? '',
+    input.teacherName?.trim() ?? '',
+    input.schoolHubUrl ?? '',
+  ].join('|')
+}
+
+function readCalendarSessionSnapshot(key: string): CalendarSessionSnapshot | null {
+  try {
+    const raw = window.sessionStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<CalendarSessionSnapshot>
+    if (!Array.isArray(parsed.schedule) || !Array.isArray(parsed.committeeEvents) || !Array.isArray(parsed.sharedTasks)) return null
+    return {
+      schedule: parsed.schedule,
+      weeklyPlan: parsed.weeklyPlan ?? EMPTY_WEEKLY_PLAN,
+      committeeEvents: parsed.committeeEvents,
+      sharedTasks: parsed.sharedTasks,
+      savedAt: parsed.savedAt ?? '',
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeCalendarSessionSnapshot(key: string, snapshot: Omit<CalendarSessionSnapshot, 'savedAt'>) {
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify({ ...snapshot, savedAt: new Date().toISOString() }))
+  } catch {
+    // 세션 저장 공간을 사용할 수 없어도 온라인 일정 조회는 계속 동작한다.
+  }
+}
 
 interface TaskDraft {
   id?: string
@@ -78,32 +130,63 @@ export default function CalendarPage() {
   const hasNeis = Boolean(config.officeCode && config.schoolCode && config.neisApiKey?.trim())
 
   const loadMonth = useCallback(async (force = false) => {
-    setLoading(true)
     const year = Number(format(viewDate, 'yyyy'))
     const month = Number(format(viewDate, 'M'))
     const neisKey = config.neisApiKey?.trim() || NEIS_API_KEY
     const teacherName = config.teacherName?.trim() ?? ''
+    const cacheKey = calendarSessionCacheKey({
+      monthKey: format(viewDate, 'yyyy-MM'),
+      officeCode: config.officeCode,
+      schoolCode: config.schoolCode,
+      teacherName,
+      schoolHubUrl: config.schoolHubUrl,
+    })
+    const cached = readCalendarSessionSnapshot(cacheKey)
+    if (cached) {
+      setSchedule(cached.schedule)
+      setWeeklyPlan(cached.weeklyPlan)
+      setCommitteeEvents(cached.committeeEvents)
+      setSharedTasks(cached.sharedTasks)
+    }
+    setLoading(true)
     try {
-      const [nextTasks, nextSchedule, nextWeekly, committees, workTasks] = await Promise.all([
-        loadPersonalTasks(),
-        hasNeis
-          ? getSchedule(neisKey, config.officeCode!, config.schoolCode!, year, month).catch(() => [])
-          : Promise.resolve([]),
-        window.electron?.weeklyPlanGetMonth
-          ? window.electron.weeklyPlanGetMonth(year, month, force).catch(() => EMPTY_WEEKLY_PLAN)
-          : Promise.resolve(EMPTY_WEEKLY_PLAN),
-        config.schoolHubUrl && teacherName
-          ? listCommitteeState().catch(() => ({ assignments: [], events: [] }))
-          : Promise.resolve({ assignments: [], events: [] }),
-        config.schoolHubUrl && teacherName
-          ? listStaffChecklists(teacherName).catch(() => [])
-          : Promise.resolve([]),
-      ])
-      setTasks(nextTasks)
-      setSchedule(nextSchedule)
-      setWeeklyPlan(nextWeekly)
-      setCommitteeEvents(committees.events.filter(event => event.memberNames.includes(teacherName)))
-      setSharedTasks(workTasks)
+      void loadPersonalTasks().then(setTasks)
+      let nextSchedule = cached?.schedule ?? []
+      let nextWeekly = cached?.weeklyPlan ?? EMPTY_WEEKLY_PLAN
+      let nextCommitteeEvents = cached?.committeeEvents ?? []
+      let nextSharedTasks = cached?.sharedTasks ?? []
+
+      const scheduleRequest = (hasNeis
+        ? getSchedule(neisKey, config.officeCode!, config.schoolCode!, year, month)
+        : Promise.resolve([]))
+        .then(value => { nextSchedule = value; setSchedule(value) })
+        .catch(() => { if (!cached) setSchedule([]) })
+      const weeklyRequest = (window.electron?.weeklyPlanGetMonth
+        ? window.electron.weeklyPlanGetMonth(year, month, force)
+        : Promise.resolve(EMPTY_WEEKLY_PLAN))
+        .then(value => { nextWeekly = value; setWeeklyPlan(value) })
+        .catch(() => { if (!cached) setWeeklyPlan(EMPTY_WEEKLY_PLAN) })
+      const committeeRequest = (config.schoolHubUrl && teacherName
+        ? listCommitteeState(force)
+        : Promise.resolve({ assignments: [], events: [] }))
+        .then(value => {
+          nextCommitteeEvents = value.events.filter(event => event.memberNames.includes(teacherName))
+          setCommitteeEvents(nextCommitteeEvents)
+        })
+        .catch(() => { if (!cached) setCommitteeEvents([]) })
+      const sharedWorkRequest = (config.schoolHubUrl && teacherName
+        ? listStaffChecklists(teacherName, '', force)
+        : Promise.resolve([]))
+        .then(value => { nextSharedTasks = value; setSharedTasks(value) })
+        .catch(() => { if (!cached) setSharedTasks([]) })
+
+      await Promise.allSettled([scheduleRequest, weeklyRequest, committeeRequest, sharedWorkRequest])
+      writeCalendarSessionSnapshot(cacheKey, {
+        schedule: nextSchedule,
+        weeklyPlan: nextWeekly,
+        committeeEvents: nextCommitteeEvents,
+        sharedTasks: nextSharedTasks,
+      })
     } finally {
       setLoading(false)
     }

@@ -70,6 +70,18 @@ const NEIS_ENDPOINT_PARAMS = {
 };
 const RELEASE_NOTES = [
   {
+    key: 'v1.0.31',
+    title: '[업데이트] 웅천고 업무도우미 v1.0.31',
+    body: [
+      '· 캘린더 즉시 표시: 앱 실행 중 월별 일정 스냅샷을 보관해 다시 열 때 먼저 표시',
+      '· 백그라운드 갱신: NEIS·주간계획·위원회·공유 업무를 개별 갱신해 느린 요청이 화면을 막지 않도록 개선',
+      '· 담임 표시 수정: 3-4 같은 학급 표기가 날짜로 바뀌는 문제를 복구하고 텍스트 형식으로 고정',
+      '· 메뉴 정리: 별도 NEIS 정보 메뉴를 숨기고 대시보드와 캘린더에서 관련 정보를 확인하도록 정리',
+      '· 대시보드 재배치: 이번 주·다음 주 2주 달력을 날씨·급식보다 위에 표시'
+    ].join('\n'),
+    date: '2026-08-01'
+  },
+  {
     key: 'v1.0.30',
     title: '[업데이트] 웅천고 업무도우미 v1.0.30',
     body: [
@@ -433,6 +445,7 @@ function ensureSheets_() {
   ensureDataSheet_(book, STAFF_ROSTER_SHEET, [
     'id', 'name', 'position', 'department', 'subject', 'homeroom'
   ]);
+  repairStaffHomeroomCells_(book);
   ensureStaffAssignments2026_(book);
   ensureDataSheet_(book, STUDENT_ROSTER_META_SHEET, [
     'version', 'sourceFileName', 'uploadedBy', 'uploadedAt', 'studentCount'
@@ -456,6 +469,7 @@ function ensureSheets_() {
     'id', 'committeeId', 'committeeName', 'title', 'date', 'startTime', 'endTime',
     'location', 'agenda', 'memberNamesJson', 'createdBy', 'createdAt'
   ]);
+  repairCommitteeTimeCells_(book);
   ensureReleaseNotices_();
 }
 
@@ -493,6 +507,7 @@ function ensureStaffAssignments2026_(book) {
   });
   if (!matched) return;
   if (changed) {
+    sheet.getRange('F:F').setNumberFormat('@');
     sheet.getRange(2, 1, values.length, 6).setValues(values);
     const meta = readObjects_(STAFF_ROSTER_META_SHEET)[0] || {};
     replaceSheetRows_(STAFF_ROSTER_META_SHEET, [[
@@ -504,6 +519,40 @@ function ensureStaffAssignments2026_(book) {
     ]]);
   }
   properties.setProperty(STAFF_ASSIGNMENTS_2026_APPLIED_KEY, 'true');
+}
+
+function normalizeStaffHomeroom_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return String(value.getMonth() + 1) + '-' + String(value.getDate());
+  }
+  return String(value == null ? '' : value).trim();
+}
+
+function repairStaffHomeroomCells_(book) {
+  const sheet = book.getSheetByName(STAFF_ROSTER_SHEET);
+  if (!sheet) return;
+  sheet.getRange('F:F').setNumberFormat('@');
+  if (sheet.getLastRow() < 2) return;
+  const range = sheet.getRange(2, 6, sheet.getLastRow() - 1, 1);
+  const values = range.getValues();
+  let changed = false;
+  values.forEach(function(row) {
+    const normalized = normalizeStaffHomeroom_(row[0]);
+    if (Object.prototype.toString.call(row[0]) === '[object Date]' || String(row[0] || '') !== normalized) {
+      row[0] = normalized;
+      changed = true;
+    }
+  });
+  if (!changed) return;
+  range.setValues(values);
+  const meta = readObjects_(STAFF_ROSTER_META_SHEET)[0] || {};
+  replaceSheetRows_(STAFF_ROSTER_META_SHEET, [[
+    (Number(meta.version) || 0) + 1,
+    String(meta.sourceFileName || ''),
+    '담임 학급 표기 복구',
+    new Date().toISOString(),
+    sheet.getLastRow() - 1
+  ]]);
 }
 
 function ensureReleaseNotices_() {
@@ -906,7 +955,7 @@ function getStaffRoster_() {
         position: String(row.position || ''),
         department: String(row.department || ''),
         subject: String(row.subject || ''),
-        homeroom: String(row.homeroom || '')
+        homeroom: normalizeStaffHomeroom_(row.homeroom)
       };
     })
     .filter(function(member) { return member.id && member.name; })
@@ -959,6 +1008,8 @@ function replaceStaffRoster_(body) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_ROSTER_SHEET)
+      .getRange('F:F').setNumberFormat('@');
     replaceSheetRows_(STAFF_ROSTER_SHEET, rows);
     replaceSheetRows_(STAFF_ROSTER_META_SHEET, [[
       version, sourceFileName, uploadedBy, uploadedAt, rows.length
@@ -1285,6 +1336,38 @@ function normalizeCommitteeMembers_(values) {
   }).filter(function(member) { return member; });
 }
 
+function normalizeCommitteeTime_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return String(value.getHours()).padStart(2, '0') + ':' +
+      String(value.getMinutes()).padStart(2, '0');
+  }
+  const text = String(value == null ? '' : value).trim();
+  const direct = text.match(/^(\d{1,2}):(\d{2})/);
+  if (direct) return direct[1].padStart(2, '0') + ':' + direct[2];
+  const embedded = text.match(/\b(\d{1,2}):(\d{2}):\d{2}\b/);
+  return embedded ? embedded[1].padStart(2, '0') + ':' + embedded[2] : text;
+}
+
+function repairCommitteeTimeCells_(book) {
+  const sheet = book.getSheetByName(COMMITTEE_EVENTS_SHEET);
+  if (!sheet) return;
+  sheet.getRange('F:G').setNumberFormat('@');
+  if (sheet.getLastRow() < 2) return;
+  const range = sheet.getRange(2, 6, sheet.getLastRow() - 1, 2);
+  const values = range.getValues();
+  let changed = false;
+  values.forEach(function(row) {
+    for (let index = 0; index < 2; index++) {
+      const normalized = normalizeCommitteeTime_(row[index]);
+      if (Object.prototype.toString.call(row[index]) === '[object Date]' || String(row[index] || '') !== normalized) {
+        row[index] = normalized;
+        changed = true;
+      }
+    }
+  });
+  if (changed) range.setValues(values);
+}
+
 function listCommitteeState_() {
   const assignments = readObjects_(COMMITTEE_MEMBERS_SHEET)
     .map(function(row) {
@@ -1307,8 +1390,8 @@ function listCommitteeState_() {
         committeeName: String(row.committeeName || ''),
         title: String(row.title || ''),
         date: dateOnly_(row.date),
-        startTime: String(row.startTime || ''),
-        endTime: String(row.endTime || ''),
+        startTime: normalizeCommitteeTime_(row.startTime),
+        endTime: normalizeCommitteeTime_(row.endTime),
         location: String(row.location || ''),
         agenda: String(row.agenda || ''),
         memberNames: uniqueStrings_(parseJsonArray_(row.memberNamesJson), 30, 100),
@@ -1398,6 +1481,8 @@ function addCommitteeEvent_(body) {
     }
 
     const id = Utilities.getUuid();
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(COMMITTEE_EVENTS_SHEET)
+      .getRange('F:G').setNumberFormat('@');
     const createdAt = new Date().toISOString();
     SpreadsheetApp.getActiveSpreadsheet().getSheetByName(COMMITTEE_EVENTS_SHEET).appendRow([
       id, committeeId, committeeName, title, date, startTime, endTime,
