@@ -53,7 +53,7 @@ import {
   loadSharedWorkLastViewedAt, subscribeSharedWorkViewed,
 } from '../services/sharedWorkNotifications'
 import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
-import type { MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
+import type { DutyScheduleResult, MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
 import {
   addDays, eachDayOfInterval, endOfMonth, endOfWeek, format,
   isSameMonth, startOfMonth, startOfWeek,
@@ -76,7 +76,7 @@ interface PortfolioGroup { group: string; color: string; items: PortfolioItem[] 
 interface DashboardScheduleEvent {
   date: string
   eventName: string
-  source: 'neis' | 'weekly' | 'committee' | 'sharedWork' | 'personal'
+  source: 'neis' | 'weekly' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty'
   department?: string
   completed?: boolean
   taskId?: string
@@ -254,6 +254,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   })
   const [weeklyPlanLoading, setWeeklyPlanLoading] = useState(false)
   const [weeklyPlanError, setWeeklyPlanError] = useState('')
+  const [dutySchedule, setDutySchedule] = useState<DutyScheduleResult>({ events: [], sources: [], fetchedAt: '' })
+  const [dutyScheduleLoading, setDutyScheduleLoading] = useState(false)
+  const [dutyScheduleError, setDutyScheduleError] = useState('')
   const [timetable, setTimetable] = useState<TimetableEntry[]>([])
   const [teacherTT, setTeacherTT] = useState<TimetableEntry[]>([])
   const [sharedTeacher, setSharedTeacher] = useState<TeacherTimetable | null>(null)
@@ -528,6 +531,48 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     return () => window.clearInterval(id)
   }, [loadWeeklyPlan])
 
+  const loadDutySchedule = useCallback(async (force = false) => {
+    const teacherName = config.teacherName?.trim()
+    if (!teacherName || !window.electron?.dutyScheduleGetMonth) {
+      setDutySchedule({ events: [], sources: [], fetchedAt: '' })
+      setDutyScheduleError('')
+      return
+    }
+    const dashboardWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
+    const months = Array.from(new Set([
+      selectedDate.slice(0, 7),
+      format(dashboardWeekStart, 'yyyy-MM'),
+      format(addDays(dashboardWeekStart, 13), 'yyyy-MM'),
+    ]))
+    setDutyScheduleLoading(true)
+    setDutyScheduleError('')
+    try {
+      const results = await Promise.all(months.map(value => {
+        const [year, month] = value.split('-').map(Number)
+        return window.electron.dutyScheduleGetMonth(year, month, teacherName, force)
+      }))
+      setDutySchedule({
+        events: results.flatMap(result => result.events).filter((event, index, all) =>
+          all.findIndex(item => item.date === event.date && item.kind === event.kind && item.location === event.location) === index,
+        ),
+        sources: results.flatMap(result => result.sources).filter((source, index, all) =>
+          all.findIndex(item => item.kind === source.kind && item.url === source.url) === index,
+        ),
+        fetchedAt: results.map(result => result.fetchedAt).filter(Boolean).sort().at(-1) ?? '',
+      })
+    } catch {
+      setDutyScheduleError('등교지도·급식지도 일정을 불러오지 못했습니다.')
+    } finally {
+      setDutyScheduleLoading(false)
+    }
+  }, [config.teacherName, selectedDate])
+
+  useEffect(() => { void loadDutySchedule() }, [loadDutySchedule])
+  useEffect(() => {
+    const id = window.setInterval(() => void loadDutySchedule(true), 30 * 60 * 1000)
+    return () => window.clearInterval(id)
+  }, [loadDutySchedule])
+
   const goDay = (delta: number) => {
     const d = new Date(selectedDate)
     d.setDate(d.getDate() + delta)
@@ -553,6 +598,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       eventName: `${item.startTime} ${item.title}`,
       department: item.committeeName,
       source: 'committee' as const,
+    })),
+    ...dutySchedule.events.map(item => ({
+      date: item.date,
+      eventName: `${item.time} ${item.title}`,
+      department: item.kind === 'gate' ? '등교지도' : '급식지도',
+      source: item.kind === 'gate' ? 'gateDuty' as const : 'mealDuty' as const,
     })),
     ...sharedTasks.filter(task => task.deadline).map(task => ({
       date: toYmd(task.deadline),
@@ -638,11 +689,11 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
             )}
           </div>
           <button
-            onClick={() => { load(); loadWeeklyPlan(true) }}
-            disabled={loading || weeklyPlanLoading || !hasSchool}
+            onClick={() => { void load(); void loadWeeklyPlan(true); void loadDutySchedule(true) }}
+            disabled={loading || weeklyPlanLoading || dutyScheduleLoading || !hasSchool}
             className="btn-ghost flex items-center gap-1.5 disabled:opacity-40"
           >
-            <RefreshCw size={13} className={loading || weeklyPlanLoading ? 'animate-spin' : ''} />
+            <RefreshCw size={13} className={loading || weeklyPlanLoading || dutyScheduleLoading ? 'animate-spin' : ''} />
             <span className="text-xs">새로고침</span>
           </button>
         </div>
@@ -701,7 +752,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                 badge="2주 보기"
                 badgeColor="violet"
               >
-                {(loading || weeklyPlanLoading) && combinedSchedule.length === 0 ? (
+                {(loading || weeklyPlanLoading || dutyScheduleLoading) && combinedSchedule.length === 0 ? (
                   <Skeleton rows={8}/>
                 ) : (
                   <TwoWeekScheduleCalendar
@@ -709,6 +760,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                     events={combinedSchedule}
                     notes={selectedWeekNotes}
                     weeklyPlanError={weeklyPlanError}
+                    dutyScheduleError={dutyScheduleError}
                     sourceSheetCount={weeklyPlan.sourceSheets.length}
                     onSelectDate={setSelectedDate}
                     neisConfigured={hasNeisApiKey}
@@ -924,6 +976,7 @@ function TwoWeekScheduleCalendar({
   events,
   notes,
   weeklyPlanError,
+  dutyScheduleError,
   sourceSheetCount,
   onSelectDate,
   neisConfigured,
@@ -934,6 +987,7 @@ function TwoWeekScheduleCalendar({
   events: DashboardScheduleEvent[]
   notes: WeeklyPlanNote[]
   weeklyPlanError: string
+  dutyScheduleError: string
   sourceSheetCount: number
   onSelectDate: (date: string) => void
   neisConfigured: boolean
@@ -960,6 +1014,10 @@ function TwoWeekScheduleCalendar({
         ? '공유 업무'
       : event.source === 'personal'
         ? '개인'
+        : event.source === 'gateDuty'
+          ? '등교지도'
+          : event.source === 'mealDuty'
+            ? '급식지도'
         : 'NEIS'
   const sourceClass = (event: DashboardScheduleEvent) => event.source === 'weekly'
     ? 'border-sky-400 bg-sky-500/15 text-sky-200'
@@ -969,6 +1027,10 @@ function TwoWeekScheduleCalendar({
         ? 'border-fuchsia-400 bg-fuchsia-500/15 text-fuchsia-200'
       : event.source === 'personal'
         ? 'border-emerald-400 bg-emerald-500/15 text-emerald-200'
+        : event.source === 'gateDuty'
+          ? 'border-cyan-400 bg-cyan-500/15 text-cyan-200'
+          : event.source === 'mealDuty'
+            ? 'border-orange-400 bg-orange-500/15 text-orange-200'
         : 'border-violet-400 bg-violet-500/15 text-violet-200'
 
   return (
@@ -980,6 +1042,8 @@ function TwoWeekScheduleCalendar({
           <span className="flex items-center gap-1 text-amber-300"><span className="h-2 w-2 rounded-full bg-amber-400" />내 위원회</span>
           <span className="flex items-center gap-1 text-fuchsia-300"><span className="h-2 w-2 rounded-full bg-fuchsia-400" />공유 업무</span>
           <span className="flex items-center gap-1 text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400" />개인 업무</span>
+          <span className="flex items-center gap-1 text-cyan-300"><span className="h-2 w-2 rounded-full bg-cyan-400" />등교지도</span>
+          <span className="flex items-center gap-1 text-orange-300"><span className="h-2 w-2 rounded-full bg-orange-400" />급식지도</span>
         </div>
         <button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />월간 캘린더<ArrowUpRight size={11} /></button>
       </div>
@@ -1050,6 +1114,7 @@ function TwoWeekScheduleCalendar({
       </div>
 
       {weeklyPlanError && <p className="mt-2 text-[10px] text-amber-400">{weeklyPlanError} NEIS·개인 일정만 표시합니다.</p>}
+      {dutyScheduleError && <p className="mt-2 text-[10px] text-orange-400">{dutyScheduleError}</p>}
       {!weeklyPlanError && sourceSheetCount > 0 && <p className="mt-2 text-[9px] text-slate-600">교무기획부 주간계획 {sourceSheetCount}개 시트 자동 반영</p>}
     </div>
   )

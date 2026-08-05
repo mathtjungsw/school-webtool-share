@@ -19,9 +19,9 @@ import {
   createPersonalTaskId, loadPersonalTasks, savePersonalTasks, sortPersonalTasks,
   subscribePersonalOrganizer, type PersonalTask, type PersonalTaskPriority,
 } from '../services/personalOrganizer'
-import type { ScheduleEvent, WeeklyPlanResult } from '../types'
+import type { DutyScheduleEvent, DutyScheduleResult, ScheduleEvent, WeeklyPlanResult } from '../types'
 
-type CalendarSource = 'neis' | 'weekly' | 'committee' | 'sharedWork' | 'personal'
+type CalendarSource = 'neis' | 'weekly' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty'
 
 interface CalendarEvent {
   id: string
@@ -35,6 +35,7 @@ interface CalendarEvent {
 }
 
 const EMPTY_WEEKLY_PLAN: WeeklyPlanResult = { events: [], notes: [], sourceSheets: [], fetchedAt: '' }
+const EMPTY_DUTY_SCHEDULE: DutyScheduleResult = { events: [], sources: [], fetchedAt: '' }
 const CALENDAR_SESSION_CACHE_PREFIX = 'ungcheon.calendar.session.v1'
 const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'] as const
 const SOURCE_STYLE: Record<CalendarSource, string> = {
@@ -43,6 +44,8 @@ const SOURCE_STYLE: Record<CalendarSource, string> = {
   committee: 'border-amber-400 bg-amber-500/15 text-amber-200',
   sharedWork: 'border-rose-400 bg-rose-500/15 text-rose-200',
   personal: 'border-emerald-400 bg-emerald-500/15 text-emerald-200',
+  gateDuty: 'border-cyan-400 bg-cyan-500/15 text-cyan-200',
+  mealDuty: 'border-orange-400 bg-orange-500/15 text-orange-200',
 }
 
 function today() { return format(new Date(), 'yyyy-MM-dd') }
@@ -54,6 +57,7 @@ interface CalendarSessionSnapshot {
   weeklyPlan: WeeklyPlanResult
   committeeEvents: CommitteeEvent[]
   sharedTasks: StaffChecklist[]
+  dutyEvents: DutyScheduleEvent[]
   savedAt: string
 }
 
@@ -85,6 +89,7 @@ function readCalendarSessionSnapshot(key: string): CalendarSessionSnapshot | nul
       weeklyPlan: parsed.weeklyPlan ?? EMPTY_WEEKLY_PLAN,
       committeeEvents: parsed.committeeEvents,
       sharedTasks: parsed.sharedTasks,
+      dutyEvents: Array.isArray(parsed.dutyEvents) ? parsed.dutyEvents : [],
       savedAt: parsed.savedAt ?? '',
     }
   } catch {
@@ -121,6 +126,8 @@ export default function CalendarPage() {
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanResult>(EMPTY_WEEKLY_PLAN)
   const [committeeEvents, setCommitteeEvents] = useState<CommitteeEvent[]>([])
   const [sharedTasks, setSharedTasks] = useState<StaffChecklist[]>([])
+  const [dutySchedule, setDutySchedule] = useState<DutyScheduleResult>(EMPTY_DUTY_SCHEDULE)
+  const [dutyError, setDutyError] = useState('')
   const [tasks, setTasks] = useState<PersonalTask[]>([])
   const [draft, setDraft] = useState<TaskDraft>(() => emptyDraft(today()))
   const [loading, setLoading] = useState(false)
@@ -148,14 +155,17 @@ export default function CalendarPage() {
       setWeeklyPlan(cached.weeklyPlan)
       setCommitteeEvents(cached.committeeEvents)
       setSharedTasks(cached.sharedTasks)
+      setDutySchedule({ ...EMPTY_DUTY_SCHEDULE, events: cached.dutyEvents })
     }
     setLoading(true)
+    setDutyError('')
     try {
       void loadPersonalTasks().then(setTasks)
       let nextSchedule = cached?.schedule ?? []
       let nextWeekly = cached?.weeklyPlan ?? EMPTY_WEEKLY_PLAN
       let nextCommitteeEvents = cached?.committeeEvents ?? []
       let nextSharedTasks = cached?.sharedTasks ?? []
+      let nextDutyEvents = cached?.dutyEvents ?? []
 
       const scheduleRequest = (hasNeis
         ? getSchedule(neisKey, config.officeCode!, config.schoolCode!, year, month)
@@ -180,13 +190,22 @@ export default function CalendarPage() {
         : Promise.resolve([]))
         .then(value => { nextSharedTasks = value; setSharedTasks(value) })
         .catch(() => { if (!cached) setSharedTasks([]) })
+      const dutyRequest = (teacherName && window.electron?.dutyScheduleGetMonth
+        ? window.electron.dutyScheduleGetMonth(year, month, teacherName, force)
+        : Promise.resolve(EMPTY_DUTY_SCHEDULE))
+        .then(value => { nextDutyEvents = value.events; setDutySchedule(value) })
+        .catch(() => {
+          setDutyError('등교지도·급식지도 일정을 불러오지 못했습니다.')
+          if (!cached) setDutySchedule(EMPTY_DUTY_SCHEDULE)
+        })
 
-      await Promise.allSettled([scheduleRequest, weeklyRequest, committeeRequest, sharedWorkRequest])
+      await Promise.allSettled([scheduleRequest, weeklyRequest, committeeRequest, sharedWorkRequest, dutyRequest])
       writeCalendarSessionSnapshot(cacheKey, {
         schedule: nextSchedule,
         weeklyPlan: nextWeekly,
         committeeEvents: nextCommitteeEvents,
         sharedTasks: nextSharedTasks,
+        dutyEvents: nextDutyEvents,
       })
     } finally {
       setLoading(false)
@@ -240,6 +259,14 @@ export default function CalendarPage() {
       source: 'committee' as const,
       label: item.committeeName,
     })),
+    ...dutySchedule.events.map((item, index) => ({
+      id: `duty-${item.kind}-${item.date}-${index}`,
+      date: fromYmd(item.date),
+      title: item.title,
+      time: item.time,
+      source: item.kind === 'gate' ? 'gateDuty' as const : 'mealDuty' as const,
+      label: item.kind === 'gate' ? '등교지도' : '급식지도',
+    })),
     ...sharedTasks.filter(task => {
       if (!task.deadline) return false
       const own = task.responses.find(response => response.teacherName === config.teacherName?.trim())
@@ -268,7 +295,7 @@ export default function CalendarPage() {
     }))]
     return combined.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '') || a.title.localeCompare(b.title, 'ko'))
   },
-  [committeeEvents, config.teacherName, hideCompleted, schedule, sharedTasks, tasks, weeklyPlan.events])
+  [committeeEvents, config.teacherName, dutySchedule.events, hideCompleted, schedule, sharedTasks, tasks, weeklyPlan.events])
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>()
@@ -340,7 +367,7 @@ export default function CalendarPage() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-xl font-black text-white"><CalendarDays className="text-emerald-400" />통합 캘린더</h1>
-          <p className="mt-1 text-sm text-slate-400">학사일정·주간계획·내 위원회·공유 업무·개인 업무를 한 달 단위로 확인합니다.</p>
+          <p className="mt-1 text-sm text-slate-400">학사일정·주간계획·등교지도·급식지도·내 위원회·업무를 한 달 단위로 확인합니다.</p>
         </div>
         <div className="flex items-center gap-2">
           <button className="btn-ghost" onClick={() => void loadMonth(true)} disabled={loading}><RotateCcw size={13} className={loading ? 'animate-spin' : ''} />새로고침</button>
@@ -368,6 +395,8 @@ export default function CalendarPage() {
               <Legend color="bg-amber-400" label="내 위원회" />
               <Legend color="bg-rose-400" label="공유 업무" />
               <Legend color="bg-emerald-400" label="개인 업무" />
+              <Legend color="bg-cyan-400" label="등교지도" />
+              <Legend color="bg-orange-400" label="급식지도" />
               <label className="flex cursor-pointer items-center gap-1.5 text-slate-400">
                 <input type="checkbox" checked={hideCompleted} onChange={event => setHideCompleted(event.target.checked)} />완료 숨김
               </label>
@@ -375,6 +404,8 @@ export default function CalendarPage() {
           </div>
 
           {!hasNeis && <p className="mb-3 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-[11px] text-violet-200">환경설정에 NEIS API 키를 입력하면 학사일정도 함께 표시됩니다.</p>}
+          {!config.teacherName?.trim() && <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: 'settings' }))} className="mb-3 w-full rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-left text-[11px] text-cyan-200">환경설정에서 이름을 등록하면 본인의 등교지도·급식지도 일정이 표시됩니다. 이름 설정 바로가기</button>}
+          {dutyError && <p className="mb-3 rounded-xl border border-orange-400/20 bg-orange-500/10 px-3 py-2 text-[11px] text-orange-200">{dutyError}</p>}
 
           <div className="overflow-hidden rounded-xl border border-white/10">
             <div className="grid grid-cols-7 gap-px bg-white/5">
@@ -401,7 +432,7 @@ export default function CalendarPage() {
               })}
             </div>
           </div>
-          <p className="mt-2 text-[10px] text-slate-600">교무기획부 주간계획 {weeklyPlan.sourceSheets.length}개 시트 반영 · {monthKey}</p>
+          <p className="mt-2 text-[10px] text-slate-600">교무기획부 주간계획 {weeklyPlan.sourceSheets.length}개 시트 · 지도 일정 {dutySchedule.sources.length}개 시트 반영 · {monthKey}</p>
         </section>
 
         <aside className="space-y-4">

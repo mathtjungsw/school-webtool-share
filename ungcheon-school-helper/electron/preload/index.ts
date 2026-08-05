@@ -113,6 +113,10 @@ contextBridge.exposeInMainWorld('electron', {
   weeklyPlanGetMonth: (year: number, month: number, force = false) =>
     ipcRenderer.invoke('weeklyPlan:getMonth', year, month, force),
 
+  // 인성안전부 등교지도·문화건강부 급식지도
+  dutyScheduleGetMonth: (year: number, month: number, teacherName: string, force = false) =>
+    ipcRenderer.invoke('dutySchedule:getMonth', year, month, teacherName, force),
+
   // 교육과정 편제표 PDF
   curriculumGetPdfUrl: (id: 'all' | 'grade1' | 'grade2' | 'grade3') =>
     ipcRenderer.invoke('curriculum:getPdfUrl', id),

@@ -116,6 +116,24 @@ export interface AppConfig {
   theme?: 'auto' | 'light' | 'dark'
 }
 
+export type DutyScheduleKind = 'gate' | 'meal'
+
+export interface DutyScheduleEvent {
+  date: string
+  kind: DutyScheduleKind
+  title: string
+  time: string
+  location: string
+  sourceSheet: string
+  sourceUrl: string
+}
+
+export interface DutyScheduleResult {
+  events: DutyScheduleEvent[]
+  fetchedAt: string
+  sources: Array<{ kind: DutyScheduleKind; sheetName: string; url: string }>
+}
+
 export interface LogEntry {
   id: string
   time: string

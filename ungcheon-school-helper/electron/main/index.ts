@@ -10,6 +10,7 @@ import { autoUpdater } from 'electron-updater'
 import Store from 'electron-store'
 import { startMonitoring, stopMonitoring, isMonitoringActive } from './notifier'
 import { getWeeklyPlanMonth } from './weekly-plan'
+import { getDutyScheduleMonth } from './duty-schedule'
 
 const execFileAsync = promisify(execFile)
 
@@ -116,7 +117,7 @@ const ALLOWED_CONFIG_KEY_PREFIXES = [
   'special_remarks:', 'exam_supervisor:', 'newSemClass:',
   'wr:', 'club:', 'photo:', 'insa:',
   'assessment:', 'feedback.', 'timetable_plan:',
-  'personal.',
+  'personal.', 'sidebar.',
 ]
 function isAllowedConfigKey(key: string): boolean {
   return ALLOWED_CONFIG_KEY_PREFIXES.some(p => key.startsWith(p))
@@ -208,6 +209,19 @@ ipcMain.handle('weeklyPlan:getMonth', (_, year: number, month: number, force = f
     throw new Error('주간계획 조회 월이 올바르지 않습니다.')
   }
   return getWeeklyPlanMonth(year, month, force === true)
+})
+
+ipcMain.handle('dutySchedule:getMonth', (_, year: number, month: number, teacherName: string, force = false) => {
+  if (!Number.isInteger(year) || year < 2020 || year > 2100) {
+    throw new Error('지도 일정 조회 연도가 올바르지 않습니다.')
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    throw new Error('지도 일정 조회 월이 올바르지 않습니다.')
+  }
+  if (typeof teacherName !== 'string' || teacherName.trim().length > 20) {
+    throw new Error('교사 이름이 올바르지 않습니다.')
+  }
+  return getDutyScheduleMonth(year, month, teacherName, force === true)
 })
 
 const CURRICULUM_PDFS = {
