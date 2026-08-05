@@ -1,12 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  ArrowLeftRight, Bell, BookOpen, Calculator, CalendarDays, CalendarRange, ChevronDown,
-  ChevronRight, ClipboardCheck, FileCode2, FileDown, FileScan, HelpCircle,
-  FilePenLine, Landmark, LayoutDashboard, Link2, MapPinned, MessageSquareText, ScrollText,
-  Settings, Table2, FileText, UsersRound, Wrench,
+  ArrowLeftRight, Bell, BookOpen, Calculator, CalendarDays, CalendarRange,
+  Check, ClipboardCheck, FileCode2, FileDown, FileScan, FilePenLine, FileText,
+  GripVertical, HelpCircle, Landmark, LayoutDashboard, Link2, ListRestart,
+  MapPinned, MessageSquareText, ScrollText, Settings, Table2, UsersRound, Wrench,
   type LucideIcon,
 } from 'lucide-react'
+import {
+  DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, arrayMove, useSortable, verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import clsx from 'clsx'
 import { useAppStore } from '../stores/appStore'
 import schoolLogo from '../assets/ungcheon-logo.png'
@@ -17,77 +24,42 @@ interface NavItem {
   icon: LucideIcon
 }
 
-interface NavGroup {
-  label: string
-  defaultOpen?: boolean
-  items: NavItem[]
-}
-
-const NAV: NavGroup[] = [
-  {
-    label: '',
-    defaultOpen: true,
-    items: [
-      { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
-      { id: 'calendar', label: '캘린더', icon: CalendarDays },
-      { id: 'school_hub', label: '학교 공유 링크', icon: Link2 },
-      { id: 'feature_requests', label: '기능개선 요청', icon: MessageSquareText },
-      { id: 'settings', label: '환경설정', icon: Settings },
-      { id: 'help', label: '사용 매뉴얼', icon: HelpCircle },
-    ],
-  },
-  {
-    label: '학사·기록',
-    defaultOpen: true,
-    items: [
-      { id: 'timetable_swap', label: '교환·대강 계획', icon: ArrowLeftRight },
-      { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange },
-      { id: 'attendance_print', label: '출석부 출력', icon: UsersRound },
-      { id: 'grade_preview', label: '성적 산출 미리보기', icon: Calculator },
-      { id: 'estimated_split_score', label: '추정분할점수 도우미', icon: Table2 },
-      { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText },
-    ],
-  },
-  {
-    label: '학교운영',
-    defaultOpen: true,
-    items: [
-      { id: 'staff_tasks', label: '업무센터', icon: ClipboardCheck },
-      { id: 'staff_roster', label: '교원 명렬', icon: UsersRound },
-      { id: 'form_center', label: '서식센터', icon: FilePenLine },
-      { id: 'teacher_tools', label: '교사용 도구', icon: Wrench },
-      { id: 'committees', label: '각종 위원회 현황', icon: Landmark },
-    ],
-  },
-  {
-    label: '자료·진로',
-    items: [
-      { id: 'excel_processor', label: 'Excel 전처리', icon: Table2 },
-      { id: 'recommended_subjects', label: '대학 권장과목', icon: BookOpen },
-    ],
-  },
-  {
-    label: '인사행정',
-    items: [
-      { id: 'payroll', label: '호봉획정 계산기', icon: Calculator },
-      { id: 'transfer_score', label: '전보내신점수 계산기', icon: MapPinned },
-      { id: 'insa_analysis', label: 'NEIS 인사기록 분석', icon: FileScan },
-    ],
-  },
-  {
-    label: '파일 처리',
-    items: [
-      { id: 'pdf_extractor', label: 'PDF 텍스트 추출', icon: FileDown },
-      { id: 'file_parser', label: '만능 파일 파서', icon: FileCode2 },
-    ],
-  },
-  {
-    label: '알림',
-    items: [
-      { id: 'notifier', label: '업무 알리미', icon: Bell },
-    ],
-  },
+const NAV: NavItem[] = [
+  { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
+  { id: 'calendar', label: '캘린더', icon: CalendarDays },
+  { id: 'school_hub', label: '학교 공유 링크', icon: Link2 },
+  { id: 'feature_requests', label: '기능개선 요청', icon: MessageSquareText },
+  { id: 'settings', label: '환경설정', icon: Settings },
+  { id: 'help', label: '사용 매뉴얼', icon: HelpCircle },
+  { id: 'timetable_swap', label: '교환·대강 계획', icon: ArrowLeftRight },
+  { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange },
+  { id: 'attendance_print', label: '출석부 출력', icon: UsersRound },
+  { id: 'grade_preview', label: '성적 산출 미리보기', icon: Calculator },
+  { id: 'estimated_split_score', label: '추정분할점수 도우미', icon: Table2 },
+  { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText },
+  { id: 'staff_tasks', label: '업무센터', icon: ClipboardCheck },
+  { id: 'staff_roster', label: '교원 명렬', icon: UsersRound },
+  { id: 'form_center', label: '서식센터', icon: FilePenLine },
+  { id: 'teacher_tools', label: '교사용 도구', icon: Wrench },
+  { id: 'committees', label: '각종 위원회 현황', icon: Landmark },
+  { id: 'excel_processor', label: 'Excel 전처리', icon: Table2 },
+  { id: 'recommended_subjects', label: '대학 권장과목', icon: BookOpen },
+  { id: 'payroll', label: '호봉획정 계산기', icon: Calculator },
+  { id: 'transfer_score', label: '전보내신점수 계산기', icon: MapPinned },
+  { id: 'insa_analysis', label: 'NEIS 인사기록 분석', icon: FileScan },
+  { id: 'pdf_extractor', label: 'PDF 텍스트 추출', icon: FileDown },
+  { id: 'file_parser', label: '만능 파일 파서', icon: FileCode2 },
+  { id: 'notifier', label: '업무 알리미', icon: Bell },
 ]
+
+const DEFAULT_ORDER = NAV.map(item => item.id)
+const NAV_BY_ID = new Map(NAV.map(item => [item.id, item]))
+
+function normalizeOrder(value: unknown) {
+  const saved = Array.isArray(value) ? value.map(String) : []
+  const known = saved.filter((id, index) => NAV_BY_ID.has(id) && saved.indexOf(id) === index)
+  return [...known, ...DEFAULT_ORDER.filter(id => !known.includes(id))]
+}
 
 export default function Sidebar({
   currentPage,
@@ -101,22 +73,39 @@ export default function Sidebar({
   logErrorCount: number
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [menuOrder, setMenuOrder] = useState(DEFAULT_ORDER)
   const config = useAppStore(s => s.config)
-  const currentGroup = NAV.find(group => group.items.some(item => item.id === currentPage))?.label ?? ''
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(NAV.filter(g => g.label).map(g => [g.label, Boolean(g.defaultOpen)])),
-  )
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const isExpanded = expanded || editing
 
   useEffect(() => {
-    if (currentGroup) setOpenGroups(state => ({ ...state, [currentGroup]: true }))
-  }, [currentGroup])
+    void window.electron?.configGet('sidebar.menuOrder').then(value => setMenuOrder(normalizeOrder(value)))
+  }, [])
+
+  const orderedItems = useMemo(() =>
+    menuOrder.map(id => NAV_BY_ID.get(id)).filter((item): item is NavItem => Boolean(item)),
+  [menuOrder])
+
+  const saveOrder = (next: string[]) => {
+    setMenuOrder(next)
+    void window.electron?.configSet('sidebar.menuOrder', next)
+  }
+
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return
+    const oldIndex = menuOrder.indexOf(String(active.id))
+    const newIndex = menuOrder.indexOf(String(over.id))
+    if (oldIndex < 0 || newIndex < 0) return
+    saveOrder(arrayMove(menuOrder, oldIndex, newIndex))
+  }
 
   return (
     <motion.aside
-      animate={{ width: expanded ? 226 : 58 }}
+      animate={{ width: isExpanded ? 226 : 58 }}
       transition={{ duration: 0.22 }}
       onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
+      onMouseLeave={() => { if (!editing) setExpanded(false) }}
       className="app-sidebar h-full bg-surface-950 border-r flex flex-col flex-shrink-0 overflow-hidden z-20"
     >
       <div className="h-14 px-3 flex items-center border-b border-white/5">
@@ -124,7 +113,7 @@ export default function Sidebar({
           <img src={schoolLogo} alt="웅천고등학교" className="w-full h-full object-contain" />
         </div>
         <AnimatePresence>
-          {expanded && (
+          {isExpanded && (
             <motion.div initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="ml-2.5 min-w-0">
               <p className="text-xs font-bold text-white whitespace-nowrap">웅천고등학교</p>
               <p className="text-[10px] text-slate-500 truncate">{config.teacherName || '교직원 업무지원'}</p>
@@ -133,70 +122,96 @@ export default function Sidebar({
         </AnimatePresence>
       </div>
 
+      {isExpanded && (
+        <div className="flex items-center gap-1 border-b border-white/5 px-2 py-1.5">
+          <button
+            type="button"
+            onClick={() => setEditing(value => !value)}
+            className={clsx('flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[10px] font-semibold transition-colors', editing ? 'bg-amber-400/15 text-amber-300' : 'text-slate-500 hover:bg-white/5 hover:text-slate-300')}
+          >
+            {editing ? <><Check size={12} />순서 변경 완료</> : <><GripVertical size={12} />목록 순서 변경</>}
+          </button>
+          {editing && (
+            <button type="button" onClick={() => saveOrder(DEFAULT_ORDER)} className="rounded-lg p-1.5 text-slate-500 hover:bg-white/5 hover:text-slate-300" title="기본 순서로 초기화">
+              <ListRestart size={13} />
+            </button>
+          )}
+        </div>
+      )}
+
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-none">
-        {NAV.map((group, groupIndex) => {
-          const alwaysOpen = group.label === ''
-          const isOpen = alwaysOpen || openGroups[group.label]
-          return (
-            <div key={group.label || groupIndex} className="mb-1">
-              {group.label && expanded && (
-                <button
-                  onClick={() => setOpenGroups(state => ({ ...state, [group.label]: !state[group.label] }))}
-                  className="w-full px-4 pt-3 pb-1 flex items-center justify-between text-[10px] font-semibold tracking-widest text-slate-600 hover:text-slate-400"
-                >
-                  {group.label}
-                  <ChevronDown size={10} className={clsx('transition-transform', !isOpen && '-rotate-90')} />
-                </button>
-              )}
-              {group.label && !expanded && <div className="mx-3 my-1.5 border-t border-white/5" />}
-              {(isOpen || !expanded) && group.items.map(item => (
-                <NavButton
-                  key={item.id}
-                  item={item}
-                  expanded={expanded}
-                  active={currentPage === item.id}
-                  onClick={() => onNavigate(item.id)}
-                />
-              ))}
-            </div>
-          )
-        })}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={menuOrder} strategy={verticalListSortingStrategy}>
+            {orderedItems.map(item => (
+              <NavButton
+                key={item.id}
+                item={item}
+                expanded={isExpanded}
+                editing={editing}
+                active={currentPage === item.id}
+                onClick={() => onNavigate(item.id)}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       </nav>
 
       <button onClick={onOpenLog} className="relative h-10 mx-1.5 mb-1 flex items-center px-3 text-slate-600 hover:text-slate-300 rounded-lg hover:bg-white/5">
         <ScrollText size={15} className="flex-shrink-0" />
-        {expanded && <span className="ml-2.5 text-xs whitespace-nowrap">앱 로그</span>}
+        {isExpanded && <span className="ml-2.5 text-xs whitespace-nowrap">앱 로그</span>}
         {logErrorCount > 0 && <span className="absolute top-1.5 left-6 w-2 h-2 rounded-full bg-rose-500" />}
       </button>
-      <div className="h-8 border-t border-white/5 flex items-center justify-center text-slate-700">
-        <ChevronRight size={13} className={clsx('transition-transform', expanded && 'rotate-180')} />
-      </div>
     </motion.aside>
   )
 }
 
 function NavButton({
-  item, expanded, active, onClick,
+  item, expanded, editing, active, onClick,
 }: {
   item: NavItem
   expanded: boolean
+  editing: boolean
   active: boolean
   onClick: () => void
 }) {
   const Icon = item.icon
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+    disabled: !editing,
+  })
+
   return (
-    <button
-      onClick={onClick}
-      title={!expanded ? item.label : undefined}
-      className={clsx(
-        'relative h-9 mx-1.5 px-3 flex items-center rounded-xl transition-colors',
-        active ? 'bg-amber-400/20 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5',
-      )}
-      style={{ width: 'calc(100% - 12px)' }}
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.45 : 1 }}
+      className="relative mx-1.5"
     >
-      {active && <span className="absolute left-0 w-1 h-5 rounded-r-full bg-amber-400" />}
-      <Icon size={16} className={clsx('flex-shrink-0', active && 'text-amber-400')} />
-      {expanded && <span className="ml-2.5 text-sm whitespace-nowrap">{item.label}</span>}
-    </button>
+      <button
+        type="button"
+        onClick={() => { if (!editing) onClick() }}
+        title={!expanded ? item.label : undefined}
+        className={clsx(
+          'relative flex h-9 w-full items-center rounded-xl px-3 transition-colors',
+          editing ? 'cursor-default pr-9' : '',
+          active ? 'bg-amber-400/20 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5',
+        )}
+      >
+        {active && <span className="absolute left-0 w-1 h-5 rounded-r-full bg-amber-400" />}
+        <Icon size={16} className={clsx('flex-shrink-0', active && 'text-amber-400')} />
+        {expanded && <span className="ml-2.5 truncate text-sm whitespace-nowrap">{item.label}</span>}
+      </button>
+      {expanded && editing && (
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="absolute right-1 top-1 grid h-7 w-7 cursor-grab place-items-center rounded-lg text-slate-500 hover:bg-white/10 hover:text-amber-300 active:cursor-grabbing"
+          title={`${item.label} 순서 이동`}
+          aria-label={`${item.label} 순서 이동`}
+        >
+          <GripVertical size={14} />
+        </button>
+      )}
+    </div>
   )
 }
