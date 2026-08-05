@@ -362,6 +362,9 @@
 [data-theme="light"] .text-teal-300    { color: #0f766e !important; }
 [data-theme="light"] .text-cyan-400    { color: #0e7490 !important; }
 
+/* 지도 일정은 밝은 화면에서는 검정에 가까운 글씨, 어두운 화면에서는 밝은 글씨로 표시 */
+.duty-event-text { color: var(--surface-50) !important; }
+
 /* 시간표 현재교시 삼각형·시간 — 라이트 모드 가시성 보정 */
 .current-period-indicator            { color: #eab308; } /* 다크: yellow-400 */
 .current-period-time                 { color: #ca8a04; } /* 다크: yellow-600 */

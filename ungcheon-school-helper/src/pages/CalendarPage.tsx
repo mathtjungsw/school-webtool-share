@@ -44,8 +44,8 @@ const SOURCE_STYLE: Record<CalendarSource, string> = {
   committee: 'border-amber-400 bg-amber-500/15 text-amber-200',
   sharedWork: 'border-rose-400 bg-rose-500/15 text-rose-200',
   personal: 'border-emerald-400 bg-emerald-500/15 text-emerald-200',
-  gateDuty: 'border-cyan-400 bg-cyan-500/15 text-cyan-200',
-  mealDuty: 'border-orange-400 bg-orange-500/15 text-orange-200',
+  gateDuty: 'duty-event-text border-cyan-500 bg-cyan-500/15 font-semibold',
+  mealDuty: 'duty-event-text border-orange-500 bg-orange-500/15 font-semibold',
 }
 
 function today() { return format(new Date(), 'yyyy-MM-dd') }
