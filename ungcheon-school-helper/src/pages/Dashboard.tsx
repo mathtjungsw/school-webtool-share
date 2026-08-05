@@ -1028,9 +1028,9 @@ function TwoWeekScheduleCalendar({
       : event.source === 'personal'
         ? 'border-emerald-400 bg-emerald-500/15 text-emerald-200'
         : event.source === 'gateDuty'
-          ? 'border-cyan-400 bg-cyan-500/15 text-cyan-200'
+          ? 'duty-event-text border-cyan-500 bg-cyan-500/15 font-semibold'
           : event.source === 'mealDuty'
-            ? 'border-orange-400 bg-orange-500/15 text-orange-200'
+            ? 'duty-event-text border-orange-500 bg-orange-500/15 font-semibold'
         : 'border-violet-400 bg-violet-500/15 text-violet-200'
 
   return (
@@ -1042,8 +1042,8 @@ function TwoWeekScheduleCalendar({
           <span className="flex items-center gap-1 text-amber-300"><span className="h-2 w-2 rounded-full bg-amber-400" />내 위원회</span>
           <span className="flex items-center gap-1 text-fuchsia-300"><span className="h-2 w-2 rounded-full bg-fuchsia-400" />공유 업무</span>
           <span className="flex items-center gap-1 text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400" />개인 업무</span>
-          <span className="flex items-center gap-1 text-cyan-300"><span className="h-2 w-2 rounded-full bg-cyan-400" />등교지도</span>
-          <span className="flex items-center gap-1 text-orange-300"><span className="h-2 w-2 rounded-full bg-orange-400" />급식지도</span>
+          <span className="duty-event-text flex items-center gap-1 font-semibold"><span className="h-2 w-2 rounded-full bg-cyan-500" />등교지도</span>
+          <span className="duty-event-text flex items-center gap-1 font-semibold"><span className="h-2 w-2 rounded-full bg-orange-500" />급식지도</span>
         </div>
         <button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />월간 캘린더<ArrowUpRight size={11} /></button>
       </div>
