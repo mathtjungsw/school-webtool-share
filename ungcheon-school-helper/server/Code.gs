@@ -71,6 +71,19 @@ const NEIS_ENDPOINT_PARAMS = {
 };
 const RELEASE_NOTES = [
   {
+    key: 'v1.0.40',
+    title: '[업데이트] 웅천고 업무도우미 v1.0.40',
+    body: [
+      '· 교환·대강 승인 요청의 거절을 보류로 변경하고, 보류 후 나중에 다시 승인할 수 있도록 개선',
+      '· Excel·한글·PDF 파일에서 잘못 연결된 학생 학번과 이름을 찾는 교정기 추가',
+      '· 학번과 이름이 한 셀에 함께 있거나 옆 칸에 나뉜 표를 모두 인식',
+      '· 원본 프로그램에서 복사한 표와 문장을 직접 붙여넣어 검사하는 기능 추가',
+      '· 이름 불일치·학번 불일치·동명이인·학생 명렬에 없는 값을 원본 위치와 함께 표시',
+      '· 검색도우미와 사용 매뉴얼에 학생 학번·이름 교정기 안내 추가'
+    ].join('\n'),
+    date: '2026-08-09'
+  },
+  {
     key: 'v1.0.39',
     title: '[업데이트] 웅천고 업무도우미 v1.0.39',
     body: [
@@ -79,7 +92,7 @@ const RELEASE_NOTES = [
       '· 대시보드와 통합 캘린더에 NEIS 학사일정 표시 켜기·끄기 기능 추가',
       '· 교원 명렬 메뉴를 교직원 명렬로 변경하고 연수등록부의 교원·교직원 선택 및 출력용 명단 편집 지원',
       '· 학번 4·5자리 또는 이름으로 현재 수업·교실·담당 교사를 확인하는 학생 위치 찾기 추가',
-      '· 교환·대강 반영 요청, 대상 교사 승인·거절 알림, 승인 일정의 달력·시간표 반영 기능 추가',
+      '· 교환·대강 반영 요청, 대상 교사 승인·보류 알림, 승인 일정의 달력·시간표 반영 기능 추가',
       '· 검색도우미와 사용 매뉴얼에 새 기능 안내 추가'
     ].join('\n'),
     date: '2026-08-09'
@@ -309,7 +322,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 12 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 13 } });
 }
 
 function doPost(e) {
@@ -318,7 +331,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 12 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 13 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
@@ -1859,8 +1872,10 @@ function createTimetableChange_(body) {
 function respondTimetableChange_(body) {
   const id = clean_(body.id, 100);
   const responder = clean_(body.responderName, 30);
-  const decision = clean_(body.decision, 20);
-  if (decision !== 'approved' && decision !== 'rejected') throw new Error('승인 또는 거절을 선택해 주세요.');
+  const requestedDecision = clean_(body.decision, 20);
+  // v1.0.39 이하 앱의 rejected 요청도 보류로 처리해 이전 버전과 호환한다.
+  const decision = requestedDecision === 'rejected' ? 'held' : requestedDecision;
+  if (decision !== 'approved' && decision !== 'held') throw new Error('승인 또는 보류를 선택해 주세요.');
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_CHANGES_SHEET);
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(String);
@@ -1873,7 +1888,7 @@ function respondTimetableChange_(body) {
   for (let index = 1; index < values.length; index++) {
     if (String(values[index][idColumn]) !== id) continue;
     if (String(values[index][targetColumn]) !== responder) throw new Error('상대 교사 본인만 응답할 수 있습니다.');
-    if (String(values[index][statusColumn]) !== 'pending') throw new Error('이미 처리된 요청입니다.');
+    if (['pending', 'held', 'rejected'].indexOf(String(values[index][statusColumn])) < 0) throw new Error('이미 처리된 요청입니다.');
     if (decision === 'approved') {
       const candidate = {};
       headers.forEach(function(header, column) { candidate[header] = values[index][column]; });
@@ -1912,7 +1927,7 @@ function cancelTimetableChange_(body) {
     if (String(values[index][headers.indexOf('id')]) !== id) continue;
     if (String(values[index][headers.indexOf('requesterName')]) !== requester) throw new Error('요청한 교사만 취소할 수 있습니다.');
     const status = String(values[index][headers.indexOf('status')]);
-    if (status !== 'pending' && status !== 'approved') throw new Error('취소할 수 없는 요청입니다.');
+    if (['pending', 'held', 'rejected', 'approved'].indexOf(status) < 0) throw new Error('취소할 수 없는 요청입니다.');
     const now = new Date().toISOString();
     sheet.getRange(index + 1, headers.indexOf('status') + 1).setValue('cancelled');
     sheet.getRange(index + 1, headers.indexOf('updatedAt') + 1).setValue(now);

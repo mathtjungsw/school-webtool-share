@@ -39,6 +39,7 @@ const FormCenterPage = lazy(() => import('../pages/FormCenterPage'))
 const TeacherToolsPage = lazy(() => import('../pages/TeacherToolsPage'))
 const TeacherTransferScorePage = lazy(() => import('../pages/TeacherTransferScorePage'))
 const StudentLocatorPage = lazy(() => import('../pages/StudentLocatorPage'))
+const StudentIdentityAuditPage = lazy(() => import('../pages/StudentIdentityAuditPage'))
 
 const PAGES: Record<string, React.ComponentType> = {
   neis: NeisPage,
@@ -71,6 +72,7 @@ const PAGES: Record<string, React.ComponentType> = {
   teacher_tools: TeacherToolsPage,
   transfer_score: TeacherTransferScorePage,
   student_locator: StudentLocatorPage,
+  student_identity_audit: StudentIdentityAuditPage,
 }
 
 const MAX_HISTORY = 40

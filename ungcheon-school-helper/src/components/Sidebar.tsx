@@ -4,7 +4,7 @@ import {
   ArrowLeftRight, Bell, BookOpen, Calculator, CalendarDays, CalendarRange,
   Check, ClipboardCheck, FileCode2, FileDown, FileScan, FilePenLine, FileText,
   GripVertical, HelpCircle, Landmark, LayoutDashboard, Link2, ListRestart,
-  MapPinned, MessageSquareText, ScrollText, SearchCheck, Settings, Table2, UsersRound, Wrench,
+  MapPinned, MessageSquareText, ScanSearch, ScrollText, SearchCheck, Settings, Table2, UsersRound, Wrench,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -34,6 +34,7 @@ const NAV: NavItem[] = [
   { id: 'timetable_swap', label: '교환·대강 계획', icon: ArrowLeftRight },
   { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange },
   { id: 'student_locator', label: '학생 위치 찾기', icon: SearchCheck },
+  { id: 'student_identity_audit', label: '학생 학번·이름 교정기', icon: ScanSearch },
   { id: 'attendance_print', label: '출석부 출력', icon: UsersRound },
   { id: 'grade_preview', label: '성적 산출 미리보기', icon: Calculator },
   { id: 'estimated_split_score', label: '추정분할점수 도우미', icon: Table2 },

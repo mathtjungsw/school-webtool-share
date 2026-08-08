@@ -1,7 +1,7 @@
 import type { TimetablePlanEntry } from './timetablePlan'
 import { hubRequest } from './schoolHub'
 
-export type TimetableChangeStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+export type TimetableChangeStatus = 'pending' | 'approved' | 'held' | 'rejected' | 'cancelled'
 export interface TimetableChangeRequest extends TimetablePlanEntry {
   requesterName: string
   targetTeacherName: string
@@ -16,7 +16,7 @@ export const listTimetableChanges = (viewerName: string, fromDate = '', toDate =
 export const createTimetableChange = (entry: TimetablePlanEntry, requesterName: string) =>
   hubRequest<TimetableChangeRequest>({ action: 'createTimetableChange', entry, requesterName })
 
-export const respondTimetableChange = (id: string, responderName: string, decision: 'approved' | 'rejected') =>
+export const respondTimetableChange = (id: string, responderName: string, decision: 'approved' | 'held') =>
   hubRequest<TimetableChangeRequest>({ action: 'respondTimetableChange', id, responderName, decision })
 
 export const cancelTimetableChange = (id: string, requesterName: string) =>
