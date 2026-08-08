@@ -16,6 +16,7 @@ export interface WorkAssistantResult extends WorkAssistantEntry {
 export const WORK_ASSISTANT_SUGGESTIONS = [
   '내 수업 출석부 출력하고 싶어',
   '학생이 지금 어느 교실에 있는지 찾고 싶어',
+  '학번과 이름이 잘못 연결된 학생을 찾고 싶어',
   '개인 업무를 등록하고 싶어',
   '수업 교환이나 대강 교사 찾기',
   '연수등록부 출력하기',
@@ -105,6 +106,12 @@ export const WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
     summary: '학번 4·5자리 또는 이름을 입력해 학생의 현재 수업, 담당 교사와 교실을 확인합니다.',
     steps: ['학생 위치 찾기 메뉴를 엽니다.', '학번 또는 이름을 입력합니다.', '동명이인이면 학번·학급을 확인해 한 명을 선택합니다.', '현재 교시의 수업·교실·담당 교사를 확인합니다. 승인된 교환·대강도 자동 반영됩니다.'],
     keywords: ['학생 위치', '학생 찾기', '어느 교실', '현재 수업', '학생 교실', '학번 검색', '이름 검색', '동명이인', '학생 어디'],
+  },
+  {
+    id: 'student-identity-audit', title: '학생 학번·이름 연결 오류 찾기', page: 'student_identity_audit', category: '학사·기록',
+    summary: 'Excel·한글·PDF 파일이나 붙여넣은 표에서 학번과 이름을 추출해 학교 학생 명렬과 다른 연결만 찾아줍니다.',
+    steps: ['학생 학번·이름 교정기 메뉴를 엽니다.', 'Excel·HWP·HWPX·PDF 파일을 선택하거나 원본 표를 복사해 입력칸에 붙여넣습니다.', '이름 불일치·학번 불일치·동명이인·명렬에 없는 값을 확인합니다.', '필요하면 오류 목록 복사 버튼으로 결과를 표 형태로 복사합니다.'],
+    keywords: ['학번 이름 교정', '학번 이름 오류', '학번 이름 매칭', '학생 명단 오류', '잘못 연결된 학생', '학번 잘못', '이름 잘못', '명렬 대조', '엑셀 붙여넣기', '한글 표 붙여넣기', 'PDF 명단'],
   },
   {
     id: 'grade-preview', title: '성적 산출 미리보기', page: 'grade_preview', category: '성적',
