@@ -32,6 +32,8 @@ import {
   buildTimetablePlanHwpBytes,
   printTimetablePlan,
 } from '../services/timetablePlanDocument'
+import { cancelTimetableChange, createTimetableChange, listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
+import type { TimetablePlanEntry } from '../services/timetablePlan'
 
 type ViewMode = 'exchange' | 'substitution' | 'plan'
 type PreviewSelection = {
@@ -55,6 +57,7 @@ export default function TimetableSwapPage() {
   const [preview, setPreview] = useState<PreviewSelection | null>(null)
   const [planDraft, setPlanDraft] = useState<TimetablePlanDraft>(() => createEmptyPlanDraft(config.teacherName))
   const [planLoaded, setPlanLoaded] = useState(false)
+  const [changeRequests, setChangeRequests] = useState<TimetableChangeRequest[]>([])
   const configured = Boolean(config.schoolHubUrl)
 
   const load = useCallback(async () => {
@@ -86,6 +89,13 @@ export default function TimetableSwapPage() {
       setPlanLoaded(true)
     })
   }, [config.teacherName])
+
+  const loadChangeRequests = useCallback(async () => {
+    const name = config.teacherName?.trim()
+    if (!name || !configured) return setChangeRequests([])
+    try { setChangeRequests(await listTimetableChanges(name)) } catch { setChangeRequests([]) }
+  }, [config.teacherName, configured])
+  useEffect(() => { void loadChangeRequests(); const handler = () => void loadChangeRequests(); window.addEventListener('timetableChanges:updated', handler); return () => window.removeEventListener('timetableChanges:updated', handler) }, [loadChangeRequests])
 
   useEffect(() => {
     if (!planLoaded) return
@@ -185,6 +195,22 @@ export default function TimetableSwapPage() {
     const name = `교환보강_계획서_${planDraft.meta.documentDate || new Date().toISOString().slice(0, 10)}.hwp`
     const saved = await window.electron?.saveFileDialog(name, buildTimetablePlanHwpBytes(planDraft))
     if (saved) setSuccess('한글(HWP) 계획서를 저장했습니다.')
+  }
+
+  const requestApplication = async (entry: TimetablePlanEntry) => {
+    const requesterName = config.teacherName?.trim() || ''
+    if (!requesterName || entry.originalTeacher !== requesterName) {
+      setError('본인 수업이 원 수업인 교환·대강 항목만 반영 요청을 보낼 수 있습니다.')
+      return
+    }
+    const warning = '해당 교사와 학급에 반영됩니다. 계속 하시겠습니까?\n\n이 기능은 NEIS와 별개이며 교직원의 업무 편의를 위해 제공되는 기능입니다.'
+    if (!window.confirm(warning)) return
+    try {
+      const result = await createTimetableChange(entry, requesterName)
+      setSuccess(`${result.targetTeacherName} 교사에게 승인 요청을 보냈습니다. 승인 후 날짜별 시간표에 반영됩니다.`)
+      await loadChangeRequests()
+      window.dispatchEvent(new Event('timetableChanges:updated'))
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
   }
 
   const upload = async () => {
@@ -303,15 +329,17 @@ export default function TimetableSwapPage() {
         </div>
       )}
 
-      {timetable && teacher && (viewMode === 'plan' ? (
+      {timetable && teacher && (viewMode === 'plan' ? (<>
         <TimetablePlanEditor
           draft={planDraft}
           timetable={timetable}
           onChange={setPlanDraft}
           onPrint={() => printTimetablePlan(planDraft)}
           onSaveHwp={saveHwp}
+          onApply={requestApplication}
         />
-      ) : (
+        <ChangeRequestHistory items={changeRequests} teacherName={config.teacherName?.trim() ?? ''} onChanged={loadChangeRequests} />
+      </>) : (
         <>
           <section className="card p-4 flex flex-wrap items-center gap-4">
             <div className="min-w-0 flex-1">
@@ -487,6 +515,16 @@ export default function TimetableSwapPage() {
       ))}
     </div>
   )
+}
+
+function ChangeRequestHistory({ items, teacherName, onChanged }: { items: TimetableChangeRequest[]; teacherName: string; onChanged: () => Promise<void> }) {
+  const cancel = async (item: TimetableChangeRequest) => {
+    if (!window.confirm(`'${timetableChangeSummary(item)}' 반영 요청을 취소할까요?\n승인된 요청이라면 날짜별 반영도 함께 해제됩니다.`)) return
+    try { await cancelTimetableChange(item.id, teacherName); await onChanged(); window.dispatchEvent(new Event('timetableChanges:updated')) }
+    catch (error) { window.alert(error instanceof Error ? error.message : String(error)) }
+  }
+  const labels: Record<TimetableChangeRequest['status'], string> = { pending: '승인 대기', approved: '승인·반영', rejected: '거절', cancelled: '취소' }
+  return <section className="card p-4"><h2 className="font-bold text-white">반영 요청·처리 내역</h2><p className="mt-1 text-xs text-slate-500">승인된 항목은 원본이 아닌 날짜별 변경 기록으로 적용됩니다.</p><div className="mt-3 space-y-2">{items.map(item => <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-white/[0.025] p-3"><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-slate-200">{timetableChangeSummary(item)}</p><p className="mt-1 text-[10px] text-slate-500">요청 {item.requesterName} → {item.targetTeacherName}</p></div><span className={clsx('rounded-full px-2 py-1 text-[10px] font-bold', item.status === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : item.status === 'pending' ? 'bg-amber-500/15 text-amber-300' : 'bg-slate-500/15 text-slate-400')}>{labels[item.status]}</span>{item.requesterName === teacherName && (item.status === 'pending' || item.status === 'approved') && <button onClick={() => void cancel(item)} className="btn-ghost text-[10px] text-rose-300">취소·반영 해제</button>}</div>)}{!items.length && <p className="py-6 text-center text-xs text-slate-500">반영 요청 내역이 없습니다.</p>}</div></section>
 }
 
 function SlotContent({

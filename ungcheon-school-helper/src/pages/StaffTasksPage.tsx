@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertCircle, BellRing, CalendarDays, Check, CheckCircle2, ClipboardCheck,
+  AlertCircle, ArrowDown, ArrowUp, BellRing, CalendarDays, Check, CheckCircle2, ClipboardCheck,
   ClipboardCopy, Clock3, Download, ExternalLink, FileSpreadsheet, GraduationCap,
   LayoutList, Link2, Pencil, Plus, Printer, RefreshCw, Save,
   ShieldCheck, Trash2, Upload, UserRoundCog, UsersRound,
@@ -103,13 +103,13 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
   }
 
   const tabs: Array<{ id: Tab; label: string; icon: typeof ClipboardCheck }> = [
-    { id: 'roster', label: '교원 명렬', icon: UsersRound },
+    { id: 'roster', label: '교직원 명렬', icon: UsersRound },
     { id: 'training', label: '연수등록부', icon: GraduationCap },
   ]
-  const pageTitle = mode === 'checklists' ? '업무센터' : '교원 명렬'
+  const pageTitle = mode === 'checklists' ? '업무센터' : '교직원 명렬'
   const pageSubtitle = mode === 'checklists'
     ? '개인 업무와 교원별·부서별 공유 업무를 등록하고 진행 현황을 확인합니다.'
-    : '공유 교원 명렬을 관리하고 연수등록부를 출력합니다.'
+    : '공유 교직원 명렬을 관리하고 연수등록부를 출력합니다.'
   const PageIcon = mode === 'checklists' ? ClipboardCheck : UsersRound
 
   return (
@@ -358,7 +358,7 @@ function ChecklistTab(props: {
   }
 
   if (!members.length) {
-    return <div className="card border-dashed border-amber-500/20 py-14 text-center"><UsersRound size={36} className="mx-auto mb-3 text-slate-600" /><h2 className="text-base font-semibold text-slate-300">교원 명렬을 먼저 등록해 주세요</h2><p className="mt-2 text-xs text-slate-500">관리자 모드의 교원 명렬 메뉴에서 Excel을 업로드하면 대상자와 부서를 선택할 수 있습니다.</p></div>
+    return <div className="card border-dashed border-amber-500/20 py-14 text-center"><UsersRound size={36} className="mx-auto mb-3 text-slate-600" /><h2 className="text-base font-semibold text-slate-300">교직원 명렬을 먼저 등록해 주세요</h2><p className="mt-2 text-xs text-slate-500">관리자 모드의 교직원 명렬 메뉴에서 Excel을 업로드하면 대상자와 부서를 선택할 수 있습니다.</p></div>
   }
 
   return (
@@ -500,7 +500,7 @@ function RosterTab({
       const members = parseStaffRosterWorkbook(await window.electron.readFile(filePath))
       setDraft(members)
       setSourceFileName(filePath.split(/[\\/]/).pop() ?? '')
-      onSuccess(`${members.length}명의 교원 명렬을 읽었습니다. 내용을 확인하고 저장하세요.`)
+      onSuccess(`${members.length}명의 교직원 명렬을 읽었습니다. 내용을 확인하고 저장하세요.`)
     } catch (uploadError) {
       onError(uploadError instanceof Error ? uploadError.message : String(uploadError))
     }
@@ -512,7 +512,7 @@ function RosterTab({
     onError('')
     try {
       const result = await replaceSharedStaffRoster(sortStaffMembers(draft), adminPassword, uploadedBy, sourceFileName || roster?.sourceFileName)
-      onSuccess(`교원 명렬 ${result.version}차 저장을 완료했습니다.`)
+      onSuccess(`교직원 명렬 ${result.version}차 저장을 완료했습니다.`)
       await onChanged()
     } catch (saveError) {
       onError(saveError instanceof Error ? saveError.message : String(saveError))
@@ -528,7 +528,7 @@ function RosterTab({
     <div className="space-y-4">
       <div className="card flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="font-bold text-white">공유 교원 명렬 {roster ? `${roster.version}차` : ''}</h2>
+          <h2 className="font-bold text-white">공유 교직원 명렬 {roster ? `${roster.version}차` : ''}</h2>
           <p className="text-[11px] text-slate-500 mt-1">
             {roster ? `${roster.members.length}명 · ${roster.uploadedBy} · ${new Date(roster.uploadedAt).toLocaleString('ko-KR')}` : '등록된 명렬이 없습니다.'}
           </p>
@@ -588,17 +588,32 @@ function RosterTab({
   )
 }
 
+function isTeachingStaff(member: StaffMember) {
+  const position = member.position.replace(/\s/g, '')
+  return position === '교장' || position === '교감' || position.includes('교사')
+}
+
 function TrainingTab({ members }: { members: StaffMember[] }) {
   const [title, setTitle] = useState('교과학점제 연수')
   const [date, setDate] = useState(today())
-  const sortedMembers = useMemo(() => sortStaffMembers(members), [members])
-  const splitAt = Math.max(33, Math.ceil(sortedMembers.length / 2))
-  const leftMembers = sortedMembers.slice(0, splitAt)
-  const rightMembers = sortedMembers.slice(splitAt)
+  const [scope, setScope] = useState<'teachers' | 'all'>('teachers')
+  const scopedMembers = useMemo(() => sortStaffMembers(scope === 'teachers' ? members.filter(isTeachingStaff) : members), [members, scope])
+  const [draftMembers, setDraftMembers] = useState<StaffMember[]>(scopedMembers)
+  useEffect(() => { setDraftMembers(scopedMembers) }, [scopedMembers])
+  const splitAt = Math.max(33, Math.ceil(draftMembers.length / 2))
+  const leftMembers = draftMembers.slice(0, splitAt)
+  const rightMembers = draftMembers.slice(splitAt)
   const previewRows = Array.from(
     { length: Math.max(leftMembers.length, rightMembers.length) },
     (_, index) => ({ left: leftMembers[index], right: rightMembers[index] }),
   )
+  const move = (index: number, direction: -1 | 1) => setDraftMembers(current => {
+    const nextIndex = index + direction
+    if (nextIndex < 0 || nextIndex >= current.length) return current
+    const next = [...current]
+    ;[next[index], next[nextIndex]] = [next[nextIndex], next[index]]
+    return next
+  })
   return (
     <div className="grid lg:grid-cols-[380px_minmax(0,1fr)] gap-4 items-start">
       <div className="card space-y-4">
@@ -608,7 +623,9 @@ function TrainingTab({ members }: { members: StaffMember[] }) {
         </div>
         <label className="field-label">연수 제목<input className="input-field mt-1" value={title} onChange={event => setTitle(event.target.value)} /></label>
         <label className="field-label">연수 날짜<input type="date" className="input-field mt-1" value={date} onChange={event => setDate(event.target.value)} /></label>
-        <button onClick={() => printTrainingRoster(members, title, date)} disabled={!members.length || !title.trim()} className="btn-primary w-full flex items-center justify-center gap-1.5">
+        <label className="field-label">출력 대상<select className="input-field mt-1" value={scope} onChange={event => setScope(event.target.value as 'teachers' | 'all')}><option value="teachers">교원</option><option value="all">교직원</option></select></label>
+        <div className="rounded-xl border border-sky-400/15 bg-sky-500/5 px-3 py-2 text-[11px] text-sky-200">출력용 명단 편집은 이 PC에만 적용되며 공유 원본은 수정되지 않습니다.</div>
+        <button onClick={() => printTrainingRoster(draftMembers, title, date)} disabled={!draftMembers.length || !title.trim()} className="btn-primary w-full flex items-center justify-center gap-1.5">
           <Printer size={14} />연수등록부 인쇄·PDF 저장
         </button>
       </div>
@@ -620,9 +637,13 @@ function TrainingTab({ members }: { members: StaffMember[] }) {
         <dl className="grid grid-cols-[110px_1fr] gap-y-2 text-xs">
           <dt className="text-slate-500">제목</dt><dd className="text-slate-200">{title || '-'}</dd>
           <dt className="text-slate-500">날짜</dt><dd className="text-slate-200">{date || '-'}</dd>
-          <dt className="text-slate-500">대상 인원</dt><dd className="text-slate-200">{members.length}명</dd>
-          <dt className="text-slate-500">정렬</dt><dd className="text-slate-200">교장, 교감, 나머지 교원 가나다순</dd>
+          <dt className="text-slate-500">대상 인원</dt><dd className="text-slate-200">{draftMembers.length}명</dd>
+          <dt className="text-slate-500">범위</dt><dd className="text-slate-200">{scope === 'teachers' ? '교원' : '교직원'} · 출력용 로컬 편집</dd>
         </dl>
+        <div className="mt-4 flex items-center justify-between gap-2"><p className="text-xs font-semibold text-slate-300">출력용 명단 편집</p><div className="flex gap-1"><button type="button" onClick={() => setDraftMembers(scopedMembers)} className="btn-ghost text-[10px]">원본 복원</button><button type="button" onClick={() => setDraftMembers(current => [...current, { id: crypto.randomUUID(), name: '', position: scope === 'teachers' ? '교사' : '직원', department: '', subject: '', homeroom: '' }])} className="btn-ghost text-[10px]"><Plus size={12} />추가</button></div></div>
+        <div className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-1">
+          {draftMembers.map((member, index) => <div key={member.id} className="grid grid-cols-[30px_68px_minmax(0,1fr)_72px] items-center gap-1 rounded-lg border border-white/5 p-1.5"><span className="text-center text-[10px] text-slate-500">{index + 1}</span><input className="input-field px-2 py-1 text-[11px]" value={member.position} onChange={event => setDraftMembers(current => current.map(item => item.id === member.id ? { ...item, position: event.target.value } : item))} /><input className="input-field px-2 py-1 text-[11px]" value={member.name} placeholder="이름" onChange={event => setDraftMembers(current => current.map(item => item.id === member.id ? { ...item, name: event.target.value } : item))} /><div className="flex justify-end"><button onClick={() => move(index, -1)} disabled={index === 0} className="p-1 text-slate-500 disabled:opacity-20"><ArrowUp size={12} /></button><button onClick={() => move(index, 1)} disabled={index === draftMembers.length - 1} className="p-1 text-slate-500 disabled:opacity-20"><ArrowDown size={12} /></button><button onClick={() => setDraftMembers(current => current.filter(item => item.id !== member.id))} className="p-1 text-rose-400"><Trash2 size={12} /></button></div></div>)}
+        </div>
         <div className="mt-4 rounded-xl border border-white/5 overflow-hidden">
           <div className="grid grid-cols-2 bg-white/[0.04] text-[10px] font-semibold text-slate-500">
             <div className="px-3 py-2 border-r border-white/5">왼쪽 열 · 1번부터</div>

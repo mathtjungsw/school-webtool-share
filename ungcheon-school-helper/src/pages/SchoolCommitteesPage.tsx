@@ -478,7 +478,7 @@ function MemberEditor({
       {editable && (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 p-3">
-            <p className="mb-2 text-xs font-black text-slate-700">교원 명렬에서 선택</p>
+            <p className="mb-2 text-xs font-black text-slate-700">교직원 명렬에서 선택</p>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
               <input
@@ -500,7 +500,7 @@ function MemberEditor({
                   {selectedNames.has(person.name) ? <Check size={13} /> : <Plus size={13} />}
                 </button>
               ))}
-              {!staff.length && <p className="p-3 text-center text-xs text-slate-400">등록된 교원 명렬이 없습니다.</p>}
+              {!staff.length && <p className="p-3 text-center text-xs text-slate-400">등록된 교직원 명렬이 없습니다.</p>}
             </div>
           </div>
           <div className="rounded-2xl border border-slate-200 p-3">
@@ -529,7 +529,7 @@ function MemberEditor({
               <UserPlus size={14} /> 직접 입력 위원 추가
             </button>
             <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
-              학부모·전문가 등 교원 명렬에 없는 위원도 직접 등록할 수 있습니다.
+              학부모·전문가 등 교직원 명렬에 없는 위원도 직접 등록할 수 있습니다.
             </p>
           </div>
         </div>
@@ -541,7 +541,7 @@ function MemberEditor({
             <span className="text-center text-xs font-bold text-slate-400">{index + 1}</span>
             <div>
               <strong className="text-sm text-slate-800">{member.name}</strong>
-              <span className="ml-2 text-[11px] text-slate-400">{member.source === 'staff' ? '교원 명렬' : '직접 입력'}</span>
+              <span className="ml-2 text-[11px] text-slate-400">{member.source === 'staff' ? '교직원 명렬' : '직접 입력'}</span>
             </div>
             {editable ? (
               <input

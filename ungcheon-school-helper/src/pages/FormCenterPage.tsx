@@ -135,7 +135,7 @@ const TEMPLATES: FormTemplate[] = [
 ]
 
 const EXISTING_FORMS = [
-  { page: 'staff_roster', title: '연수등록부', desc: '공유 교원 명렬을 반영한 2단 서명부', icon: GraduationCap },
+  { page: 'staff_roster', title: '연수등록부', desc: '공유 교직원 명렬을 반영한 2단 서명부', icon: GraduationCap },
   { page: 'attendance_print', title: '출석부', desc: '학급·수업·교사·과목별 출석부', icon: UsersRound },
   { page: 'timetable_swap', title: '교환·보강 계획서', desc: '교환·대강 계획 작성 및 HWP·PDF 출력', icon: ArrowLeftRight },
 ]

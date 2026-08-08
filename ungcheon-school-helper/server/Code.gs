@@ -21,6 +21,7 @@ const STAFF_CHECKLISTS_SHEET = '업무체크리스트';
 const STAFF_CHECKLIST_RESPONSES_SHEET = '업무체크응답';
 const COMMITTEE_MEMBERS_SHEET = '위원회명단';
 const COMMITTEE_EVENTS_SHEET = '위원회일정';
+const TIMETABLE_CHANGES_SHEET = '교환대강반영';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
 const STAFF_ASSIGNMENTS_2026_APPLIED_KEY = 'UNG_STAFF_ASSIGNMENTS_2026_APPLIED';
 const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
@@ -69,6 +70,20 @@ const NEIS_ENDPOINT_PARAMS = {
   schoolMajorinfo: ['AY']
 };
 const RELEASE_NOTES = [
+  {
+    key: 'v1.0.39',
+    title: '[업데이트] 웅천고 업무도우미 v1.0.39',
+    body: [
+      '· 교직원 명렬의 이름을 직접 입력하는 시범 로그인과 10시간 로그인 유지 기능 추가',
+      '· 창의적체험활동 및 2학기 학사일정을 대시보드 2주 달력과 통합 캘린더에 자동 반영',
+      '· 대시보드와 통합 캘린더에 NEIS 학사일정 표시 켜기·끄기 기능 추가',
+      '· 교원 명렬 메뉴를 교직원 명렬로 변경하고 연수등록부의 교원·교직원 선택 및 출력용 명단 편집 지원',
+      '· 학번 4·5자리 또는 이름으로 현재 수업·교실·담당 교사를 확인하는 학생 위치 찾기 추가',
+      '· 교환·대강 반영 요청, 대상 교사 승인·거절 알림, 승인 일정의 달력·시간표 반영 기능 추가',
+      '· 검색도우미와 사용 매뉴얼에 새 기능 안내 추가'
+    ].join('\n'),
+    date: '2026-08-09'
+  },
   {
     key: 'v1.0.38',
     title: '[업데이트] 웅천고 업무도우미 v1.0.38',
@@ -294,7 +309,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 11 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 12 } });
 }
 
 function doPost(e) {
@@ -303,7 +318,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 11 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 12 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
@@ -386,6 +401,13 @@ function doPost(e) {
       deleteRowById_(COMMITTEE_EVENTS_SHEET, String(body.id || ''));
       return json_({ ok: true });
     }
+    if (action === 'listTimetableChanges') return json_({ ok: true, data: listTimetableChanges_(body) });
+    if (action === 'createTimetableChange') return json_({ ok: true, data: createTimetableChange_(body) });
+    if (action === 'respondTimetableChange') return json_({ ok: true, data: respondTimetableChange_(body) });
+    if (action === 'cancelTimetableChange') {
+      cancelTimetableChange_(body);
+      return json_({ ok: true });
+    }
     if (action === 'getNeisStatus') {
       return json_({ ok: true, data: getNeisStatus_() });
     }
@@ -427,6 +449,7 @@ function getSyncManifest_() {
       staffRoster: versionOf_(STAFF_ROSTER_META_SHEET),
       studentRoster: versionOf_(STUDENT_ROSTER_META_SHEET),
       staffChecklists: activityOf_([STAFF_CHECKLISTS_SHEET, STAFF_CHECKLIST_RESPONSES_SHEET])
+      ,timetableChanges: activityOf_([TIMETABLE_CHANGES_SHEET])
     }
   };
 }
@@ -552,6 +575,12 @@ function ensureSheets_() {
   ensureDataSheet_(book, COMMITTEE_EVENTS_SHEET, [
     'id', 'committeeId', 'committeeName', 'title', 'date', 'startTime', 'endTime',
     'location', 'agenda', 'memberNamesJson', 'createdBy', 'createdAt'
+  ]);
+  ensureDataSheet_(book, TIMETABLE_CHANGES_SHEET, [
+    'id', 'kind', 'status', 'requesterName', 'targetTeacherName',
+    'originalSlotIndex', 'replacementSlotIndex', 'originalDate', 'replacementDate',
+    'originalTeacher', 'replacementTeacher', 'originalClass', 'replacementClass',
+    'originalSubject', 'replacementSubject', 'note', 'createdAt', 'respondedAt', 'responderName', 'updatedAt'
   ]);
   repairCommitteeTimeCells_(book);
   ensureReleaseNotices_();
@@ -1762,6 +1791,134 @@ function deleteRowById_(sheetName, id) {
     }
   }
   throw new Error('삭제할 항목을 찾을 수 없습니다.');
+}
+
+function timetableChangeObject_(row) {
+  return {
+    id: String(row.id || ''), kind: String(row.kind || ''), status: String(row.status || 'pending'),
+    requesterName: String(row.requesterName || ''), targetTeacherName: String(row.targetTeacherName || ''),
+    originalSlotIndex: Number(row.originalSlotIndex) || 0, replacementSlotIndex: Number(row.replacementSlotIndex) || 0,
+    originalDate: dateOnly_(row.originalDate), replacementDate: dateOnly_(row.replacementDate),
+    originalTeacher: String(row.originalTeacher || ''), replacementTeacher: String(row.replacementTeacher || ''),
+    originalClass: String(row.originalClass || ''), replacementClass: String(row.replacementClass || ''),
+    originalSubject: String(row.originalSubject || ''), replacementSubject: String(row.replacementSubject || ''),
+    note: String(row.note || ''), createdAt: iso_(row.createdAt), respondedAt: iso_(row.respondedAt),
+    responderName: String(row.responderName || '')
+  };
+}
+
+function listTimetableChanges_(body) {
+  const viewer = clean_(body.viewerName, 30);
+  if (!viewer) return [];
+  const fromDate = clean_(body.fromDate, 10);
+  const toDate = clean_(body.toDate, 10);
+  const includeSchool = body.includeSchool === true;
+  return readObjects_(TIMETABLE_CHANGES_SHEET).map(timetableChangeObject_).filter(function(item) {
+    if (includeSchool) {
+      if (item.status !== 'approved') return false;
+    } else if (item.requesterName !== viewer && item.targetTeacherName !== viewer && item.originalTeacher !== viewer && item.replacementTeacher !== viewer) return false;
+    const firstDate = item.originalDate < item.replacementDate ? item.originalDate : item.replacementDate;
+    const lastDate = item.originalDate > item.replacementDate ? item.originalDate : item.replacementDate;
+    if (fromDate && lastDate < fromDate) return false;
+    if (toDate && firstDate > toDate) return false;
+    return true;
+  }).sort(function(a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+}
+
+function createTimetableChange_(body) {
+  const entry = body.entry || {};
+  const requester = clean_(body.requesterName, 30);
+  const target = clean_(entry.replacementTeacher, 30);
+  const kind = clean_(entry.kind, 20);
+  if (!requester || !target) throw new Error('요청 교사와 상대 교사를 확인해 주세요.');
+  if (clean_(entry.originalTeacher, 30) !== requester) throw new Error('본인 수업만 반영 요청을 보낼 수 있습니다.');
+  if (requester === target) throw new Error('본인에게는 반영 요청을 보낼 수 없습니다.');
+  if (kind !== 'exchange' && kind !== 'substitution') throw new Error('교환 또는 대강 항목만 반영할 수 있습니다.');
+  const originalDate = clean_(entry.originalDate, 10);
+  const replacementDate = clean_(entry.replacementDate, 10) || originalDate;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(originalDate) || !/^\d{4}-\d{2}-\d{2}$/.test(replacementDate)) throw new Error('반영 날짜를 확인해 주세요.');
+  const now = new Date().toISOString();
+  const row = [
+    Utilities.getUuid(), kind, 'pending', requester, target,
+    Math.max(0, Math.min(34, Number(entry.originalSlotIndex) || 0)),
+    Math.max(0, Math.min(34, Number(entry.replacementSlotIndex) || 0)),
+    originalDate, replacementDate, clean_(entry.originalTeacher, 30) || requester, target,
+    clean_(entry.originalClass, 20), clean_(entry.replacementClass, 20),
+    clean_(entry.originalSubject, 100), clean_(entry.replacementSubject, 100),
+    clean_(entry.note, 200), now, '', '', now
+  ];
+  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_CHANGES_SHEET).appendRow(row);
+  return timetableChangeObject_({
+    id: row[0], kind: row[1], status: row[2], requesterName: row[3], targetTeacherName: row[4],
+    originalSlotIndex: row[5], replacementSlotIndex: row[6], originalDate: row[7], replacementDate: row[8],
+    originalTeacher: row[9], replacementTeacher: row[10], originalClass: row[11], replacementClass: row[12],
+    originalSubject: row[13], replacementSubject: row[14], note: row[15], createdAt: row[16], respondedAt: '', responderName: ''
+  });
+}
+
+function respondTimetableChange_(body) {
+  const id = clean_(body.id, 100);
+  const responder = clean_(body.responderName, 30);
+  const decision = clean_(body.decision, 20);
+  if (decision !== 'approved' && decision !== 'rejected') throw new Error('승인 또는 거절을 선택해 주세요.');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_CHANGES_SHEET);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(String);
+  const idColumn = headers.indexOf('id');
+  const targetColumn = headers.indexOf('targetTeacherName');
+  const statusColumn = headers.indexOf('status');
+  const respondedColumn = headers.indexOf('respondedAt');
+  const responderColumn = headers.indexOf('responderName');
+  const updatedColumn = headers.indexOf('updatedAt');
+  for (let index = 1; index < values.length; index++) {
+    if (String(values[index][idColumn]) !== id) continue;
+    if (String(values[index][targetColumn]) !== responder) throw new Error('상대 교사 본인만 응답할 수 있습니다.');
+    if (String(values[index][statusColumn]) !== 'pending') throw new Error('이미 처리된 요청입니다.');
+    if (decision === 'approved') {
+      const candidate = {};
+      headers.forEach(function(header, column) { candidate[header] = values[index][column]; });
+      const item = timetableChangeObject_(candidate);
+      const conflict = readObjects_(TIMETABLE_CHANGES_SHEET).map(timetableChangeObject_).some(function(other) {
+        if (other.id === id || other.status !== 'approved') return false;
+        const teacherConflict = [item.originalTeacher, item.replacementTeacher].some(function(name) {
+          return name && [other.originalTeacher, other.replacementTeacher].indexOf(name) >= 0;
+        });
+        const dateSlotConflict = (item.originalDate === other.originalDate && item.originalSlotIndex === other.originalSlotIndex) ||
+          (item.replacementDate === other.replacementDate && item.replacementSlotIndex === other.replacementSlotIndex);
+        return teacherConflict && dateSlotConflict;
+      });
+      if (conflict) throw new Error('같은 날짜·교시에 이미 승인된 수업 변경이 있습니다.');
+    }
+    const now = new Date().toISOString();
+    sheet.getRange(index + 1, statusColumn + 1).setValue(decision);
+    sheet.getRange(index + 1, respondedColumn + 1).setValue(now);
+    sheet.getRange(index + 1, responderColumn + 1).setValue(responder);
+    sheet.getRange(index + 1, updatedColumn + 1).setValue(now);
+    const changed = {};
+    headers.forEach(function(header, column) { changed[header] = values[index][column]; });
+    changed.status = decision; changed.respondedAt = now; changed.responderName = responder;
+    return timetableChangeObject_(changed);
+  }
+  throw new Error('처리할 요청을 찾을 수 없습니다.');
+}
+
+function cancelTimetableChange_(body) {
+  const id = clean_(body.id, 100);
+  const requester = clean_(body.requesterName, 30);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_CHANGES_SHEET);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(String);
+  for (let index = 1; index < values.length; index++) {
+    if (String(values[index][headers.indexOf('id')]) !== id) continue;
+    if (String(values[index][headers.indexOf('requesterName')]) !== requester) throw new Error('요청한 교사만 취소할 수 있습니다.');
+    const status = String(values[index][headers.indexOf('status')]);
+    if (status !== 'pending' && status !== 'approved') throw new Error('취소할 수 없는 요청입니다.');
+    const now = new Date().toISOString();
+    sheet.getRange(index + 1, headers.indexOf('status') + 1).setValue('cancelled');
+    sheet.getRange(index + 1, headers.indexOf('updatedAt') + 1).setValue(now);
+    return;
+  }
+  throw new Error('취소할 요청을 찾을 수 없습니다.');
 }
 
 function requireAdmin_(password) {

@@ -5,16 +5,24 @@ import Layout from './components/Layout'
 import UpdateModal from './components/UpdateModal'
 import NoticeModal from './components/NoticeModal'
 import { clearSchoolHubSessionCache, preloadSchoolHubCache } from './services/schoolHub'
+import { useAuthStore } from './stores/authStore'
+import PilotLogin from './components/PilotLogin'
 
 export default function App() {
   const { loadConfig, setUpdateAvailable, setUpdateDownloaded, setUpdateNone, setUpdateError, config } = useAppStore()
   const fetchNotices = useNoticeStore(s => s.fetchNotices)
+  const authReady = useAuthStore(state => state.ready)
+  const authenticated = useAuthStore(state => state.authenticated)
+  const bootstrapAuth = useAuthStore(state => state.bootstrap)
 
   useEffect(() => {
     void (async () => {
       await loadConfig()
       const loadedConfig = useAppStore.getState().config
-      if (loadedConfig.schoolHubUrl) void preloadSchoolHubCache(loadedConfig.teacherName ?? '')
+      await bootstrapAuth()
+      if (loadedConfig.schoolHubUrl && useAuthStore.getState().authenticated) {
+        void preloadSchoolHubCache(useAuthStore.getState().teacherName)
+      }
       await fetchNotices()   // 설정 로드 후 공지 자동 확인 → 새 공지 있으면 팝업
     })()
     if (!window.electron) return
@@ -45,6 +53,22 @@ export default function App() {
     const t = setInterval(apply, 60_000)
     return () => clearInterval(t)
   }, [config.theme])
+
+  useEffect(() => {
+    if (!authenticated) return
+    const remaining = Date.parse(useAuthStore.getState().expiresAt) - Date.now()
+    if (remaining <= 0) {
+      void useAuthStore.getState().logout()
+      return
+    }
+    const timer = window.setTimeout(() => void useAuthStore.getState().logout(), remaining)
+    return () => window.clearTimeout(timer)
+  }, [authenticated])
+
+  if (!useAppStore.getState().isConfigLoaded || !authReady) {
+    return <div className="min-h-screen bg-surface-950 grid place-items-center text-sm text-slate-400">시작 준비 중...</div>
+  }
+  if (!authenticated) return <PilotLogin />
 
   return (
     <>

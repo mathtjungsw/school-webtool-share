@@ -114,6 +114,7 @@ export interface AppConfig {
   schoolAddress?: string
   secondLocationName?: string
   theme?: 'auto' | 'light' | 'dark'
+  showNeisSchedule?: boolean
 }
 
 export type DutyScheduleKind = 'gate' | 'meal'
@@ -132,6 +133,25 @@ export interface DutyScheduleResult {
   events: DutyScheduleEvent[]
   fetchedAt: string
   sources: Array<{ kind: DutyScheduleKind; sheetName: string; url: string }>
+}
+
+export type CreativeScheduleKind = 'activity' | 'schoolEvent'
+export interface CreativeScheduleEvent {
+  date: string
+  title: string
+  kind: CreativeScheduleKind
+  period: string
+  grades: string
+  guidance: string
+  department: string
+  sourceSheet: string
+  sourceUrl: string
+}
+export interface CreativeScheduleResult {
+  events: CreativeScheduleEvent[]
+  fetchedAt: string
+  sourceSheets: string[]
+  sourceUrl: string
 }
 
 export interface LogEntry {

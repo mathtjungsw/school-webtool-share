@@ -11,6 +11,7 @@ import Store from 'electron-store'
 import { startMonitoring, stopMonitoring, isMonitoringActive } from './notifier'
 import { getWeeklyPlanMonth } from './weekly-plan'
 import { getDutyScheduleMonth } from './duty-schedule'
+import { getCreativeScheduleMonth } from './creative-schedule'
 
 const execFileAsync = promisify(execFile)
 
@@ -117,7 +118,7 @@ const ALLOWED_CONFIG_KEY_PREFIXES = [
   'special_remarks:', 'exam_supervisor:', 'newSemClass:',
   'wr:', 'club:', 'photo:', 'insa:',
   'assessment:', 'feedback.', 'timetable_plan:',
-  'personal.', 'sidebar.',
+  'personal.', 'sidebar.', 'pilotLogin.',
 ]
 function isAllowedConfigKey(key: string): boolean {
   return ALLOWED_CONFIG_KEY_PREFIXES.some(p => key.startsWith(p))
@@ -222,6 +223,13 @@ ipcMain.handle('dutySchedule:getMonth', (_, year: number, month: number, teacher
     throw new Error('교사 이름이 올바르지 않습니다.')
   }
   return getDutyScheduleMonth(year, month, teacherName, force === true)
+})
+
+ipcMain.handle('creativeSchedule:getMonth', (_, year: number, month: number, force = false) => {
+  if (!Number.isInteger(year) || year < 2020 || year > 2100 || !Number.isInteger(month) || month < 1 || month > 12) {
+    throw new Error('창의적체험활동 조회 날짜가 올바르지 않습니다.')
+  }
+  return getCreativeScheduleMonth(year, month, force === true)
 })
 
 const CURRICULUM_PDFS = {
@@ -673,12 +681,17 @@ const HUB_ACTIONS = new Set([
   'replaceStudentRoster',
   'listStaffChecklists',
   'addStaffChecklist',
+  'updateStaffChecklist',
   'submitStaffChecklist',
   'deleteStaffChecklist',
   'listCommitteeState',
   'saveCommitteeMembers',
   'addCommitteeEvent',
   'deleteCommitteeEvent',
+  'listTimetableChanges',
+  'createTimetableChange',
+  'respondTimetableChange',
+  'cancelTimetableChange',
 ])
 
 async function requestSchoolHub(payload: Record<string, unknown>) {
@@ -708,6 +721,10 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
     action === 'saveCommitteeMembers' ||
     action === 'addCommitteeEvent' ||
     action === 'deleteCommitteeEvent'
+    || action === 'listTimetableChanges'
+    || action === 'createTimetableChange'
+    || action === 'respondTimetableChange'
+    || action === 'cancelTimetableChange'
   const timer = setTimeout(() => controller.abort(), isLargeDataAction ? 60_000 : 20_000)
   try {
     const res = await fetch(endpoint, {
