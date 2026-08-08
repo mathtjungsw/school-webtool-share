@@ -460,7 +460,7 @@ export default function CalendarPage() {
                   )}>
                     <span className={clsx('mb-1 grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold', date === today() ? 'bg-amber-400 text-slate-950' : index % 7 === 0 ? 'text-rose-400' : index % 7 === 6 ? 'text-sky-400' : 'text-slate-300')}>{format(day, 'd')}</span>
                     <div className="space-y-1">
-                      {dayEvents.slice(0, 4).map(event => <div key={event.id} className={clsx('truncate rounded border-l-2 px-1 py-0.5 text-[9px]', SOURCE_STYLE[event.source], event.completed && 'line-through opacity-50')} title={`${event.label} · ${event.title}`}>{event.time && <span className="mr-1 opacity-70">{event.time}</span>}{event.title}</div>)}
+                      {dayEvents.slice(0, 4).map(event => <div key={event.id} className={clsx('calendar-event-text truncate rounded border-l-2 px-1 py-0.5 text-[9px]', SOURCE_STYLE[event.source], event.completed && 'line-through opacity-50')} title={`${event.label} · ${event.title}`}>{event.time && <span className="mr-1">{event.time}</span>}{event.title}</div>)}
                       {dayEvents.length > 4 && <span className="block pl-1 text-[8px] font-bold text-slate-500">+{dayEvents.length - 4}개</span>}
                     </div>
                   </button>
@@ -511,7 +511,7 @@ export default function CalendarPage() {
 }
 
 function Legend({ color, label }: { color: string; label: string }) {
-  return <span className="flex items-center gap-1 text-slate-400"><span className={clsx('h-2 w-2 rounded-full', color)} />{label}</span>
+  return <span className="calendar-legend-text flex items-center gap-1 text-slate-400"><span className={clsx('h-2 w-2 rounded-full', color)} />{label}</span>
 }
 
 function Summary({ label, value, tone }: { label: string; value: number; tone: 'emerald' | 'sky' | 'rose' }) {

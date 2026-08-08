@@ -76,9 +76,11 @@ const PAGES: Record<string, React.ComponentType> = {
 }
 
 const MAX_HISTORY = 40
+const INITIAL_PAGE = 'dashboard'
 
 export default function Layout() {
-  const [history, setHistory] = useState(['dashboard'])
+  // 앱을 새로 실행하거나 로그인 세션이 시작될 때는 이전 화면과 관계없이 대시보드에서 시작한다.
+  const [history, setHistory] = useState([INITIAL_PAGE])
   const [historyIndex, setHistoryIndex] = useState(0)
   const [logOpen, setLogOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)

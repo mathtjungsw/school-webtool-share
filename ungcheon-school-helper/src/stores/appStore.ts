@@ -10,7 +10,7 @@ export const UNGCHEON_DEFAULT_CONFIG: AppConfig = {
   schoolHubUrl: 'https://script.google.com/macros/s/AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w/exec',
   schoolAddress: '경상남도 창원시 진해구 웅천중로 71',
   theme: 'auto',
-  showNeisSchedule: true,
+  showNeisSchedule: false,
   grade: '1',
   classNm: '1',
   period1Start: '08:40',
@@ -126,20 +126,29 @@ export const useAppStore = create<AppState>((set, get) => ({
     // 따라서 store.store를 flat하게 순회하면 'config' 키 하나만 나옴 → 직접 꺼내야 함
     const all = (await window.electron.configGetAll()) as Record<string, unknown>
     const nested = ((all as Record<string, unknown>).config ?? {}) as Record<string, unknown>
+    const migrations = ((all as Record<string, unknown>).migrations ?? {}) as Record<string, unknown>
+    const applyNeisDefaultOff = migrations.neisScheduleDefaultOffV1 !== true
 
     // API 키는 safeStorage에서 별도 로드 (없으면 기존 plain 값 유지 — 마이그레이션)
     const apiKeys = await window.electron.apiKeyGetAll()
     const cfg: AppConfig = { ...UNGCHEON_DEFAULT_CONFIG, ...nested, ...apiKeys } as AppConfig
+    // 기존 기본값(true)이 저장된 PC도 이번 업데이트에서 한 번만 꺼짐으로 전환한다.
+    // 이후 사용자가 켜거나 끈 선택은 그대로 유지된다.
+    if (applyNeisDefaultOff) cfg.showNeisSchedule = false
 
     set({ config: cfg, isConfigLoaded: true })
 
+    const patch: Record<string, unknown> = {}
     // 최초 실행 시 웅천고 기본값을 사용자 데이터 폴더에 저장한다.
     if (!nested.schoolCode) {
-      const patch: Record<string, unknown> = {}
       for (const [key, value] of Object.entries(UNGCHEON_DEFAULT_CONFIG)) {
         patch[`config.${key}`] = value
       }
-      await window.electron.configSetMany(patch)
     }
+    if (applyNeisDefaultOff) {
+      patch['config.showNeisSchedule'] = false
+      patch['migrations.neisScheduleDefaultOffV1'] = true
+    }
+    if (Object.keys(patch).length > 0) await window.electron.configSetMany(patch)
   },
 }))
