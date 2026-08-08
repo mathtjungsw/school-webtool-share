@@ -1100,16 +1100,16 @@ function TwoWeekScheduleCalendar({
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 text-[10px]">
-          <span className={clsx('flex items-center gap-1', neisConfigured ? 'text-violet-300' : 'text-slate-600')}><span className="h-2 w-2 rounded-full bg-violet-400" />NEIS 학사일정</span>
-          <span className="flex items-center gap-1 text-sky-300"><span className="h-2 w-2 rounded-full bg-sky-400" />주간계획</span>
-          <span className="flex items-center gap-1 text-teal-300"><span className="h-2 w-2 rounded-full bg-teal-400" />창체</span>
-          <span className="flex items-center gap-1 text-indigo-300"><span className="h-2 w-2 rounded-full bg-indigo-400" />창체 학사일정</span>
-          <span className="flex items-center gap-1 text-amber-300"><span className="h-2 w-2 rounded-full bg-amber-400" />내 위원회</span>
-          <span className="flex items-center gap-1 text-fuchsia-300"><span className="h-2 w-2 rounded-full bg-fuchsia-400" />공유 업무</span>
-          <span className="flex items-center gap-1 text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400" />개인 업무</span>
-          <span className="duty-event-text flex items-center gap-1 font-semibold"><span className="h-2 w-2 rounded-full bg-cyan-500" />등교지도</span>
-          <span className="duty-event-text flex items-center gap-1 font-semibold"><span className="h-2 w-2 rounded-full bg-orange-500" />급식지도</span>
-          <span className="flex items-center gap-1 text-fuchsia-300"><span className="h-2 w-2 rounded-full bg-fuchsia-400" />수업변경</span>
+          <span className={clsx('calendar-legend-text flex items-center gap-1', neisConfigured ? 'text-violet-300' : 'text-slate-600')}><span className="h-2 w-2 rounded-full bg-violet-400" />NEIS 학사일정</span>
+          <span className="calendar-legend-text flex items-center gap-1 text-sky-300"><span className="h-2 w-2 rounded-full bg-sky-400" />주간계획</span>
+          <span className="calendar-legend-text flex items-center gap-1 text-teal-300"><span className="h-2 w-2 rounded-full bg-teal-400" />창체</span>
+          <span className="calendar-legend-text flex items-center gap-1 text-indigo-300"><span className="h-2 w-2 rounded-full bg-indigo-400" />창체 학사일정</span>
+          <span className="calendar-legend-text flex items-center gap-1 text-amber-300"><span className="h-2 w-2 rounded-full bg-amber-400" />내 위원회</span>
+          <span className="calendar-legend-text flex items-center gap-1 text-fuchsia-300"><span className="h-2 w-2 rounded-full bg-fuchsia-400" />공유 업무</span>
+          <span className="calendar-legend-text flex items-center gap-1 text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400" />개인 업무</span>
+          <span className="calendar-legend-text flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-cyan-500" />등교지도</span>
+          <span className="calendar-legend-text flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500" />급식지도</span>
+          <span className="calendar-legend-text flex items-center gap-1 text-fuchsia-300"><span className="h-2 w-2 rounded-full bg-fuchsia-400" />수업변경</span>
         </div>
         <div className="flex items-center gap-2"><label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-violet-400/15 bg-violet-500/5 px-2 py-1 text-[10px] text-violet-200"><input type="checkbox" checked={showNeis} onChange={event => onToggleNeis(event.target.checked)} />NEIS 학사일정 켜기</label><button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />월간 캘린더<ArrowUpRight size={11} /></button></div>
       </div>
@@ -1151,8 +1151,8 @@ function TwoWeekScheduleCalendar({
                     </div>
                     <div className="space-y-1">
                       {dayEvents.slice(0, 5).map((event, index) => (
-                        <div key={`${event.source}-${event.department ?? ''}-${index}`} className={clsx('rounded border-l-2 px-1.5 py-1 text-[9px] leading-tight', sourceClass(event), event.completed && 'line-through opacity-50')} title={`${sourceLabel(event)} · ${event.eventName}`}>
-                          <span className="block truncate text-[8px] font-bold opacity-70">{sourceLabel(event)}</span>
+                        <div key={`${event.source}-${event.department ?? ''}-${index}`} className={clsx('calendar-event-text rounded border-l-2 px-1.5 py-1 text-[9px] leading-tight', sourceClass(event), event.completed && 'line-through opacity-50')} title={`${sourceLabel(event)} · ${event.eventName}`}>
+                          <span className="block truncate text-[8px] font-black">{sourceLabel(event)}</span>
                           <span className="block truncate">{event.eventName.replace(/\s*\n\s*/g, ' · ')}</span>
                         </div>
                       ))}
@@ -1170,7 +1170,7 @@ function TwoWeekScheduleCalendar({
         <div className="rounded-xl border border-violet-400/15 bg-violet-500/5 p-3">
           <p className="mb-2 text-[10px] font-bold text-violet-300">{format(new Date(`${selectedDate}T00:00:00`), 'M월 d일 (EEE)', { locale: ko })} 선택 일정</p>
           {selectedEvents.length > 0 ? <div className="max-h-28 space-y-1.5 overflow-y-auto">
-            {selectedEvents.map((event, index) => <div key={`${event.source}-${event.department ?? ''}-${index}`} className="flex items-start gap-2 text-[11px] leading-relaxed"><span className={clsx('mt-0.5 flex-shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold', sourceClass(event))}>{sourceLabel(event)}</span><span className={clsx('whitespace-pre-line text-slate-300', event.completed && 'line-through text-slate-500')}>{event.eventName}</span></div>)}
+            {selectedEvents.map((event, index) => <div key={`${event.source}-${event.department ?? ''}-${index}`} className="flex items-start gap-2 text-[11px] leading-relaxed"><span className={clsx('calendar-event-text mt-0.5 flex-shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-black', sourceClass(event))}>{sourceLabel(event)}</span><span className={clsx('whitespace-pre-line font-semibold text-slate-300', event.completed && 'line-through text-slate-500')}>{event.eventName}</span></div>)}
           </div> : <p className="text-[11px] text-slate-500">선택한 날짜에 등록된 일정이 없습니다.</p>}
         </div>
         <div className="rounded-xl border border-sky-400/15 bg-sky-500/5 p-3">

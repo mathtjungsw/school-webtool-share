@@ -71,6 +71,19 @@ const NEIS_ENDPOINT_PARAMS = {
 };
 const RELEASE_NOTES = [
   {
+    key: 'v1.0.41',
+    title: '[업데이트] 웅천고 업무도우미 v1.0.41',
+    body: [
+      '· 대시보드 2주 일정과 통합 캘린더의 일정명·출처·범례를 항상 진한 글씨로 표시',
+      '· 초기 메뉴를 사용 매뉴얼·업무알리미·대시보드·캘린더·환경설정·업무센터 순서로 재정리',
+      '· 기존에 메뉴를 직접 재배치한 사용자의 개인 순서는 유지하고 기본 순서만 갱신',
+      '· 앱 실행과 로그인 후 항상 대시보드 화면에서 시작하도록 시작 화면 고정',
+      '· NEIS 학사일정 표시를 기본 꺼짐으로 변경하고 이후 사용자의 켜기·끄기 선택은 저장',
+      '· 검색도우미와 사용 매뉴얼에 변경된 기본 설정 안내 반영'
+    ].join('\n'),
+    date: '2026-08-09'
+  },
+  {
     key: 'v1.0.40',
     title: '[업데이트] 웅천고 업무도우미 v1.0.40',
     body: [
@@ -322,7 +335,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 13 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 14 } });
 }
 
 function doPost(e) {
@@ -331,7 +344,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 13 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 14 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
