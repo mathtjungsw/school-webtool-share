@@ -1,4 +1,4 @@
-import { Download, Eye, Printer, ShieldCheck, Trash2, X } from 'lucide-react'
+import { Download, Eye, Send, Printer, ShieldCheck, Trash2, X } from 'lucide-react'
 import { useId, useState } from 'react'
 import {
   PERIODS_PER_DAY,
@@ -20,12 +20,14 @@ export default function TimetablePlanEditor({
   onChange,
   onPrint,
   onSaveHwp,
+  onApply,
 }: {
   draft: TimetablePlanDraft
   timetable: SchoolTimetable
   onChange: (draft: TimetablePlanDraft) => void
   onPrint: () => void
   onSaveHwp: () => void
+  onApply?: (entry: TimetablePlanEntry) => void
 }) {
   const [previewOpen, setPreviewOpen] = useState(false)
   const setMeta = (patch: Partial<TimetablePlanDraft['meta']>) =>
@@ -124,9 +126,10 @@ export default function TimetablePlanEditor({
                     <EditCell value={entry.replacementSubject} onChange={value => updateEntry(entry.id, { replacementSubject: value })} width="w-28" />
                     <EditCell value={entry.replacementTeacher} onChange={value => updateEntry(entry.id, { replacementTeacher: value })} width="w-24" list={timetable.teachers.map(teacher => teacher.name)} />
                     <EditCell value={entry.note} onChange={value => updateEntry(entry.id, { note: value })} width="w-16" />
-                    <td className="p-1.5">
+                    <td className="p-1.5"><div className="flex gap-1">
+                      {entry.kind !== 'change' && <button type="button" className="btn-ghost !p-2 text-cyan-300" onClick={() => onApply?.(entry)} title="상대 교사에게 반영 요청"><Send size={14} /></button>}
                       <button type="button" className="btn-ghost !p-2 text-rose-400" onClick={() => removeEntry(entry.id)} aria-label="항목 삭제"><Trash2 size={14} /></button>
-                    </td>
+                    </div></td>
                   </tr>
                 ))}
               </tbody>

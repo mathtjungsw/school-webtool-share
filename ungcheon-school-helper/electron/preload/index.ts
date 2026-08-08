@@ -117,6 +117,9 @@ contextBridge.exposeInMainWorld('electron', {
   dutyScheduleGetMonth: (year: number, month: number, teacherName: string, force = false) =>
     ipcRenderer.invoke('dutySchedule:getMonth', year, month, teacherName, force),
 
+  creativeScheduleGetMonth: (year: number, month: number, force = false) =>
+    ipcRenderer.invoke('creativeSchedule:getMonth', year, month, force),
+
   // 교육과정 편제표 PDF
   curriculumGetPdfUrl: (id: 'all' | 'grade1' | 'grade2' | 'grade3') =>
     ipcRenderer.invoke('curriculum:getPdfUrl', id),

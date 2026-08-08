@@ -62,6 +62,11 @@ declare global {
         teacherName: string,
         force?: boolean,
       ) => Promise<import('./types').DutyScheduleResult>
+      creativeScheduleGetMonth: (
+        year: number,
+        month: number,
+        force?: boolean,
+      ) => Promise<import('./types').CreativeScheduleResult>
       curriculumGetPdfUrl: (id: 'all' | 'grade1' | 'grade2' | 'grade3') => Promise<string>
       curriculumOpenPdf: (id: 'all' | 'grade1' | 'grade2' | 'grade3') => Promise<string>
       curriculumSavePdf: (

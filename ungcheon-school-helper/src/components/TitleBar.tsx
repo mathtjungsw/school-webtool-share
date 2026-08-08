@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import {
   AlertCircle, Check, ChevronLeft, Link2, Megaphone, MessageSquareText,
-  Minus, Moon, Search, ScrollText, Square, Sun, SunMoon, X,
+  LogOut, Minus, Moon, Search, ScrollText, Square, Sun, SunMoon, X,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useNoticeStore } from '../stores/noticeStore'
 import AdminModeButton from './AdminModeButton'
 import schoolLogo from '../assets/ungcheon-logo.png'
+import { useAuthStore } from '../stores/authStore'
+import TimetableChangeNotifications from './TimetableChangeNotifications'
 
 export default function TitleBar({
   currentPage,
@@ -31,6 +33,7 @@ export default function TitleBar({
   const updateNone = useAppStore(state => state.updateNone)
   const updateError = useAppStore(state => state.updateError)
   const clearUpdateError = useAppStore(state => state.clearUpdateError)
+  const logout = useAuthStore(state => state.logout)
 
   useEffect(() => { window.electron?.getVersion().then(setVersion) }, [])
 
@@ -64,6 +67,7 @@ export default function TitleBar({
         <TopNav active={currentPage === 'school_hub'} onClick={() => onNavigate('school_hub')} icon={<Link2 size={11} />}>학교 공유 링크</TopNav>
         <TopNav active={currentPage === 'feature_requests'} onClick={() => onNavigate('feature_requests')} icon={<MessageSquareText size={11} />}>기능개선</TopNav>
         <NoticeButton />
+        <TimetableChangeNotifications />
         <TopNav active={currentPage === 'settings'} onClick={() => onNavigate('settings')}>환경설정</TopNav>
       </div>
 
@@ -75,6 +79,9 @@ export default function TitleBar({
           </button>
         )}
         <AdminModeButton />
+        <button onClick={() => void logout()} title={`${config.teacherName ?? ''} 로그아웃·사용자 전환`} className="flex h-7 items-center gap-1 rounded px-2 text-[10px] text-slate-400 hover:bg-white/5 hover:text-white">
+          <LogOut size={12} /><span className="max-w-16 truncate">{config.teacherName}</span>
+        </button>
         <button onClick={cycleTheme} title={`테마: ${theme}`} className="w-7 h-7 grid place-items-center text-slate-500 hover:text-slate-200 rounded hover:bg-white/5">
           <ThemeIcon size={13} />
         </button>

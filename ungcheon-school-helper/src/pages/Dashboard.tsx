@@ -53,7 +53,8 @@ import {
   loadSharedWorkLastViewedAt, subscribeSharedWorkViewed,
 } from '../services/sharedWorkNotifications'
 import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
-import type { DutyScheduleResult, MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
+import type { CreativeScheduleResult, DutyScheduleResult, MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
+import { listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
 import {
   addDays, eachDayOfInterval, endOfMonth, endOfWeek, format,
   isSameMonth, startOfMonth, startOfWeek,
@@ -76,7 +77,7 @@ interface PortfolioGroup { group: string; color: string; items: PortfolioItem[] 
 interface DashboardScheduleEvent {
   date: string
   eventName: string
-  source: 'neis' | 'weekly' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty'
+  source: 'neis' | 'weekly' | 'creative' | 'schoolEvent' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty' | 'timetableChange'
   department?: string
   completed?: boolean
   taskId?: string
@@ -86,6 +87,7 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
   { group: '학사·기록', color: 'amber', items: [
     { id: 'timetable_swap', label: '교환·대강 계획', icon: Shuffle, desc: '후보 시간표·연강 확인과 계획서 출력' },
     { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange, desc: '과목선택 자료를 반영한 개인 시간표 조회·인쇄' },
+    { id: 'student_locator', label: '학생 위치 찾기', icon: FileSearch, desc: '학번·이름으로 현재 수업과 교실 확인' },
     { id: 'attendance_print', label: '출석부 출력', icon: ClipboardList, desc: '학급·수업·교사·과목별 출석부 묶음 출력' },
     { id: 'grade_preview', label: '성적 산출 미리보기', icon: BarChart3, desc: '평가 점수 합산·석차등급·성취도 사전 확인' },
     { id: 'estimated_split_score', label: '추정분할점수 도우미', icon: SquareStack, desc: '분할점수 구성·성취도 분포 예측과 목표 분포 역산' },
@@ -93,7 +95,7 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
   ]},
   { group: '학교운영', color: 'rose', items: [
     { id: 'staff_tasks', label: '업무센터', icon: ClipboardCheck, desc: '내 업무·부서 업무·개인 업무와 완료 현황 관리' },
-    { id: 'staff_roster', label: '교원 명렬', icon: UsersRound, desc: '교원 명렬 관리와 연수등록부 출력' },
+    { id: 'staff_roster', label: '교직원 명렬', icon: UsersRound, desc: '교직원 명렬 관리와 연수등록부 출력' },
     { id: 'committees', label: '각종 위원회 현황', icon: Landmark, desc: '위원 명단·개최 일정과 중복 확인' },
   ]},
   { group: '학교 공유 링크', color: 'violet', items: [
@@ -257,6 +259,10 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const [dutySchedule, setDutySchedule] = useState<DutyScheduleResult>({ events: [], sources: [], fetchedAt: '' })
   const [dutyScheduleLoading, setDutyScheduleLoading] = useState(false)
   const [dutyScheduleError, setDutyScheduleError] = useState('')
+  const [creativeSchedule, setCreativeSchedule] = useState<CreativeScheduleResult>({ events: [], sourceSheets: [], sourceUrl: '', fetchedAt: '' })
+  const [creativeScheduleLoading, setCreativeScheduleLoading] = useState(false)
+  const [creativeScheduleError, setCreativeScheduleError] = useState('')
+  const [timetableChanges, setTimetableChanges] = useState<TimetableChangeRequest[]>([])
   const [timetable, setTimetable] = useState<TimetableEntry[]>([])
   const [teacherTT, setTeacherTT] = useState<TimetableEntry[]>([])
   const [sharedTeacher, setSharedTeacher] = useState<TeacherTimetable | null>(null)
@@ -268,6 +274,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
+  const showNeis = config.showNeisSchedule !== false
 
   // ── 학교 날씨 (오늘 날씨 / 이후 기간 예보 카드가 공유) ──
   const { data: weather, loading: weatherLoading, displayName: weatherPlace } = useWeather(config.schoolAddress)
@@ -573,6 +580,37 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     return () => window.clearInterval(id)
   }, [loadDutySchedule])
 
+  const loadCreativeSchedule = useCallback(async (force = false) => {
+    if (!window.electron?.creativeScheduleGetMonth) return
+    const dashboardWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
+    const months = Array.from(new Set([selectedDate.slice(0, 7), format(dashboardWeekStart, 'yyyy-MM'), format(addDays(dashboardWeekStart, 13), 'yyyy-MM')]))
+    setCreativeScheduleLoading(true); setCreativeScheduleError('')
+    try {
+      const results = await Promise.all(months.map(value => { const [year, month] = value.split('-').map(Number); return window.electron.creativeScheduleGetMonth(year, month, force) }))
+      setCreativeSchedule({
+        events: results.flatMap(result => result.events).filter((event, index, all) => all.findIndex(item => item.date === event.date && item.kind === event.kind && item.title === event.title) === index),
+        sourceSheets: [...new Set(results.flatMap(result => result.sourceSheets))],
+        sourceUrl: results.find(result => result.sourceUrl)?.sourceUrl ?? '',
+        fetchedAt: results.map(result => result.fetchedAt).filter(Boolean).sort().at(-1) ?? '',
+      })
+    } catch { setCreativeScheduleError('창의적체험활동 일정을 불러오지 못했습니다.') }
+    finally { setCreativeScheduleLoading(false) }
+  }, [selectedDate])
+
+  const loadTimetableChanges = useCallback(async () => {
+    const name = config.teacherName?.trim()
+    if (!name || !config.schoolHubUrl) return setTimetableChanges([])
+    const dashboardWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
+    const selectedWeekStart = startOfWeek(new Date(`${selectedDate}T00:00:00`), { weekStartsOn: 0 })
+    const fromDate = dashboardWeekStart < selectedWeekStart ? dashboardWeekStart : selectedWeekStart
+    const toDate = dashboardWeekStart > selectedWeekStart ? addDays(dashboardWeekStart, 13) : addDays(selectedWeekStart, 13)
+    try { setTimetableChanges(await listTimetableChanges(name, format(fromDate, 'yyyy-MM-dd'), format(toDate, 'yyyy-MM-dd'))) }
+    catch { setTimetableChanges([]) }
+  }, [config.schoolHubUrl, config.teacherName, selectedDate])
+
+  useEffect(() => { void loadCreativeSchedule(); void loadTimetableChanges() }, [loadCreativeSchedule, loadTimetableChanges])
+  useEffect(() => { const handler = () => void loadTimetableChanges(); window.addEventListener('timetableChanges:updated', handler); return () => window.removeEventListener('timetableChanges:updated', handler) }, [loadTimetableChanges])
+
   const goDay = (delta: number) => {
     const d = new Date(selectedDate)
     d.setDate(d.getDate() + delta)
@@ -582,7 +620,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const isToday = selectedDate === todayStr()
   const selYmd = toYmd(selectedDate)
   const combinedSchedule: DashboardScheduleEvent[] = [
-    ...schedule.map(item => ({
+    ...(showNeis ? schedule : []).map(item => ({
       date: item.date,
       eventName: item.eventName,
       source: 'neis' as const,
@@ -593,6 +631,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       department: item.department,
       source: 'weekly' as const,
     })),
+    ...creativeSchedule.events.map(item => ({ date: item.date, eventName: item.title, department: item.kind === 'activity' ? (item.department || '창의적체험활동') : '창체 학사일정', source: item.kind === 'activity' ? 'creative' as const : 'schoolEvent' as const })),
+    ...timetableChanges.filter(item => item.status === 'approved').flatMap(item => [...new Set([item.originalDate, item.replacementDate])].map(date => ({ date: toYmd(date), eventName: timetableChangeSummary(item), department: '승인된 수업변경', source: 'timetableChange' as const }))),
     ...committeeEvents.map(item => ({
       date: toYmd(item.date),
       eventName: `${item.startTime} ${item.title}`,
@@ -689,11 +729,11 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
             )}
           </div>
           <button
-            onClick={() => { void load(); void loadWeeklyPlan(true); void loadDutySchedule(true) }}
-            disabled={loading || weeklyPlanLoading || dutyScheduleLoading || !hasSchool}
+            onClick={() => { void load(); void loadWeeklyPlan(true); void loadDutySchedule(true); void loadCreativeSchedule(true); void loadTimetableChanges() }}
+            disabled={loading || weeklyPlanLoading || dutyScheduleLoading || creativeScheduleLoading || !hasSchool}
             className="btn-ghost flex items-center gap-1.5 disabled:opacity-40"
           >
-            <RefreshCw size={13} className={loading || weeklyPlanLoading || dutyScheduleLoading ? 'animate-spin' : ''} />
+            <RefreshCw size={13} className={loading || weeklyPlanLoading || dutyScheduleLoading || creativeScheduleLoading ? 'animate-spin' : ''} />
             <span className="text-xs">새로고침</span>
           </button>
         </div>
@@ -752,7 +792,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                 badge="2주 보기"
                 badgeColor="violet"
               >
-                {(loading || weeklyPlanLoading || dutyScheduleLoading) && combinedSchedule.length === 0 ? (
+                {(loading || weeklyPlanLoading || dutyScheduleLoading || creativeScheduleLoading) && combinedSchedule.length === 0 ? (
                   <Skeleton rows={8}/>
                 ) : (
                   <TwoWeekScheduleCalendar
@@ -766,6 +806,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                     neisConfigured={hasNeisApiKey}
                     onOpenHelp={() => onNavigate('help')}
                     onOpenCalendar={() => onNavigate('calendar')}
+                    showNeis={showNeis}
+                    onToggleNeis={value => void saveConfig({ showNeisSchedule: value })}
+                    creativeScheduleError={creativeScheduleError}
                   />
                 )}
               </DashCard>
@@ -842,6 +885,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                 currentTime={currentTime}
                 classStatus={classStatus}
                 onNavigate={onNavigate}
+                timetableChanges={timetableChanges}
               />
             </DashCard>
           </div>
@@ -982,6 +1026,9 @@ function TwoWeekScheduleCalendar({
   neisConfigured,
   onOpenHelp,
   onOpenCalendar,
+  showNeis,
+  onToggleNeis,
+  creativeScheduleError,
 }: {
   selectedDate: string
   events: DashboardScheduleEvent[]
@@ -993,6 +1040,9 @@ function TwoWeekScheduleCalendar({
   neisConfigured: boolean
   onOpenHelp: () => void
   onOpenCalendar: () => void
+  showNeis: boolean
+  onToggleNeis: (value: boolean) => void
+  creativeScheduleError: string
 }) {
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
   const weeks = [0, 1].map(week => Array.from({ length: 7 }, (_, day) => addDays(weekStart, week * 7 + day)))
@@ -1018,7 +1068,13 @@ function TwoWeekScheduleCalendar({
           ? '등교지도'
           : event.source === 'mealDuty'
             ? '급식지도'
-        : 'NEIS'
+          : event.source === 'creative'
+            ? '창체'
+            : event.source === 'schoolEvent'
+              ? '창체 학사일정'
+              : event.source === 'timetableChange'
+                ? '수업변경'
+                : 'NEIS'
   const sourceClass = (event: DashboardScheduleEvent) => event.source === 'weekly'
     ? 'border-sky-400 bg-sky-500/15 text-sky-200'
     : event.source === 'committee'
@@ -1031,7 +1087,13 @@ function TwoWeekScheduleCalendar({
           ? 'duty-event-text border-cyan-500 bg-cyan-500/15 font-semibold'
           : event.source === 'mealDuty'
             ? 'duty-event-text border-orange-500 bg-orange-500/15 font-semibold'
-        : 'border-violet-400 bg-violet-500/15 text-violet-200'
+          : event.source === 'creative'
+            ? 'border-teal-400 bg-teal-500/15 text-teal-200'
+            : event.source === 'schoolEvent'
+              ? 'border-indigo-400 bg-indigo-500/15 text-indigo-200'
+              : event.source === 'timetableChange'
+                ? 'border-fuchsia-400 bg-fuchsia-500/15 text-fuchsia-200 font-semibold'
+                : 'border-violet-400 bg-violet-500/15 text-violet-200'
 
   return (
     <div>
@@ -1039,13 +1101,16 @@ function TwoWeekScheduleCalendar({
         <div className="flex flex-wrap items-center gap-3 text-[10px]">
           <span className={clsx('flex items-center gap-1', neisConfigured ? 'text-violet-300' : 'text-slate-600')}><span className="h-2 w-2 rounded-full bg-violet-400" />NEIS 학사일정</span>
           <span className="flex items-center gap-1 text-sky-300"><span className="h-2 w-2 rounded-full bg-sky-400" />주간계획</span>
+          <span className="flex items-center gap-1 text-teal-300"><span className="h-2 w-2 rounded-full bg-teal-400" />창체</span>
+          <span className="flex items-center gap-1 text-indigo-300"><span className="h-2 w-2 rounded-full bg-indigo-400" />창체 학사일정</span>
           <span className="flex items-center gap-1 text-amber-300"><span className="h-2 w-2 rounded-full bg-amber-400" />내 위원회</span>
           <span className="flex items-center gap-1 text-fuchsia-300"><span className="h-2 w-2 rounded-full bg-fuchsia-400" />공유 업무</span>
           <span className="flex items-center gap-1 text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400" />개인 업무</span>
           <span className="duty-event-text flex items-center gap-1 font-semibold"><span className="h-2 w-2 rounded-full bg-cyan-500" />등교지도</span>
           <span className="duty-event-text flex items-center gap-1 font-semibold"><span className="h-2 w-2 rounded-full bg-orange-500" />급식지도</span>
+          <span className="flex items-center gap-1 text-fuchsia-300"><span className="h-2 w-2 rounded-full bg-fuchsia-400" />수업변경</span>
         </div>
-        <button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />월간 캘린더<ArrowUpRight size={11} /></button>
+        <div className="flex items-center gap-2"><label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-violet-400/15 bg-violet-500/5 px-2 py-1 text-[10px] text-violet-200"><input type="checkbox" checked={showNeis} onChange={event => onToggleNeis(event.target.checked)} />NEIS 학사일정 켜기</label><button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />월간 캘린더<ArrowUpRight size={11} /></button></div>
       </div>
 
       {!neisConfigured && (
@@ -1115,6 +1180,7 @@ function TwoWeekScheduleCalendar({
 
       {weeklyPlanError && <p className="mt-2 text-[10px] text-amber-400">{weeklyPlanError} NEIS·개인 일정만 표시합니다.</p>}
       {dutyScheduleError && <p className="mt-2 text-[10px] text-orange-400">{dutyScheduleError}</p>}
+      {creativeScheduleError && <p className="mt-2 text-[10px] text-teal-300">{creativeScheduleError}</p>}
       {!weeklyPlanError && sourceSheetCount > 0 && <p className="mt-2 text-[9px] text-slate-600">교무기획부 주간계획 {sourceSheetCount}개 시트 자동 반영</p>}
     </div>
   )
@@ -1519,7 +1585,7 @@ function ClassStatusBanner({ status }: { status: ClassStatus }) {
 
 // ─── TimetableSection ─────────────────────────────────────────────
 function TimetableSection({
-  timetable, teacherTT, sharedTeacher, selectedDate, config, periodRanges, currentTime, classStatus, onNavigate
+  timetable, teacherTT, sharedTeacher, selectedDate, config, periodRanges, currentTime, classStatus, onNavigate, timetableChanges
 }: {
   timetable: TimetableEntry[]
   teacherTT: TimetableEntry[]
@@ -1530,6 +1596,7 @@ function TimetableSection({
   currentTime: Date
   classStatus: ClassStatus | null
   onNavigate: (id: string) => void
+  timetableChanges: TimetableChangeRequest[]
 }) {
   const weekDates = getWeekDates(selectedDate)
   const DAY = ['월','화','수','목','금']
@@ -1585,6 +1652,19 @@ function TimetableSection({
               const dayIndex = weekDates.indexOf(date)
               const slotIndex = dayIndex * 7 + Number(period) - 1
               const slot = sharedTeacher.slots[slotIndex]
+              const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
+              const change = timetableChanges.find(item => item.status === 'approved' && (
+                (item.originalDate === isoDate && item.originalSlotIndex === slotIndex) ||
+                (item.kind === 'exchange' && item.replacementDate === isoDate && item.replacementSlotIndex === slotIndex)
+              ))
+              if (change) {
+                const firstSide = change.originalDate === isoDate && change.originalSlotIndex === slotIndex
+                const assignedTeacher = firstSide ? change.replacementTeacher : change.originalTeacher
+                const className = firstSide ? change.originalClass : change.replacementClass
+                const subject = firstSide ? change.originalSubject : change.replacementSubject
+                if (assignedTeacher === sharedTeacher.name) return { text: className || subject, sub: `${subject} · 승인 반영`, colorClass: 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30', isNow: date === todayYmd && period === currentPeriod }
+                if (change.originalTeacher === sharedTeacher.name || change.replacementTeacher === sharedTeacher.name) return { text: slot?.value.split(/\r?\n/)[0] || className, sub: `변경 담당 · ${assignedTeacher}`, colorClass: 'bg-amber-500/15 text-amber-200', isNow: false }
+              }
               if (!slot?.value) return null
               const lines = slot.value.split(/\r?\n/).filter(Boolean)
               const isNow = date === todayYmd && period === currentPeriod

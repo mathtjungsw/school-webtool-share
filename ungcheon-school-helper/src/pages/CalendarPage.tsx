@@ -19,9 +19,10 @@ import {
   createPersonalTaskId, loadPersonalTasks, savePersonalTasks, sortPersonalTasks,
   subscribePersonalOrganizer, type PersonalTask, type PersonalTaskPriority,
 } from '../services/personalOrganizer'
-import type { DutyScheduleEvent, DutyScheduleResult, ScheduleEvent, WeeklyPlanResult } from '../types'
+import type { CreativeScheduleResult, DutyScheduleEvent, DutyScheduleResult, ScheduleEvent, WeeklyPlanResult } from '../types'
+import { listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
 
-type CalendarSource = 'neis' | 'weekly' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty'
+type CalendarSource = 'neis' | 'weekly' | 'creative' | 'schoolEvent' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty' | 'timetableChange'
 
 interface CalendarEvent {
   id: string
@@ -36,16 +37,20 @@ interface CalendarEvent {
 
 const EMPTY_WEEKLY_PLAN: WeeklyPlanResult = { events: [], notes: [], sourceSheets: [], fetchedAt: '' }
 const EMPTY_DUTY_SCHEDULE: DutyScheduleResult = { events: [], sources: [], fetchedAt: '' }
+const EMPTY_CREATIVE_SCHEDULE: CreativeScheduleResult = { events: [], sourceSheets: [], sourceUrl: '', fetchedAt: '' }
 const CALENDAR_SESSION_CACHE_PREFIX = 'ungcheon.calendar.session.v1'
 const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'] as const
 const SOURCE_STYLE: Record<CalendarSource, string> = {
   neis: 'border-violet-400 bg-violet-500/15 text-violet-200',
   weekly: 'border-sky-400 bg-sky-500/15 text-sky-200',
+  creative: 'border-teal-400 bg-teal-500/15 text-teal-200',
+  schoolEvent: 'border-indigo-400 bg-indigo-500/15 text-indigo-200',
   committee: 'border-amber-400 bg-amber-500/15 text-amber-200',
   sharedWork: 'border-rose-400 bg-rose-500/15 text-rose-200',
   personal: 'border-emerald-400 bg-emerald-500/15 text-emerald-200',
   gateDuty: 'duty-event-text border-cyan-500 bg-cyan-500/15 font-semibold',
   mealDuty: 'duty-event-text border-orange-500 bg-orange-500/15 font-semibold',
+  timetableChange: 'border-fuchsia-400 bg-fuchsia-500/15 text-fuchsia-200 font-semibold',
 }
 
 function today() { return format(new Date(), 'yyyy-MM-dd') }
@@ -120,6 +125,7 @@ function emptyDraft(date: string): TaskDraft {
 
 export default function CalendarPage() {
   const config = useAppStore(state => state.config)
+  const saveConfig = useAppStore(state => state.saveConfig)
   const [viewDate, setViewDate] = useState(() => startOfMonth(new Date()))
   const [selectedDate, setSelectedDate] = useState(today())
   const [schedule, setSchedule] = useState<ScheduleEvent[]>([])
@@ -127,6 +133,8 @@ export default function CalendarPage() {
   const [committeeEvents, setCommitteeEvents] = useState<CommitteeEvent[]>([])
   const [sharedTasks, setSharedTasks] = useState<StaffChecklist[]>([])
   const [dutySchedule, setDutySchedule] = useState<DutyScheduleResult>(EMPTY_DUTY_SCHEDULE)
+  const [creativeSchedule, setCreativeSchedule] = useState<CreativeScheduleResult>(EMPTY_CREATIVE_SCHEDULE)
+  const [timetableChanges, setTimetableChanges] = useState<TimetableChangeRequest[]>([])
   const [dutyError, setDutyError] = useState('')
   const [tasks, setTasks] = useState<PersonalTask[]>([])
   const [draft, setDraft] = useState<TaskDraft>(() => emptyDraft(today()))
@@ -136,6 +144,7 @@ export default function CalendarPage() {
 
   const monthKey = format(viewDate, 'yyyy-MM')
   const hasNeis = Boolean(config.officeCode && config.schoolCode && config.neisApiKey?.trim())
+  const showNeis = config.showNeisSchedule !== false
 
   const loadMonth = useCallback(async (force = false) => {
     const year = Number(format(viewDate, 'yyyy'))
@@ -199,7 +208,18 @@ export default function CalendarPage() {
           if (!cached) setDutySchedule(EMPTY_DUTY_SCHEDULE)
         })
 
-      await Promise.allSettled([scheduleRequest, weeklyRequest, committeeRequest, sharedWorkRequest, dutyRequest])
+      const creativeRequest = (window.electron?.creativeScheduleGetMonth
+        ? window.electron.creativeScheduleGetMonth(year, month, force)
+        : Promise.resolve(EMPTY_CREATIVE_SCHEDULE))
+        .then(setCreativeSchedule)
+        .catch(() => setCreativeSchedule(EMPTY_CREATIVE_SCHEDULE))
+      const changeRequest = (teacherName && config.schoolHubUrl
+        ? listTimetableChanges(teacherName, `${format(viewDate, 'yyyy-MM')}-01`, `${format(viewDate, 'yyyy-MM')}-31`)
+        : Promise.resolve([]))
+        .then(setTimetableChanges)
+        .catch(() => setTimetableChanges([]))
+
+      await Promise.allSettled([scheduleRequest, weeklyRequest, committeeRequest, sharedWorkRequest, dutyRequest, creativeRequest, changeRequest])
       writeCalendarSessionSnapshot(cacheKey, {
         schedule: nextSchedule,
         weeklyPlan: nextWeekly,
@@ -237,7 +257,7 @@ export default function CalendarPage() {
 
   const events = useMemo<CalendarEvent[]>(() => {
     const combined: CalendarEvent[] = [
-    ...schedule.map(item => ({
+    ...(showNeis ? schedule : []).map(item => ({
       id: `neis-${item.date}-${item.eventName}`,
       date: fromYmd(item.date),
       title: item.eventName,
@@ -251,6 +271,16 @@ export default function CalendarPage() {
       source: 'weekly' as const,
       label: item.department || '주간계획',
     })),
+    ...creativeSchedule.events.map((item, index) => ({
+      id: `creative-${item.kind}-${item.date}-${index}`,
+      date: fromYmd(item.date), title: item.title,
+      source: item.kind === 'activity' ? 'creative' as const : 'schoolEvent' as const,
+      label: item.kind === 'activity' ? (item.department || '창의적체험활동') : '창체 학사일정',
+    })),
+    ...timetableChanges.filter(item => item.status === 'approved').flatMap(item => {
+      const dates = [...new Set([item.originalDate, item.replacementDate])]
+      return dates.map(date => ({ id: `timetable-change-${item.id}-${date}`, date, title: timetableChangeSummary(item), source: 'timetableChange' as const, label: '승인된 수업변경' }))
+    }),
     ...committeeEvents.map(item => ({
       id: `committee-${item.id}`,
       date: item.date,
@@ -295,7 +325,7 @@ export default function CalendarPage() {
     }))]
     return combined.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '') || a.title.localeCompare(b.title, 'ko'))
   },
-  [committeeEvents, config.teacherName, dutySchedule.events, hideCompleted, schedule, sharedTasks, tasks, weeklyPlan.events])
+  [committeeEvents, config.teacherName, creativeSchedule.events, dutySchedule.events, hideCompleted, schedule, sharedTasks, showNeis, tasks, timetableChanges, weeklyPlan.events])
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>()
@@ -392,11 +422,17 @@ export default function CalendarPage() {
             <div className="flex flex-wrap items-center gap-3 text-[10px]">
               <Legend color="bg-violet-400" label="NEIS" />
               <Legend color="bg-sky-400" label="주간계획" />
+              <Legend color="bg-teal-400" label="창의적체험활동" />
+              <Legend color="bg-indigo-400" label="창체 학사일정" />
               <Legend color="bg-amber-400" label="내 위원회" />
               <Legend color="bg-rose-400" label="공유 업무" />
               <Legend color="bg-emerald-400" label="개인 업무" />
               <Legend color="bg-cyan-400" label="등교지도" />
               <Legend color="bg-orange-400" label="급식지도" />
+              <Legend color="bg-fuchsia-400" label="수업변경" />
+              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-violet-400/15 bg-violet-500/5 px-2 py-1 text-violet-200">
+                <input type="checkbox" checked={showNeis} onChange={event => void saveConfig({ showNeisSchedule: event.target.checked })} />NEIS 학사일정 켜기
+              </label>
               <label className="flex cursor-pointer items-center gap-1.5 text-slate-400">
                 <input type="checkbox" checked={hideCompleted} onChange={event => setHideCompleted(event.target.checked)} />완료 숨김
               </label>

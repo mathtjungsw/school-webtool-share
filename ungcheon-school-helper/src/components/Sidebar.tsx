@@ -4,7 +4,7 @@ import {
   ArrowLeftRight, Bell, BookOpen, Calculator, CalendarDays, CalendarRange,
   Check, ClipboardCheck, FileCode2, FileDown, FileScan, FilePenLine, FileText,
   GripVertical, HelpCircle, Landmark, LayoutDashboard, Link2, ListRestart,
-  MapPinned, MessageSquareText, ScrollText, Settings, Table2, UsersRound, Wrench,
+  MapPinned, MessageSquareText, ScrollText, SearchCheck, Settings, Table2, UsersRound, Wrench,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -33,12 +33,13 @@ const NAV: NavItem[] = [
   { id: 'help', label: '사용 매뉴얼', icon: HelpCircle },
   { id: 'timetable_swap', label: '교환·대강 계획', icon: ArrowLeftRight },
   { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange },
+  { id: 'student_locator', label: '학생 위치 찾기', icon: SearchCheck },
   { id: 'attendance_print', label: '출석부 출력', icon: UsersRound },
   { id: 'grade_preview', label: '성적 산출 미리보기', icon: Calculator },
   { id: 'estimated_split_score', label: '추정분할점수 도우미', icon: Table2 },
   { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText },
   { id: 'staff_tasks', label: '업무센터', icon: ClipboardCheck },
-  { id: 'staff_roster', label: '교원 명렬', icon: UsersRound },
+  { id: 'staff_roster', label: '교직원 명렬', icon: UsersRound },
   { id: 'form_center', label: '서식센터', icon: FilePenLine },
   { id: 'teacher_tools', label: '교사용 도구', icon: Wrench },
   { id: 'committees', label: '각종 위원회 현황', icon: Landmark },

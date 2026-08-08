@@ -5,6 +5,7 @@ import {
   Database, Trash2,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
+import { useAuthStore } from '../stores/authStore'
 import { useAdminStore } from '../stores/adminStore'
 import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 import {
@@ -16,6 +17,7 @@ import {
 const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
 
 export default function UngcheonSettingsPage() {
+  const logout = useAuthStore(state => state.logout)
   const config = useAppStore(s => s.config)
   const saveConfig = useAppStore(s => s.saveConfig)
   const isAdmin = useAdminStore(s => s.isAdmin)
@@ -84,7 +86,9 @@ export default function UngcheonSettingsPage() {
       <Section icon={<UserRound size={17} />} title="사용자 설정">
         <div className="grid sm:grid-cols-3 gap-3">
           <Field label="교사 이름">
-            <input value={draft.teacherName ?? ''} onChange={e => setDraft({ ...draft, teacherName: e.target.value })} placeholder="예: 김교사" />
+            <input value={draft.teacherName ?? ''} readOnly className="cursor-not-allowed opacity-70" />
+            <button type="button" onClick={() => void logout()} className="mt-2 text-xs text-sky-400 hover:text-sky-300">로그아웃하고 사용자 전환</button>
+            <p className="mt-1 text-[10px] text-amber-300">시범운영 뒤 비밀번호 생성예정입니다</p>
           </Field>
           <Field label="담당 학년">
             <select value={draft.grade ?? '1'} onChange={e => setDraft({ ...draft, grade: e.target.value })}>
