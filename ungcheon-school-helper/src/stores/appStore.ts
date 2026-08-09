@@ -126,7 +126,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     // 따라서 store.store를 flat하게 순회하면 'config' 키 하나만 나옴 → 직접 꺼내야 함
     const all = (await window.electron.configGetAll()) as Record<string, unknown>
     const nested = ((all as Record<string, unknown>).config ?? {}) as Record<string, unknown>
-    const migrations = ((all as Record<string, unknown>).migrations ?? {}) as Record<string, unknown>
+    // dashboard.*는 메인 프로세스의 허용된 설정 영역이다.
+    // 1.0.41의 migrations.* 키는 보안 화이트리스트에 없어 시작 중 저장 예외를 일으켰다.
+    const migrations = ((all as Record<string, unknown>).dashboard ?? {}) as Record<string, unknown>
     const applyNeisDefaultOff = migrations.neisScheduleDefaultOffV1 !== true
 
     // API 키는 safeStorage에서 별도 로드 (없으면 기존 plain 값 유지 — 마이그레이션)
@@ -147,8 +149,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (applyNeisDefaultOff) {
       patch['config.showNeisSchedule'] = false
-      patch['migrations.neisScheduleDefaultOffV1'] = true
+      patch['dashboard.neisScheduleDefaultOffV1'] = true
     }
-    if (Object.keys(patch).length > 0) await window.electron.configSetMany(patch)
+    if (Object.keys(patch).length > 0) {
+      try {
+        await window.electron.configSetMany(patch)
+      } catch (error) {
+        // 설정 이전 기록 저장에 실패해도 로그인 초기화와 앱 시작을 막지 않는다.
+        get().addLog('warn', `초기 설정 저장을 건너뜁니다: ${error instanceof Error ? error.message : String(error)}`, '설정')
+      }
+    }
   },
 }))
