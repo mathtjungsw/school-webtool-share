@@ -1,0 +1,4 @@
+__pycache__/
+*.py[cod]
+docs/user-manual-source/screenshots-original/
+docs/user-manual-source/screenshots-generated/
