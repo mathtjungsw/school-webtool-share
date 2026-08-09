@@ -29,9 +29,16 @@ export const WORK_ASSISTANT_SUGGESTIONS = [
   '내 등교지도나 급식지도 일정 확인',
   '왼쪽 메뉴 순서를 바꾸고 싶어',
   '공용 NEIS 동기화 방법',
+  '관리자가 지금 바로 NEIS 자료를 동기화하고 싶어',
 ]
 
 export const WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
+  {
+    id: 'admin-center', title: '관리자 센터·즉시 NEIS 동기화', page: 'admin_center', category: '관리자',
+    summary: '관리자 전용 화면에서 공용 NEIS 상태를 확인하고 13:00까지 기다리지 않고 10일치 자료를 즉시 갱신합니다.',
+    steps: ['상단 사용자 버튼에서 관리자 모드를 시작합니다.', '왼쪽 관리자 센터 메뉴를 엽니다.', '이 PC가 동기화 PC이고 API 키가 저장되어 있는지 상태를 확인합니다.', '관리자 동기화 — 지금 10일치 갱신 버튼을 누릅니다.', '완료 문구와 자료 날짜 범위를 확인합니다. 필요한 관리 화면은 아래 바로가기로 엽니다.'],
+    keywords: ['관리자 센터', '관리자 전용 탭', '관리자 동기화', '즉시 동기화', '지금 동기화', '10일치 동기화', '13시 동기화', 'NEIS 수동 갱신', '공용 자료 갱신', '관리 바로가기'],
+  },
   {
     id: 'user-manual', title: '사용 매뉴얼', page: 'help', category: '설정·도움말',
     summary: '처음 설치부터 주요 메뉴 사용법, 공용 NEIS 동기화와 자동 업데이트 방법을 확인합니다.',
