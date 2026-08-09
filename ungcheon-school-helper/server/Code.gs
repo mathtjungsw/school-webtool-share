@@ -24,6 +24,7 @@ const COMMITTEE_EVENTS_SHEET = '위원회일정';
 const TIMETABLE_CHANGES_SHEET = '교환대강반영';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
 const STAFF_ASSIGNMENTS_2026_APPLIED_KEY = 'UNG_STAFF_ASSIGNMENTS_2026_APPLIED';
+const OFFICIAL_RELEASE_NOTICE_RESET_KEY = 'UNG_OFFICIAL_RELEASE_NOTICE_RESET_1_0_0';
 const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
 const NEIS_BASE_URL = 'https://open.neis.go.kr/hub/';
 const UNGCHEON_OFFICE_CODE = 'S10';
@@ -69,7 +70,8 @@ const NEIS_ENDPOINT_PARAMS = {
   classInfo: ['AY'],
   schoolMajorinfo: ['AY']
 };
-const RELEASE_NOTES = [
+// 시험 운영 중의 변경 기록은 소스 이력으로만 보관하고 공지에는 다시 게시하지 않습니다.
+const LEGACY_RELEASE_NOTES = [
   {
     key: 'v1.0.43',
     title: '[업데이트] 웅천고 업무도우미 v1.0.43',
@@ -355,8 +357,21 @@ const RELEASE_NOTES = [
   }
 ];
 
+const RELEASE_NOTES = [
+  {
+    key: 'official-v1.0.0',
+    title: '[첫 배포] 웅천고 업무도우미 v1.0.0',
+    body: [
+      '· 웅천고등학교 교직원 업무 지원을 위한 첫 공식 배포입니다.',
+      '· 학교 일정, 시간표, 출석부, 업무센터 등 교내 업무 기능을 제공합니다.',
+      '· 이후 기능 개선과 오류 수정은 자동 업데이트로 배포됩니다.'
+    ].join('\n'),
+    date: '2026-08-10'
+  }
+];
+
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 16 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 17 } });
 }
 
 function doPost(e) {
@@ -365,7 +380,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 16 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 17 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
@@ -717,6 +732,11 @@ function repairStaffHomeroomCells_(book) {
 
 function ensureReleaseNotices_() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTICES_SHEET);
+  const properties = PropertiesService.getScriptProperties();
+  const shouldReset = properties.getProperty(OFFICIAL_RELEASE_NOTICE_RESET_KEY) !== 'true';
+  if (shouldReset && sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+  }
   const existing = readObjects_(NOTICES_SHEET);
   const titles = {};
   let maxId = 0;
@@ -730,6 +750,7 @@ function ensureReleaseNotices_() {
     sheet.appendRow([maxId, note.title, note.body, 'important', note.date, '']);
     titles[note.title] = true;
   });
+  if (shouldReset) properties.setProperty(OFFICIAL_RELEASE_NOTICE_RESET_KEY, 'true');
 }
 
 function listLinks_() {
