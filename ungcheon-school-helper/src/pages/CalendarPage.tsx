@@ -10,7 +10,7 @@ import {
 import { ko } from 'date-fns/locale'
 import clsx from 'clsx'
 import { useAppStore } from '../stores/appStore'
-import { getSchedule, NEIS_API_KEY } from '../services/neis'
+import { getSharedNeisSnapshot } from '../services/sharedNeis'
 import {
   listCommitteeState, listStaffChecklists, subscribeHubResource, type CommitteeEvent, type CommitteeState,
 } from '../services/schoolHub'
@@ -142,15 +142,15 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [hideCompleted, setHideCompleted] = useState(false)
+  const [neisSnapshotAvailable, setNeisSnapshotAvailable] = useState<boolean | null>(null)
 
   const monthKey = format(viewDate, 'yyyy-MM')
-  const hasNeis = Boolean(config.officeCode && config.schoolCode && config.neisApiKey?.trim())
+  const hasNeis = Boolean(config.schoolHubUrl?.trim())
   const showNeis = config.showNeisSchedule !== false
 
   const loadMonth = useCallback(async (force = false) => {
     const year = Number(format(viewDate, 'yyyy'))
     const month = Number(format(viewDate, 'M'))
-    const neisKey = config.neisApiKey?.trim() || NEIS_API_KEY
     const teacherName = config.teacherName?.trim() ?? ''
     const cacheKey = calendarSessionCacheKey({
       monthKey: format(viewDate, 'yyyy-MM'),
@@ -178,10 +178,13 @@ export default function CalendarPage() {
       let nextDutyEvents = cached?.dutyEvents ?? []
 
       const scheduleRequest = (hasNeis
-        ? getSchedule(neisKey, config.officeCode!, config.schoolCode!, year, month)
+        ? getSharedNeisSnapshot(force).then(snapshot => {
+          setNeisSnapshotAvailable(Boolean(snapshot))
+          return (snapshot?.schedules ?? []).filter(item => item.date.startsWith(`${year}${String(month).padStart(2, '0')}`))
+        })
         : Promise.resolve([]))
         .then(value => { nextSchedule = value; setSchedule(value) })
-        .catch(() => { if (!cached) setSchedule([]) })
+        .catch(() => { setNeisSnapshotAvailable(false); if (!cached) setSchedule([]) })
       const weeklyRequest = (window.electron?.weeklyPlanGetMonth
         ? window.electron.weeklyPlanGetMonth(year, month, force)
         : Promise.resolve(EMPTY_WEEKLY_PLAN))
@@ -231,7 +234,7 @@ export default function CalendarPage() {
     } finally {
       setLoading(false)
     }
-  }, [config.neisApiKey, config.officeCode, config.schoolCode, config.schoolHubUrl, config.teacherName, hasNeis, viewDate])
+  }, [config.officeCode, config.schoolCode, config.schoolHubUrl, config.teacherName, hasNeis, viewDate])
 
   useEffect(() => { void loadMonth() }, [loadMonth])
 
@@ -447,7 +450,8 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          {!hasNeis && <p className="mb-3 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-[11px] text-violet-200">환경설정에 NEIS API 키를 입력하면 학사일정도 함께 표시됩니다.</p>}
+          {!hasNeis && <p className="mb-3 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-[11px] text-violet-200">관리자가 공용 NEIS 자료를 동기화하면 학사일정도 함께 표시됩니다.</p>}
+          {hasNeis && neisSnapshotAvailable === false && <p className="mb-3 rounded-xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">공용 NEIS 자료가 아직 없습니다. 관리자에게 환경설정에서 첫 동기화를 실행해 달라고 요청하세요.</p>}
           {!config.teacherName?.trim() && <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: 'settings' }))} className="mb-3 w-full rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-left text-[11px] text-cyan-200">환경설정에서 이름을 등록하면 본인의 등교지도·급식지도 일정이 표시됩니다. 이름 설정 바로가기</button>}
           {dutyError && <p className="mb-3 rounded-xl border border-orange-400/20 bg-orange-500/10 px-3 py-2 text-[11px] text-orange-200">{dutyError}</p>}
 

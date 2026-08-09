@@ -3,6 +3,7 @@ import {
   CheckCircle2, KeyRound, Link2, Palette, Save, School,
   UserRound, Clock3, Power, AlertCircle, ExternalLink, LockKeyhole,
   Database, Trash2,
+  MonitorCheck, RefreshCw, Loader2,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useAuthStore } from '../stores/authStore'
@@ -13,6 +14,13 @@ import {
   getSchoolHubCacheStatus,
   preloadSchoolHubCache,
 } from '../services/schoolHub'
+import {
+  getNeisSyncStatus,
+  registerThisNeisSyncDevice,
+  revokeNeisSyncDevice,
+  runNeisSync,
+  type NeisSyncStatus,
+} from '../services/sharedNeis'
 
 const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
 
@@ -21,17 +29,26 @@ export default function UngcheonSettingsPage() {
   const config = useAppStore(s => s.config)
   const saveConfig = useAppStore(s => s.saveConfig)
   const isAdmin = useAdminStore(s => s.isAdmin)
+  const adminPassword = useAdminStore(s => s.adminPassword)
   const [draft, setDraft] = useState(config)
   const [saved, setSaved] = useState(false)
   const [hubStatus, setHubStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
   const [autoLaunch, setAutoLaunch] = useState(false)
   const [cacheStatus, setCacheStatus] = useState(() => getSchoolHubCacheStatus())
   const [cacheMessage, setCacheMessage] = useState('')
+  const [neisSyncStatus, setNeisSyncStatus] = useState<NeisSyncStatus | null>(null)
+  const [neisSyncBusy, setNeisSyncBusy] = useState(false)
+  const [neisSyncMessage, setNeisSyncMessage] = useState('')
+  const [neisSyncError, setNeisSyncError] = useState('')
 
   useEffect(() => setDraft(config), [config])
   useEffect(() => {
     window.electron?.getAutoLaunch().then(setAutoLaunch).catch(() => undefined)
   }, [])
+  useEffect(() => {
+    if (!config.schoolHubUrl) return
+    getNeisSyncStatus().then(setNeisSyncStatus).catch(() => setNeisSyncStatus(null))
+  }, [config.schoolHubUrl, isAdmin])
   useEffect(() => {
     const timer = window.setInterval(() => setCacheStatus(getSchoolHubCacheStatus()), 1_000)
     return () => window.clearInterval(timer)
@@ -62,6 +79,51 @@ export default function UngcheonSettingsPage() {
     } catch {
       setHubStatus('error')
     }
+  }
+
+  const refreshNeisSyncStatus = async () => {
+    const status = await getNeisSyncStatus()
+    setNeisSyncStatus(status)
+    return status
+  }
+
+  const registerSyncPc = async () => {
+    if (!isAdmin || !adminPassword) return
+    if (neisSyncStatus?.registered && !neisSyncStatus.isThisDevice && !window.confirm('기존 동기화 PC의 권한을 해제하고 이 PC로 변경할까요?')) return
+    setNeisSyncBusy(true); setNeisSyncError(''); setNeisSyncMessage('')
+    try {
+      await saveConfig({ neisApiKey: draft.neisApiKey?.trim() ?? '' })
+      const status = await registerThisNeisSyncDevice(adminPassword, config.teacherName?.trim() || '관리자')
+      setNeisSyncStatus(status)
+      setNeisSyncMessage('이 PC를 NEIS 동기화 PC로 등록했습니다. API 키를 저장한 뒤 지금 동기화를 실행하세요.')
+    } catch (error) {
+      setNeisSyncError(error instanceof Error ? error.message : String(error))
+    } finally { setNeisSyncBusy(false) }
+  }
+
+  const syncNow = async () => {
+    setNeisSyncBusy(true); setNeisSyncError(''); setNeisSyncMessage('')
+    try {
+      const apiKey = draft.neisApiKey?.trim() ?? ''
+      await saveConfig({ neisApiKey: apiKey })
+      const snapshot = await runNeisSync({ ...config, ...draft, neisApiKey: apiKey })
+      await refreshNeisSyncStatus()
+      setNeisSyncMessage(`${snapshot.fromDate}~${snapshot.toDate} 공용 자료 동기화를 완료했습니다.`)
+    } catch (error) {
+      setNeisSyncError(error instanceof Error ? error.message : String(error))
+    } finally { setNeisSyncBusy(false) }
+  }
+
+  const revokeSyncPc = async () => {
+    if (!isAdmin || !adminPassword || !window.confirm('등록된 NEIS 동기화 PC 권한을 해제할까요? 공용으로 저장된 기존 자료는 유지됩니다.')) return
+    setNeisSyncBusy(true); setNeisSyncError(''); setNeisSyncMessage('')
+    try {
+      await revokeNeisSyncDevice(adminPassword)
+      await refreshNeisSyncStatus()
+      setNeisSyncMessage('동기화 PC 권한을 해제했습니다. 기존 공용 자료는 그대로 유지됩니다.')
+    } catch (error) {
+      setNeisSyncError(error instanceof Error ? error.message : String(error))
+    } finally { setNeisSyncBusy(false) }
   }
 
   return (
@@ -101,24 +163,53 @@ export default function UngcheonSettingsPage() {
         </div>
       </Section>
 
-      <Section icon={<KeyRound size={17} />} title="NEIS Open API">
-        <Field label="NEIS API 키" help="키는 Windows 보안 저장소로 암호화해 이 PC에만 저장합니다. 자세한 발급 방법은 사용 매뉴얼에서도 확인할 수 있습니다.">
-          <input
-            type="password"
-            value={draft.neisApiKey ?? ''}
-            onChange={e => setDraft({ ...draft, neisApiKey: e.target.value })}
-            placeholder="발급받은 NEIS API 키"
-            autoComplete="off"
-          />
-          <button
-            type="button"
-            onClick={() => window.electron?.openExternal(NEIS_KEY_URL)}
-            className="mt-2 text-xs text-sky-400 hover:text-sky-300 inline-flex items-center gap-1"
-          >
-            NEIS 인증키 발급·확인 페이지
-            <ExternalLink size={12} />
-          </button>
-        </Field>
+      <Section icon={<MonitorCheck size={17} />} title="학교 공용 NEIS 동기화">
+        <div className="rounded-xl border border-sky-400/20 bg-sky-500/10 p-4">
+          <p className="text-sm font-bold text-slate-100">일반 사용자는 API 키를 입력하지 않습니다.</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-300">등록된 관리자 PC 한 대가 매일 13:00에 오늘 포함 10일치 급식·학사일정·전체 학급 시간표를 수집합니다. 13시에 꺼져 있었다면 다음 실행 때 자동으로 보충합니다.</p>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <ReadOnly label="동기화 PC" value={neisSyncStatus?.isThisDevice ? '이 PC가 등록됨' : neisSyncStatus?.registered ? '다른 PC가 등록됨' : '등록된 PC 없음'} />
+          <ReadOnly label="마지막 공용 동기화" value={neisSyncStatus?.lastSyncedAt ? new Date(neisSyncStatus.lastSyncedAt).toLocaleString('ko-KR') : '아직 동기화되지 않음'} />
+        </div>
+
+        {isAdmin ? (
+          <div className="mt-4 space-y-3">
+            <Field label="관리자 PC 전용 NEIS API 키" help="키는 서버나 구글시트에 올라가지 않고 이 PC의 Windows 보안 저장소에만 암호화해 저장됩니다.">
+              <input
+                type="password"
+                value={draft.neisApiKey ?? ''}
+                onChange={e => setDraft({ ...draft, neisApiKey: e.target.value })}
+                placeholder="관리자 본인의 NEIS API 키"
+                autoComplete="off"
+                disabled={!neisSyncStatus?.isThisDevice}
+              />
+              <button type="button" onClick={() => window.electron?.openExternal(NEIS_KEY_URL)} className="mt-2 text-xs text-sky-400 hover:text-sky-300 inline-flex items-center gap-1">
+                NEIS 인증키 발급·확인 페이지 <ExternalLink size={12} />
+              </button>
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              {!neisSyncStatus?.isThisDevice && (
+                <button type="button" onClick={() => void registerSyncPc()} disabled={neisSyncBusy} className="btn-primary inline-flex items-center gap-2">
+                  {neisSyncBusy ? <Loader2 size={14} className="animate-spin" /> : <MonitorCheck size={14} />}{neisSyncStatus?.registered ? '이 PC로 동기화 PC 변경' : '이 PC를 동기화 PC로 등록'}
+                </button>
+              )}
+              {neisSyncStatus?.isThisDevice && (
+                <>
+                  <button type="button" onClick={() => void syncNow()} disabled={neisSyncBusy || !draft.neisApiKey?.trim()} className="btn-primary inline-flex items-center gap-2">
+                    {neisSyncBusy ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}지금 10일치 동기화
+                  </button>
+                  <button type="button" onClick={() => void revokeSyncPc()} disabled={neisSyncBusy} className="btn-ghost text-rose-300">동기화 PC 등록 해제</button>
+                </>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p className="mt-4 text-xs text-slate-400">급식·학사일정·학급 시간표는 관리자가 동기화한 공용 자료를 자동으로 사용합니다.</p>
+        )}
+        {neisSyncMessage && <p className="mt-3 text-xs font-semibold text-emerald-400">{neisSyncMessage}</p>}
+        {neisSyncError && <p className="mt-3 text-xs font-semibold text-rose-400">{neisSyncError}</p>}
       </Section>
 
       <Section icon={<Link2 size={17} />} title="학교 공유 서비스">

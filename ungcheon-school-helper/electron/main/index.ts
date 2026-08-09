@@ -118,7 +118,7 @@ const ALLOWED_CONFIG_KEY_PREFIXES = [
   'special_remarks:', 'exam_supervisor:', 'newSemClass:',
   'wr:', 'club:', 'photo:', 'insa:',
   'assessment:', 'feedback.', 'timetable_plan:',
-  'personal.', 'sidebar.', 'pilotLogin.',
+  'personal.', 'sidebar.', 'pilotLogin.', 'neisSync.', 'notifier.',
 ]
 function isAllowedConfigKey(key: string): boolean {
   return ALLOWED_CONFIG_KEY_PREFIXES.some(p => key.startsWith(p))
@@ -342,7 +342,7 @@ ipcMain.handle('dialog:saveFile', async (_, defaultName: string, buffer: number[
 
 // ── API 키 — safeStorage 암호화 저장 (Gemini / Claude / OpenAI / NEIS) ──────
 // portal 비밀번호와 동일한 방식으로 OS DPAPI/Keychain 사용.
-const API_KEY_NAMES = ['neisApiKey'] as const
+const API_KEY_NAMES = ['neisApiKey', 'neisSyncToken'] as const
 type ApiKeyName = (typeof API_KEY_NAMES)[number]
 
 function apiKeyStoreKey(name: ApiKeyName) { return `apikey:enc:${name}` }
@@ -692,6 +692,11 @@ const HUB_ACTIONS = new Set([
   'createTimetableChange',
   'respondTimetableChange',
   'cancelTimetableChange',
+  'getNeisSyncStatus',
+  'registerNeisSyncDevice',
+  'revokeNeisSyncDevice',
+  'getNeisSnapshot',
+  'replaceNeisSnapshot',
 ])
 
 async function requestSchoolHub(payload: Record<string, unknown>) {
@@ -702,6 +707,7 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
     'replaceStudentTimetable',
     'replaceStudentRoster',
     'replaceStaffRoster',
+    'replaceNeisSnapshot',
   ])
   const maxRequestLength = largePayloadActions.has(action) ? 8_000_000 : 500_000
   if (JSON.stringify(payload).length > maxRequestLength) return { ok: false, error: '요청 데이터가 너무 큽니다.' }
@@ -725,6 +731,8 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
     || action === 'createTimetableChange'
     || action === 'respondTimetableChange'
     || action === 'cancelTimetableChange'
+    || action === 'getNeisSnapshot'
+    || action === 'replaceNeisSnapshot'
   const timer = setTimeout(() => controller.abort(), isLargeDataAction ? 60_000 : 20_000)
   try {
     const res = await fetch(endpoint, {

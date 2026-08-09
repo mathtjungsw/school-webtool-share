@@ -32,7 +32,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useAppStore } from '../stores/appStore'
 import { WeatherTodayView, WeatherForecastView } from '../components/WeatherBar'
 import { useWeather } from '../components/useWeather'
-import { getMeal, getSchedule, getTimetableRange, getSchoolDetail, NEIS_API_KEY } from '../services/neis'
+import { getSharedNeisSnapshot } from '../services/sharedNeis'
 import {
   getSchoolTimetable,
   listStaffChecklists,
@@ -344,8 +344,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     ), [])
 
   const hasSchool = !!(config.officeCode && config.schoolCode)
-  const hasNeisApiKey = Boolean(config.neisApiKey?.trim())
-  const neisApiKey = config.neisApiKey?.trim() || NEIS_API_KEY
+  const hasNeisApiKey = Boolean(config.schoolHubUrl?.trim())
   const periodRanges = UNGCHEON_PERIOD_RANGES
   const hasTeacher = !!(config.teacherClasses?.length)
 
@@ -398,16 +397,6 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     return () => { unsubscribeTimetable(); unsubscribeCommittees(); unsubscribeTasks() }
   }, [config.schoolHubUrl, config.teacherName])
 
-  // schoolAddress 자동 보완
-  useEffect(() => {
-    if (hasSchool && hasNeisApiKey && !config.schoolAddress) {
-      getSchoolDetail(neisApiKey, config.officeCode!, config.schoolCode!).then(detail => {
-        if (detail?.address) saveConfig({ schoolAddress: detail.address })
-      }).catch(() => {})
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.officeCode, config.schoolCode, hasNeisApiKey])
-
   useEffect(() => {
     if (!committeeEvents.length || !config.teacherName?.trim() || !('Notification' in window)) return
     const today = todayStr()
@@ -440,7 +429,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     return () => clearInterval(id)
   }, [])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     if (!hasSchool || !hasNeisApiKey) {
       setMeal([])
       setNextMeal([])
@@ -458,50 +447,34 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       const toYmdStr = weekDates[4]
 
       const nextDay = addDays(new Date(selectedDate), 1)
-      const dashboardWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
-      const scheduleMonths = Array.from(new Set([
-        selectedDate.slice(0, 7),
-        format(dashboardWeekStart, 'yyyy-MM'),
-        format(addDays(dashboardWeekStart, 13), 'yyyy-MM'),
-      ]))
-
-      const promises: Promise<unknown>[] = [
-        getMeal(neisApiKey, config.officeCode!, config.schoolCode!, new Date(selectedDate)),
-        getMeal(neisApiKey, config.officeCode!, config.schoolCode!, nextDay),
-        Promise.all(scheduleMonths.map(value => {
-          const [year, month] = value.split('-').map(Number)
-          return getSchedule(neisApiKey, config.officeCode!, config.schoolCode!, year, month)
-        })).then(results => results.flat()),
-      ]
-
-      if (config.grade && config.classNm && config.schoolType) {
-        promises.push(
-          getTimetableRange(neisApiKey, config.officeCode!, config.schoolCode!, config.schoolType, config.grade, config.classNm, fromYmdStr, toYmdStr)
-        )
+      const snapshot = await getSharedNeisSnapshot(force)
+      if (!snapshot) throw new Error('관리자 동기화 자료가 아직 없습니다.')
+      const selectedYmd = toYmd(selectedDate)
+      const nextYmd = format(nextDay, 'yyyyMMdd')
+      setMeal(snapshot.meals.filter(item => item.date === selectedYmd))
+      setNextMeal(snapshot.meals.filter(item => item.date === nextYmd))
+      setSchedule(snapshot.schedules)
+      setTimetable(snapshot.timetables.filter(item =>
+        Boolean(item.date) &&
+        item.grade?.trim() === config.grade?.trim() &&
+        item.classNm?.trim() === config.classNm?.trim() &&
+        item.date! >= fromYmdStr && item.date! <= toYmdStr,
+      ))
+      if (hasTeacher && config.teacherClasses) {
+        setTeacherTT(snapshot.timetables.filter(item =>
+          Boolean(item.date) && item.date! >= fromYmdStr && item.date! <= toYmdStr && config.teacherClasses!.some(tc =>
+            item.grade?.trim() === tc.grade.trim() && item.classNm?.trim() === tc.classNm.trim(),
+          ),
+        ))
       } else {
-        promises.push(Promise.resolve(null))
+        setTeacherTT([])
       }
-
-      const [meals, nxtMeals, sched, tt] = await Promise.all(promises) as [MealInfo[], MealInfo[], ScheduleEvent[], TimetableEntry[] | null]
-      setMeal(meals ?? [])
-      setNextMeal(nxtMeals ?? [])
-      setSchedule(sched)
-      setTimetable(tt ?? [])
-
-      if (hasTeacher && config.teacherClasses && config.schoolType) {
-        const results = await Promise.all(
-          config.teacherClasses.map(tc =>
-            getTimetableRange(neisApiKey, config.officeCode!, config.schoolCode!, config.schoolType!, tc.grade, tc.classNm, fromYmdStr, toYmdStr)
-          )
-        )
-        setTeacherTT(results.flat())
-      }
-    } catch {
-      setError('데이터를 불러오는 중 오류가 발생했습니다.')
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : '공용 NEIS 자료를 불러오는 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
-  }, [selectedDate, config.officeCode, config.schoolCode, config.grade, config.classNm, config.schoolType, config.neisApiKey, hasSchool, hasTeacher, config.teacherClasses, neisApiKey, hasNeisApiKey])
+  }, [selectedDate, config.grade, config.classNm, hasSchool, hasTeacher, config.teacherClasses, hasNeisApiKey])
 
   useEffect(() => { load() }, [load])
 
@@ -741,7 +714,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
             )}
           </div>
           <button
-            onClick={() => { void load(); void loadWeeklyPlan(true); void loadDutySchedule(true); void loadCreativeSchedule(true); void loadTimetableChanges() }}
+            onClick={() => { void load(true); void loadWeeklyPlan(true); void loadDutySchedule(true); void loadCreativeSchedule(true); void loadTimetableChanges() }}
             disabled={loading || weeklyPlanLoading || dutyScheduleLoading || creativeScheduleLoading || !hasSchool}
             className="btn-ghost flex items-center gap-1.5 disabled:opacity-40"
           >
@@ -870,8 +843,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                 >
                   {!hasNeisApiKey ? (
                     <SetupGuide
-                      title="NEIS API 키를 입력하면 급식을 볼 수 있습니다."
-                      buttonLabel="사용 매뉴얼에서 입력 방법 보기"
+                      title="관리자가 공용 NEIS 자료를 동기화하면 급식을 볼 수 있습니다."
+                      buttonLabel="동기화 안내 보기"
                       onClick={() => onNavigate('help')}
                     />
                   ) : loading ? <Skeleton rows={4}/> : meal.length > 0 ? (
@@ -1136,7 +1109,7 @@ function TwoWeekScheduleCalendar({
 
       {!neisConfigured && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2.5">
-          <p className="text-[11px] text-violet-200">NEIS API 키를 입력하면 학사일정도 함께 볼 수 있습니다.</p>
+          <p className="text-[11px] text-violet-200">관리자가 공용 NEIS 자료를 동기화하면 학사일정도 함께 볼 수 있습니다.</p>
           <button onClick={onOpenHelp} className="text-[10px] font-bold text-violet-300 underline underline-offset-2">사용 매뉴얼 바로가기</button>
         </div>
       )}
@@ -1371,7 +1344,7 @@ function MonthScheduleCalendar({
 
       {!neisConfigured && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2.5">
-          <p className="text-[11px] text-violet-200">NEIS API 키를 입력하면 학사일정도 함께 볼 수 있습니다.</p>
+          <p className="text-[11px] text-violet-200">관리자가 공용 NEIS 자료를 동기화하면 학사일정도 함께 볼 수 있습니다.</p>
           <button onClick={onOpenHelp} className="text-[10px] font-bold text-violet-300 underline underline-offset-2">
             사용 매뉴얼 바로가기
           </button>

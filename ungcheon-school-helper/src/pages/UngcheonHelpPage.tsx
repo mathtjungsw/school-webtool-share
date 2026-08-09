@@ -8,24 +8,24 @@ const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
 
 const NEIS_KEY_STEPS = [
   {
-    title: '1. 나이스 교육정보 개방 포털 로그인',
-    detail: '아래 ‘NEIS 인증키 발급·확인’ 버튼을 누르고 Google·카카오·네이버·Facebook 계정 중 하나로 로그인합니다.',
+    title: '1. 일반 사용자는 API 키 불필요',
+    detail: '일반 교직원은 NEIS 인증키를 발급하거나 환경설정에 입력하지 않습니다. 관리자가 갱신한 학교 공용 자료를 자동으로 사용합니다.',
   },
   {
-    title: '2. 인증키 신청',
-    detail: '활용가이드 → 인증키 신청으로 이동합니다. 활용 목적에는 “웅천고 업무도우미의 급식·학사일정·시간표 조회”처럼 실제 용도를 적습니다.',
+    title: '2. 관리자 PC 한 대 등록',
+    detail: '관리자 모드 → 환경설정 → 학교 공용 NEIS 동기화에서 “이 PC를 동기화 PC로 등록”을 누릅니다. 동시에 한 대만 등록됩니다.',
   },
   {
-    title: '3. 발급 상태와 인증키 확인',
-    detail: '인증키 신청 화면에서 발급 상태를 확인하고, 발급된 인증키 문자열 전체를 복사합니다. NEIS 아이디나 비밀번호를 복사하는 것이 아닙니다.',
+    title: '3. 관리자 인증키 입력',
+    detail: '등록된 PC에서만 관리자의 NEIS Open API 인증키를 입력합니다. 키는 Windows 보안 저장소에 암호화되며 서버와 구글시트에는 올라가지 않습니다.',
   },
   {
-    title: '4. 프로그램에 입력',
-    detail: '웅천고 업무도우미 → 환경설정 → NEIS API 키에 붙여넣고 ‘설정 저장’을 누릅니다. 키 앞뒤에 공백이 들어가지 않도록 주의합니다.',
+    title: '4. 처음 10일치 동기화',
+    detail: '“지금 10일치 동기화”를 눌러 급식·학사일정·전체 학급 시간표를 확인하고 공용 서버에 올립니다. 실패하면 기존 공용 자료가 유지됩니다.',
   },
   {
-    title: '5. 정상 작동 확인',
-    detail: '대시보드에서 급식·학사일정·시간표를 확인합니다. 방학·휴업일에는 데이터가 없을 수 있으므로 대시보드 날짜를 수업일로 바꿔 확인합니다.',
+    title: '5. 매일 13:00 자동 갱신',
+    detail: '등록 PC가 실행 중이면 매일 13:00에 오늘 포함 10일치를 갱신합니다. 그때 꺼져 있었다면 다음 프로그램 실행 시 자동으로 보충합니다.',
   },
 ]
 
@@ -106,7 +106,9 @@ const SECTIONS = [
     title: 'NEIS·학사',
     icon: BookOpen,
     items: [
-      'NEIS 정보와 대시보드는 NEIS Open API를 사용하며 실제 NEIS 로그인 정보는 요구하지 않습니다.',
+      '일반 사용자는 NEIS API 키를 입력하지 않습니다. 등록된 관리자 PC 한 대가 매일 13시에 공용 급식·학사일정·전체 학급 시간표를 갱신합니다.',
+      '관리자 API 키는 해당 PC의 Windows 보안 저장소에만 암호화되며 Apps Script와 구글시트에는 저장되지 않습니다.',
+      '13시에 등록 PC가 꺼져 있었으면 다음 프로그램 실행 시 누락 동기화를 보충하고, 실패하면 기존 공용 자료를 유지한 채 10분 후 재시도합니다.',
       '대시보드의 학사일정·주간계획은 교무기획부 공개 시트의 새 주간 탭을 자동으로 찾아 30분마다 갱신합니다.',
       '등교지도와 급식지도는 인성안전부·문화건강부 Google Sheets에서 환경설정의 교사 이름과 정확히 일치하는 일정만 자동으로 불러옵니다. 사용자가 링크를 별도로 입력할 필요는 없습니다.',
       '학생별 시간표는 관리자가 2학기 Excel 자료를 한 번 업로드하면 모든 사용자가 별도 파일 없이 조회·인쇄할 수 있습니다.',
@@ -226,10 +228,10 @@ export default function UngcheonHelpPage() {
           <div>
             <h2 className="font-semibold text-white flex items-center gap-2">
               <KeyRound size={17} className="text-sky-400" />
-              NEIS Open API 인증키 발급·입력
+              학교 공용 NEIS 동기화
             </h2>
             <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-              급식·학사일정·시간표 조회용 공개 API 키입니다. 업무포털·NEIS 로그인 비밀번호와는 전혀 다릅니다.
+              관리자 PC 한 대만 공개 API 키를 보관하며 일반 사용자는 별도 키 없이 공용 자료를 조회합니다.
             </p>
           </div>
           <button
@@ -252,7 +254,7 @@ export default function UngcheonHelpPage() {
         </ol>
 
         <div className="mt-4 rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-xs text-amber-600 leading-relaxed">
-          인증키는 교직원에게 메신저나 공지로 공개하지 마세요. 이 프로그램에 저장한 키는 Windows 보안 저장소로 암호화되며 해당 PC에만 보관됩니다.
+          관리자 인증키는 교직원에게 메신저나 공지로 공개하지 마세요. 서버와 구글시트에는 조회 결과만 저장되며 인증키는 등록된 관리자 PC 밖으로 전송되지 않습니다.
         </div>
       </section>
 

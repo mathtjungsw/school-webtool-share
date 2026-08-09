@@ -71,6 +71,7 @@ jobs:
           }
 
           $requested = "$env:REQUESTED_VERSION".Trim()
+          $packageVersion = [version](node -p "require('./package.json').version")
           if ($requested) {
             if ($requested -notmatch '^\d+\.\d+\.\d+$') {
               throw "버전은 1.0.2처럼 숫자.숫자.숫자 형식이어야 합니다."
@@ -80,13 +81,13 @@ jobs:
               throw "지정한 버전 $version 은 현재 최신 버전 $latestVersion 보다 높아야 합니다."
             }
           } elseif ($latestVersion) {
-            $version = [version]::new(
+            $nextPatch = [version]::new(
               $latestVersion.Major,
               $latestVersion.Minor,
               $latestVersion.Build + 1
             )
+            $version = if ($packageVersion -gt $nextPatch) { $packageVersion } else { $nextPatch }
           } else {
-            $packageVersion = node -p "require('./package.json').version"
             $version = [version]$packageVersion
           }
 

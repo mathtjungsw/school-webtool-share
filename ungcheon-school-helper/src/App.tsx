@@ -7,6 +7,7 @@ import NoticeModal from './components/NoticeModal'
 import { clearSchoolHubSessionCache, preloadSchoolHubCache } from './services/schoolHub'
 import { useAuthStore } from './stores/authStore'
 import PilotLogin from './components/PilotLogin'
+import { startNeisSyncScheduler } from './services/sharedNeis'
 
 export default function App() {
   const { loadConfig, setUpdateAvailable, setUpdateDownloaded, setUpdateNone, setUpdateError, config } = useAppStore()
@@ -64,6 +65,11 @@ export default function App() {
     const timer = window.setTimeout(() => void useAuthStore.getState().logout(), remaining)
     return () => window.clearTimeout(timer)
   }, [authenticated])
+
+  useEffect(() => {
+    if (!authenticated || !config.schoolHubUrl) return
+    return startNeisSyncScheduler(() => useAppStore.getState().config)
+  }, [authenticated, config.schoolHubUrl, config.neisApiKey])
 
   if (!useAppStore.getState().isConfigLoaded || !authReady) {
     return <div className="min-h-screen bg-surface-950 grid place-items-center text-sm text-slate-400">시작 준비 중...</div>
