@@ -112,7 +112,9 @@ export function sortStaffMembers(members: StaffMember[]): StaffMember[] {
     const normalized = compact(position)
     if (normalized === '교장') return 0
     if (normalized === '교감') return 1
-    return 2
+    if (normalized.includes('교사')) return 2
+    if (normalized === '교무실무원') return 3
+    return 4
   }
   return [...members].sort((a, b) => {
     const rank = positionRank(a.position) - positionRank(b.position)

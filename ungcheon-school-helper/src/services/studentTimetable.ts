@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import type { StudentRosterEntry } from './rosterAttendance'
 
 export const STUDENT_TIMETABLE_DAYS = ['월', '화', '수', '목', '금'] as const
 export type StudentTimetableDay = (typeof STUDENT_TIMETABLE_DAYS)[number]
@@ -519,6 +520,7 @@ export function isStudentTimetableReady(dataset: StudentTimetableDataset): boole
 
 export function prepareSharedStudentTimetable(
   dataset: StudentTimetableDataset,
+  rosterStudents: StudentRosterEntry[] = [],
   title = '2026학년도 2학기 학생별 시간표',
   semester = '2026-2',
 ): SharedStudentTimetableUpload {
@@ -544,6 +546,39 @@ export function prepareSharedStudentTimetable(
       warnings: [],
     }
   })
+  const includedIds = new Set(students.map(item => item.student.studentId))
+  for (const rosterStudent of rosterStudents) {
+    if (includedIds.has(rosterStudent.studentId)) continue
+    const grade = rosterStudent.grade || rosterStudent.studentId.slice(0, 1)
+    const className = String(Number(rosterStudent.className))
+    const classLabel = `${grade}-${className}`
+    const base = dataset.classes[classLabel]
+    if (!base) continue
+    const slots: Record<string, PersonalTimetableSlot> = {}
+    for (const day of STUDENT_TIMETABLE_DAYS) {
+      for (let period = 1; period <= 7; period += 1) {
+        const key = slotKey(day, period)
+        const baseSlot = base[key] ?? { day, period, subject: '', teacher: '', raw: '' }
+        slots[key] = mappedBaseSlot(baseSlot, grade, dataset.subjectNames)
+      }
+    }
+    students.push({
+      student: {
+        studentId: rosterStudent.studentId,
+        name: rosterStudent.name,
+        grade,
+        className,
+        classLabel,
+        number: String(Number(rosterStudent.number)),
+        enrollmentCount: 0,
+      },
+      slots,
+      selections: [],
+      warnings: [],
+    })
+    includedIds.add(rosterStudent.studentId)
+  }
+  students.sort((a, b) => a.student.studentId.localeCompare(b.student.studentId, 'ko'))
   const warningCount = students.reduce((sum, student) => sum + student.warnings.length, 0)
   if (warningCount > 0) {
     throw new Error(`학생별 시간표 생성 중 ${warningCount}건의 경고가 발견되었습니다. 입력 파일을 확인해 주세요.`)

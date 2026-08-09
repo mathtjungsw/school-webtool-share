@@ -429,3 +429,69 @@
     box-shadow: 0 0 20px rgba(217, 186, 0, 0.18);
   }
 }
+
+/* ── 전역 글자 대비 보장 ──
+   색상 단계나 투명도 유틸리티가 달라도 라이트에서는 어둡게,
+   다크에서는 밝게 고정해 작은 글씨까지 읽히도록 합니다. */
+[data-theme="light"] [class*="text-slate-"],
+[data-theme="light"] [class*="text-gray-"],
+[data-theme="light"] [class*="text-zinc-"],
+[data-theme="light"] [class*="text-neutral-"] { color: #1f2937 !important; }
+[data-theme="light"] [class*="text-cyan-"],
+[data-theme="light"] [class*="text-sky-"],
+[data-theme="light"] [class*="text-blue-"] { color: #075985 !important; }
+[data-theme="light"] [class*="text-violet-"],
+[data-theme="light"] [class*="text-purple-"],
+[data-theme="light"] [class*="text-indigo-"],
+[data-theme="light"] [class*="text-fuchsia-"] { color: #5b21b6 !important; }
+[data-theme="light"] [class*="text-emerald-"],
+[data-theme="light"] [class*="text-green-"],
+[data-theme="light"] [class*="text-teal-"] { color: #065f46 !important; }
+[data-theme="light"] [class*="text-amber-"],
+[data-theme="light"] [class*="text-yellow-"],
+[data-theme="light"] [class*="text-orange-"] { color: #78350f !important; }
+[data-theme="light"] [class*="text-rose-"],
+[data-theme="light"] [class*="text-red-"] { color: #881337 !important; }
+[data-theme="light"] [class*="text-white"],
+[data-theme="light"] [class*="text-black"] { color: #111827 !important; }
+
+[data-theme="dark"] [class*="text-slate-"],
+[data-theme="dark"] [class*="text-gray-"],
+[data-theme="dark"] [class*="text-zinc-"],
+[data-theme="dark"] [class*="text-neutral-"] { color: #e2e8f0 !important; }
+[data-theme="dark"] [class*="text-cyan-"],
+[data-theme="dark"] [class*="text-sky-"],
+[data-theme="dark"] [class*="text-blue-"] { color: #bae6fd !important; }
+[data-theme="dark"] [class*="text-violet-"],
+[data-theme="dark"] [class*="text-purple-"],
+[data-theme="dark"] [class*="text-indigo-"],
+[data-theme="dark"] [class*="text-fuchsia-"] { color: #ddd6fe !important; }
+[data-theme="dark"] [class*="text-emerald-"],
+[data-theme="dark"] [class*="text-green-"],
+[data-theme="dark"] [class*="text-teal-"] { color: #a7f3d0 !important; }
+[data-theme="dark"] [class*="text-amber-"],
+[data-theme="dark"] [class*="text-yellow-"],
+[data-theme="dark"] [class*="text-orange-"] { color: #fde68a !important; }
+[data-theme="dark"] [class*="text-rose-"],
+[data-theme="dark"] [class*="text-red-"] { color: #fecdd3 !important; }
+[data-theme="dark"] [class*="text-white"],
+[data-theme="dark"] [class*="text-black"] { color: #f8fafc !important; }
+
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select,
+[data-theme="light"] option { color: #111827 !important; }
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select,
+[data-theme="dark"] option { color: #f8fafc !important; }
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder { color: #475569 !important; opacity: 1; }
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder { color: #cbd5e1 !important; opacity: 1; }
+
+/* 황금색 기본 버튼은 두 테마 모두 진한 잉크색이 가장 선명합니다. */
+[data-theme="light"] .btn-primary,
+[data-theme="dark"] .btn-primary,
+[data-theme="light"] .btn-primary *,
+[data-theme="dark"] .btn-primary * { color: #19222c !important; }

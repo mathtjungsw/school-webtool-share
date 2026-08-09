@@ -13,6 +13,24 @@ export interface SharedNeisSnapshot {
   meals: MealInfo[]
   schedules: ScheduleEvent[]
   timetables: TimetableEntry[]
+  updatedResources?: NeisSyncResource[]
+  syncWarning?: string
+  syncReport?: NeisSyncReport
+}
+
+export type NeisSyncResource = 'meals' | 'schedules' | 'timetables'
+
+export interface NeisSyncResourceResult {
+  status: 'updated' | 'preserved'
+  count: number
+  error: string
+}
+
+export interface NeisSyncReport {
+  meals: NeisSyncResourceResult
+  schedules: NeisSyncResourceResult
+  timetables: NeisSyncResourceResult
+  partial: boolean
 }
 
 export interface NeisSyncStatus {
@@ -24,7 +42,7 @@ export interface NeisSyncStatus {
   fromDate: string
   toDate: string
   version: number
-  lastStatus: 'ready' | 'success' | 'error'
+  lastStatus: 'ready' | 'success' | 'partial' | 'error'
   lastError: string
 }
 
@@ -92,6 +110,23 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, mapper: (item
   return result
 }
 
+function errorMessage(cause: unknown) {
+  return cause instanceof Error ? cause.message : String(cause)
+}
+
+export function describeNeisSyncReport(report?: NeisSyncReport) {
+  if (!report) return '공용 NEIS 자료 동기화를 완료했습니다.'
+  const entries: Array<[string, NeisSyncResourceResult]> = [
+    ['급식', report.meals],
+    ['NEIS 학사일정', report.schedules],
+    ['학급시간표', report.timetables],
+  ]
+  return entries.map(([label, item]) => item.status === 'updated'
+    ? `${label} ${item.count}건 갱신`
+    : `${label} 실패 — 기존 자료 유지 (${item.error})`,
+  ).join(' · ')
+}
+
 export async function runNeisSync(config: AppConfig): Promise<SharedNeisSnapshot> {
   if (syncInFlight) return syncInFlight
   syncInFlight = (async () => {
@@ -112,21 +147,64 @@ export async function runNeisSync(config: AppConfig): Promise<SharedNeisSnapshot
     const toDate = localYmd(to)
     await window.electron.configSet(LAST_ATTEMPT_AT_KEY, new Date().toISOString())
 
-    const [school, classes, meals, schedules] = await Promise.all([
-      getSchoolDetail(apiKey, officeCode, schoolCode),
-      getClassInfo(apiKey, officeCode, schoolCode),
-      getMealRange(apiKey, officeCode, schoolCode, fromDate, toDate),
-      getScheduleRange(apiKey, officeCode, schoolCode, fromDate, toDate),
-    ])
+    const school = await getSchoolDetail(apiKey, officeCode, schoolCode)
     if (!school || school.schoolCode !== schoolCode) throw new Error('API 키로 웅천고등학교 정보를 확인하지 못했습니다.')
 
-    const uniqueClasses = classes.filter((item, index, all) =>
-      item.grade && item.classNm && all.findIndex(other => other.grade === item.grade && other.classNm === item.classNm) === index,
-    )
-    if (!uniqueClasses.length) throw new Error('NEIS에서 학급 정보를 가져오지 못했습니다.')
-    const classTimetables = await mapWithConcurrency(uniqueClasses, 4, item =>
-      getTimetableRange(apiKey, officeCode, schoolCode, schoolType, item.grade, item.classNm, fromDate, toDate),
-    )
+    const [mealResult, scheduleResult, classResult] = await Promise.allSettled([
+      getMealRange(apiKey, officeCode, schoolCode, fromDate, toDate),
+      getScheduleRange(apiKey, officeCode, schoolCode, fromDate, toDate),
+      getClassInfo(apiKey, officeCode, schoolCode),
+    ])
+
+    const meals = mealResult.status === 'fulfilled' ? mealResult.value : []
+    const schedules = scheduleResult.status === 'fulfilled' ? scheduleResult.value : []
+    let timetables: TimetableEntry[] = []
+    let timetableError = ''
+
+    if (classResult.status === 'rejected') {
+      timetableError = errorMessage(classResult.reason)
+    } else {
+      const uniqueClasses = classResult.value.filter((item, index, all) =>
+        item.grade && item.classNm && all.findIndex(other => other.grade === item.grade && other.classNm === item.classNm) === index,
+      )
+      if (!uniqueClasses.length) {
+        timetableError = 'NEIS에서 학급 정보를 가져오지 못했습니다.'
+      } else {
+        const classTimetables = await mapWithConcurrency(uniqueClasses, 4, async item => {
+          try {
+            return { entries: await getTimetableRange(apiKey, officeCode, schoolCode, schoolType, item.grade, item.classNm, fromDate, toDate), error: '' }
+          } catch (cause) {
+            return { entries: [] as TimetableEntry[], error: `${item.grade}학년 ${item.classNm}반: ${errorMessage(cause)}` }
+          }
+        })
+        const failedClasses = classTimetables.filter(item => item.error)
+        if (failedClasses.length) {
+          timetableError = failedClasses.slice(0, 3).map(item => item.error).join(' / ')
+          if (failedClasses.length > 3) timetableError += ` 외 ${failedClasses.length - 3}개 학급`
+        } else {
+          timetables = classTimetables.flatMap(item => item.entries)
+        }
+      }
+    }
+
+    const report: NeisSyncReport = {
+      meals: mealResult.status === 'fulfilled'
+        ? { status: 'updated', count: meals.length, error: '' }
+        : { status: 'preserved', count: 0, error: errorMessage(mealResult.reason) },
+      schedules: scheduleResult.status === 'fulfilled'
+        ? { status: 'updated', count: schedules.length, error: '' }
+        : { status: 'preserved', count: 0, error: errorMessage(scheduleResult.reason) },
+      timetables: timetableError
+        ? { status: 'preserved', count: 0, error: timetableError }
+        : { status: 'updated', count: timetables.length, error: '' },
+      partial: false,
+    }
+    report.partial = [report.meals, report.schedules, report.timetables].some(item => item.status === 'preserved')
+    const updatedResources: NeisSyncResource[] = []
+    if (report.meals.status === 'updated') updatedResources.push('meals')
+    if (report.schedules.status === 'updated') updatedResources.push('schedules')
+    if (report.timetables.status === 'updated') updatedResources.push('timetables')
+    if (!updatedResources.length) throw new Error(`급식·NEIS 학사일정·학급시간표를 모두 가져오지 못했습니다. ${describeNeisSyncReport(report)}`)
 
     const snapshot: SharedNeisSnapshot = {
       version: 0,
@@ -137,9 +215,10 @@ export async function runNeisSync(config: AppConfig): Promise<SharedNeisSnapshot
       schoolName: school.schoolName,
       meals,
       schedules,
-      timetables: classTimetables.flat(),
+      timetables,
+      updatedResources,
+      syncWarning: report.partial ? describeNeisSyncReport(report) : '',
     }
-    await window.electron.configSet(LOCAL_SNAPSHOT_KEY, snapshot)
     const uploaded = await hubRequest<SharedNeisSnapshot>({
       action: 'replaceNeisSnapshot',
       deviceId,
@@ -147,10 +226,11 @@ export async function runNeisSync(config: AppConfig): Promise<SharedNeisSnapshot
       snapshot,
     })
     await window.electron.configSet(LAST_SUCCESS_DAY_KEY, localYmd(new Date()))
-    await window.electron.configSet(LOCAL_SNAPSHOT_KEY, uploaded)
-    sharedSnapshotCache = uploaded
+    const result = { ...uploaded, syncReport: report }
+    await window.electron.configSet(LOCAL_SNAPSHOT_KEY, result)
+    sharedSnapshotCache = result
     sharedSnapshotLoadedAt = Date.now()
-    return uploaded
+    return result
   })().finally(() => { syncInFlight = null })
   return syncInFlight
 }

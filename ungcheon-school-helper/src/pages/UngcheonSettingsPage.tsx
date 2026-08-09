@@ -16,6 +16,7 @@ import {
 } from '../services/schoolHub'
 import {
   getNeisSyncStatus,
+  describeNeisSyncReport,
   registerThisNeisSyncDevice,
   revokeNeisSyncDevice,
   runNeisSync,
@@ -39,6 +40,7 @@ export default function UngcheonSettingsPage() {
   const [neisSyncStatus, setNeisSyncStatus] = useState<NeisSyncStatus | null>(null)
   const [neisSyncBusy, setNeisSyncBusy] = useState(false)
   const [neisSyncMessage, setNeisSyncMessage] = useState('')
+  const [neisSyncWarning, setNeisSyncWarning] = useState('')
   const [neisSyncError, setNeisSyncError] = useState('')
 
   useEffect(() => setDraft(config), [config])
@@ -90,7 +92,7 @@ export default function UngcheonSettingsPage() {
   const registerSyncPc = async () => {
     if (!isAdmin || !adminPassword) return
     if (neisSyncStatus?.registered && !neisSyncStatus.isThisDevice && !window.confirm('기존 동기화 PC의 권한을 해제하고 이 PC로 변경할까요?')) return
-    setNeisSyncBusy(true); setNeisSyncError(''); setNeisSyncMessage('')
+    setNeisSyncBusy(true); setNeisSyncError(''); setNeisSyncMessage(''); setNeisSyncWarning('')
     try {
       await saveConfig({ neisApiKey: draft.neisApiKey?.trim() ?? '' })
       const status = await registerThisNeisSyncDevice(adminPassword, config.teacherName?.trim() || '관리자')
@@ -102,13 +104,15 @@ export default function UngcheonSettingsPage() {
   }
 
   const syncNow = async () => {
-    setNeisSyncBusy(true); setNeisSyncError(''); setNeisSyncMessage('')
+    setNeisSyncBusy(true); setNeisSyncError(''); setNeisSyncMessage(''); setNeisSyncWarning('')
     try {
       const apiKey = draft.neisApiKey?.trim() ?? ''
       await saveConfig({ neisApiKey: apiKey })
       const snapshot = await runNeisSync({ ...config, ...draft, neisApiKey: apiKey })
       await refreshNeisSyncStatus()
-      setNeisSyncMessage(`${snapshot.fromDate}~${snapshot.toDate} 공용 자료 동기화를 완료했습니다.`)
+      const summary = `${snapshot.fromDate}~${snapshot.toDate} · ${describeNeisSyncReport(snapshot.syncReport)}`
+      if (snapshot.syncReport?.partial) setNeisSyncWarning(`일부 동기화를 완료했습니다. ${summary}`)
+      else setNeisSyncMessage(`동기화를 완료했습니다. ${summary}`)
     } catch (error) {
       setNeisSyncError(error instanceof Error ? error.message : String(error))
     } finally { setNeisSyncBusy(false) }
@@ -116,7 +120,7 @@ export default function UngcheonSettingsPage() {
 
   const revokeSyncPc = async () => {
     if (!isAdmin || !adminPassword || !window.confirm('등록된 NEIS 동기화 PC 권한을 해제할까요? 공용으로 저장된 기존 자료는 유지됩니다.')) return
-    setNeisSyncBusy(true); setNeisSyncError(''); setNeisSyncMessage('')
+    setNeisSyncBusy(true); setNeisSyncError(''); setNeisSyncMessage(''); setNeisSyncWarning('')
     try {
       await revokeNeisSyncDevice(adminPassword)
       await refreshNeisSyncStatus()
@@ -198,7 +202,7 @@ export default function UngcheonSettingsPage() {
               {neisSyncStatus?.isThisDevice && (
                 <>
                   <button type="button" onClick={() => void syncNow()} disabled={neisSyncBusy || !draft.neisApiKey?.trim()} className="btn-primary inline-flex items-center gap-2">
-                    {neisSyncBusy ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}지금 10일치 동기화
+                    {neisSyncBusy ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}급식·학사일정·학급시간표 지금 동기화
                   </button>
                   <button type="button" onClick={() => void revokeSyncPc()} disabled={neisSyncBusy} className="btn-ghost text-rose-300">동기화 PC 등록 해제</button>
                 </>
@@ -209,6 +213,7 @@ export default function UngcheonSettingsPage() {
           <p className="mt-4 text-xs text-slate-400">급식·학사일정·학급 시간표는 관리자가 동기화한 공용 자료를 자동으로 사용합니다.</p>
         )}
         {neisSyncMessage && <p className="mt-3 text-xs font-semibold text-emerald-400">{neisSyncMessage}</p>}
+        {neisSyncWarning && <p className="mt-3 text-xs font-semibold text-amber-400">{neisSyncWarning}</p>}
         {neisSyncError && <p className="mt-3 text-xs font-semibold text-rose-400">{neisSyncError}</p>}
       </Section>
 

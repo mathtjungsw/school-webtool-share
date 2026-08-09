@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useAdminStore } from '../stores/adminStore'
 import { useAppStore } from '../stores/appStore'
-import { getNeisSyncStatus, runNeisSync, type NeisSyncStatus } from '../services/sharedNeis'
+import { describeNeisSyncReport, getNeisSyncStatus, runNeisSync, type NeisSyncStatus } from '../services/sharedNeis'
 
 const SHORTCUTS: Array<{ page: string; title: string; detail: string; icon: LucideIcon }> = [
   { page: 'school_hub', title: '공지·학교 공유 링크', detail: '학교 공지와 교직원 공용 링크를 관리합니다.', icon: Link2 },
@@ -36,6 +36,7 @@ export default function AdminCenterPage() {
   const [busy, setBusy] = useState(false)
   const [checkingUpdate, setCheckingUpdate] = useState(false)
   const [message, setMessage] = useState('')
+  const [warning, setWarning] = useState('')
   const [error, setError] = useState('')
 
   const refreshStatus = async () => {
@@ -70,11 +71,14 @@ export default function AdminCenterPage() {
   const syncNow = async () => {
     setBusy(true)
     setMessage('')
+    setWarning('')
     setError('')
     try {
       const snapshot = await runNeisSync(config)
       await refreshStatus()
-      setMessage(`${snapshot.fromDate}~${snapshot.toDate} 급식·학사일정·전체 학급 시간표 동기화를 완료했습니다.`)
+      const summary = `${snapshot.fromDate}~${snapshot.toDate} · ${describeNeisSyncReport(snapshot.syncReport)}`
+      if (snapshot.syncReport?.partial) setWarning(`일부 동기화를 완료했습니다. ${summary}`)
+      else setMessage(`동기화를 완료했습니다. ${summary}`)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
@@ -113,7 +117,7 @@ export default function AdminCenterPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="flex items-center gap-2 font-bold text-white"><MonitorCheck size={18} className="text-sky-400" />학교 공용 NEIS 동기화</h2>
-              <p className="mt-1.5 max-w-3xl text-xs leading-relaxed text-slate-300">매일 13:00에 자동 갱신합니다. 아래 버튼은 기다리지 않고 오늘을 포함한 10일치 급식·학사일정·전체 학급 시간표를 즉시 다시 수집할 때 사용합니다.</p>
+              <p className="mt-1.5 max-w-3xl text-xs leading-relaxed text-slate-300">매일 13:00에 자동 갱신합니다. 아래 버튼은 기다리지 않고 오늘을 포함한 10일치 <strong className="text-white">급식·NEIS 학사일정·전체 학급시간표</strong>를 즉시 다시 수집할 때 사용합니다.</p>
             </div>
             <button type="button" onClick={() => void refreshStatus()} disabled={busy} className="btn-ghost inline-flex items-center gap-2"><RefreshCw size={14} />상태 새로고침</button>
           </div>
@@ -130,7 +134,7 @@ export default function AdminCenterPage() {
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => void syncNow()} disabled={busy || !canSync} className="btn-primary inline-flex items-center gap-2 px-5 py-2.5">
               {busy ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-              {busy ? '동기화 중...' : '관리자 동기화 — 지금 10일치 갱신'}
+              {busy ? '급식·학사일정·학급시간표 동기화 중...' : '급식·학사일정·학급시간표 지금 동기화'}
             </button>
             <button type="button" onClick={() => navigate('settings')} className="btn-ghost inline-flex items-center gap-2"><Settings size={14} />동기화 PC·API 키 설정</button>
           </div>
@@ -141,6 +145,8 @@ export default function AdminCenterPage() {
           {status?.isThisDevice && !config.neisApiKey?.trim() && (
             <Notice tone="warn">이 PC의 NEIS API 키가 비어 있습니다. 환경설정에서 API 키를 저장해 주세요.</Notice>
           )}
+          {warning && <Notice tone="warn">{warning}</Notice>}
+          {!warning && status?.lastStatus === 'partial' && status.lastError && <Notice tone="warn">마지막 동기화는 일부만 완료되었습니다. {status.lastError}</Notice>}
           {message && <Notice tone="success">{message}</Notice>}
           {error && <Notice tone="error">{error}</Notice>}
         </div>

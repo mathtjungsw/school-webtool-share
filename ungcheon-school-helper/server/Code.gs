@@ -355,6 +355,20 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.2',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.2',
+    body: [
+      '· 관리자 동기화를 급식·NEIS 학사일정·학급시간표 세 항목으로 분명하게 표시',
+      '· 한 항목의 조회가 실패해도 성공한 급식·학사일정 또는 시간표는 정상 갱신',
+      '· 실패한 항목은 기존 공용 자료를 지우지 않고 그대로 유지하도록 안정성 개선',
+      '· 동기화 완료 후 항목별 갱신 건수와 실패 원인을 각각 안내',
+      '· 학생 위치 찾기에 1학년 학생 명렬과 공용 학급시간표 연결',
+      '· 라이트 모드는 어두운 글씨, 다크 모드는 밝은 글씨로 전역 대비 강화',
+      '· 교직원 명렬에서 교사를 먼저 표시한 뒤 교무실무원이 나오도록 정렬 개선'
+    ].join('\n'),
+    date: '2026-08-09'
+  },
+  {
     key: 'official-v1.1.1',
     title: '[첫 배포] 웅천고 업무도우미 v1.1.1',
     body: [
@@ -369,7 +383,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 20 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 21 } });
 }
 
 function doPost(e) {
@@ -378,7 +392,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 20 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 21 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
@@ -1220,7 +1234,9 @@ function compareStaffMembers_(a, b) {
     const value = String(position || '').replace(/\s/g, '');
     if (value === '교장') return 0;
     if (value === '교감') return 1;
-    return 2;
+    if (value.indexOf('교사') >= 0) return 2;
+    if (value === '교무실무원') return 3;
+    return 4;
   }
   const rank = rank_(a.position) - rank_(b.position);
   return rank || String(a.name || '').localeCompare(String(b.name || ''), 'ko');
@@ -1868,7 +1884,12 @@ function replaceNeisSnapshot_(body) {
   const meals = Array.isArray(snapshot.meals) ? snapshot.meals.slice(0, 100) : [];
   const schedules = Array.isArray(snapshot.schedules) ? snapshot.schedules.slice(0, 500) : [];
   const timetables = Array.isArray(snapshot.timetables) ? snapshot.timetables.slice(0, 5000) : [];
-  if (!timetables.length) throw new Error('업로드할 학급 시간표가 없습니다. 기존 공용 자료를 유지합니다.');
+  const allowedResources = { meals: true, schedules: true, timetables: true };
+  const requestedResources = Array.isArray(snapshot.updatedResources)
+    ? snapshot.updatedResources.map(String).filter(function(name) { return allowedResources[name]; })
+    : ['meals', 'schedules', 'timetables'];
+  const updatedResources = requestedResources.filter(function(name, index) { return requestedResources.indexOf(name) === index; });
+  if (!updatedResources.length) throw new Error('갱신할 NEIS 자료 항목이 없습니다. 기존 공용 자료를 유지합니다.');
 
   const mealRows = meals.map(function(item) {
     return [clean_(item.date, 8), clean_(item.mealType, 30), JSON.stringify(Array.isArray(item.dishNames) ? item.dishNames.slice(0, 100) : []), clean_(item.calories, 100), clean_(item.ntrInfo, 2000)];
@@ -1886,13 +1907,18 @@ function replaceNeisSnapshot_(body) {
     const previous = readObjects_(NEIS_SYNC_META_SHEET)[0] || {};
     const version = (Number(previous.version) || 0) + 1;
     const uploadedAt = new Date().toISOString();
-    replaceSheetRows_(NEIS_MEALS_SHEET, mealRows);
-    replaceSheetRows_(NEIS_SCHEDULE_SHEET, scheduleRows);
-    replaceSheetRows_(NEIS_CLASS_TIMETABLE_SHEET, timetableRows);
+    if (updatedResources.indexOf('meals') >= 0) replaceSheetRows_(NEIS_MEALS_SHEET, mealRows);
+    if (updatedResources.indexOf('schedules') >= 0) replaceSheetRows_(NEIS_SCHEDULE_SHEET, scheduleRows);
+    if (updatedResources.indexOf('timetables') >= 0) replaceSheetRows_(NEIS_CLASS_TIMETABLE_SHEET, timetableRows);
+    const mealCount = readObjects_(NEIS_MEALS_SHEET).length;
+    const scheduleCount = readObjects_(NEIS_SCHEDULE_SHEET).length;
+    const timetableCount = readObjects_(NEIS_CLASS_TIMETABLE_SHEET).length;
+    const partial = updatedResources.length < 3;
     replaceSheetRows_(NEIS_SYNC_META_SHEET, [[
       version, clean_(snapshot.schoolName, 100) || '웅천고등학교', fromDate, toDate,
       iso_(snapshot.fetchedAt) || uploadedAt, uploadedAt, clean_(body.deviceId, 100),
-      mealRows.length, scheduleRows.length, timetableRows.length, 'success', ''
+      mealCount, scheduleCount, timetableCount, partial ? 'partial' : 'success',
+      partial ? clean_(snapshot.syncWarning, 500) : ''
     ]]);
     return getNeisSnapshotWithoutLock_();
   } finally {
