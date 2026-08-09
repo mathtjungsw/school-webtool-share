@@ -4,7 +4,7 @@ import {
   ArrowLeftRight, Bell, BookOpen, Calculator, CalendarDays, CalendarRange,
   Check, ClipboardCheck, FileCode2, FileDown, FileScan, FilePenLine, FileText,
   GripVertical, HelpCircle, Landmark, LayoutDashboard, Link2, ListRestart,
-  MapPinned, MessageSquareText, ScanSearch, ScrollText, SearchCheck, Settings, Table2, UsersRound, Wrench,
+  MapPinned, MessageSquareText, ScanSearch, ScrollText, SearchCheck, Settings, ShieldCheck, Table2, UsersRound, Wrench,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -16,6 +16,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import clsx from 'clsx'
 import { useAppStore } from '../stores/appStore'
+import { useAdminStore } from '../stores/adminStore'
 import schoolLogo from '../assets/ungcheon-logo.png'
 
 interface NavItem {
@@ -30,6 +31,7 @@ const NAV: NavItem[] = [
   { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
   { id: 'calendar', label: '캘린더', icon: CalendarDays },
   { id: 'settings', label: '환경설정', icon: Settings },
+  { id: 'admin_center', label: '관리자 센터', icon: ShieldCheck },
   { id: 'staff_tasks', label: '업무센터', icon: ClipboardCheck },
   { id: 'school_hub', label: '학교 공유 링크', icon: Link2 },
   { id: 'timetable_swap', label: '교환·대강 계획', icon: ArrowLeftRight },
@@ -71,7 +73,14 @@ function normalizeOrder(value: unknown) {
     return DEFAULT_ORDER
   }
   const known = saved.filter((id, index) => NAV_BY_ID.has(id) && saved.indexOf(id) === index)
-  return [...known, ...DEFAULT_ORDER.filter(id => !known.includes(id))]
+  const next = [...known, ...DEFAULT_ORDER.filter(id => !known.includes(id))]
+  if (!known.includes('admin_center')) {
+    const appendedIndex = next.indexOf('admin_center')
+    if (appendedIndex >= 0) next.splice(appendedIndex, 1)
+    const settingsIndex = next.indexOf('settings')
+    next.splice(settingsIndex >= 0 ? settingsIndex + 1 : 0, 0, 'admin_center')
+  }
+  return next
 }
 
 export default function Sidebar({
@@ -89,6 +98,7 @@ export default function Sidebar({
   const [editing, setEditing] = useState(false)
   const [menuOrder, setMenuOrder] = useState(DEFAULT_ORDER)
   const config = useAppStore(s => s.config)
+  const isAdmin = useAdminStore(s => s.isAdmin)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const isExpanded = expanded || editing
 
@@ -97,8 +107,11 @@ export default function Sidebar({
   }, [])
 
   const orderedItems = useMemo(() =>
-    menuOrder.map(id => NAV_BY_ID.get(id)).filter((item): item is NavItem => Boolean(item)),
-  [menuOrder])
+    menuOrder
+      .map(id => NAV_BY_ID.get(id))
+      .filter((item): item is NavItem => Boolean(item))
+      .filter(item => item.id !== 'admin_center' || isAdmin),
+  [isAdmin, menuOrder])
 
   const saveOrder = (next: string[]) => {
     setMenuOrder(next)

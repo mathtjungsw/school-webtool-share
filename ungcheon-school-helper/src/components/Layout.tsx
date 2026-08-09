@@ -6,6 +6,7 @@ import LogPanel from './LogPanel'
 import WorkAssistantSearch from './WorkAssistantSearch'
 import Dashboard from '../pages/Dashboard'
 import { useAppStore } from '../stores/appStore'
+import { useAdminStore } from '../stores/adminStore'
 
 const NeisPage = lazy(() => import('../pages/NeisPage'))
 const CalendarPage = lazy(() => import('../pages/CalendarPage'))
@@ -40,6 +41,7 @@ const TeacherToolsPage = lazy(() => import('../pages/TeacherToolsPage'))
 const TeacherTransferScorePage = lazy(() => import('../pages/TeacherTransferScorePage'))
 const StudentLocatorPage = lazy(() => import('../pages/StudentLocatorPage'))
 const StudentIdentityAuditPage = lazy(() => import('../pages/StudentIdentityAuditPage'))
+const AdminCenterPage = lazy(() => import('../pages/AdminCenterPage'))
 
 const PAGES: Record<string, React.ComponentType> = {
   neis: NeisPage,
@@ -73,6 +75,7 @@ const PAGES: Record<string, React.ComponentType> = {
   transfer_score: TeacherTransferScorePage,
   student_locator: StudentLocatorPage,
   student_identity_audit: StudentIdentityAuditPage,
+  admin_center: AdminCenterPage,
 }
 
 const MAX_HISTORY = 40
@@ -86,15 +89,24 @@ export default function Layout() {
   const [assistantOpen, setAssistantOpen] = useState(false)
   const page = history[historyIndex]
   const logs = useAppStore(state => state.logs)
+  const isAdmin = useAdminStore(state => state.isAdmin)
   const logErrorCount = logs.filter(log => log.level === 'error').length
   const Page = PAGES[page]
 
   const navigate = (id: string) => {
+    if (id === 'admin_center' && !isAdmin) return
     if (id === page) return
     const next = [...history.slice(0, historyIndex + 1), id].slice(-MAX_HISTORY)
     setHistory(next)
     setHistoryIndex(next.length - 1)
   }
+
+  useEffect(() => {
+    if (!isAdmin && page === 'admin_center') {
+      setHistory([INITIAL_PAGE])
+      setHistoryIndex(0)
+    }
+  }, [isAdmin, page])
 
   useEffect(() => {
     const openAssistant = (event: KeyboardEvent) => {

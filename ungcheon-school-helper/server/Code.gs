@@ -355,6 +355,19 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.1',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.1',
+    body: [
+      '· 관리자 모드에서만 표시되는 관리자 센터 메뉴 추가',
+      '· 매일 13:00 자동 갱신을 기다리지 않고 NEIS 10일치 공용 자료를 즉시 동기화하는 버튼 추가',
+      '· 동기화 PC·마지막 갱신·자료 범위·버전을 한눈에 확인하는 상태판 추가',
+      '· 공지·시간표·교직원·학생·위원회·기능개선·환경설정 관리 바로가기 추가',
+      '· 프로그램 업데이트 즉시 확인 버튼과 관리자 화면 접근 차단 강화',
+      '· 검색도우미와 사용 매뉴얼에 관리자 센터 사용법 반영'
+    ].join('\n'),
+    date: '2026-08-09'
+  },
+  {
     key: 'v1.1.0',
     title: '[업데이트] 웅천고 업무도우미 v1.1.0',
     body: [
@@ -380,7 +393,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 18 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 19 } });
 }
 
 function doPost(e) {
