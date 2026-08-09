@@ -71,6 +71,16 @@ const NEIS_ENDPOINT_PARAMS = {
 };
 const RELEASE_NOTES = [
   {
+    key: 'v1.0.42',
+    title: '[긴급 수정] 웅천고 업무도우미 v1.0.42',
+    body: [
+      '· 1.0.41 업데이트 후 “시작 준비 중...” 화면에서 진행되지 않던 오류 수정',
+      '· NEIS 학사일정 기본값 이전 기록을 앱에서 허용된 설정 영역에 저장하도록 교정',
+      '· 초기 설정 저장에 문제가 생겨도 로그인과 대시보드 시작은 계속되도록 안전장치 추가'
+    ].join('\n'),
+    date: '2026-08-09'
+  },
+  {
     key: 'v1.0.41',
     title: '[업데이트] 웅천고 업무도우미 v1.0.41',
     body: [
@@ -335,7 +345,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 14 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 15 } });
 }
 
 function doPost(e) {
@@ -344,7 +354,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 14 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 15 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
