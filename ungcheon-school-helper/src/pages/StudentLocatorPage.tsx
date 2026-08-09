@@ -6,6 +6,7 @@ import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 import { listTimetableChanges, type TimetableChangeRequest } from '../services/timetableChanges'
 import { applyStudentLessonOverride } from '../services/effectiveTimetable'
 import { useAppStore } from '../stores/appStore'
+import { getSpecialTimetableDay, getTimetableDayIndex, localDateKey } from '../services/specialTimetableDays'
 
 const DAY_NAMES: Array<StudentTimetableDay | ''> = ['', '월', '화', '수', '목', '금', '']
 
@@ -63,11 +64,14 @@ export default function StudentLocatorPage() {
   }, [candidates, selected?.student.studentId])
 
   const submit = (event: FormEvent) => { event.preventDefault(); setSubmitted(query.trim()); setSelected(null) }
-  const day = DAY_NAMES[clock.getDay()]
+  const dateKey = localDateKey(clock)
+  const specialTimetableDay = getSpecialTimetableDay(dateKey)
+  const dayIndex = getTimetableDayIndex(dateKey)
+  const day = specialTimetableDay?.sourceWeekday ?? DAY_NAMES[clock.getDay()]
   const period = currentPeriod(clock)
   const baseSlot = selected && day && period ? selected.slots[`${day}${period.period}`] : undefined
-  const slotIndex = period && clock.getDay() >= 1 && clock.getDay() <= 5 ? (clock.getDay() - 1) * 7 + Number(period.period) - 1 : -1
-  const slot = selected && slotIndex >= 0 ? applyStudentLessonOverride(baseSlot, selected.student.classLabel, clock.toISOString().slice(0, 10), slotIndex, changes) : baseSlot
+  const slotIndex = period && dayIndex >= 0 ? dayIndex * 7 + Number(period.period) - 1 : -1
+  const slot = selected && slotIndex >= 0 ? applyStudentLessonOverride(baseSlot, selected.student.classLabel, dateKey, slotIndex, changes) : baseSlot
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-6">
@@ -77,6 +81,7 @@ export default function StudentLocatorPage() {
       </header>
       <form onSubmit={submit} className="card flex gap-2 p-4"><input value={query} onChange={event => setQuery(event.target.value)} className="input-field flex-1 text-base" placeholder="학번 또는 학생 이름 입력" /><button className="btn-primary px-5"><Search size={15} />찾기</button></form>
       {error && <p className="rounded-xl border border-rose-400/20 bg-rose-500/10 p-3 text-xs text-rose-200">{error}</p>}
+      {specialTimetableDay && <p className="rounded-xl border-2 border-amber-400 bg-amber-100 p-3 text-sm font-black text-slate-950">{specialTimetableDay.message} 현재 위치도 {specialTimetableDay.sourceWeekday}요일 수업을 기준으로 안내합니다.</p>}
       {submitted && candidates.length === 0 && !loading && <div className="card py-14 text-center text-sm text-slate-400">일치하는 학생이 없습니다.</div>}
       {candidates.length > 1 && !selected && <section className="card"><h2 className="font-bold text-white">동명이인·검색 후보 {candidates.length}명</h2><p className="mt-1 text-xs text-slate-500">학번과 학급을 확인해 학생을 선택하세요.</p><div className="mt-4 grid gap-2 sm:grid-cols-2">{candidates.map(item => <button key={item.student.studentId} onClick={() => setSelected(item)} className="rounded-xl border border-white/10 bg-white/[0.025] p-3 text-left hover:border-cyan-400/40"><p className="font-bold text-white">{item.student.name}</p><p className="mt-1 text-xs text-cyan-200">{item.student.studentId} · {item.student.classLabel}반 {item.student.number}번</p></button>)}</div></section>}
       {selected && <section className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">

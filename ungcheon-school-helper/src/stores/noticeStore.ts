@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { listNotices } from '../services/schoolHub'
+import { SPECIAL_TIMETABLE_NOTICE } from '../services/specialTimetableDays'
 
 export interface Notice {
   id: number
@@ -13,6 +14,7 @@ export interface Notice {
 // ─── LocalStorage 키 (사용자별 읽음/스누즈 기억) ──────────────────────
 const LS_LAST_READ = 'swh.notice.lastReadId'      // 사용자가 확인한 가장 큰 공지 ID
 const LS_SNOOZE_UNTIL = 'swh.notice.snoozeUntil'  // '오늘 하루 보지 않기' — 이 날짜(오늘)면 자동 팝업 차단
+const LS_SPECIAL_TIMETABLE_READ = 'swh.notice.special.20260811.read'
 
 function todayStr(): string {
   const d = new Date()
@@ -86,8 +88,8 @@ export const useNoticeStore = create<NoticeState>((set, get) => ({
   // 진입 시 자동 확인(On-Load Verification)
   fetchNotices: async () => {
     try {
-      const raw = await listNotices()
-      const notices = sanitize(raw)
+      const raw = await listNotices().catch(() => [])
+      const notices = sanitize([...(Array.isArray(raw) ? raw : []), SPECIAL_TIMETABLE_NOTICE])
       set({ notices, loaded: true })
 
       // '오늘 하루 보지 않기' 토큰이 오늘이면 자동 팝업 차단
@@ -95,8 +97,16 @@ export const useNoticeStore = create<NoticeState>((set, get) => ({
       try { snoozeUntil = localStorage.getItem(LS_SNOOZE_UNTIL) } catch { /* ignore */ }
       if (snoozeUntil === todayStr()) return
 
+      // 특별 시간표 안내는 원격 공지 연번과 별도로 한 번 반드시 보여 줍니다.
+      let specialRead = false
+      try { specialRead = localStorage.getItem(LS_SPECIAL_TIMETABLE_READ) === 'true' } catch { /* ignore */ }
+      if (!specialRead && !isExpired(SPECIAL_TIMETABLE_NOTICE)) {
+        set({ open: true, activeId: SPECIAL_TIMETABLE_NOTICE.id })
+        return
+      }
+
       // 만료되지 않은 공지 중 가장 최신 ID가 마지막으로 읽은 ID보다 크면 팝업
-      const active = notices.filter(n => !isExpired(n))[0]  // notices는 최신순
+      const active = notices.filter(n => n.id > 0 && !isExpired(n))[0]  // notices는 최신순
       if (active && active.id > get().lastReadId) {
         set({ open: true, activeId: active.id })
       }
@@ -117,6 +127,7 @@ export const useNoticeStore = create<NoticeState>((set, get) => ({
     const maxId = get().notices.reduce((m, n) => Math.max(m, n.id), get().lastReadId)
     try {
       localStorage.setItem(LS_LAST_READ, String(maxId))
+      if (get().activeId === SPECIAL_TIMETABLE_NOTICE.id) localStorage.setItem(LS_SPECIAL_TIMETABLE_READ, 'true')
       if (snoozeToday) localStorage.setItem(LS_SNOOZE_UNTIL, todayStr())
     } catch { /* ignore */ }
     set({ open: false, activeId: null, lastReadId: maxId })
