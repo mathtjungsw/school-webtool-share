@@ -9,6 +9,7 @@ import { useAdminStore } from '../stores/adminStore'
 import { useAppStore } from '../stores/appStore'
 import {
   getSharedStudentTimetable,
+  getSharedStudentRoster,
   replaceSharedStudentTimetable,
   subscribeHubResource,
 } from '../services/schoolHub'
@@ -243,9 +244,10 @@ export default function StudentTimetablePage() {
       }
 
       const stats = getStudentTimetableStats(nextDataset)
-      const prepared = prepareSharedStudentTimetable(nextDataset)
+      const roster = await getSharedStudentRoster(true)
+      const prepared = prepareSharedStudentTimetable(nextDataset, roster?.students ?? [])
       const confirmed = confirm(
-        `학생별 시간표 공유 자료를 교체할까요?\n\n학생 ${stats.students}명 · 학급 ${stats.classes}개 · 강좌 ${stats.courses}개\n\nExcel 원본은 전송되지 않으며 조회용 시간표만 저장됩니다.`,
+        `학생별 시간표 공유 자료를 교체할까요?\n\n학생 ${prepared.studentCount}명 · 학급 ${stats.classes}개 · 강좌 ${stats.courses}개\n\n학생 명렬에 등록된 1학년은 학급 기본시간표로 함께 생성됩니다.\nExcel 원본은 전송되지 않으며 조회용 시간표만 저장됩니다.`,
       )
       if (!confirmed) return
 
@@ -397,6 +399,7 @@ export default function StudentTimetablePage() {
             <div className="p-4 border-b border-white/5">
               <div className="grid grid-cols-2 gap-2 mb-2">
                 <select value={grade} onChange={event => { setGrade(event.target.value); setClassName('') }} className="input text-xs">
+                  <option value="1">1학년</option>
                   <option value="2">2학년</option>
                   <option value="3">3학년</option>
                 </select>
