@@ -28,7 +28,7 @@ const NEIS_SCHEDULE_SHEET = 'NEIS학사일정';
 const NEIS_CLASS_TIMETABLE_SHEET = 'NEIS학급시간표';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
 const STAFF_ASSIGNMENTS_2026_APPLIED_KEY = 'UNG_STAFF_ASSIGNMENTS_2026_APPLIED';
-const OFFICIAL_RELEASE_NOTICE_RESET_KEY = 'UNG_OFFICIAL_RELEASE_NOTICE_RESET_1_1_1';
+const OFFICIAL_RELEASE_NOTICE_RESET_KEY = 'UNG_OFFICIAL_RELEASE_NOTICE_RESET_1_1_2';
 const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
 const NEIS_SYNC_DEVICE_ID_PROPERTY = 'UNG_NEIS_SYNC_DEVICE_ID';
 const NEIS_SYNC_TOKEN_HASH_PROPERTY = 'UNG_NEIS_SYNC_TOKEN_SHA256';
@@ -355,22 +355,8 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
-    key: 'v1.1.2',
-    title: '[업데이트] 웅천고 업무도우미 v1.1.2',
-    body: [
-      '· 관리자 동기화를 급식·NEIS 학사일정·학급시간표 세 항목으로 분명하게 표시',
-      '· 한 항목의 조회가 실패해도 성공한 급식·학사일정 또는 시간표는 정상 갱신',
-      '· 실패한 항목은 기존 공용 자료를 지우지 않고 그대로 유지하도록 안정성 개선',
-      '· 동기화 완료 후 항목별 갱신 건수와 실패 원인을 각각 안내',
-      '· 학생 위치 찾기에 1학년 학생 명렬과 공용 학급시간표 연결',
-      '· 라이트 모드는 어두운 글씨, 다크 모드는 밝은 글씨로 전역 대비 강화',
-      '· 교직원 명렬에서 교사를 먼저 표시한 뒤 교무실무원이 나오도록 정렬 개선'
-    ].join('\n'),
-    date: '2026-08-09'
-  },
-  {
-    key: 'official-v1.1.1',
-    title: '[첫 배포] 웅천고 업무도우미 v1.1.1',
+    key: 'official-v1.1.2',
+    title: '[첫 배포] 웅천고 업무도우미 v1.1.2',
     body: [
       '· 웅천고등학교 교직원 업무 지원을 위한 첫 공식 배포입니다.',
       '· 대시보드, 캘린더, 시간표, 출석부, 업무센터와 학교 공용 업무 기능을 제공합니다.',
@@ -383,7 +369,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 21 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 22 } });
 }
 
 function doPost(e) {
@@ -392,7 +378,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 21 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 22 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
