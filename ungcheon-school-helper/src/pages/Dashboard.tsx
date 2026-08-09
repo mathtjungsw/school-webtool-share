@@ -53,6 +53,10 @@ import {
   loadSharedWorkLastViewedAt, subscribeSharedWorkViewed,
 } from '../services/sharedWorkNotifications'
 import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
+import {
+  getSpecialTimetableDay, getTimetableDayIndex, getTimetableSourceDate,
+  SPECIAL_TIMETABLE_DAYS,
+} from '../services/specialTimetableDays'
 import type { CreativeScheduleResult, DutyScheduleResult, MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
 import { listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
 import {
@@ -664,6 +668,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       completed: task.completed,
       taskId: task.id,
     })),
+    ...SPECIAL_TIMETABLE_DAYS.map(item => ({
+      date: toYmd(item.date),
+      eventName: item.title,
+      department: '시간표 운영',
+      source: 'schoolEvent' as const,
+    })),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.eventName.localeCompare(b.eventName))
   const upcomingCommitteeEvents = committeeEvents
     .filter(item => item.date >= todayStr() && item.date <= format(addDays(new Date(), 7), 'yyyy-MM-dd'))
@@ -675,7 +685,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const todaySubjects: Record<string, string> = {}
   if (isToday) {
     if (sharedTeacher) {
-      const dayIndex = getWeekDates(selectedDate).indexOf(selYmd)
+      const dayIndex = getTimetableDayIndex(selectedDate)
       if (dayIndex >= 0) {
         sharedTeacher.slots
           .slice(dayIndex * 7, (dayIndex + 1) * 7)
@@ -687,7 +697,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       config.teacherClasses.forEach(tc => {
         teacherTT
           .filter(t =>
-            t.date === selYmd &&
+            t.date === getTimetableSourceDate(selYmd) &&
             t.grade?.trim() === tc.grade &&
             t.classNm?.trim() === tc.classNm &&
             t.subject?.trim() === tc.subject?.trim()
@@ -695,11 +705,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
           .forEach(t => { todaySubjects[String(t.period)] = `${tc.grade}-${tc.classNm}반 ${tc.subject}` })
       })
     } else if (config.grade && config.classNm) {
-      timetable.filter(t => t.date === selYmd)
+      timetable.filter(t => t.date === getTimetableSourceDate(selYmd))
         .forEach(t => { todaySubjects[String(t.period)] = t.subject })
     }
   }
   const classStatus = isToday ? getClassStatus(periodRanges, currentTime, todaySubjects) : null
+  const specialTimetableDay = getSpecialTimetableDay(selectedDate)
 
   return (
     <div className="p-5">
@@ -739,6 +750,15 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
           </button>
         </div>
       </div>
+      {specialTimetableDay && (
+        <div className="mb-4 flex items-start gap-3 rounded-2xl border-2 border-amber-400 bg-amber-100 px-4 py-3 text-slate-950 shadow-sm">
+          <BellRing size={18} className="mt-0.5 shrink-0 text-amber-700" />
+          <div>
+            <p className="text-sm font-black">{specialTimetableDay.message}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-700">이 날짜의 교사·학급 시간표는 {specialTimetableDay.sourceWeekday}요일 시간표를 기준으로 표시됩니다.</p>
+          </div>
+        </div>
+      )}
 
       {/* ── No school ── */}
       {!hasSchool && (
@@ -1650,7 +1670,7 @@ function TimetableSection({
             periodRanges={periodRanges}
             lunch={lunch}
             renderCell={(date, period) => {
-              const dayIndex = weekDates.indexOf(date)
+              const dayIndex = getTimetableDayIndex(date)
               const slotIndex = dayIndex * 7 + Number(period) - 1
               const slot = sharedTeacher.slots[slotIndex]
               const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
@@ -1705,7 +1725,7 @@ function TimetableSection({
               const entry = config.teacherClasses!.reduce<{label:string;subject:string;colorIdx:number}|null>((acc, tc, idx) => {
                 if (acc) return acc
                 const found = teacherTT.find(t =>
-                  t.date === date &&
+                  t.date === getTimetableSourceDate(date) &&
                   String(t.period) === period &&
                   t.grade?.trim() === tc.grade &&
                   t.classNm?.trim() === tc.classNm &&
@@ -1736,7 +1756,7 @@ function TimetableSection({
             periodRanges={periodRanges}
             lunch={lunch}
             renderCell={(date, period) => {
-              const entry = timetable.find(t => t.date === date && String(t.period) === period)
+              const entry = timetable.find(t => t.date === getTimetableSourceDate(date) && String(t.period) === period)
               if (!entry) return null
               const isNow = date === todayYmd && period === currentPeriod
               return { text: entry.subject, sub: '', colorClass: 'bg-sky-500/10 text-sky-300', isNow }
@@ -1777,10 +1797,12 @@ function WeekGrid({ weekDates, DAY, todayYmd, currentPeriod, periodRanges = [], 
             <th className="w-14 py-1.5 text-center text-slate-600"></th>
             {weekDates.map((d, i) => {
               const isT = d === todayYmd
+              const special = getSpecialTimetableDay(d)
               return (
                 <th key={d} className="py-1.5 text-center">
                   <div className={clsx('font-semibold', isT ? 'text-violet-400' : 'text-slate-400')}>{DAY[i]}</div>
                   <div className="text-slate-600 font-normal">{d.slice(6)}</div>
+                  {special && <div className="mx-auto mt-1 w-fit rounded bg-amber-300 px-1.5 py-0.5 text-[8px] font-black text-slate-950">{special.sourceWeekday} 시간표</div>}
                 </th>
               )
             })}

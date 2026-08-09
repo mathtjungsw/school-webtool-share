@@ -21,6 +21,7 @@ import {
 } from '../services/personalOrganizer'
 import type { CreativeScheduleResult, DutyScheduleEvent, DutyScheduleResult, ScheduleEvent, WeeklyPlanResult } from '../types'
 import { listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
+import { SPECIAL_TIMETABLE_DAYS } from '../services/specialTimetableDays'
 
 type CalendarSource = 'neis' | 'weekly' | 'creative' | 'schoolEvent' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty' | 'timetableChange'
 
@@ -322,6 +323,13 @@ export default function CalendarPage() {
       label: '개인 업무',
       completed: task.completed,
       task,
+    })),
+    ...SPECIAL_TIMETABLE_DAYS.map(item => ({
+      id: `special-timetable-${item.date}`,
+      date: item.date,
+      title: item.title,
+      source: 'schoolEvent' as const,
+      label: '시간표 운영',
     }))]
     return combined.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '') || a.title.localeCompare(b.title, 'ko'))
   },
