@@ -71,6 +71,17 @@ const NEIS_ENDPOINT_PARAMS = {
 };
 const RELEASE_NOTES = [
   {
+    key: 'v1.0.43',
+    title: '[업데이트] 웅천고 업무도우미 v1.0.43',
+    body: [
+      '· 교직원 명렬의 “교원 추가” 버튼을 “교직원 명렬 추가”로 변경',
+      '· 새 교직원 행을 편집 중에는 목록 맨 아래에 생성하고 이름 칸으로 바로 이동',
+      '· 공유 명렬 저장 후 교장·교감 우선, 나머지는 가나다순으로 자동 재배치',
+      '· 검색도우미와 사용 매뉴얼에 교직원 추가·저장 순서 안내 반영'
+    ].join('\n'),
+    date: '2026-08-09'
+  },
+  {
     key: 'v1.0.42',
     title: '[긴급 수정] 웅천고 업무도우미 v1.0.42',
     body: [
@@ -345,7 +356,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 15 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 16 } });
 }
 
 function doPost(e) {
@@ -354,7 +365,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 15 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 16 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);

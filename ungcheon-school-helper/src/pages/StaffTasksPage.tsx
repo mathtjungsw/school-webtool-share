@@ -491,6 +491,7 @@ function RosterTab({
   const [draft, setDraft] = useState<StaffMember[]>([])
   const [sourceFileName, setSourceFileName] = useState('')
   const [saving, setSaving] = useState(false)
+  const rosterListRef = useRef<HTMLDivElement>(null)
   useEffect(() => setDraft(sortStaffMembers(roster?.members ?? [])), [roster])
 
   const upload = async () => {
@@ -511,7 +512,9 @@ function RosterTab({
     setSaving(true)
     onError('')
     try {
-      const result = await replaceSharedStaffRoster(sortStaffMembers(draft), adminPassword, uploadedBy, sourceFileName || roster?.sourceFileName)
+      const sortedDraft = sortStaffMembers(draft)
+      const result = await replaceSharedStaffRoster(sortedDraft, adminPassword, uploadedBy, sourceFileName || roster?.sourceFileName)
+      setDraft(sortedDraft)
       onSuccess(`교직원 명렬 ${result.version}차 저장을 완료했습니다.`)
       await onChanged()
     } catch (saveError) {
@@ -523,6 +526,18 @@ function RosterTab({
 
   const update = (id: string, patch: Partial<StaffMember>) =>
     setDraft(current => current.map(member => member.id === id ? { ...member, ...patch } : member))
+
+  const addMember = () => {
+    const id = crypto.randomUUID()
+    setDraft(current => [...current, { id, position: '교사', name: '', department: '', subject: '', homeroom: '' }])
+    // 추가 직후에는 편집하기 쉽도록 새 행을 목록 맨 아래에 그대로 보여준다.
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      const list = rosterListRef.current
+      if (!list) return
+      list.scrollTop = list.scrollHeight
+      list.querySelector<HTMLInputElement>(`[data-member-id="${id}"] input[data-field="name"]`)?.focus()
+    }))
+  }
 
   return (
     <div className="space-y-4">
@@ -551,15 +566,15 @@ function RosterTab({
         <div className="grid grid-cols-[54px_100px_120px_180px_150px_120px_42px] gap-2 px-4 py-2.5 bg-white/5 text-[10px] font-semibold text-slate-500">
           <span>순번</span><span>직책</span><span>성명</span><span>부서</span><span>교과</span><span>담임</span><span></span>
         </div>
-        <div className="max-h-[620px] overflow-y-auto">
-          {sortStaffMembers(draft).map((member, index) => (
-            <div key={member.id} className="grid grid-cols-[54px_100px_120px_180px_150px_120px_42px] gap-2 items-center px-4 py-2 border-t border-white/5">
+        <div ref={rosterListRef} className="max-h-[620px] overflow-y-auto">
+          {draft.map((member, index) => (
+            <div key={member.id} data-member-id={member.id} className="grid grid-cols-[54px_100px_120px_180px_150px_120px_42px] gap-2 items-center px-4 py-2 border-t border-white/5">
               <span className="text-xs text-slate-600">{index + 1}</span>
               {isAdmin
                 ? <input className="input-field py-1.5 text-xs" value={member.position} onChange={event => update(member.id, { position: event.target.value })} />
                 : <span className="text-xs text-slate-400">{member.position}</span>}
               {isAdmin
-                ? <input className="input-field py-1.5 text-xs" value={member.name} onChange={event => update(member.id, { name: event.target.value })} />
+                ? <input data-field="name" className="input-field py-1.5 text-xs" value={member.name} onChange={event => update(member.id, { name: event.target.value })} />
                 : <span className="text-sm font-semibold text-slate-200">{member.name}</span>}
               {isAdmin
                 ? <input className="input-field py-1.5 text-xs" placeholder="부서(업무 배부에 사용)" value={member.department ?? ''} onChange={event => update(member.id, { department: event.target.value })} />
@@ -575,11 +590,11 @@ function RosterTab({
                 : <span />}
             </div>
           ))}
-          {!draft.length && <p className="py-14 text-center text-sm text-slate-500">등록된 교원이 없습니다.</p>}
+          {!draft.length && <p className="py-14 text-center text-sm text-slate-500">등록된 교직원이 없습니다.</p>}
         </div>
         {isAdmin && (
           <div className="border-t border-white/5 p-3">
-            <button onClick={() => setDraft(current => [...current, { id: crypto.randomUUID(), position: '교사', name: '', department: '', subject: '', homeroom: '' }])} className="btn-ghost flex items-center gap-1.5"><Plus size={13} />교원 추가</button>
+            <button onClick={addMember} className="btn-ghost flex items-center gap-1.5"><Plus size={13} />교직원 명렬 추가</button>
           </div>
         )}
         </div>
