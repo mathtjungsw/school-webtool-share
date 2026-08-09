@@ -22,15 +22,19 @@ const STAFF_CHECKLIST_RESPONSES_SHEET = '업무체크응답';
 const COMMITTEE_MEMBERS_SHEET = '위원회명단';
 const COMMITTEE_EVENTS_SHEET = '위원회일정';
 const TIMETABLE_CHANGES_SHEET = '교환대강반영';
+const NEIS_SYNC_META_SHEET = 'NEIS동기화정보';
+const NEIS_MEALS_SHEET = 'NEIS급식';
+const NEIS_SCHEDULE_SHEET = 'NEIS학사일정';
+const NEIS_CLASS_TIMETABLE_SHEET = 'NEIS학급시간표';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
 const STAFF_ASSIGNMENTS_2026_APPLIED_KEY = 'UNG_STAFF_ASSIGNMENTS_2026_APPLIED';
 const OFFICIAL_RELEASE_NOTICE_RESET_KEY = 'UNG_OFFICIAL_RELEASE_NOTICE_RESET_1_0_0';
 const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
-const NEIS_BASE_URL = 'https://open.neis.go.kr/hub/';
-const UNGCHEON_OFFICE_CODE = 'S10';
-const UNGCHEON_SCHOOL_CODE = '9010464';
+const NEIS_SYNC_DEVICE_ID_PROPERTY = 'UNG_NEIS_SYNC_DEVICE_ID';
+const NEIS_SYNC_TOKEN_HASH_PROPERTY = 'UNG_NEIS_SYNC_TOKEN_SHA256';
+const NEIS_SYNC_REGISTERED_AT_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_AT';
+const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
-const NEIS_CACHE_SECONDS = 300;
 // 2026학년도 업무분장 원문에서 담임·교과·부서만 선별한 자료입니다.
 // 업무, 세부업무, 부담임 등 나머지 원문 정보는 저장하지 않습니다.
 const STAFF_ASSIGNMENTS_2026 = [
@@ -62,14 +66,6 @@ const STAFF_ASSIGNMENTS_2026 = [
   ['이경민', '3학년부', '영어', '3-1'], ['신숙자', '3학년부', '수학', '3-2'],
   ['정유현', '3학년부', '국어', '3-6']
 ];
-const NEIS_ENDPOINT_PARAMS = {
-  schoolInfo: ['SCHUL_NM'],
-  mealServiceDietInfo: ['MLSV_YMD'],
-  SchoolSchedule: ['AA_YMD', 'AA_FROM_YMD', 'AA_TO_YMD'],
-  hisTimetable: ['AY', 'SEM', 'ALL_TI_YMD', 'TI_FROM_YMD', 'TI_TO_YMD', 'GRADE', 'CLASS_NM'],
-  classInfo: ['AY'],
-  schoolMajorinfo: ['AY']
-};
 // 시험 운영 중의 변경 기록은 소스 이력으로만 보관하고 공지에는 다시 게시하지 않습니다.
 const LEGACY_RELEASE_NOTES = [
   {
@@ -359,6 +355,19 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.0',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.0',
+    body: [
+      '· 공용 NEIS 동기화: 등록된 관리자 PC 한 대만 API 키를 보관하고 전체 사용자는 공용 자료 조회',
+      '· 자동 수집: 매일 13:00에 오늘 포함 10일치 급식·학사일정·전체 학급 시간표 갱신',
+      '· 누락 보충: 13시에 PC가 꺼져 있으면 다음 프로그램 실행 때 자동 동기화하고 실패 시 10분 간격 재시도',
+      '· 보안 강화: API 키는 관리자 PC의 Windows 암호화 저장소에만 보관하고 서버·구글시트에는 저장하지 않음',
+      '· 안정성 강화: 새 자료를 모두 검증한 뒤 교체하며 수집·업로드 실패 시 기존 공용 자료 유지',
+      '· 대시보드·캘린더·업무알리미·검색도우미·사용 매뉴얼을 공용 NEIS 방식으로 갱신'
+    ].join('\n'),
+    date: '2026-08-09'
+  },
+  {
     key: 'official-v1.0.0',
     title: '[첫 배포] 웅천고 업무도우미 v1.0.0',
     body: [
@@ -371,7 +380,7 @@ const RELEASE_NOTES = [
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 17 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 18 } });
 }
 
 function doPost(e) {
@@ -380,7 +389,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 17 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 18 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
@@ -470,16 +479,18 @@ function doPost(e) {
       cancelTimetableChange_(body);
       return json_({ ok: true });
     }
-    if (action === 'getNeisStatus') {
-      return json_({ ok: true, data: getNeisStatus_() });
-    }
-    if (action === 'setNeisApiKey') {
+    if (action === 'getNeisSyncStatus') return json_({ ok: true, data: getNeisSyncStatus_(body) });
+    if (action === 'registerNeisSyncDevice') {
       requireAdmin_(body.adminPassword);
-      return json_({ ok: true, data: setNeisApiKey_(body.apiKey) });
+      return json_({ ok: true, data: registerNeisSyncDevice_(body) });
     }
-    if (action === 'neisQuery') {
-      return json_({ ok: true, data: neisQuery_(body.endpoint, body.params) });
+    if (action === 'revokeNeisSyncDevice') {
+      requireAdmin_(body.adminPassword);
+      revokeNeisSyncDevice_();
+      return json_({ ok: true });
     }
+    if (action === 'getNeisSnapshot') return json_({ ok: true, data: getNeisSnapshot_() });
+    if (action === 'replaceNeisSnapshot') return json_({ ok: true, data: replaceNeisSnapshot_(body) });
     throw new Error('허용되지 않는 요청입니다.');
   } catch (error) {
     return json_({ ok: false, error: String(error && error.message ? error.message : error) });
@@ -510,6 +521,7 @@ function getSyncManifest_() {
       studentTimetable: versionOf_(STUDENT_TIMETABLE_META_SHEET),
       staffRoster: versionOf_(STAFF_ROSTER_META_SHEET),
       studentRoster: versionOf_(STUDENT_ROSTER_META_SHEET),
+      sharedNeis: versionOf_(NEIS_SYNC_META_SHEET),
       staffChecklists: activityOf_([STAFF_CHECKLISTS_SHEET, STAFF_CHECKLIST_RESPONSES_SHEET])
       ,timetableChanges: activityOf_([TIMETABLE_CHANGES_SHEET])
     }
@@ -643,6 +655,19 @@ function ensureSheets_() {
     'originalSlotIndex', 'replacementSlotIndex', 'originalDate', 'replacementDate',
     'originalTeacher', 'replacementTeacher', 'originalClass', 'replacementClass',
     'originalSubject', 'replacementSubject', 'note', 'createdAt', 'respondedAt', 'responderName', 'updatedAt'
+  ]);
+  ensureDataSheet_(book, NEIS_SYNC_META_SHEET, [
+    'version', 'schoolName', 'fromDate', 'toDate', 'fetchedAt', 'uploadedAt',
+    'deviceId', 'mealCount', 'scheduleCount', 'timetableCount', 'status', 'lastError'
+  ]);
+  ensureDataSheet_(book, NEIS_MEALS_SHEET, [
+    'date', 'mealType', 'dishNamesJson', 'calories', 'ntrInfo'
+  ]);
+  ensureDataSheet_(book, NEIS_SCHEDULE_SHEET, [
+    'date', 'eventName', 'eventLevel'
+  ]);
+  ensureDataSheet_(book, NEIS_CLASS_TIMETABLE_SHEET, [
+    'date', 'grade', 'classNm', 'period', 'subject', 'teacher', 'classroom'
   ]);
   repairCommitteeTimeCells_(book);
   ensureReleaseNotices_();
@@ -1740,112 +1765,166 @@ function toBooleanValue_(value) {
   return value === true || String(value || '').toLowerCase() === 'true';
 }
 
-function getNeisStatus_() {
+function getNeisSyncStatus_(body) {
+  const properties = PropertiesService.getScriptProperties();
+  const registeredDeviceId = properties.getProperty(NEIS_SYNC_DEVICE_ID_PROPERTY) || '';
+  const deviceId = clean_(body && body.deviceId, 100);
+  const meta = readObjects_(NEIS_SYNC_META_SHEET)[0] || {};
   return {
-    configured: Boolean(PropertiesService.getScriptProperties().getProperty(NEIS_API_KEY_PROPERTY)),
-    schoolName: '웅천고등학교'
+    registered: Boolean(registeredDeviceId),
+    isThisDevice: Boolean(registeredDeviceId && deviceId && registeredDeviceId === deviceId),
+    registeredAt: properties.getProperty(NEIS_SYNC_REGISTERED_AT_PROPERTY) || '',
+    registeredBy: properties.getProperty(NEIS_SYNC_REGISTERED_BY_PROPERTY) || '',
+    lastSyncedAt: iso_(meta.uploadedAt),
+    fromDate: clean_(meta.fromDate, 8),
+    toDate: clean_(meta.toDate, 8),
+    version: Number(meta.version) || 0,
+    lastStatus: clean_(meta.status, 20) || 'ready',
+    lastError: clean_(meta.lastError, 500)
   };
 }
 
-function setNeisApiKey_(value) {
-  const apiKey = clean_(value, 200);
-  if (!apiKey) throw new Error('저장할 NEIS API 키를 입력하세요.');
-  if (!/^[A-Za-z0-9_-]+$/.test(apiKey)) throw new Error('NEIS API 키 형식이 올바르지 않습니다.');
-
-  const rows = fetchNeisRows_('schoolInfo', {}, apiKey);
-  if (!rows.length || String(rows[0].SD_SCHUL_CODE || '') !== UNGCHEON_SCHOOL_CODE) {
-    throw new Error('NEIS API 키로 웅천고등학교 정보를 확인하지 못했습니다.');
-  }
-
-  PropertiesService.getScriptProperties().setProperty(NEIS_API_KEY_PROPERTY, apiKey);
-  return { configured: true, schoolName: '웅천고등학교' };
+function registerNeisSyncDevice_(body) {
+  const deviceId = clean_(body.deviceId, 100);
+  const registeredBy = clean_(body.registeredBy, 30) || '관리자';
+  if (!/^[A-Za-z0-9-]{20,100}$/.test(deviceId)) throw new Error('동기화 PC 식별값이 올바르지 않습니다.');
+  const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  const properties = PropertiesService.getScriptProperties();
+  properties.setProperty(NEIS_SYNC_DEVICE_ID_PROPERTY, deviceId);
+  properties.setProperty(NEIS_SYNC_TOKEN_HASH_PROPERTY, sha256_(token));
+  properties.setProperty(NEIS_SYNC_REGISTERED_AT_PROPERTY, new Date().toISOString());
+  properties.setProperty(NEIS_SYNC_REGISTERED_BY_PROPERTY, registeredBy);
+  // 이전 Apps Script 직접 호출 방식의 API 키는 더 이상 서버에 보관하지 않습니다.
+  properties.deleteProperty(NEIS_API_KEY_PROPERTY);
+  return { token: token, status: getNeisSyncStatus_({ deviceId: deviceId }) };
 }
 
-function neisQuery_(endpointValue, paramsValue) {
-  const endpoint = String(endpointValue || '');
-  if (!Object.prototype.hasOwnProperty.call(NEIS_ENDPOINT_PARAMS, endpoint)) {
-    throw new Error('허용되지 않는 NEIS 조회입니다.');
+function revokeNeisSyncDevice_() {
+  const properties = PropertiesService.getScriptProperties();
+  properties.deleteProperty(NEIS_SYNC_DEVICE_ID_PROPERTY);
+  properties.deleteProperty(NEIS_SYNC_TOKEN_HASH_PROPERTY);
+  properties.deleteProperty(NEIS_SYNC_REGISTERED_AT_PROPERTY);
+  properties.deleteProperty(NEIS_SYNC_REGISTERED_BY_PROPERTY);
+  properties.deleteProperty(NEIS_API_KEY_PROPERTY);
+}
+
+function requireNeisSyncDevice_(body) {
+  const properties = PropertiesService.getScriptProperties();
+  const expectedDeviceId = properties.getProperty(NEIS_SYNC_DEVICE_ID_PROPERTY) || '';
+  const expectedTokenHash = properties.getProperty(NEIS_SYNC_TOKEN_HASH_PROPERTY) || '';
+  const deviceId = clean_(body.deviceId, 100);
+  const token = clean_(body.syncToken, 200);
+  if (!expectedDeviceId || !expectedTokenHash) throw new Error('NEIS 동기화 PC가 아직 등록되지 않았습니다.');
+  if (deviceId !== expectedDeviceId || !token || sha256_(token) !== expectedTokenHash) {
+    throw new Error('등록된 NEIS 동기화 PC만 공용 자료를 올릴 수 있습니다.');
   }
+}
 
-  const apiKey = PropertiesService.getScriptProperties().getProperty(NEIS_API_KEY_PROPERTY);
-  if (!apiKey) throw new Error('관리자가 NEIS API 키를 아직 등록하지 않았습니다.');
-
-  const input = paramsValue && typeof paramsValue === 'object' ? paramsValue : {};
-  const params = {};
-  NEIS_ENDPOINT_PARAMS[endpoint].forEach(function(name) {
-    const value = clean_(input[name], 20);
-    if (value) params[name] = value;
-  });
-  validateNeisParams_(params);
-
-  const cacheKey = 'neis:' + sha256_(endpoint + ':' + JSON.stringify(params)).slice(0, 40);
-  const cache = CacheService.getScriptCache();
-  const cached = cache.get(cacheKey);
-  if (cached) return JSON.parse(cached);
-
-  const rows = fetchNeisRows_(endpoint, params, apiKey);
+function getNeisSnapshot_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
   try {
-    const serialized = JSON.stringify(rows);
-    if (serialized.length < 95000) cache.put(cacheKey, serialized, NEIS_CACHE_SECONDS);
-  } catch (ignore) {
-    // 캐시 실패는 실제 조회 결과에 영향을 주지 않습니다.
+    const meta = readObjects_(NEIS_SYNC_META_SHEET)[0];
+    if (!meta || !Number(meta.version)) return null;
+    return {
+      version: Number(meta.version) || 0,
+      schoolName: clean_(meta.schoolName, 100) || '웅천고등학교',
+      fromDate: clean_(meta.fromDate, 8),
+      toDate: clean_(meta.toDate, 8),
+      fetchedAt: iso_(meta.fetchedAt),
+      uploadedAt: iso_(meta.uploadedAt),
+      meals: readObjects_(NEIS_MEALS_SHEET).map(function(row) {
+        let dishNames = [];
+        try { dishNames = JSON.parse(String(row.dishNamesJson || '[]')); } catch (ignore) {}
+        return {
+          date: clean_(row.date, 8), mealType: clean_(row.mealType, 30), dishNames: dishNames,
+          calories: clean_(row.calories, 100), ntrInfo: clean_(row.ntrInfo, 2000)
+        };
+      }),
+      schedules: readObjects_(NEIS_SCHEDULE_SHEET).map(function(row) {
+        return { date: clean_(row.date, 8), eventName: clean_(row.eventName, 300), eventLevel: clean_(row.eventLevel, 2000) };
+      }),
+      timetables: readObjects_(NEIS_CLASS_TIMETABLE_SHEET).map(function(row) {
+        return {
+          date: clean_(row.date, 8), grade: clean_(row.grade, 2), classNm: clean_(row.classNm, 10),
+          period: Number(row.period) || 0, subject: clean_(row.subject, 200),
+          teacher: clean_(row.teacher, 100), classroom: clean_(row.classroom, 100)
+        };
+      })
+    };
+  } finally {
+    lock.releaseLock();
   }
-  return rows;
 }
 
-function validateNeisParams_(params) {
-  const dateKeys = ['MLSV_YMD', 'AA_YMD', 'AA_FROM_YMD', 'AA_TO_YMD', 'ALL_TI_YMD', 'TI_FROM_YMD', 'TI_TO_YMD'];
-  dateKeys.forEach(function(key) {
-    if (params[key] && !/^\d{8}$/.test(params[key])) throw new Error('NEIS 날짜 형식이 올바르지 않습니다.');
+function replaceSheetRows_(sheetName, rows) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const columnCount = sheet.getLastColumn();
+  const oldCount = Math.max(0, sheet.getLastRow() - 1);
+  if (oldCount) sheet.getRange(2, 1, oldCount, columnCount).clearContent();
+  if (!rows.length) return;
+  if (sheet.getMaxRows() < rows.length + 1) sheet.insertRowsAfter(sheet.getMaxRows(), rows.length + 1 - sheet.getMaxRows());
+  sheet.getRange(2, 1, rows.length, columnCount).setValues(rows);
+}
+
+function replaceNeisSnapshot_(body) {
+  requireNeisSyncDevice_(body);
+  const snapshot = body.snapshot && typeof body.snapshot === 'object' ? body.snapshot : {};
+  const fromDate = clean_(snapshot.fromDate, 8);
+  const toDate = clean_(snapshot.toDate, 8);
+  if (!/^\d{8}$/.test(fromDate) || !/^\d{8}$/.test(toDate) || fromDate > toDate) throw new Error('동기화 날짜 범위가 올바르지 않습니다.');
+  const from = new Date(fromDate.slice(0, 4) + '-' + fromDate.slice(4, 6) + '-' + fromDate.slice(6, 8) + 'T00:00:00');
+  const to = new Date(toDate.slice(0, 4) + '-' + toDate.slice(4, 6) + '-' + toDate.slice(6, 8) + 'T00:00:00');
+  if ((to.getTime() - from.getTime()) / 86400000 > 9) throw new Error('공용 NEIS 자료는 오늘 포함 최대 10일치만 저장할 수 있습니다.');
+  const meals = Array.isArray(snapshot.meals) ? snapshot.meals.slice(0, 100) : [];
+  const schedules = Array.isArray(snapshot.schedules) ? snapshot.schedules.slice(0, 500) : [];
+  const timetables = Array.isArray(snapshot.timetables) ? snapshot.timetables.slice(0, 5000) : [];
+  if (!timetables.length) throw new Error('업로드할 학급 시간표가 없습니다. 기존 공용 자료를 유지합니다.');
+
+  const mealRows = meals.map(function(item) {
+    return [clean_(item.date, 8), clean_(item.mealType, 30), JSON.stringify(Array.isArray(item.dishNames) ? item.dishNames.slice(0, 100) : []), clean_(item.calories, 100), clean_(item.ntrInfo, 2000)];
   });
-  if (params.AY && !/^\d{4}$/.test(params.AY)) throw new Error('NEIS 학년도 형식이 올바르지 않습니다.');
-  if (params.SEM && !/^[12]$/.test(params.SEM)) throw new Error('NEIS 학기 형식이 올바르지 않습니다.');
-  if (params.GRADE && !/^[1-3]$/.test(params.GRADE)) throw new Error('웅천고 학년 형식이 올바르지 않습니다.');
-  if (params.CLASS_NM && !/^\d{1,2}$/.test(params.CLASS_NM)) throw new Error('학급 형식이 올바르지 않습니다.');
+  const scheduleRows = schedules.map(function(item) {
+    return [clean_(item.date, 8), clean_(item.eventName, 300), clean_(item.eventLevel, 2000)];
+  });
+  const timetableRows = timetables.map(function(item) {
+    return [clean_(item.date, 8), clean_(item.grade, 2), clean_(item.classNm, 10), Number(item.period) || 0, clean_(item.subject, 200), clean_(item.teacher, 100), clean_(item.classroom, 100)];
+  });
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const previous = readObjects_(NEIS_SYNC_META_SHEET)[0] || {};
+    const version = (Number(previous.version) || 0) + 1;
+    const uploadedAt = new Date().toISOString();
+    replaceSheetRows_(NEIS_MEALS_SHEET, mealRows);
+    replaceSheetRows_(NEIS_SCHEDULE_SHEET, scheduleRows);
+    replaceSheetRows_(NEIS_CLASS_TIMETABLE_SHEET, timetableRows);
+    replaceSheetRows_(NEIS_SYNC_META_SHEET, [[
+      version, clean_(snapshot.schoolName, 100) || '웅천고등학교', fromDate, toDate,
+      iso_(snapshot.fetchedAt) || uploadedAt, uploadedAt, clean_(body.deviceId, 100),
+      mealRows.length, scheduleRows.length, timetableRows.length, 'success', ''
+    ]]);
+    return getNeisSnapshotWithoutLock_();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
-function fetchNeisRows_(endpoint, params, apiKey) {
-  const query = {
-    KEY: apiKey,
-    Type: 'json',
-    pIndex: '1',
-    pSize: '200',
-    ATPT_OFCDC_SC_CODE: UNGCHEON_OFFICE_CODE,
-    SD_SCHUL_CODE: UNGCHEON_SCHOOL_CODE
+function getNeisSnapshotWithoutLock_() {
+  const meta = readObjects_(NEIS_SYNC_META_SHEET)[0] || {};
+  return {
+    version: Number(meta.version) || 0,
+    schoolName: clean_(meta.schoolName, 100) || '웅천고등학교',
+    fromDate: clean_(meta.fromDate, 8), toDate: clean_(meta.toDate, 8),
+    fetchedAt: iso_(meta.fetchedAt), uploadedAt: iso_(meta.uploadedAt),
+    meals: readObjects_(NEIS_MEALS_SHEET).map(function(row) {
+      let names = []; try { names = JSON.parse(String(row.dishNamesJson || '[]')); } catch (ignore) {}
+      return { date: clean_(row.date, 8), mealType: clean_(row.mealType, 30), dishNames: names, calories: clean_(row.calories, 100), ntrInfo: clean_(row.ntrInfo, 2000) };
+    }),
+    schedules: readObjects_(NEIS_SCHEDULE_SHEET).map(function(row) { return { date: clean_(row.date, 8), eventName: clean_(row.eventName, 300), eventLevel: clean_(row.eventLevel, 2000) }; }),
+    timetables: readObjects_(NEIS_CLASS_TIMETABLE_SHEET).map(function(row) { return { date: clean_(row.date, 8), grade: clean_(row.grade, 2), classNm: clean_(row.classNm, 10), period: Number(row.period) || 0, subject: clean_(row.subject, 200), teacher: clean_(row.teacher, 100), classroom: clean_(row.classroom, 100) }; })
   };
-  Object.keys(params).forEach(function(key) { query[key] = params[key]; });
-  const queryString = Object.keys(query)
-    .map(function(key) { return encodeURIComponent(key) + '=' + encodeURIComponent(query[key]); })
-    .join('&');
-  const response = UrlFetchApp.fetch(NEIS_BASE_URL + endpoint + '?' + queryString, {
-    method: 'get',
-    muteHttpExceptions: true,
-    followRedirects: true
-  });
-  const status = response.getResponseCode();
-  if (status < 200 || status >= 300) throw new Error('NEIS 서버 응답 오류 (' + status + ')');
-
-  let payload;
-  try {
-    payload = JSON.parse(response.getContentText());
-  } catch (error) {
-    throw new Error('NEIS 서버 응답을 해석하지 못했습니다.');
-  }
-
-  if (payload.RESULT && payload.RESULT.CODE && payload.RESULT.CODE !== 'INFO-000' && payload.RESULT.CODE !== 'INFO-200') {
-    throw new Error(payload.RESULT.MESSAGE || 'NEIS API 오류 (' + payload.RESULT.CODE + ')');
-  }
-  const head = payload[endpoint] && payload[endpoint][0] && payload[endpoint][0].head;
-  const resultItem = Array.isArray(head)
-    ? head.filter(function(item) { return item && item.RESULT; })[0]
-    : null;
-  if (resultItem && resultItem.RESULT && resultItem.RESULT.CODE === 'INFO-200') return [];
-  if (resultItem && resultItem.RESULT && resultItem.RESULT.CODE !== 'INFO-000') {
-    throw new Error(resultItem.RESULT.MESSAGE || 'NEIS API 오류 (' + resultItem.RESULT.CODE + ')');
-  }
-  return payload[endpoint] && payload[endpoint][1] && Array.isArray(payload[endpoint][1].row)
-    ? payload[endpoint][1].row
-    : [];
 }
 
 function deleteRowById_(sheetName, id) {

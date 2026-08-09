@@ -16,7 +16,7 @@ function monthRange(year: number, month: number) {
 async function fetchNeis(endpoint: string, params: Record<string, string>) {
   const url = new URL(`${BASE_URL}/${endpoint}`)
   url.searchParams.set('Type', 'json')
-  url.searchParams.set('pSize', '200')
+  url.searchParams.set('pSize', '1000')
   for (const [k, v] of Object.entries(params)) {
     const value = v.trim()
     if (value) url.searchParams.set(k, value)
@@ -35,6 +35,52 @@ async function fetchNeis(endpoint: string, params: Record<string, string>) {
     throw new Error(result.MESSAGE || `NEIS API 오류 (${result.CODE})`)
   }
   return json[endpoint]?.[1]?.row ?? null
+}
+
+export async function getMealRange(
+  apiKey: string,
+  officeCode: string,
+  schoolCode: string,
+  fromYmd: string,
+  toYmd: string,
+): Promise<MealInfo[]> {
+  const rows = await fetchNeis('mealServiceDietInfo', {
+    KEY: apiKey,
+    ATPT_OFCDC_SC_CODE: officeCode,
+    SD_SCHUL_CODE: schoolCode,
+    MLSV_FROM_YMD: fromYmd,
+    MLSV_TO_YMD: toYmd,
+  })
+  if (!rows) return []
+  return rows.map((r: Record<string, string>) => ({
+    date: r.MLSV_YMD,
+    mealType: r.MMEAL_SC_NM,
+    dishNames: r.DDISH_NM?.split('<br/>').map((s: string) => s.replace(/\s*\([\d., ]+\)/g, '').trim()) ?? [],
+    calories: r.CAL_INFO,
+    ntrInfo: r.NTR_INFO,
+  }))
+}
+
+export async function getScheduleRange(
+  apiKey: string,
+  officeCode: string,
+  schoolCode: string,
+  fromYmd: string,
+  toYmd: string,
+): Promise<ScheduleEvent[]> {
+  const rows = await fetchNeis('SchoolSchedule', {
+    KEY: apiKey,
+    ATPT_OFCDC_SC_CODE: officeCode,
+    SD_SCHUL_CODE: schoolCode,
+    AA_FROM_YMD: fromYmd,
+    AA_TO_YMD: toYmd,
+  })
+  if (!rows) return []
+  return rows.map((r: Record<string, string>) => ({
+    date: r.AA_YMD,
+    eventName: r.EVENT_NM,
+    eventLevel: r.EVENT_CNTNT,
+  }))
 }
 
 export async function searchSchool(apiKey: string, name: string): Promise<SchoolInfo[]> {

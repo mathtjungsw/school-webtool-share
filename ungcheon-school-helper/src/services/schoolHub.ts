@@ -97,6 +97,7 @@ export type HubResource =
   | 'studentRoster'
   | 'staffChecklists'
   | 'committees'
+  | 'sharedNeis'
 
 interface SyncManifest {
   generatedAt: string
@@ -133,6 +134,7 @@ const MUTATION_RESOURCE: Record<string, HubResource | undefined> = {
   replaceStaffRoster: 'staffRoster', replaceStudentRoster: 'studentRoster',
   addStaffChecklist: 'staffChecklists', updateStaffChecklist: 'staffChecklists', submitStaffChecklist: 'staffChecklists', deleteStaffChecklist: 'staffChecklists',
   saveCommitteeMembers: 'committees', addCommitteeEvent: 'committees', deleteCommitteeEvent: 'committees',
+  replaceNeisSnapshot: 'sharedNeis',
 }
 
 function dataSignature(data: unknown) {
@@ -224,6 +226,11 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
       'createTimetableChange',
       'respondTimetableChange',
       'cancelTimetableChange',
+      'getNeisSyncStatus',
+      'registerNeisSyncDevice',
+      'revokeNeisSyncDevice',
+      'getNeisSnapshot',
+      'replaceNeisSnapshot',
     ].includes(action)
     if (needsServerUpdate && message.includes('허용되지 않는 요청')) {
       throw new Error('학교 공유 서버 업데이트가 필요합니다. 관리자에게 문의하세요.')
