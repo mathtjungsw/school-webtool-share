@@ -28,7 +28,7 @@ const NEIS_SCHEDULE_SHEET = 'NEIS학사일정';
 const NEIS_CLASS_TIMETABLE_SHEET = 'NEIS학급시간표';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
 const STAFF_ASSIGNMENTS_2026_APPLIED_KEY = 'UNG_STAFF_ASSIGNMENTS_2026_APPLIED';
-const OFFICIAL_RELEASE_NOTICE_RESET_KEY = 'UNG_OFFICIAL_RELEASE_NOTICE_RESET_1_0_0';
+const OFFICIAL_RELEASE_NOTICE_RESET_KEY = 'UNG_OFFICIAL_RELEASE_NOTICE_RESET_1_1_1';
 const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
 const NEIS_SYNC_DEVICE_ID_PROPERTY = 'UNG_NEIS_SYNC_DEVICE_ID';
 const NEIS_SYNC_TOKEN_HASH_PROPERTY = 'UNG_NEIS_SYNC_TOKEN_SHA256';
@@ -355,45 +355,21 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
-    key: 'v1.1.1',
-    title: '[업데이트] 웅천고 업무도우미 v1.1.1',
-    body: [
-      '· 관리자 모드에서만 표시되는 관리자 센터 메뉴 추가',
-      '· 매일 13:00 자동 갱신을 기다리지 않고 NEIS 10일치 공용 자료를 즉시 동기화하는 버튼 추가',
-      '· 동기화 PC·마지막 갱신·자료 범위·버전을 한눈에 확인하는 상태판 추가',
-      '· 공지·시간표·교직원·학생·위원회·기능개선·환경설정 관리 바로가기 추가',
-      '· 프로그램 업데이트 즉시 확인 버튼과 관리자 화면 접근 차단 강화',
-      '· 검색도우미와 사용 매뉴얼에 관리자 센터 사용법 반영'
-    ].join('\n'),
-    date: '2026-08-09'
-  },
-  {
-    key: 'v1.1.0',
-    title: '[업데이트] 웅천고 업무도우미 v1.1.0',
-    body: [
-      '· 공용 NEIS 동기화: 등록된 관리자 PC 한 대만 API 키를 보관하고 전체 사용자는 공용 자료 조회',
-      '· 자동 수집: 매일 13:00에 오늘 포함 10일치 급식·학사일정·전체 학급 시간표 갱신',
-      '· 누락 보충: 13시에 PC가 꺼져 있으면 다음 프로그램 실행 때 자동 동기화하고 실패 시 10분 간격 재시도',
-      '· 보안 강화: API 키는 관리자 PC의 Windows 암호화 저장소에만 보관하고 서버·구글시트에는 저장하지 않음',
-      '· 안정성 강화: 새 자료를 모두 검증한 뒤 교체하며 수집·업로드 실패 시 기존 공용 자료 유지',
-      '· 대시보드·캘린더·업무알리미·검색도우미·사용 매뉴얼을 공용 NEIS 방식으로 갱신'
-    ].join('\n'),
-    date: '2026-08-09'
-  },
-  {
-    key: 'official-v1.0.0',
-    title: '[첫 배포] 웅천고 업무도우미 v1.0.0',
+    key: 'official-v1.1.1',
+    title: '[첫 배포] 웅천고 업무도우미 v1.1.1',
     body: [
       '· 웅천고등학교 교직원 업무 지원을 위한 첫 공식 배포입니다.',
-      '· 학교 일정, 시간표, 출석부, 업무센터 등 교내 업무 기능을 제공합니다.',
-      '· 이후 기능 개선과 오류 수정은 자동 업데이트로 배포됩니다.'
+      '· 대시보드, 캘린더, 시간표, 출석부, 업무센터와 학교 공용 업무 기능을 제공합니다.',
+      '· 궁금한 기능은 상단 업무 검색 또는 Ctrl+K 검색도우미에서 평소 말하듯 입력해 찾아볼 수 있습니다.',
+      '· 자세한 사용법은 왼쪽 사용 매뉴얼에서 확인해 주세요.',
+      '· 이후 기능 개선과 오류 수정 내용은 이 공지사항에 새로 기록됩니다.'
     ].join('\n'),
     date: '2026-08-10'
   }
 ];
 
 function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 19 } });
+  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 20 } });
 }
 
 function doPost(e) {
@@ -402,7 +378,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 18 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 20 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
