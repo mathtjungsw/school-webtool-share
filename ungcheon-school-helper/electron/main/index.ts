@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog, safeStorage, session } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog, safeStorage, session, net } from 'electron'
 import { join, resolve as pathResolve, basename } from 'path'
 import { pathToFileURL } from 'url'
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync, readdirSync, copyFileSync } from 'fs'
@@ -699,16 +699,83 @@ const HUB_ACTIONS = new Set([
   'replaceNeisSnapshot',
 ])
 
+// 학교 유선망은 외부 POST 요청만 별도로 차단하는 경우가 있어 조회 요청은 GET으로 보낸다.
+// 조회는 재시도해도 서버 데이터가 바뀌지 않지만, 저장·수정 요청은 중복 반영을 막기 위해 재시도하지 않는다.
+const HUB_READ_ACTIONS = new Set([
+  'health',
+  'getSyncManifest',
+  'listLinks',
+  'listNotices',
+  'listFeatureRequests',
+  'getTimetable',
+  'getStudentTimetable',
+  'getStaffRoster',
+  'getStudentRoster',
+  'listStaffChecklists',
+  'listCommitteeState',
+  'listTimetableChanges',
+  'getNeisSyncStatus',
+  'getNeisSnapshot',
+])
+
+const HUB_LARGE_DATA_ACTIONS = new Set([
+  'replaceStudentTimetable',
+  'replaceStudentRoster',
+  'replaceStaffRoster',
+  'replaceNeisSnapshot',
+  'getStudentTimetable',
+  'getStudentRoster',
+  'listCommitteeState',
+  'saveCommitteeMembers',
+  'addCommitteeEvent',
+  'deleteCommitteeEvent',
+  'listTimetableChanges',
+  'createTimetableChange',
+  'respondTimetableChange',
+  'cancelTimetableChange',
+  'getNeisSnapshot',
+])
+
+const waitForHubRetry = (delayMs: number) => new Promise(resolve => setTimeout(resolve, delayMs))
+
+async function fetchSchoolHub(
+  endpoint: string,
+  payload: Record<string, unknown>,
+  action: string,
+  timeoutMs: number,
+) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    if (HUB_READ_ACTIONS.has(action)) {
+      const url = new URL(endpoint)
+      url.searchParams.set('action', action)
+      url.searchParams.set('payload', JSON.stringify(payload))
+      return await net.fetch(url.toString(), {
+        method: 'GET',
+        signal: controller.signal,
+        redirect: 'follow',
+        headers: { 'Cache-Control': 'no-cache' },
+      })
+    }
+
+    return await net.fetch(endpoint, {
+      method: 'POST',
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': 'no-cache' },
+      body: JSON.stringify(payload),
+    })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function requestSchoolHub(payload: Record<string, unknown>) {
   const endpoint = String(store.get('config.schoolHubUrl', '')).trim()
   if (!endpoint) return { ok: false, error: '학교 공유 서비스 URL이 설정되지 않았습니다.' }
   const action = String(payload.action ?? '')
-  const largePayloadActions = new Set([
-    'replaceStudentTimetable',
-    'replaceStudentRoster',
-    'replaceStaffRoster',
-    'replaceNeisSnapshot',
-  ])
+  const largePayloadActions = new Set(['replaceStudentTimetable', 'replaceStudentRoster', 'replaceStaffRoster', 'replaceNeisSnapshot'])
   const maxRequestLength = largePayloadActions.has(action) ? 8_000_000 : 500_000
   if (JSON.stringify(payload).length > maxRequestLength) return { ok: false, error: '요청 데이터가 너무 큽니다.' }
   if (!HUB_ACTIONS.has(action)) return { ok: false, error: '허용되지 않는 요청입니다.' }
@@ -719,35 +786,32 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
     return { ok: false, error: 'Google Apps Script HTTPS 배포 URL만 사용할 수 있습니다.' }
   }
 
-  const controller = new AbortController()
-  const isLargeDataAction = largePayloadActions.has(action) ||
-    action === 'getStudentTimetable' ||
-    action === 'getStudentRoster' ||
-    action === 'listCommitteeState' ||
-    action === 'saveCommitteeMembers' ||
-    action === 'addCommitteeEvent' ||
-    action === 'deleteCommitteeEvent'
-    || action === 'listTimetableChanges'
-    || action === 'createTimetableChange'
-    || action === 'respondTimetableChange'
-    || action === 'cancelTimetableChange'
-    || action === 'getNeisSnapshot'
-    || action === 'replaceNeisSnapshot'
-  const timer = setTimeout(() => controller.abort(), isLargeDataAction ? 60_000 : 20_000)
-  try {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': 'no-cache' },
-      body: JSON.stringify(payload),
-    })
-    if (!res.ok) return { ok: false, error: `공유 서비스 HTTP ${res.status}` }
-    return await res.json() as Record<string, unknown>
-  } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) }
-  } finally {
-    clearTimeout(timer)
+  const isReadAction = HUB_READ_ACTIONS.has(action)
+  const maxAttempts = isReadAction ? 3 : 1
+  const timeoutMs = HUB_LARGE_DATA_ACTIONS.has(action) ? 60_000 : 15_000
+  let lastError = ''
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const res = await fetchSchoolHub(endpoint, payload, action, timeoutMs)
+      if (res.ok) return await res.json() as Record<string, unknown>
+
+      lastError = `공유 서비스 HTTP ${res.status}`
+      const canRetryStatus = res.status === 408 || res.status === 429 || res.status >= 500
+      if (!isReadAction || !canRetryStatus || attempt === maxAttempts) {
+        return { ok: false, error: lastError }
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error)
+      if (!isReadAction || attempt === maxAttempts) break
+    }
+
+    await waitForHubRetry(attempt === 1 ? 350 : 900)
+  }
+
+  return {
+    ok: false,
+    error: `학교 공유 서비스에 연결할 수 없습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.${lastError ? ` (${lastError})` : ''}`,
   }
 }
 
