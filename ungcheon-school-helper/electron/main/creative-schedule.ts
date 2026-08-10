@@ -1,4 +1,6 @@
 import * as XLSX from 'xlsx'
+import { readScheduleCache, writeScheduleCache } from './schedule-cache'
+import { fetchWithSystemNetwork } from './system-network'
 
 const SPREADSHEET_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00'
 const SOURCE_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit?gid=1578654997#gid=1578654997`
@@ -29,7 +31,9 @@ const ymd = (date: Date) => `${date.getUTCFullYear()}${String(date.getUTCMonth()
 
 async function fetchSheet(sheetName: string) {
   const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}&_=${Date.now()}`
-  const response = await fetch(url, { signal: AbortSignal.timeout(15_000), headers: { 'cache-control': 'no-cache', 'user-agent': 'Mozilla/5.0 UngcheonSchoolHelper/1.0' } })
+  const response = await fetchWithSystemNetwork(url, {
+    headers: { 'cache-control': 'no-cache', 'user-agent': 'Mozilla/5.0 UngcheonSchoolHelper/1.0' },
+  }, { attempts: 3, timeoutMs: 15_000 })
   if (!response.ok) throw new Error(`${sheetName} 시트 응답 오류 (${response.status})`)
   const csv = await response.text()
   // raw=true를 유지해야 GViz의 ISO 날짜(2026-08-11)가 지역화된
@@ -88,10 +92,8 @@ function parseSchoolEvents(rows: unknown[][]): CreativeScheduleEvent[] {
   return events
 }
 
-export async function getCreativeScheduleMonth(year: number, month: number, force = false): Promise<CreativeScheduleResult> {
+async function refreshCreativeScheduleMonth(year: number, month: number): Promise<CreativeScheduleResult> {
   const key = `${year}-${month}`
-  const cached = cache.get(key)
-  if (!force && cached && cached.expiresAt > Date.now()) return cached.value
   const [activityRows, schoolRows] = await Promise.all([fetchSheet('창체입력'), fetchSheet('학사일정_2학기')])
   const prefix = `${year}${String(month).padStart(2, '0')}`
   const all = [...parseActivities(activityRows), ...parseSchoolEvents(schoolRows)]
@@ -104,5 +106,29 @@ export async function getCreativeScheduleMonth(year: number, month: number, forc
   }).sort((a, b) => a.date.localeCompare(b.date) || a.period.localeCompare(b.period) || a.title.localeCompare(b.title, 'ko'))
   const result = { events, fetchedAt: new Date().toISOString(), sourceSheets: ['창체입력', '학사일정_2학기'], sourceUrl: SOURCE_URL }
   cache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, value: result })
+  writeScheduleCache(`creative-schedule:${key}`, result)
   return result
+}
+
+export async function getCreativeScheduleMonth(year: number, month: number, force = false): Promise<CreativeScheduleResult> {
+  const key = `${year}-${month}`
+  const cached = cache.get(key)
+  if (!force && cached && cached.expiresAt > Date.now()) return cached.value
+
+  const persistent = readScheduleCache<CreativeScheduleResult>(`creative-schedule:${key}`)
+  if (!force && persistent) {
+    cache.set(key, { expiresAt: Date.now() + 30_000, value: persistent })
+    void refreshCreativeScheduleMonth(year, month).catch(() => undefined)
+    return persistent
+  }
+
+  try {
+    return await refreshCreativeScheduleMonth(year, month)
+  } catch (error) {
+    if (persistent) {
+      cache.set(key, { expiresAt: Date.now() + 30_000, value: persistent })
+      return persistent
+    }
+    throw error
+  }
 }

@@ -355,6 +355,18 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.4',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.4',
+    body: [
+      '· 학교 유선망에서도 주간계획·창체·등교지도·급식지도를 불러오도록 통신 방식을 개선했습니다.',
+      '· 외부 Google Sheets 조회가 Windows 시스템 프록시와 인증서를 따르도록 변경했습니다.',
+      '· 일시적인 연결 실패에는 자동 재시도를 적용했습니다.',
+      '· 마지막으로 정상 조회한 일정을 PC 로컬에 저장해 통신 장애 시에도 표시합니다.',
+      '· 검색도우미에 학교 PC 외부 일정 연결·로컬 복구 안내를 추가했습니다.'
+    ].join('\n'),
+    date: '2026-08-10'
+  },
+  {
     key: 'v1.1.3',
     title: '[업데이트] 웅천고 업무도우미 v1.1.3',
     body: [
@@ -399,7 +411,7 @@ const GET_READ_ACTIONS = [
 function doGet(e) {
   try {
     const action = String(e && e.parameter && e.parameter.action || '');
-    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 23 } });
+    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 24 } });
     if (GET_READ_ACTIONS.indexOf(action) < 0) throw new Error('GET으로 허용되지 않는 요청입니다.');
 
     const rawPayload = String(e && e.parameter && e.parameter.payload || '{}');
@@ -417,7 +429,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 23 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 24 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
