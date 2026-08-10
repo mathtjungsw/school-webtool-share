@@ -30,6 +30,7 @@ export const WORK_ASSISTANT_SUGGESTIONS = [
   '왼쪽 메뉴 순서를 바꾸고 싶어',
   '공용 NEIS 동기화 방법',
   '관리자가 지금 바로 NEIS 자료를 동기화하고 싶어',
+  '로그인할 때 fetch failed가 떠',
 ]
 
 export const WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
@@ -44,6 +45,12 @@ export const WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
     summary: '처음 설치부터 주요 메뉴 사용법, 공용 NEIS 동기화와 자동 업데이트 방법을 확인합니다.',
     steps: ['사용 매뉴얼 메뉴를 엽니다.', '궁금한 기능의 제목을 선택해 단계별 설명을 확인합니다.', '찾기 어려우면 Ctrl+K 검색도우미에 평소 말하듯 질문합니다.'],
     keywords: ['사용법', '사용 매뉴얼', '설명서', '도움말', '처음 설치', '메뉴 설명', '어떻게 사용'],
+  },
+  {
+    id: 'login-school-network', title: '로그인·학교 공유 서비스 연결 확인', page: 'help', category: '설정·도움말',
+    summary: '학교 유선망의 프록시나 보안 필터로 로그인이 되지 않을 때 연결 상태와 자동 업데이트 여부를 확인합니다. v1.1.3부터 조회 요청은 유선망 호환 방식으로 전송하고 일시적인 실패를 자동 재시도합니다.',
+    steps: ['앱을 완전히 종료한 뒤 다시 실행해 자동 업데이트를 적용합니다.', '인터넷 연결을 확인한 뒤 이름을 다시 입력하고 로그인합니다.', '학교 Wi-Fi에서는 되지만 유선망에서만 안 되면 최신 버전인지 확인합니다.', '최신 버전에서도 계속 실패하면 표시되는 오류 문구와 사용 중인 네트워크를 관리자에게 전달합니다.'],
+    keywords: ['로그인 안됨', '로그인 오류', 'fetch failed', '패치 페일', '학교 공유 서비스', '공유 서비스 연결', '유선망', '학교 랜선', '프록시', '보안 필터', '인터넷 연결', '자동 재시도'],
   },
   {
     id: 'attendance-teacher', title: '내 수업 출석부 묶음 출력', page: 'attendance_print', category: '학사·기록',

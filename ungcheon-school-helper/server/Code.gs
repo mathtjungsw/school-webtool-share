@@ -355,6 +355,17 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.3',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.3',
+    body: [
+      '· 학교 유선망에서도 로그인과 자료 조회가 가능하도록 조회 통신 방식을 개선했습니다.',
+      '· Windows 시스템 프록시와 인증서를 따르도록 앱의 학교 공유 서비스 연결 방식을 변경했습니다.',
+      '· 교직원 명렬·시간표 등 조회 요청에 일시적인 연결 실패 자동 재시도를 적용했습니다.',
+      '· 검색도우미에 로그인·학교 공유 서비스 연결 문제 해결 안내를 추가했습니다.'
+    ].join('\n'),
+    date: '2026-08-10'
+  },
+  {
     key: 'official-v1.1.2',
     title: '[첫 배포] 웅천고 업무도우미 v1.1.2',
     body: [
@@ -368,8 +379,36 @@ const RELEASE_NOTES = [
   }
 ];
 
-function doGet() {
-  return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 22 } });
+const GET_READ_ACTIONS = [
+  'health',
+  'getSyncManifest',
+  'listLinks',
+  'listNotices',
+  'listFeatureRequests',
+  'getTimetable',
+  'getStudentTimetable',
+  'getStaffRoster',
+  'getStudentRoster',
+  'listStaffChecklists',
+  'listCommitteeState',
+  'listTimetableChanges',
+  'getNeisSyncStatus',
+  'getNeisSnapshot'
+];
+
+function doGet(e) {
+  try {
+    const action = String(e && e.parameter && e.parameter.action || '');
+    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 23 } });
+    if (GET_READ_ACTIONS.indexOf(action) < 0) throw new Error('GET으로 허용되지 않는 요청입니다.');
+
+    const rawPayload = String(e && e.parameter && e.parameter.payload || '{}');
+    const body = JSON.parse(rawPayload);
+    body.action = action;
+    return doPost({ postData: { contents: JSON.stringify(body) } });
+  } catch (error) {
+    return json_({ ok: false, error: String(error && error.message ? error.message : error) });
+  }
 }
 
 function doPost(e) {
@@ -378,7 +417,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 22 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 23 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
