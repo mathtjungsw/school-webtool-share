@@ -1,4 +1,6 @@
 import { parseHtmlRows } from './weekly-plan'
+import { readScheduleCache, writeScheduleCache } from './schedule-cache'
+import { fetchWithSystemNetwork } from './system-network'
 
 const CACHE_TTL_MS = 10 * 60 * 1000
 const MAX_RESPONSE_CHARS = 1_000_000
@@ -149,14 +151,13 @@ async function fetchSource(source: DutySource, force: boolean) {
   if (!force && cached && cached.expiresAt > Date.now()) return cached.value
 
   const url = `https://docs.google.com/spreadsheets/d/${source.spreadsheetId}/htmlview/sheet?headers=true&gid=${encodeURIComponent(source.gid)}&_=${Date.now()}`
-  const response = await fetch(url, {
+  const response = await fetchWithSystemNetwork(url, {
     headers: {
       accept: 'text/html,application/xhtml+xml',
       'cache-control': 'no-cache',
       'user-agent': 'Mozilla/5.0 UngcheonSchoolHelper/1.0',
     },
-    signal: AbortSignal.timeout(15_000),
-  })
+  }, { attempts: 3, timeoutMs: 15_000 })
   if (!response.ok) throw new Error(`${source.title} 시트 응답 오류 (${response.status})`)
   const text = await response.text()
   if (text.length > MAX_RESPONSE_CHARS) throw new Error(`${source.title} 시트 응답이 너무 큽니다.`)
@@ -164,18 +165,15 @@ async function fetchSource(source: DutySource, force: boolean) {
   return text
 }
 
-export async function getDutyScheduleMonth(
+async function refreshDutyScheduleMonth(
   year: number,
   month: number,
   teacherName: string,
-  force = false,
+  force: boolean,
 ): Promise<DutyScheduleResult> {
   const normalizedName = teacherName.trim()
   if (!normalizedName) return { events: [], fetchedAt: new Date().toISOString(), sources: [] }
   const cacheKey = `${year}-${month}-${normalizedName}`
-  const cached = resultCache.get(cacheKey)
-  if (!force && cached && cached.expiresAt > Date.now()) return cached.value
-
   const parsed = await Promise.allSettled(DUTY_SOURCES.map(async source => {
     const html = await fetchSource(source, force)
     return parseDutySheet(html, source, year, month, normalizedName)
@@ -198,5 +196,38 @@ export async function getDutyScheduleMonth(
       })),
   }
   resultCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, value: result })
+  if (parsed.every(item => item.status === 'fulfilled')) {
+    writeScheduleCache(`duty-schedule:${cacheKey}`, result)
+  }
   return result
+}
+
+export async function getDutyScheduleMonth(
+  year: number,
+  month: number,
+  teacherName: string,
+  force = false,
+): Promise<DutyScheduleResult> {
+  const normalizedName = teacherName.trim()
+  if (!normalizedName) return { events: [], fetchedAt: new Date().toISOString(), sources: [] }
+  const cacheKey = `${year}-${month}-${normalizedName}`
+  const cached = resultCache.get(cacheKey)
+  if (!force && cached && cached.expiresAt > Date.now()) return cached.value
+
+  const persistent = readScheduleCache<DutyScheduleResult>(`duty-schedule:${cacheKey}`)
+  if (!force && persistent) {
+    resultCache.set(cacheKey, { expiresAt: Date.now() + 30_000, value: persistent })
+    void refreshDutyScheduleMonth(year, month, normalizedName, true).catch(() => undefined)
+    return persistent
+  }
+
+  try {
+    return await refreshDutyScheduleMonth(year, month, normalizedName, force)
+  } catch (error) {
+    if (persistent) {
+      resultCache.set(cacheKey, { expiresAt: Date.now() + 30_000, value: persistent })
+      return persistent
+    }
+    throw error
+  }
 }

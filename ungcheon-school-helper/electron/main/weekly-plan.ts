@@ -1,3 +1,6 @@
+import { readScheduleCache, writeScheduleCache } from './schedule-cache'
+import { fetchWithSystemNetwork } from './system-network'
+
 const SPREADSHEET_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k'
 const HTML_VIEW_URL = `https://docs.google.com/spreadsheets/u/0/d/${SPREADSHEET_ID}/htmlview`
 const CACHE_TTL_MS = 10 * 60 * 1000
@@ -271,14 +274,13 @@ export function parseWeeklySheet(
 }
 
 async function fetchText(url: string) {
-  const response = await fetch(url, {
+  const response = await fetchWithSystemNetwork(url, {
     headers: {
       accept: 'text/html,application/xhtml+xml',
       'cache-control': 'no-cache',
       'user-agent': 'Mozilla/5.0 UngcheonSchoolHelper/1.0',
     },
-    signal: AbortSignal.timeout(15_000),
-  })
+  }, { attempts: 3, timeoutMs: 15_000 })
   if (!response.ok) throw new Error(`웅천고 주간계획 응답 오류 (${response.status})`)
   const text = await response.text()
   if (text.length > MAX_RESPONSE_CHARS) throw new Error('웅천고 주간계획 응답이 너무 큽니다.')
@@ -295,11 +297,8 @@ function uniqueBy<T>(items: T[], key: (item: T) => string) {
   })
 }
 
-export async function getWeeklyPlanMonth(year: number, month: number, force = false): Promise<WeeklyPlanResult> {
+async function refreshWeeklyPlanMonth(year: number, month: number): Promise<WeeklyPlanResult> {
   const cacheKey = `${year}-${month}`
-  const cached = monthCache.get(cacheKey)
-  if (!force && cached && cached.expiresAt > Date.now()) return cached.value
-
   const indexHtml = await fetchText(`${HTML_VIEW_URL}?_=${Date.now()}`)
   const tabs = extractSheetTabs(indexHtml)
   if (tabs.length === 0) throw new Error('웅천고 주간계획 시트 목록을 찾을 수 없습니다.')
@@ -340,5 +339,32 @@ export async function getWeeklyPlanMonth(year: number, month: number, force = fa
     fetchedAt: new Date().toISOString(),
   }
   monthCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, value: result })
+  if (parsed.every(item => item.status === 'fulfilled')) {
+    writeScheduleCache(`weekly-plan:${cacheKey}`, result)
+  }
   return result
+}
+
+export async function getWeeklyPlanMonth(year: number, month: number, force = false): Promise<WeeklyPlanResult> {
+  const cacheKey = `${year}-${month}`
+  const cached = monthCache.get(cacheKey)
+  if (!force && cached && cached.expiresAt > Date.now()) return cached.value
+
+  const persistentKey = `weekly-plan:${cacheKey}`
+  const persistent = readScheduleCache<WeeklyPlanResult>(persistentKey)
+  if (!force && persistent) {
+    monthCache.set(cacheKey, { expiresAt: Date.now() + 30_000, value: persistent })
+    void refreshWeeklyPlanMonth(year, month).catch(() => undefined)
+    return persistent
+  }
+
+  try {
+    return await refreshWeeklyPlanMonth(year, month)
+  } catch (error) {
+    if (persistent) {
+      monthCache.set(cacheKey, { expiresAt: Date.now() + 30_000, value: persistent })
+      return persistent
+    }
+    throw error
+  }
 }
