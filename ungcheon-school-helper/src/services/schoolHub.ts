@@ -241,6 +241,7 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
       'listTimetableChanges',
       'createTimetableChange',
       'respondTimetableChange',
+      'applyTimetableChangeForRequester',
       'cancelTimetableChange',
       'getNeisSyncStatus',
       'registerNeisSyncDevice',
