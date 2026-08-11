@@ -355,8 +355,8 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
-    key: 'v1.1.8',
-    title: '[긴급 수정] 웅천고 업무도우미 v1.1.8',
+    key: 'v1.1.9',
+    title: '[긴급 수정] 웅천고 업무도우미 v1.1.9',
     body: [
       '· “나만 우선 반영” 요청이 PC 앱에서 차단되어 학교 공유 서버 업데이트 안내가 표시되던 문제를 수정했습니다.',
       '· 실제 학교 공유 요청 허용 목록에 해당 기능을 등록하여 서버까지 정상 전달되도록 보완했습니다.',
@@ -463,7 +463,7 @@ const GET_READ_ACTIONS = [
 function doGet(e) {
   try {
     const action = String(e && e.parameter && e.parameter.action || '');
-    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 28 } });
+    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 29 } });
     if (GET_READ_ACTIONS.indexOf(action) < 0) throw new Error('GET으로 허용되지 않는 요청입니다.');
 
     const rawPayload = String(e && e.parameter && e.parameter.payload || '{}');
@@ -481,7 +481,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 28 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 29 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
