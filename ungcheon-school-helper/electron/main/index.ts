@@ -831,6 +831,7 @@ const HUB_LARGE_DATA_ACTIONS = new Set([
   'listTimetableChanges',
   'createTimetableChange',
   'respondTimetableChange',
+  'applyTimetableChangeForRequester',
   'cancelTimetableChange',
   'getNeisSnapshot',
 ])
