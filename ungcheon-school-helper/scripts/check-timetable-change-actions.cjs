@@ -7,13 +7,22 @@ const electronSource = fs.readFileSync(path.join(projectRoot, 'electron/main/ind
 const serverSource = fs.readFileSync(path.join(projectRoot, 'server/Code.gs'), 'utf8')
 
 const actions = [...serviceSource.matchAll(/action:\s*'([^']+)'/g)].map(match => match[1])
-const missingFromElectron = actions.filter(action => !electronSource.includes(`'${action}'`))
-const missingFromServer = actions.filter(action => !serverSource.includes(`action === '${action}'`))
-
-if (missingFromElectron.length || missingFromServer.length) {
-  if (missingFromElectron.length) console.error(`Electron 허용 목록 누락: ${missingFromElectron.join(', ')}`)
-  if (missingFromServer.length) console.error(`Apps Script 처리 목록 누락: ${missingFromServer.join(', ')}`)
+const electronAllowlistMatch = electronSource.match(/const HUB_ACTIONS = new Set\(\[([\s\S]*?)\]\)/)
+if (!electronAllowlistMatch) {
+  console.error('Electron HUB_ACTIONS allowlist was not found.')
   process.exit(1)
 }
 
-console.log(`PASS 교환·대강 공유 요청 허용 목록 일치 (${actions.length}개 작업)`)
+const electronActions = new Set(
+  [...electronAllowlistMatch[1].matchAll(/'([^']+)'/g)].map(match => match[1]),
+)
+const missingFromElectron = actions.filter(action => !electronActions.has(action))
+const missingFromServer = actions.filter(action => !serverSource.includes(`action === '${action}'`))
+
+if (missingFromElectron.length || missingFromServer.length) {
+  if (missingFromElectron.length) console.error(`Electron HUB_ACTIONS missing: ${missingFromElectron.join(', ')}`)
+  if (missingFromServer.length) console.error(`Apps Script handlers missing: ${missingFromServer.join(', ')}`)
+  process.exit(1)
+}
+
+console.log(`PASS timetable change action allowlists match (${actions.length} actions)`)

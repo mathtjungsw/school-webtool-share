@@ -790,6 +790,7 @@ const HUB_ACTIONS = new Set([
   'listTimetableChanges',
   'createTimetableChange',
   'respondTimetableChange',
+  'applyTimetableChangeForRequester',
   'cancelTimetableChange',
   'getNeisSyncStatus',
   'registerNeisSyncDevice',
