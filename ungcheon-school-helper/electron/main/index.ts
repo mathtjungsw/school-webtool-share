@@ -14,6 +14,19 @@ import { getDutyScheduleMonth } from './duty-schedule'
 import { getCreativeScheduleMonth } from './creative-schedule'
 import { resolveSchoolHubEndpoint, UNGCHEON_SCHOOL_HUB_URL } from './school-hub-endpoint'
 import { buildTimetablePlanHwp, type TimetablePlanDraftInput } from './timetable-plan-hwp'
+import {
+  buildVolunteerCertificateHwp,
+  parseVolunteerHwpBuffer,
+  parseVolunteerHwpFile,
+  type VolunteerCertificateDraftInput,
+} from './volunteer-hwp'
+import {
+  deleteVolunteerHwpFile,
+  importVolunteerHwpFile,
+  listVolunteerHwpFiles,
+  resolveVolunteerHwpPath,
+  storeGeneratedVolunteerHwp,
+} from './volunteer-storage'
 
 const execFileAsync = promisify(execFile)
 
@@ -159,6 +172,45 @@ ipcMain.handle('timetablePlan:buildHwp', (_, draft: Record<string, unknown>) => 
     : join(process.resourcesPath, 'templates', 'exchange-plan-template.hwp')
   return Array.from(buildTimetablePlanHwp(templatePath, draft as unknown as TimetablePlanDraftInput))
 })
+
+function volunteerTemplatePath(name: string) {
+  return process.env['ELECTRON_RENDERER_URL']
+    ? join(process.cwd(), 'resources', 'templates', name)
+    : join(process.resourcesPath, 'templates', name)
+}
+
+ipcMain.handle('volunteer:buildHwp', (_, draft: VolunteerCertificateDraftInput) => {
+  if (JSON.stringify(draft).length > 500_000) throw new Error('봉사활동 확인서 입력 내용이 너무 큽니다.')
+  return Array.from(buildVolunteerCertificateHwp(
+    volunteerTemplatePath('volunteer-single-source.hwp'),
+    volunteerTemplatePath('volunteer-double-source.hwp'),
+    draft,
+  ))
+})
+
+ipcMain.handle('volunteer:storeGeneratedHwp', (_, name: string, bytes: number[]) => {
+  if (!Array.isArray(bytes) || bytes.length > 10_000_000) throw new Error('봉사활동 확인서 파일 크기가 올바르지 않습니다.')
+  const buffer = Buffer.from(bytes)
+  const forms = parseVolunteerHwpBuffer(buffer)
+  return storeGeneratedVolunteerHwp(name, buffer, {
+    formCount: forms.length,
+    activities: forms.map(form => form.activityName),
+  })
+})
+
+ipcMain.handle('volunteer:importHwp', (_, filePath: string, allowDuplicate = false) => {
+  const abs = pathResolve(filePath)
+  const forms = parseVolunteerHwpFile(abs)
+  return importVolunteerHwpFile(abs, {
+    formCount: forms.length,
+    activities: forms.map(form => form.activityName),
+  }, Boolean(allowDuplicate))
+})
+
+ipcMain.handle('volunteer:listHwp', () => listVolunteerHwpFiles())
+ipcMain.handle('volunteer:parseHwp', (_, id: string) => parseVolunteerHwpFile(resolveVolunteerHwpPath(String(id)).path))
+ipcMain.handle('volunteer:openHwp', (_, id: string) => shell.openPath(resolveVolunteerHwpPath(String(id)).path))
+ipcMain.handle('volunteer:deleteHwp', (_, id: string) => deleteVolunteerHwpFile(String(id)))
 
 // Open external links — http/https only
 ipcMain.handle('shell:openExternal', (_, url: string) => {

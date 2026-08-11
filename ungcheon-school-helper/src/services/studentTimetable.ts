@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { StudentRosterEntry } from './rosterAttendance'
+import { canonicalStudentId, studentIdParts } from './studentId'
 
 export const STUDENT_TIMETABLE_DAYS = ['월', '화', '수', '목', '금'] as const
 export type StudentTimetableDay = (typeof STUDENT_TIMETABLE_DAYS)[number]
@@ -250,14 +251,17 @@ function parseEnrollments(rows: Matrix, fileName: string, headerRow: number): St
   const enrollments: StudentEnrollment[] = rows.slice(headerRow + 1)
     .map(row => rowObject(headers, row))
     .filter(row => row['학번'] && row['이름'] && row['강좌이름'])
-    .map(row => ({
-      studentId: compact(row['학번']),
-      name: row['이름'],
-      courseName: row['강좌이름'],
-      group: row['선택군'].toUpperCase(),
-      grade: compact(row['학번']).slice(0, 1),
-      sourceFile: fileName,
-    }))
+    .map(row => {
+      const studentId = canonicalStudentId(row['학번'])
+      return {
+        studentId,
+        name: row['이름'],
+        courseName: row['강좌이름'],
+        group: row['선택군'].toUpperCase(),
+        grade: studentId.slice(0, 1),
+        sourceFile: fileName,
+      }
+    })
   if (enrollments.length === 0) throw new Error('수강생 일괄개설 자료에 학생이 없습니다.')
   return {
     kind: 'enrollments',
@@ -391,24 +395,49 @@ export function mergeStudentTimetableImport(
 }
 
 function summarizeStudent(studentId: string, name: string, enrollmentCount: number): StudentSummary {
-  const grade = studentId.slice(0, 1)
-  const className = String(Number(studentId.slice(1, 3)))
+  const parts = studentIdParts(studentId)
   return {
-    studentId,
+    studentId: parts.studentId,
     name,
-    grade,
-    className,
-    classLabel: `${grade}-${className}`,
-    number: String(Number(studentId.slice(3, 5))),
+    grade: parts.grade,
+    className: parts.className,
+    classLabel: `${parts.grade}-${parts.className}`,
+    number: parts.number,
     enrollmentCount,
+  }
+}
+
+export function normalizeSharedStudentTimetable(
+  timetable: SharedStudentTimetable | null,
+): SharedStudentTimetable | null {
+  if (!timetable) return null
+  return {
+    ...timetable,
+    students: timetable.students.map(personal => {
+      const parts = studentIdParts(personal.student.studentId)
+      return {
+        ...personal,
+        student: {
+          ...personal.student,
+          studentId: parts.studentId,
+          grade: parts.grade || personal.student.grade,
+          className: parts.className || personal.student.className,
+          classLabel: parts.grade && parts.className
+            ? `${parts.grade}-${parts.className}`
+            : personal.student.classLabel,
+          number: parts.number || personal.student.number,
+        },
+      }
+    }),
   }
 }
 
 export function getStudentSummaries(dataset: StudentTimetableDataset): StudentSummary[] {
   const grouped = new Map<string, { name: string; count: number }>()
   for (const enrollment of dataset.enrollments) {
-    const current = grouped.get(enrollment.studentId)
-    grouped.set(enrollment.studentId, {
+    const studentId = canonicalStudentId(enrollment.studentId)
+    const current = grouped.get(studentId)
+    grouped.set(studentId, {
       name: enrollment.name || current?.name || '',
       count: (current?.count ?? 0) + 1,
     })
@@ -436,7 +465,8 @@ export function buildPersonalTimetable(
   dataset: StudentTimetableDataset,
   studentId: string,
 ): PersonalTimetable {
-  const enrollments = dataset.enrollments.filter(item => item.studentId === studentId)
+  studentId = canonicalStudentId(studentId)
+  const enrollments = dataset.enrollments.filter(item => canonicalStudentId(item.studentId) === studentId)
   if (enrollments.length === 0) throw new Error('학생의 과목선택 자료를 찾지 못했습니다.')
   const student = summarizeStudent(studentId, enrollments[0].name, enrollments.length)
   const base = dataset.classes[student.classLabel]
@@ -548,9 +578,11 @@ export function prepareSharedStudentTimetable(
   })
   const includedIds = new Set(students.map(item => item.student.studentId))
   for (const rosterStudent of rosterStudents) {
-    if (includedIds.has(rosterStudent.studentId)) continue
-    const grade = rosterStudent.grade || rosterStudent.studentId.slice(0, 1)
-    const className = String(Number(rosterStudent.className))
+    const parts = studentIdParts(rosterStudent.studentId)
+    const studentId = parts.studentId
+    if (includedIds.has(studentId)) continue
+    const grade = rosterStudent.grade || parts.grade
+    const className = String(Number(rosterStudent.className || parts.className))
     const classLabel = `${grade}-${className}`
     const base = dataset.classes[classLabel]
     if (!base) continue
@@ -564,19 +596,19 @@ export function prepareSharedStudentTimetable(
     }
     students.push({
       student: {
-        studentId: rosterStudent.studentId,
+        studentId,
         name: rosterStudent.name,
         grade,
         className,
         classLabel,
-        number: String(Number(rosterStudent.number)),
+        number: String(Number(rosterStudent.number || parts.number)),
         enrollmentCount: 0,
       },
       slots,
       selections: [],
       warnings: [],
     })
-    includedIds.add(rosterStudent.studentId)
+    includedIds.add(studentId)
   }
   students.sort((a, b) => a.student.studentId.localeCompare(b.student.studentId, 'ko'))
   const warningCount = students.reduce((sum, student) => sum + student.warnings.length, 0)

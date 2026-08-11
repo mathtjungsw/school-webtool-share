@@ -1,6 +1,7 @@
 // 명렬표/교직원부/시간표 입력 파싱 (엑셀 .xlsx + TSV 붙여넣기)
 import * as XLSX from 'xlsx'
 import { DAYS, type Day, type Student, type Teacher, type Lesson } from './types'
+import { canonicalStudentId } from '../studentId'
 
 const uid = () => `L${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
 
@@ -36,7 +37,7 @@ export function parseStudents(rows: string[][]): Student[] {
     const grade = toInt(r[0])
     const name = str(r[4])
     if (grade === null || !name || name === '이름' || name === '성명') continue   // 헤더/빈 행 제외
-    out.push({ grade, classNo: toInt(r[1]) ?? 0, num: toInt(r[2]) ?? 0, sid: str(r[3]), name })
+    out.push({ grade, classNo: toInt(r[1]) ?? 0, num: toInt(r[2]) ?? 0, sid: canonicalStudentId(r[3]), name })
   }
   return out
 }

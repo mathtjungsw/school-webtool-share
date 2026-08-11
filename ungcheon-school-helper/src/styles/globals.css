@@ -490,6 +490,62 @@
 [data-theme="dark"] input::placeholder,
 [data-theme="dark"] textarea::placeholder { color: #cbd5e1 !important; opacity: 1; }
 
+.volunteer-work-page input:not([type="checkbox"]):not([type="radio"]),
+.volunteer-work-page select,
+.volunteer-work-page textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.7rem;
+  background: #fff;
+  padding: 0.65rem 0.75rem;
+  color: #0f172a;
+  font-weight: 650;
+  outline: none;
+}
+.volunteer-work-page input:focus,
+.volunteer-work-page select:focus,
+.volunteer-work-page textarea:focus { border-color: #059669; box-shadow: 0 0 0 2px rgba(5, 150, 105, .15); }
+[data-theme="dark"] .volunteer-work-page input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="dark"] .volunteer-work-page select,
+[data-theme="dark"] .volunteer-work-page textarea { border-color: #475569; background: #0f172a; color: #f8fafc; }
+
+/* 봉사활동 화면은 운영체제의 prefers-color-scheme가 아니라 앱의 data-theme만 따른다. */
+[data-theme="light"] .volunteer-work-page { color: #0f172a !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:bg-slate-900"] { background-color: #ffffff !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:bg-slate-800"] { background-color: #f1f5f9 !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:bg-slate-200"] { background-color: #1e293b !important; color: #ffffff !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:bg-emerald-950"] { background-color: #ecfdf5 !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:bg-amber-950"] { background-color: #fffbeb !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:bg-rose-950"] { background-color: #fff1f2 !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:bg-blue-950"] { background-color: #eff6ff !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:text-slate-100"],
+[data-theme="light"] .volunteer-work-page [class*="dark:text-slate-200"] { color: #0f172a !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:text-slate-300"] { color: #475569 !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:text-emerald-"] { color: #065f46 !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:text-amber-"] { color: #78350f !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:text-rose-"] { color: #9f1239 !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:text-blue-"] { color: #1e3a8a !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:border-slate-700"],
+[data-theme="light"] .volunteer-work-page [class*="dark:border-slate-600"] { border-color: #cbd5e1 !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:border-emerald-"] { border-color: #059669 !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:border-amber-"] { border-color: #f59e0b !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:border-rose-"] { border-color: #fda4af !important; }
+[data-theme="light"] .volunteer-work-page [class*="dark:border-blue-"] { border-color: #93c5fd !important; }
+
+[data-theme="dark"] .volunteer-work-page { color: #f8fafc !important; }
+[data-theme="dark"] .volunteer-work-page [class~="bg-white"] { background-color: #0f172a !important; }
+[data-theme="dark"] .volunteer-work-page [class~="bg-slate-100"] { background-color: #1e293b !important; }
+[data-theme="dark"] .volunteer-work-page [class~="bg-emerald-50"] { background-color: #052e2b !important; }
+[data-theme="dark"] .volunteer-work-page [class~="bg-amber-50"] { background-color: #451a03 !important; }
+[data-theme="dark"] .volunteer-work-page [class~="bg-rose-50"] { background-color: #4c0519 !important; }
+[data-theme="dark"] .volunteer-work-page [class~="bg-blue-50"] { background-color: #172554 !important; }
+[data-theme="dark"] .volunteer-work-page [class~="border-slate-200"],
+[data-theme="dark"] .volunteer-work-page [class~="border-slate-300"] { border-color: #475569 !important; }
+[data-theme="dark"] .volunteer-work-page [class~="text-slate-600"],
+[data-theme="dark"] .volunteer-work-page [class~="text-slate-700"],
+[data-theme="dark"] .volunteer-work-page [class~="text-slate-800"],
+[data-theme="dark"] .volunteer-work-page [class~="text-slate-900"] { color: #e2e8f0 !important; }
+
 /* 위원회 화면의 입력칸은 테마에 맞춰 배경과 글자색을 함께 변경한다.
    전역 글자색만 반전되어 흰 배경에 흰 글자가 입력되는 현상을 방지한다. */
 [data-theme="light"] .committee-form-control {

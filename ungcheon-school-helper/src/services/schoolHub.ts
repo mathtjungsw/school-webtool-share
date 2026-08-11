@@ -1,15 +1,21 @@
 import type { ParsedTimetable, SchoolTimetable } from './schoolTimetable'
-import type {
+import {
+  normalizeSharedStudentTimetable,
+  type
   SharedStudentTimetable,
   SharedStudentTimetableUpload,
 } from './studentTimetable'
-import type {
+import {
+  normalizeSharedStudentRoster,
+  normalizeStudentRosterEntry,
+  type
   SharedStaffRoster,
   SharedStudentRoster,
   StaffChecklist,
   StaffMember,
   StudentRosterEntry,
 } from './rosterAttendance'
+import { studentIdParts } from './studentId'
 
 export type NoticeLevel = 'info' | 'important' | 'urgent'
 
@@ -150,6 +156,16 @@ function revisionFromData(data: unknown) {
   return ''
 }
 
+function normalizeHubResourceData(resource: HubResource, data: unknown) {
+  if (resource === 'studentRoster') {
+    return normalizeSharedStudentRoster(data as SharedStudentRoster | null)
+  }
+  if (resource === 'studentTimetable') {
+    return normalizeSharedStudentTimetable(data as SharedStudentTimetable | null)
+  }
+  return data
+}
+
 function notifyResource(resource: HubResource, data: unknown, cacheKey: string) {
   listeners.get(resource)?.forEach(listener => listener(data, cacheKey))
 }
@@ -279,7 +295,8 @@ async function fetchAndStore<T>(
   const epoch = resourceEpoch.get(resource) ?? 0
   const generation = cacheGeneration
   let requestPromise: Promise<T>
-  requestPromise = hubRequest<T>(request).then(data => {
+  requestPromise = hubRequest<T>(request).then(rawData => {
+    const data = normalizeHubResourceData(resource, rawData) as T
     if (cacheGeneration !== generation || (resourceEpoch.get(resource) ?? 0) !== epoch) return data
     const revision = knownRevision || revisionFromData(data)
     const signature = revision || dataSignature(data)
@@ -355,7 +372,25 @@ export const replaceSharedStudentTimetable = (
   uploadedBy: string,
 ) => hubRequest<{ version: number; uploadedAt: string }>({
   action: 'replaceStudentTimetable',
-  timetable,
+  timetable: {
+    ...timetable,
+    students: timetable.students.map(personal => {
+      const parts = studentIdParts(personal.student.studentId)
+      return {
+        ...personal,
+        student: {
+          ...personal.student,
+          studentId: parts.studentId,
+          grade: parts.grade || personal.student.grade,
+          className: parts.className || personal.student.className,
+          classLabel: parts.grade && parts.className
+            ? `${parts.grade}-${parts.className}`
+            : personal.student.classLabel,
+          number: parts.number || personal.student.number,
+        },
+      }
+    }),
+  },
   adminPassword,
   uploadedBy,
 })
@@ -378,10 +413,6 @@ export const replaceSharedStaffRoster = (
 
 export const getSharedStudentRoster = (force = false) =>
   cachedHubRequest<SharedStudentRoster | null>('studentRoster', 'studentRoster', { action: 'getStudentRoster' }, force)
-    .then(roster => roster ? {
-      ...roster,
-      students: roster.students.map(student => ({ ...student, remark: '' })),
-    } : null)
 
 export const replaceSharedStudentRoster = (
   students: StudentRosterEntry[],
@@ -390,7 +421,7 @@ export const replaceSharedStudentRoster = (
   sourceFileName = '',
 ) => hubRequest<{ version: number; uploadedAt: string }>({
   action: 'replaceStudentRoster',
-  students: students.map(student => ({ ...student, remark: '' })),
+  students: students.map(normalizeStudentRosterEntry),
   adminPassword,
   uploadedBy,
   sourceFileName,

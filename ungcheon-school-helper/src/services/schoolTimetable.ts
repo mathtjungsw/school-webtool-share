@@ -5,6 +5,12 @@ export const PERIODS_PER_DAY = 7
 export const TOTAL_SLOTS = TIMETABLE_DAYS.length * PERIODS_PER_DAY
 const MIN_SOURCE_SLOTS = TOTAL_SLOTS - 1
 
+export function schoolTimetableSlotIndex(dayIndex: number, period: number) {
+  if (!Number.isInteger(dayIndex) || dayIndex < 0 || dayIndex >= TIMETABLE_DAYS.length) return -1
+  if (!Number.isInteger(period) || period < 1 || period > PERIODS_PER_DAY) return -1
+  return dayIndex * PERIODS_PER_DAY + period - 1
+}
+
 export interface SchoolTimetableSlot {
   value: string
   locked: boolean

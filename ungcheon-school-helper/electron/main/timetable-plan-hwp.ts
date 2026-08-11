@@ -49,10 +49,20 @@ export function buildTimetablePlanHwp(templatePath: string, draft: TimetablePlan
   const compressed = (Buffer.from(fileHeader.content).readUInt32LE(36) & 1) === 1
   const sectionBytes = Buffer.from(section.content)
   const records = parseRecords(compressed ? inflateRawSync(sectionBytes) : sectionBytes)
-  const nextRecords = replaceDocumentContents(records, draft)
-  const nextSection = encodeRecords(nextRecords)
-  section.content = compressed ? deflateRawSync(nextSection) : nextSection
-  section.size = section.content.length
+  const pages = chunkEntries(draft.entries)
+  pages.forEach((entries, pageIndex) => {
+    const pageDraft = { ...draft, entries }
+    const nextRecords = replaceDocumentContents(records, pageDraft, pageIndex * DATA_ROW_COUNT)
+    const nextSection = encodeRecords(nextRecords)
+    const content = compressed ? deflateRawSync(nextSection) : nextSection
+    if (pageIndex === 0) {
+      section.content = content
+      section.size = content.length
+    } else {
+      CFB.utils.cfb_add(compound, `BodyText/Section${pageIndex}`, content)
+    }
+  })
+  updateDocumentSectionCount(compound, pages.length, compressed)
 
   const previewText = compound.FileIndex.find(entry => entry.name === 'PrvText')
   if (previewText) {
@@ -105,13 +115,13 @@ function encodeRecords(records: HwpRecord[]) {
   return Buffer.concat(chunks)
 }
 
-function replaceDocumentContents(records: HwpRecord[], draft: TimetablePlanDraftInput) {
+function replaceDocumentContents(records: HwpRecord[], draft: TimetablePlanDraftInput, rowOffset = 0) {
   const cellRanges = findDataCellRanges(records)
   if (cellRanges.length < DATA_ROW_COUNT * DATA_COLUMN_COUNT) {
     throw new Error('교환보강 HWP 템플릿의 수업계획표 6행을 찾을 수 없습니다.')
   }
 
-  const rowValues = buildDataRows(draft)
+  const rowValues = buildDataRows(draft, rowOffset)
   const replacements = new Map<number, { end: number; records: HwpRecord[] }>()
   rowValues.flat().forEach((value, index) => {
     const range = cellRanges[index]
@@ -227,19 +237,19 @@ function recordText(record: HwpRecord) {
   return record.payload.toString('utf16le')
 }
 
-function buildDataRows(draft: TimetablePlanDraftInput) {
+function buildDataRows(draft: TimetablePlanDraftInput, rowOffset = 0) {
   const entries = draft.entries.slice(0, DATA_ROW_COUNT)
   return Array.from({ length: DATA_ROW_COUNT }, (_, index) => {
     const entry = entries[index]
     if (!entry) {
       const isFirstEmpty = index === entries.length
       const cells = Array.from({ length: DATA_COLUMN_COUNT }, () => '')
-      cells[0] = String(index + 1)
+      cells[0] = String(rowOffset + index + 1)
       if (isFirstEmpty) [cells[1], cells[2], cells[3], cells[4]] = ['이', '하', '여', '백']
       return cells
     }
     return [
-      String(index + 1),
+      String(rowOffset + index + 1),
       tableDate(entry.originalDate),
       String(slotPeriod(entry.originalSlotIndex)),
       entry.originalClass,
@@ -265,13 +275,34 @@ function buildPreviewText(draft: TimetablePlanDraftInput) {
     `   일      시 : ${periodText(draft)}`,
     '2. 수업계획',
   ]
-  draft.entries.slice(0, DATA_ROW_COUNT).forEach((entry, index) => {
+  draft.entries.forEach((entry, index) => {
     lines.push(`${index + 1}. ${tableDate(entry.originalDate).replace('\n', ' ')} ${slotPeriod(entry.originalSlotIndex)}교시 ${entry.originalClass} ${entry.originalSubject} ${entry.originalTeacher}`)
     lines.push(`   → ${tableDate(entry.replacementDate).replace('\n', ' ')} ${slotPeriod(entry.replacementSlotIndex)}교시 ${entry.replacementClass} ${entry.replacementSubject} ${entry.replacementTeacher} ${planKindLabel(entry.kind)}`)
   })
   lines.push(fullDateKorean(draft.meta.documentDate))
   lines.push(`웅천고등학교 교사 성명 : ${draft.meta.author.trim()} (인)`)
   return lines.join('\r\n')
+}
+
+function chunkEntries(entries: TimetablePlanEntryInput[]) {
+  if (!entries.length) return [[]]
+  return Array.from({ length: Math.ceil(entries.length / DATA_ROW_COUNT) }, (_, index) =>
+    entries.slice(index * DATA_ROW_COUNT, (index + 1) * DATA_ROW_COUNT),
+  )
+}
+
+function updateDocumentSectionCount(compound: CFB.CFB$Container, sectionCount: number, compressed: boolean) {
+  const docInfo = findEntry(compound, 'DocInfo')
+  const bytes = Buffer.from(docInfo.content)
+  const records = parseRecords(compressed ? inflateRawSync(bytes) : bytes)
+  const properties = records.find(record => record.tag === 16)
+  if (!properties || properties.payload.length < 2) throw new Error('HWP 문서의 구역 수 정보를 찾을 수 없습니다.')
+  const payload = Buffer.from(properties.payload)
+  payload.writeUInt16LE(sectionCount, 0)
+  properties.payload = payload
+  const encoded = encodeRecords(records)
+  docInfo.content = compressed ? deflateRawSync(encoded) : encoded
+  docInfo.size = docInfo.content.length
 }
 
 function reasonText(draft: TimetablePlanDraftInput) {

@@ -10,6 +10,7 @@ import { applyStudentLessonOverride } from '../services/effectiveTimetable'
 import { useAppStore } from '../stores/appStore'
 import { getSpecialTimetableDay, getTimetableDayIndex, localDateKey } from '../services/specialTimetableDays'
 import { canonicalStudentId, studentIdsMatch } from '../services/studentId'
+import { schoolTimetableSlotIndex } from '../services/schoolTimetable'
 
 const DAY_NAMES: Array<StudentTimetableDay | ''> = ['', '월', '화', '수', '목', '금', '']
 
@@ -133,13 +134,13 @@ export default function StudentLocatorPage() {
     raw: '',
     selectedCourse: false,
   } : personalSlot
-  const slotIndex = period && dayIndex >= 0 ? dayIndex * 7 + Number(period.period) - 1 : -1
+  const slotIndex = period ? schoolTimetableSlotIndex(dayIndex, Number(period.period)) : -1
   const slot = selected && slotIndex >= 0 ? applyStudentLessonOverride(baseSlot, selected.student.classLabel, dateKey, slotIndex, changes) : baseSlot
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-6">
       <header className="flex items-start justify-between gap-3">
-        <div><h1 className="page-title flex items-center gap-2"><UserRoundSearch className="text-cyan-400" size={22} />학생 위치 찾기</h1><p className="page-subtitle">학번 4·5자리 또는 이름으로 현재 수업 교실을 확인합니다.</p></div>
+        <div><h1 className="page-title flex items-center gap-2"><UserRoundSearch className="text-cyan-400" size={22} />학생 위치 찾기</h1><p className="page-subtitle">4자리 학번 또는 이름으로 현재 수업 교실을 확인합니다. 기존 5자리 학번도 검색할 수 있습니다.</p></div>
         <button onClick={() => void load(true)} className="btn-ghost"><RefreshCw size={14} className={loading ? 'animate-spin' : ''} />새로고침</button>
       </header>
       <form onSubmit={submit} className="card flex gap-2 p-4"><input value={query} onChange={event => setQuery(event.target.value)} className="input-field flex-1 text-base" placeholder="4자리 또는 5자리 학번·학생 이름 입력" /><button className="btn-primary px-5"><Search size={15} />찾기</button></form>

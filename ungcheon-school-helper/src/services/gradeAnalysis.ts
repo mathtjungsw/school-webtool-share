@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { studentIdParts } from './studentId'
 import { generateText } from './llm'
 import type { AppConfig } from '../types'
 
@@ -134,10 +135,10 @@ export function analyzeExcelBytes(bytes: Uint8Array | number[]): { students: Stu
     let studentNumber = ''
 
     if (studentIdIndex !== -1) {
-      const studentId = String(row[studentIdIndex] || '')
-      if (studentId.length === 5 && studentId.startsWith('1')) {
-        studentClass = String(parseInt(studentId.substring(1, 3), 10))
-        studentNumber = String(parseInt(studentId.substring(3, 5), 10))
+      const parts = studentIdParts(row[studentIdIndex])
+      if (parts.grade === '1') {
+        studentClass = parts.className
+        studentNumber = parts.number
       }
     }
 

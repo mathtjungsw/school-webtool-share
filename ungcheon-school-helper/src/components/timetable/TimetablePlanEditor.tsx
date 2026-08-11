@@ -44,6 +44,20 @@ export default function TimetablePlanEditor({
       onChange({ ...draft, entries: [] })
     }
   }
+  const pageCount = Math.max(1, Math.ceil(draft.entries.length / 6))
+  const notifyMultiPage = () => {
+    if (draft.entries.length > 6) {
+      window.alert(`교체 내용이 ${draft.entries.length}개이므로 6개씩 나누어 ${pageCount}페이지로 작성합니다.\n동일한 표와 나머지 내용이 다음 페이지에 자동 생성됩니다.`)
+    }
+  }
+  const openPreview = () => {
+    notifyMultiPage()
+    setPreviewOpen(true)
+  }
+  const saveHwp = () => {
+    notifyMultiPage()
+    onSaveHwp()
+  }
 
   return (
     <div className="space-y-4 min-w-0">
@@ -98,7 +112,14 @@ export default function TimetablePlanEditor({
           <p className="p-8 text-center text-sm text-slate-500">교환 또는 대강 후보의 ‘계획서에 추가’ 버튼을 눌러주세요.</p>
         ) : (
           <div className="overflow-x-auto max-w-full">
-            <table className="min-w-[1220px] w-full text-xs">
+            <table className="min-w-[1120px] w-full table-fixed text-[11px]">
+              <colgroup>
+                <col className="w-[6%]" /><col className="w-[10%]" /><col className="w-[8%]" />
+                <col className="w-[5%]" /><col className="w-[7.5%]" /><col className="w-[7%]" />
+                <col className="w-[10%]" /><col className="w-[8%]" /><col className="w-[5%]" />
+                <col className="w-[7.5%]" /><col className="w-[7%]" /><col className="w-[5%]" />
+                <col className="w-[14%]" />
+              </colgroup>
               <thead className="bg-white/5 text-slate-400">
                 <tr>
                   <th className="p-2">구분</th><th className="p-2">결강일</th><th className="p-2">요일·교시</th>
@@ -110,25 +131,25 @@ export default function TimetablePlanEditor({
               <tbody className="divide-y divide-white/5">
                 {draft.entries.map(entry => (
                   <tr key={entry.id} className="align-top">
-                    <td className="p-1.5">
-                      <select className="input-field !py-1.5 !px-2 w-20" value={entry.kind} onChange={event => updateEntry(entry.id, { kind: event.target.value as TimetablePlanKind })}>
+                    <td className="p-1">
+                      <select className="input-field !py-1.5 !px-1.5 w-full min-w-0" value={entry.kind} onChange={event => updateEntry(entry.id, { kind: event.target.value as TimetablePlanKind })}>
                         {(['exchange', 'substitution', 'change'] as TimetablePlanKind[]).map(kind => <option key={kind} value={kind}>{planKindLabel(kind)}</option>)}
                       </select>
                     </td>
-                    <td className="p-1.5"><input type="date" className="input-field !py-1.5 !px-2 w-32" value={entry.originalDate} onChange={event => updateEntry(entry.id, { originalDate: event.target.value })} /></td>
-                    <td className="p-1.5"><SlotEditor slotIndex={entry.originalSlotIndex} onChange={slot => updateEntry(entry.id, { originalSlotIndex: slot })} /></td>
-                    <EditCell value={entry.originalClass} onChange={value => updateEntry(entry.id, { originalClass: value })} width="w-20" />
-                    <EditCell value={entry.originalSubject} onChange={value => updateEntry(entry.id, { originalSubject: value })} width="w-28" />
-                    <EditCell value={entry.originalTeacher} onChange={value => updateEntry(entry.id, { originalTeacher: value })} width="w-24" list={timetable.teachers.map(teacher => teacher.name)} />
-                    <td className="p-1.5"><input type="date" className="input-field !py-1.5 !px-2 w-32" value={entry.replacementDate} onChange={event => updateEntry(entry.id, { replacementDate: event.target.value })} /></td>
-                    <td className="p-1.5"><SlotEditor slotIndex={entry.replacementSlotIndex} onChange={slot => updateEntry(entry.id, { replacementSlotIndex: slot })} /></td>
-                    <EditCell value={entry.replacementClass} onChange={value => updateEntry(entry.id, { replacementClass: value })} width="w-20" />
-                    <EditCell value={entry.replacementSubject} onChange={value => updateEntry(entry.id, { replacementSubject: value })} width="w-28" />
-                    <EditCell value={entry.replacementTeacher} onChange={value => updateEntry(entry.id, { replacementTeacher: value })} width="w-24" list={timetable.teachers.map(teacher => teacher.name)} />
-                    <EditCell value={entry.note} onChange={value => updateEntry(entry.id, { note: value })} width="w-16" />
-                    <td className="p-1.5"><div className="flex gap-1">
-                      {entry.kind !== 'change' && <button type="button" className="btn-ghost !p-2 text-cyan-300" onClick={() => onApply?.(entry)} title="상대 교사에게 반영 요청"><Send size={14} /></button>}
-                      <button type="button" className="btn-ghost !p-2 text-rose-400" onClick={() => removeEntry(entry.id)} aria-label="항목 삭제"><Trash2 size={14} /></button>
+                    <td className="p-1"><input type="date" className="input-field !py-1.5 !px-1.5 w-full min-w-0" value={entry.originalDate} onChange={event => updateEntry(entry.id, { originalDate: event.target.value })} /></td>
+                    <td className="p-1"><SlotEditor slotIndex={entry.originalSlotIndex} onChange={slot => updateEntry(entry.id, { originalSlotIndex: slot })} /></td>
+                    <EditCell value={entry.originalClass} onChange={value => updateEntry(entry.id, { originalClass: value })} />
+                    <EditCell value={entry.originalSubject} onChange={value => updateEntry(entry.id, { originalSubject: value })} />
+                    <EditCell value={entry.originalTeacher} onChange={value => updateEntry(entry.id, { originalTeacher: value })} list={timetable.teachers.map(teacher => teacher.name)} />
+                    <td className="p-1"><input type="date" className="input-field !py-1.5 !px-1.5 w-full min-w-0" value={entry.replacementDate} onChange={event => updateEntry(entry.id, { replacementDate: event.target.value })} /></td>
+                    <td className="p-1"><SlotEditor slotIndex={entry.replacementSlotIndex} onChange={slot => updateEntry(entry.id, { replacementSlotIndex: slot })} /></td>
+                    <EditCell value={entry.replacementClass} onChange={value => updateEntry(entry.id, { replacementClass: value })} />
+                    <EditCell value={entry.replacementSubject} onChange={value => updateEntry(entry.id, { replacementSubject: value })} />
+                    <EditCell value={entry.replacementTeacher} onChange={value => updateEntry(entry.id, { replacementTeacher: value })} list={timetable.teachers.map(teacher => teacher.name)} />
+                    <EditCell value={entry.note} onChange={value => updateEntry(entry.id, { note: value })} />
+                    <td className="p-1"><div className="flex items-center justify-center gap-1 whitespace-nowrap">
+                      {entry.kind !== 'change' && <button type="button" className="btn-ghost !px-2 !py-1.5 text-cyan-300" onClick={() => onApply?.(entry)} title="상대 교사에게 반영 요청"><Send size={12} />승인 요청</button>}
+                      <button type="button" className="btn-ghost !px-2 !py-1.5 text-rose-400" onClick={() => removeEntry(entry.id)} aria-label="항목 삭제"><Trash2 size={12} />삭제</button>
                     </div></td>
                   </tr>
                 ))}
@@ -136,13 +157,14 @@ export default function TimetablePlanEditor({
             </table>
           </div>
         )}
+        {draft.entries.length > 6 && <p className="border-t border-cyan-400/15 bg-cyan-500/10 px-4 py-2.5 text-xs font-semibold text-cyan-200">총 {draft.entries.length}개 항목 · 6개씩 나누어 {pageCount}페이지로 자동 작성됩니다.</p>}
       </section>
 
       <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" onClick={onSaveHwp} disabled={!draft.entries.length} className="btn-secondary flex items-center gap-2 disabled:opacity-40">
+        <button type="button" onClick={saveHwp} disabled={!draft.entries.length} className="btn-secondary flex items-center gap-2 disabled:opacity-40">
           <Download size={15} /> 한글(HWP) 저장
         </button>
-        <button type="button" onClick={() => setPreviewOpen(true)} disabled={!draft.entries.length} className="btn-primary flex items-center gap-2 disabled:opacity-40">
+        <button type="button" onClick={openPreview} disabled={!draft.entries.length} className="btn-primary flex items-center gap-2 disabled:opacity-40">
           <Eye size={15} /> 양식 미리보기·출력
         </button>
       </div>
@@ -180,19 +202,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function EditCell({
   value,
   onChange,
-  width,
   list,
 }: {
   value: string
   onChange: (value: string) => void
-  width: string
   list?: string[]
 }) {
   const generatedId = useId()
   const listId = list ? `teachers-${generatedId.replace(/:/g, '')}` : undefined
   return (
-    <td className="p-1.5">
-      <input className={`input-field !py-1.5 !px-2 ${width}`} value={value} onChange={event => onChange(event.target.value)} list={listId} />
+    <td className="p-1">
+      <input className="input-field !py-1.5 !px-1.5 w-full min-w-0" value={value} onChange={event => onChange(event.target.value)} list={listId} />
       {list && <datalist id={listId}>{list.map(item => <option key={item} value={item} />)}</datalist>}
     </td>
   )
@@ -202,10 +222,10 @@ function SlotEditor({ slotIndex, onChange }: { slotIndex: number; onChange: (slo
   const dayIndex = Math.floor(slotIndex / PERIODS_PER_DAY)
   const period = slotPeriod(slotIndex)
   return (
-    <span className="flex items-center gap-1 min-w-28">
+    <span className="flex items-center gap-1 min-w-0 w-full">
       <select
         aria-label="요일"
-        className="input-field !py-1.5 !px-1 w-14"
+        className="input-field !py-1.5 !px-1 w-[58%] min-w-0"
         value={dayIndex}
         onChange={event => onChange(Number(event.target.value) * PERIODS_PER_DAY + period - 1)}
       >
@@ -216,7 +236,7 @@ function SlotEditor({ slotIndex, onChange }: { slotIndex: number; onChange: (slo
         type="number"
         min={1}
         max={7}
-        className="input-field !py-1.5 !px-1 w-12"
+        className="input-field !py-1.5 !px-1 w-[42%] min-w-0"
         value={period}
         onChange={event => onChange(dayIndex * PERIODS_PER_DAY + Math.max(1, Math.min(7, Number(event.target.value))) - 1)}
       />

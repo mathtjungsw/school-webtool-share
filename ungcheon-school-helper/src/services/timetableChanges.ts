@@ -8,6 +8,7 @@ export interface TimetableChangeRequest extends TimetablePlanEntry {
   status: TimetableChangeStatus
   respondedAt: string
   responderName: string
+  requesterAppliedAt: string
 }
 
 export const listTimetableChanges = (viewerName: string, fromDate = '', toDate = '', includeSchool = false) =>
@@ -19,8 +20,15 @@ export const createTimetableChange = (entry: TimetablePlanEntry, requesterName: 
 export const respondTimetableChange = (id: string, responderName: string, decision: 'approved' | 'held') =>
   hubRequest<TimetableChangeRequest>({ action: 'respondTimetableChange', id, responderName, decision })
 
+export const applyTimetableChangeForRequester = (id: string, requesterName: string) =>
+  hubRequest<TimetableChangeRequest>({ action: 'applyTimetableChangeForRequester', id, requesterName })
+
 export const cancelTimetableChange = (id: string, requesterName: string) =>
   hubRequest<void>({ action: 'cancelTimetableChange', id, requesterName })
+
+export function isTimetableChangeAppliedForTeacher(item: TimetableChangeRequest, teacherName: string) {
+  return item.status === 'approved' || (Boolean(item.requesterAppliedAt) && item.requesterName === teacherName)
+}
 
 export function timetableChangeSummary(item: TimetableChangeRequest) {
   const kind = item.kind === 'exchange' ? '수업 교환' : '대강'

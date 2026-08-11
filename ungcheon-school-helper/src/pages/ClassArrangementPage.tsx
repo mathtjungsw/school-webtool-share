@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import * as XLSX from 'xlsx'
+import { canonicalStudentId } from '../services/studentId'
 
 // ─────────────────────────────────────────────
 // 타입 정의
@@ -71,7 +72,8 @@ function parseClassExcel(buf: ArrayBuffer): Student[] {
 
     const rawClass = row['반'] ?? row['학급'] ?? row['현재반'] ?? row['Class'] ?? 1
     const classNum = parseInt(String(rawClass)) || 1
-    const studentId = String(row['번호'] ?? row['학번'] ?? '').trim()
+    const rawStudentId = String(row['번호'] ?? row['학번'] ?? '').trim()
+    const studentId = /^\d{4,5}$/.test(rawStudentId) ? canonicalStudentId(rawStudentId) : rawStudentId
     const gender = row['성별'] ? String(row['성별']).trim() : undefined
 
     const scoreRaw = row['기준성적'] ?? row['성적'] ?? row['점수']

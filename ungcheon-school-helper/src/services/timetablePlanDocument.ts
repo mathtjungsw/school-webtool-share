@@ -9,6 +9,7 @@ import {
 
 export const TIMETABLE_PLAN_DOCUMENT_CSS = `
 .swap-plan{font-family:'바탕','Batang','함초롬바탕','맑은 고딕',serif;font-size:9pt;color:#000;width:100%;}
+.sheet + .sheet{page-break-before:always;}
 .attachment{font-size:9.5pt;margin:0 0 5mm;}
 .swap-plan h1{width:122mm;text-align:center;font-size:18pt;font-weight:bold;letter-spacing:.08em;margin:0 auto 8mm;padding-bottom:3mm;border-bottom:0.7mm double #000;}
 .approval{width:63.5mm;margin:0 0 6mm auto;border-collapse:collapse;table-layout:fixed;}
@@ -54,7 +55,14 @@ body{margin:0;background:#e5e7eb;}*{box-sizing:border-box;}${TIMETABLE_PLAN_DOCU
 }
 
 export function buildTimetablePlanBody(draft: TimetablePlanDraft) {
-  const rows = [...draft.entries]
+  const pages = draft.entries.length
+    ? Array.from({ length: Math.ceil(draft.entries.length / 6) }, (_, index) => draft.entries.slice(index * 6, (index + 1) * 6))
+    : [[]]
+  return pages.map((entries, pageIndex) => buildTimetablePlanPage(draft, entries, pageIndex * 6)).join('')
+}
+
+function buildTimetablePlanPage(draft: TimetablePlanDraft, pageEntries: TimetablePlanEntry[], rowOffset: number) {
+  const rows = [...pageEntries]
   while (rows.length < 6) rows.push(emptyEntry(rows.length))
   const reason = draft.meta.reason === '기타'
     ? `기타(${escapeHtml(draft.meta.customReason)})`
@@ -86,7 +94,7 @@ export function buildTimetablePlanBody(draft: TimetablePlanDraft) {
           <th>월일<br>(요일)</th><th>교시</th><th>학반</th><th>과목</th><th>①교사</th><th>①교사의<br>서명</th><th>보강/교환<br>/변경</th><th>비고</th>
         </tr>
       </thead>
-      <tbody>${rows.map((entry, index) => planRow(entry, index, !entry.id && index === draft.entries.length)).join('')}</tbody>
+      <tbody>${rows.map((entry, index) => planRow(entry, rowOffset + index, !entry.id && index === pageEntries.length)).join('')}</tbody>
     </table>
     <p class="guide">※ 용어 정리 및 입력 내용 안내</p>
     <table class="terms">

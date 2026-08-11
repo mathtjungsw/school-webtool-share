@@ -1,6 +1,7 @@
 import type { ParsedWorkbook } from './fileParser/types'
 import { parseFile } from './fileParser'
 import type { StudentRosterEntry } from './rosterAttendance'
+import { canonicalStudentId } from './studentId'
 
 export interface ExtractedStudentIdentity {
   studentId: string
@@ -30,13 +31,13 @@ export interface StudentIdentityAuditResult {
   uniquePairCount: number
 }
 
-const ID_PATTERN = /^\d{4,5}$/
+const ID_PATTERN = /^[1-3]\d{3}$/
 const NAME_PATTERN = /^[가-힣]{2,5}$/
 const ID_HEADERS = new Set(['학번', '학생번호', '학생학번'])
 const NAME_HEADERS = new Set(['성명', '이름', '학생명', '학생이름'])
 
 const compact = (value: unknown) => String(value ?? '').replace(/\s+/g, '').trim()
-const cleanId = (value: unknown) => compact(value).replace(/[^0-9]/g, '')
+const cleanId = (value: unknown) => canonicalStudentId(compact(value))
 const cleanName = (value: unknown) => compact(value).replace(/[^가-힣]/g, '')
 const validId = (value: string) => ID_PATTERN.test(value)
 const validName = (value: string) => NAME_PATTERN.test(value)
@@ -148,20 +149,15 @@ export function extractPairsFromText(text: string, source = '붙여넣기'): Ext
   return uniqueOccurrences([...matrixPairs, ...linePairs])
 }
 
-function shortIdAlias(studentId: string) {
-  if (studentId.length !== 5) return studentId
-  return `${studentId[0]}${Number(studentId.slice(1, 3))}${studentId.slice(3)}`
-}
-
 function rosterMaps(roster: StudentRosterEntry[]) {
   const byId = new Map<string, StudentRosterEntry>()
   const byName = new Map<string, StudentRosterEntry[]>()
   roster.forEach(student => {
     const id = cleanId(student.studentId)
-    byId.set(id, student)
-    byId.set(shortIdAlias(id), student)
+    const normalizedStudent = { ...student, studentId: id }
+    byId.set(id, normalizedStudent)
     const name = cleanName(student.name)
-    byName.set(name, [...(byName.get(name) ?? []), student])
+    byName.set(name, [...(byName.get(name) ?? []), normalizedStudent])
   })
   return { byId, byName }
 }

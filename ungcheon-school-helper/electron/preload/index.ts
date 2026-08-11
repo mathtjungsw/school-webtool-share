@@ -73,6 +73,15 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('dialog:saveFilesToDir', files),
   buildTimetablePlanHwp: (draft: unknown): Promise<number[]> =>
     ipcRenderer.invoke('timetablePlan:buildHwp', draft),
+  buildVolunteerHwp: (draft: unknown): Promise<number[]> =>
+    ipcRenderer.invoke('volunteer:buildHwp', draft),
+  storeGeneratedVolunteerHwp: (name: string, bytes: number[]) =>
+    ipcRenderer.invoke('volunteer:storeGeneratedHwp', name, bytes),
+  importVolunteerHwp: (filePath: string, allowDuplicate = false) => ipcRenderer.invoke('volunteer:importHwp', filePath, allowDuplicate),
+  listVolunteerHwp: () => ipcRenderer.invoke('volunteer:listHwp'),
+  parseVolunteerHwp: (id: string) => ipcRenderer.invoke('volunteer:parseHwp', id),
+  openVolunteerHwp: (id: string) => ipcRenderer.invoke('volunteer:openHwp', id),
+  deleteVolunteerHwp: (id: string) => ipcRenderer.invoke('volunteer:deleteHwp', id),
 
   // Document parser (kordoc)
   parseDocument: (filePath: string) =>

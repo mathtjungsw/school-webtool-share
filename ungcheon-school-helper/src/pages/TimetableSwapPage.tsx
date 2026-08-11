@@ -32,7 +32,7 @@ import {
 import {
   printTimetablePlan,
 } from '../services/timetablePlanDocument'
-import { cancelTimetableChange, createTimetableChange, listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
+import { applyTimetableChangeForRequester, cancelTimetableChange, createTimetableChange, listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
 import type { TimetablePlanEntry } from '../services/timetablePlan'
 
 type ViewMode = 'exchange' | 'substitution' | 'common_free' | 'plan'
@@ -716,13 +716,21 @@ function CommonFreeTimePanel({
 }
 
 function ChangeRequestHistory({ items, teacherName, onChanged }: { items: TimetableChangeRequest[]; teacherName: string; onChanged: () => Promise<void> }) {
+  const applyForMeOnly = async (item: TimetableChangeRequest) => {
+    if (!window.confirm(`상대 교사가 승인하기 전까지 ${teacherName} 교사의 캘린더와 날짜별 시간표에만 우선 반영합니다.\n상대 교사의 승인 요청은 그대로 유지되며, 승인하면 상대 교사와 학급에도 반영됩니다.\n\n이 기능은 NEIS와 별개인 업무 편의 기능입니다. 계속하시겠습니까?\n\n${timetableChangeSummary(item)}`)) return
+    try {
+      await applyTimetableChangeForRequester(item.id, teacherName)
+      await onChanged()
+      window.dispatchEvent(new Event('timetableChanges:updated'))
+    } catch (error) { window.alert(error instanceof Error ? error.message : String(error)) }
+  }
   const cancel = async (item: TimetableChangeRequest) => {
     if (!window.confirm(`'${timetableChangeSummary(item)}' 반영 요청을 취소할까요?\n승인된 요청이라면 날짜별 반영도 함께 해제됩니다.`)) return
     try { await cancelTimetableChange(item.id, teacherName); await onChanged(); window.dispatchEvent(new Event('timetableChanges:updated')) }
     catch (error) { window.alert(error instanceof Error ? error.message : String(error)) }
   }
-  const labels: Record<TimetableChangeRequest['status'], string> = { pending: '승인 대기', approved: '승인·반영', held: '보류', rejected: '보류', cancelled: '취소' }
-  return <section className="card p-4"><h2 className="font-bold text-white">반영 요청·처리 내역</h2><p className="mt-1 text-xs text-slate-500">보류된 요청은 상대 교사가 나중에 다시 승인할 수 있으며, 승인된 항목은 원본이 아닌 날짜별 변경 기록으로 적용됩니다.</p><div className="mt-3 space-y-2">{items.map(item => <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-white/[0.025] p-3"><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-slate-200">{timetableChangeSummary(item)}</p><p className="mt-1 text-[10px] text-slate-500">요청 {item.requesterName} → {item.targetTeacherName}</p></div><span className={clsx('rounded-full px-2 py-1 text-[10px] font-bold', item.status === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : ['pending', 'held', 'rejected'].includes(item.status) ? 'bg-amber-500/15 text-amber-300' : 'bg-slate-500/15 text-slate-400')}>{labels[item.status]}</span>{item.requesterName === teacherName && ['pending', 'held', 'rejected', 'approved'].includes(item.status) && <button onClick={() => void cancel(item)} className="btn-ghost text-[10px] text-rose-300">취소·반영 해제</button>}</div>)}{!items.length && <p className="py-6 text-center text-xs text-slate-500">반영 요청 내역이 없습니다.</p>}</div></section>
+  const labels: Record<TimetableChangeRequest['status'], string> = { pending: '승인 대기', approved: '승인·전체 반영', held: '보류', rejected: '보류', cancelled: '취소' }
+  return <section className="card p-4"><h2 className="font-bold text-white">반영 요청·처리 내역</h2><p className="mt-1 text-xs text-slate-500">‘나만 우선 반영’은 상대 승인 전까지 내 캘린더와 날짜별 시간표에만 적용합니다. 상대가 승인하면 상대 교사와 학급에도 반영되고 내게 승인 완료 알림이 옵니다. 학교 공유 원본과 NEIS는 바뀌지 않습니다.</p><div className="mt-3 space-y-2">{items.map(item => <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-white/[0.025] p-3"><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-slate-200">{timetableChangeSummary(item)}</p><p className="mt-1 text-[10px] text-slate-500">요청 {item.requesterName} → {item.targetTeacherName}</p></div><span className={clsx('rounded-full px-2 py-1 text-[10px] font-bold', item.status === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : item.requesterAppliedAt ? 'bg-cyan-500/15 text-cyan-300' : ['pending', 'held', 'rejected'].includes(item.status) ? 'bg-amber-500/15 text-amber-300' : 'bg-slate-500/15 text-slate-400')}>{item.status !== 'approved' && item.requesterAppliedAt ? '나만 우선 반영' : labels[item.status]}</span>{item.requesterName === teacherName && ['pending', 'held', 'rejected'].includes(item.status) && !item.requesterAppliedAt && <button onClick={() => void applyForMeOnly(item)} className="btn-secondary text-[10px] text-cyan-200">나만 우선 반영</button>}{item.requesterName === teacherName && ['pending', 'held', 'rejected', 'approved'].includes(item.status) && <button onClick={() => void cancel(item)} className="btn-ghost text-[10px] text-rose-300">취소·반영 해제</button>}</div>)}{!items.length && <p className="py-6 text-center text-xs text-slate-500">반영 요청 내역이 없습니다.</p>}</div></section>
 }
 
 function SlotContent({
