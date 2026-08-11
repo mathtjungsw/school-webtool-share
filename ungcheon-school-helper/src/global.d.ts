@@ -15,6 +15,9 @@ declare global {
       apiKeyGet: (name: string) => Promise<string>
       apiKeyDelete: (name: string) => Promise<void>
       apiKeyGetAll: () => Promise<Record<string, string>>
+      subjectRemarksSet: (value: string) => Promise<void>
+      subjectRemarksGet: () => Promise<string>
+      subjectRemarksClear: () => Promise<void>
       openExternal: (url: string) => Promise<void>
       openPath: (filePath: string) => Promise<string>
       getVersion: () => Promise<string>
@@ -32,6 +35,7 @@ declare global {
       openFilesDialog: (filters?: Electron.FileFilter[]) => Promise<string[]>
       saveFileDialog: (defaultName: string, buffer: number[]) => Promise<boolean>
       saveFilesToDir: (files: { name: string; bytes: number[] }[]) => Promise<number>
+      buildTimetablePlanHwp: (draft: import('./services/timetablePlan').TimetablePlanDraft) => Promise<number[]>
       parseDocument: (filePath: string) => Promise<any>
       checkJava: () => Promise<boolean>
       checkOcrTools: () => Promise<{ hybrid: boolean; tesseract: boolean }>
@@ -48,6 +52,11 @@ declare global {
       fetchWeather: (url: string) => Promise<unknown>
       fetchNotices: () => Promise<unknown>
       schoolHubRequest: (request: Record<string, unknown>) => Promise<unknown>
+      schoolHubDiagnose: () => Promise<{
+        checkedAt: string
+        get: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
+        post: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
+      }>
       getAutoLaunch: () => Promise<boolean>
       setAutoLaunch: (enable: boolean) => Promise<void>
       getResourcesPath: () => Promise<string>

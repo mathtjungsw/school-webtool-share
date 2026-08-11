@@ -355,6 +355,21 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.5',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.5',
+    body: [
+      '· 교과세특 개별 인쇄기를 추가했습니다. 나이스 XLS data를 학생별 A4 한 장으로 미리보고 선택·전체 인쇄할 수 있습니다.',
+      '· 교과세특은 Windows 사용자 계정으로 암호화되어 현재 PC에만 저장되며 비우기 기능을 제공합니다.',
+      '· 누락된 학교 공유 URL을 시작 시 자동 복구하고 관리자 센터에 조회·저장 통신 진단 기능을 추가했습니다.',
+      '· 여러 교사가 모두 비는 시간을 찾는 공동 공강 확인 기능과 교환보강 계획서 HWP 출력 양식을 개선했습니다.',
+      '· 학생 위치 찾기의 4·5자리 학번 검색과 1학년 조회를 보정하고 승인된 수업변경을 반영했습니다.',
+      '· 2학기 급식지도 하루 2인 배정을 모두 인식하고 위원회 일정 입력 오류를 수정했습니다.',
+      '· 공유 학생 명렬의 비고 개인정보를 저장·응답하지 않도록 제거했습니다.',
+      '· 검색도우미와 사용 매뉴얼을 새 기능에 맞게 갱신했습니다.'
+    ].join('\n'),
+    date: '2026-08-11'
+  },
+  {
     key: 'v1.1.4',
     title: '[업데이트] 웅천고 업무도우미 v1.1.4',
     body: [
@@ -672,7 +687,7 @@ function ensureSheets_() {
     'version', 'sourceFileName', 'uploadedBy', 'uploadedAt', 'studentCount'
   ]);
   ensureDataSheet_(book, STUDENT_ROSTER_SHEET, [
-    'studentId', 'name', 'gender', 'remark', 'grade', 'className', 'number',
+    'studentId', 'name', 'gender', 'unused', 'grade', 'className', 'number',
     'homeroomTeacher', 'assistantTeacher'
   ]);
   ensureDataSheet_(book, STAFF_CHECKLISTS_SHEET, [
@@ -1289,7 +1304,8 @@ function getStudentRoster_() {
         studentId: String(row.studentId || ''),
         name: String(row.name || ''),
         gender: String(row.gender || ''),
-        remark: String(row.remark || ''),
+        // 구버전 앱과의 응답 호환을 위해 빈 값만 돌려주며 공유 시트에는 저장하지 않는다.
+        remark: '',
         grade: String(row.grade || ''),
         className: String(row.className || ''),
         number: String(row.number || ''),
@@ -1329,7 +1345,7 @@ function replaceStudentRoster_(body) {
       studentId,
       name,
       clean_(student && student.gender, 10),
-      clean_(student && student.remark, 100),
+      '',
       grade,
       className,
       number,

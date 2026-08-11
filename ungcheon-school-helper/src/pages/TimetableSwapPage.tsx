@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle, ArrowLeftRight, CheckCircle2, FileSpreadsheet,
-  ClipboardList, LockKeyhole, RefreshCw, ShieldCheck, Upload, UserRoundSearch, Users,
+  ClipboardList, LockKeyhole, RefreshCw, Search, ShieldCheck, Upload, UserRoundSearch, Users, X,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAdminStore } from '../stores/adminStore'
@@ -11,6 +11,7 @@ import TimetablePlanEditor from '../components/timetable/TimetablePlanEditor'
 import { getSchoolTimetable, replaceSchoolTimetable, subscribeHubResource } from '../services/schoolHub'
 import {
   chooseAndParseTimetable,
+  findCommonFreeSlots,
   findSwapCandidates,
   PERIODS_PER_DAY,
   slotLabel,
@@ -29,13 +30,12 @@ import {
   type TimetablePlanDraft,
 } from '../services/timetablePlan'
 import {
-  buildTimetablePlanHwpBytes,
   printTimetablePlan,
 } from '../services/timetablePlanDocument'
 import { cancelTimetableChange, createTimetableChange, listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
 import type { TimetablePlanEntry } from '../services/timetablePlan'
 
-type ViewMode = 'exchange' | 'substitution' | 'plan'
+type ViewMode = 'exchange' | 'substitution' | 'common_free' | 'plan'
 type PreviewSelection = {
   mode: 'exchange' | 'substitution'
   teacherIndex: number
@@ -54,6 +54,7 @@ export default function TimetableSwapPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('exchange')
+  const [commonFreeTeacherIndexes, setCommonFreeTeacherIndexes] = useState<number[]>([])
   const [preview, setPreview] = useState<PreviewSelection | null>(null)
   const [planDraft, setPlanDraft] = useState<TimetablePlanDraft>(() => createEmptyPlanDraft(config.teacherName))
   const [planLoaded, setPlanLoaded] = useState(false)
@@ -112,7 +113,10 @@ export default function TimetableSwapPage() {
     const ownIndex = timetable.teachers.findIndex(teacher =>
       teacher.name === teacherName || teacher.label.startsWith(teacherName),
     )
-    if (ownIndex >= 0) setTeacherIndex(ownIndex)
+    if (ownIndex >= 0) {
+      setTeacherIndex(ownIndex)
+      setCommonFreeTeacherIndexes(current => current.length ? current : [ownIndex])
+    }
   }, [timetable, config.teacherName])
 
   const candidates = useMemo(() => {
@@ -193,8 +197,14 @@ export default function TimetableSwapPage() {
 
   const saveHwp = async () => {
     const name = `교환보강_계획서_${planDraft.meta.documentDate || new Date().toISOString().slice(0, 10)}.hwp`
-    const saved = await window.electron?.saveFileDialog(name, buildTimetablePlanHwpBytes(planDraft))
-    if (saved) setSuccess('한글(HWP) 계획서를 저장했습니다.')
+    setError('')
+    try {
+      const bytes = await window.electron.buildTimetablePlanHwp(planDraft)
+      const saved = await window.electron.saveFileDialog(name, bytes)
+      if (saved) setSuccess('PDF 기준 양식을 적용한 편집 가능한 한글(HWP) 계획서를 저장했습니다.')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    }
   }
 
   const requestApplication = async (entry: TimetablePlanEntry) => {
@@ -301,6 +311,12 @@ export default function TimetableSwapPage() {
           label="대강 교사 찾기"
         />
         <ModeButton
+          active={viewMode === 'common_free'}
+          onClick={() => { setViewMode('common_free'); setSelectedSlot(null); setPreview(null) }}
+          icon={<Users size={14} />}
+          label="공동 공강 확인"
+        />
+        <ModeButton
           active={viewMode === 'plan'}
           onClick={() => { setViewMode('plan'); setPreview(null) }}
           icon={<ClipboardList size={14} />}
@@ -339,7 +355,13 @@ export default function TimetableSwapPage() {
           onApply={requestApplication}
         />
         <ChangeRequestHistory items={changeRequests} teacherName={config.teacherName?.trim() ?? ''} onChanged={loadChangeRequests} />
-      </>) : (
+      </>) : viewMode === 'common_free' ? (
+        <CommonFreeTimePanel
+          timetable={timetable}
+          selectedTeacherIndexes={commonFreeTeacherIndexes}
+          onChange={setCommonFreeTeacherIndexes}
+        />
+      ) : (
         <>
           <section className="card p-4 flex flex-wrap items-center gap-4">
             <div className="min-w-0 flex-1">
@@ -513,6 +535,182 @@ export default function TimetableSwapPage() {
           )}
         </>
       ))}
+    </div>
+  )
+}
+
+function CommonFreeTimePanel({
+  timetable,
+  selectedTeacherIndexes,
+  onChange,
+}: {
+  timetable: SchoolTimetable
+  selectedTeacherIndexes: number[]
+  onChange: (indexes: number[]) => void
+}) {
+  const [query, setQuery] = useState('')
+  const selectedSet = useMemo(() => new Set(selectedTeacherIndexes), [selectedTeacherIndexes])
+  const commonFreeSlots = useMemo(
+    () => findCommonFreeSlots(timetable, selectedTeacherIndexes),
+    [timetable, selectedTeacherIndexes],
+  )
+  const commonFreeSlotSet = useMemo(() => new Set(commonFreeSlots), [commonFreeSlots])
+  const filteredTeachers = useMemo(() => {
+    const keyword = query.trim().toLocaleLowerCase('ko-KR')
+    return timetable.teachers
+      .map((teacher, index) => ({ teacher, index }))
+      .filter(({ teacher }) => !keyword || `${teacher.name} ${teacher.label}`.toLocaleLowerCase('ko-KR').includes(keyword))
+  }, [query, timetable.teachers])
+
+  const toggleTeacher = (index: number) => {
+    onChange(selectedSet.has(index)
+      ? selectedTeacherIndexes.filter(item => item !== index)
+      : [...selectedTeacherIndexes, index])
+  }
+
+  return (
+    <div className="space-y-4">
+      <section className="card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-base font-black text-white">
+              <Users size={18} className="text-violet-400" /> 공동 공강 확인
+            </h2>
+            <p className="mt-1 text-xs font-semibold text-slate-400">
+              교사를 2명 이상 선택하면 모든 선생님에게 수업이 없는 요일·교시를 동시에 찾습니다.
+            </p>
+          </div>
+          <button type="button" className="btn-ghost text-xs" onClick={() => onChange([])} disabled={!selectedTeacherIndexes.length}>
+            전체 해제
+          </button>
+        </div>
+
+        <div className="mt-4 flex min-h-10 flex-wrap gap-2 rounded-xl border border-white/10 bg-white/[0.025] p-2.5">
+          {selectedTeacherIndexes.map(index => {
+            const teacher = timetable.teachers[index]
+            if (!teacher) return null
+            return (
+              <button
+                key={index}
+                type="button"
+                onClick={() => toggleTeacher(index)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-500/15 px-3 py-1.5 text-xs font-black text-violet-200"
+                title={`${teacher.name} 선택 해제`}
+              >
+                {teacher.label}<X size={12} />
+              </button>
+            )
+          })}
+          {!selectedTeacherIndexes.length && <span className="self-center text-xs font-semibold text-slate-500">아래에서 교사를 선택하세요.</span>}
+        </div>
+
+        <label className="relative mt-4 block">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            className="input-field w-full !pl-9"
+            placeholder="교사 이름 검색"
+          />
+        </label>
+
+        <div className="mt-3 grid max-h-56 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-5">
+          {filteredTeachers.map(({ teacher, index }) => {
+            const selected = selectedSet.has(index)
+            return (
+              <button
+                key={`${teacher.name}-${index}`}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => toggleTeacher(index)}
+                className={clsx(
+                  'rounded-lg border px-3 py-2 text-left text-xs font-extrabold transition-colors',
+                  selected
+                    ? 'border-violet-400/60 bg-violet-500/20 text-violet-200'
+                    : 'border-white/10 bg-white/[0.025] text-slate-200 hover:border-violet-400/35 hover:bg-violet-500/10',
+                )}
+              >
+                {teacher.label}
+              </button>
+            )
+          })}
+          {!filteredTeachers.length && <p className="col-span-full py-5 text-center text-xs font-semibold text-slate-500">검색 결과가 없습니다.</p>}
+        </div>
+      </section>
+
+      <section className="card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="font-black text-white">공동 공강 결과</h2>
+            <p className="mt-1 text-xs font-semibold text-slate-400">
+              {selectedTeacherIndexes.length < 2
+                ? '교사를 2명 이상 선택하면 결과가 표시됩니다.'
+                : `선택한 ${selectedTeacherIndexes.length}명 모두가 비는 시간은 총 ${commonFreeSlots.length}개입니다.`}
+            </p>
+          </div>
+          {selectedTeacherIndexes.length >= 2 && commonFreeSlots.length > 0 && (
+            <span className="rounded-full bg-emerald-500/15 px-3 py-1.5 text-xs font-black text-emerald-300">
+              공동 공강 {commonFreeSlots.length}개
+            </span>
+          )}
+        </div>
+
+        {selectedTeacherIndexes.length >= 2 && (
+          <div className="mt-4 grid gap-3 lg:grid-cols-5">
+            {TIMETABLE_DAYS.map((day, dayIndex) => {
+              const daySlots = Array.from({ length: PERIODS_PER_DAY }, (_, periodOffset) =>
+                dayIndex * PERIODS_PER_DAY + periodOffset,
+              )
+              const freePeriods = daySlots.filter(slotIndex => commonFreeSlotSet.has(slotIndex))
+              return (
+                <div key={day} className="overflow-hidden rounded-xl border border-white/10">
+                  <div className="flex items-center justify-between bg-white/5 px-3 py-2">
+                    <strong className="text-sm text-slate-100">{day}요일</strong>
+                    <span className="text-[10px] font-black text-emerald-300">{freePeriods.length}개</span>
+                  </div>
+                  <div className="divide-y divide-white/5">
+                    {daySlots.map((slotIndex, periodOffset) => {
+                      const isFree = commonFreeSlotSet.has(slotIndex)
+                      const busyTeachers = isFree ? [] : selectedTeacherIndexes
+                        .map(index => timetable.teachers[index])
+                        .filter(teacher => teacher?.slots[slotIndex]?.value)
+                      return (
+                        <div
+                          key={slotIndex}
+                          className={clsx(
+                            'min-h-14 px-3 py-2',
+                            isFree
+                              ? 'bg-emerald-500/20 ring-1 ring-inset ring-emerald-400/35'
+                              : 'bg-white/[0.015]',
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-black text-slate-400">{periodOffset + 1}교시</span>
+                            <span className={clsx('text-[11px] font-black', isFree ? 'text-emerald-300' : 'text-slate-400')}>
+                              {isFree ? '모두 공강' : `${busyTeachers.length}명 수업`}
+                            </span>
+                          </div>
+                          {!isFree && (
+                            <p className="mt-1 truncate text-[9px] font-semibold text-slate-500" title={busyTeachers.map(item => item.label).join(', ')}>
+                              {busyTeachers.slice(0, 3).map(item => item.name).join(', ')}{busyTeachers.length > 3 ? ` 외 ${busyTeachers.length - 3}명` : ''}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {selectedTeacherIndexes.length >= 2 && commonFreeSlots.length === 0 && (
+          <div className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-6 text-center text-sm font-bold text-amber-300">
+            선택한 교사 전원이 동시에 공강인 시간이 없습니다.
+          </div>
+        )}
+      </section>
     </div>
   )
 }

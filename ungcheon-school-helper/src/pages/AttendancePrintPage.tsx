@@ -452,19 +452,18 @@ function ManageRoster({
           </select>
           <span className="self-center text-xs text-slate-500">{filtered.length}명</span>
         </div>
-        <div className="grid grid-cols-[90px_110px_70px_minmax(130px,1fr)_130px_130px_42px] gap-2 px-4 py-2 bg-white/5 text-[10px] font-semibold text-slate-500">
-          <span>학번</span><span>성명</span><span>성별</span><span>비고</span><span>담임</span><span>부담임</span><span></span>
+        <div className="grid grid-cols-[90px_120px_80px_140px_140px_42px] gap-2 px-4 py-2 bg-white/5 text-[10px] font-semibold text-slate-500">
+          <span>학번</span><span>성명</span><span>성별</span><span>담임</span><span>부담임</span><span></span>
         </div>
         <div className="max-h-[560px] overflow-y-auto">
           {filtered.map(student => (
-            <div key={student.studentId} className="grid grid-cols-[90px_110px_70px_minmax(130px,1fr)_130px_130px_42px] gap-2 items-center px-4 py-2 border-t border-white/5">
+            <div key={student.studentId} className="grid grid-cols-[90px_120px_80px_140px_140px_42px] gap-2 items-center px-4 py-2 border-t border-white/5">
               <input className="input-field py-1.5 text-xs" value={student.studentId} onChange={event => update(student.studentId, {
                 studentId: event.target.value,
                 number: String(Number(event.target.value.length === 4 ? event.target.value.slice(2) : event.target.value.slice(3))),
               })} />
               <input className="input-field py-1.5 text-xs" value={student.name} onChange={event => update(student.studentId, { name: event.target.value })} />
               <input className="input-field py-1.5 text-xs" value={student.gender} onChange={event => update(student.studentId, { gender: event.target.value })} />
-              <input className="input-field py-1.5 text-xs" value={student.remark} onChange={event => update(student.studentId, { remark: event.target.value })} />
               <input className="input-field py-1.5 text-xs" value={student.homeroomTeacher} onChange={event => update(student.studentId, { homeroomTeacher: event.target.value })} />
               <input className="input-field py-1.5 text-xs" value={student.assistantTeacher} onChange={event => update(student.studentId, { assistantTeacher: event.target.value })} />
               <button onClick={() => setDraft(current => current.filter(item => item.studentId !== student.studentId))} className="btn-ghost p-2 text-rose-400"><Trash2 size={13} /></button>
@@ -496,15 +495,14 @@ function RosterPreview({ title, detail, students }: { title: string; detail: str
         <h2 className="font-bold text-white">{title}</h2>
         <p className="text-[11px] text-slate-500 mt-1">{detail}</p>
       </div>
-      <div className="grid grid-cols-[55px_90px_110px_60px_minmax(100px,1fr)] px-4 py-2 bg-white/5 text-[10px] font-semibold text-slate-500">
-        <span>순번</span><span>학번</span><span>성명</span><span>성별</span><span>비고</span>
+      <div className="grid grid-cols-[55px_100px_130px_80px] px-4 py-2 bg-white/5 text-[10px] font-semibold text-slate-500">
+        <span>순번</span><span>학번</span><span>성명</span><span>성별</span>
       </div>
       <div className="max-h-[590px] overflow-y-auto">
         {students.map((student, index) => (
-          <div key={student.studentId} className="grid grid-cols-[55px_90px_110px_60px_minmax(100px,1fr)] px-4 py-2 border-t border-white/5 text-xs">
+          <div key={student.studentId} className="grid grid-cols-[55px_100px_130px_80px] px-4 py-2 border-t border-white/5 text-xs">
             <span className="text-slate-600">{index + 1}</span><span className="text-slate-500">{student.studentId}</span>
             <span className="font-semibold text-slate-200">{student.name}</span><span className="text-slate-500">{student.gender}</span>
-            <span className="text-slate-500">{student.remark}</span>
           </div>
         ))}
         {!students.length && <p className="py-14 text-center text-sm text-slate-500">표시할 학생이 없습니다.</p>}

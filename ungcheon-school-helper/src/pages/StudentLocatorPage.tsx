@@ -9,6 +9,7 @@ import { listTimetableChanges, type TimetableChangeRequest } from '../services/t
 import { applyStudentLessonOverride } from '../services/effectiveTimetable'
 import { useAppStore } from '../stores/appStore'
 import { getSpecialTimetableDay, getTimetableDayIndex, localDateKey } from '../services/specialTimetableDays'
+import { canonicalStudentId, studentIdsMatch } from '../services/studentId'
 
 const DAY_NAMES: Array<StudentTimetableDay | ''> = ['', '월', '화', '수', '목', '금', '']
 
@@ -22,11 +23,14 @@ function currentPeriod(now = new Date()) {
 }
 
 function normalizedIdMatch(studentId: string, query: string) {
-  if (studentId === query) return true
-  if (query.length === 4 && studentId.length === 5) {
-    return `${studentId[0]}${Number(studentId.slice(1, 3))}${studentId.slice(3)}` === query
-  }
-  return false
+  return studentIdsMatch(studentId, query)
+}
+
+function canonicalizeTimetableStudent(item: PersonalTimetable): PersonalTimetable {
+  const studentId = canonicalStudentId(item.student.studentId)
+  return studentId === item.student.studentId
+    ? item
+    : { ...item, student: { ...item.student, studentId } }
 }
 
 function rosterStudentToTimetable(student: StudentRosterEntry): PersonalTimetable {
@@ -38,7 +42,7 @@ function rosterStudentToTimetable(student: StudentRosterEntry): PersonalTimetabl
   }
   return {
     student: {
-      studentId: student.studentId,
+      studentId: canonicalStudentId(student.studentId),
       name: student.name,
       grade: student.grade,
       className: student.className,
@@ -86,9 +90,14 @@ export default function StudentLocatorPage() {
   const candidates = useMemo(() => {
     const value = submitted.trim()
     if (!value) return []
-    const byId = new Map((dataset?.students ?? []).map(item => [item.student.studentId, item]))
+    const byId = new Map<string, PersonalTimetable>()
+    for (const item of dataset?.students ?? []) {
+      const normalized = canonicalizeTimetableStudent(item)
+      byId.set(normalized.student.studentId, normalized)
+    }
     for (const student of roster?.students ?? []) {
-      if (!byId.has(student.studentId)) byId.set(student.studentId, rosterStudentToTimetable(student))
+      const normalized = rosterStudentToTimetable(student)
+      if (!byId.has(normalized.student.studentId)) byId.set(normalized.student.studentId, normalized)
     }
     const students = [...byId.values()]
     if (/^\d{4,5}$/.test(value)) return students.filter(item => normalizedIdMatch(item.student.studentId, value))
@@ -133,7 +142,7 @@ export default function StudentLocatorPage() {
         <div><h1 className="page-title flex items-center gap-2"><UserRoundSearch className="text-cyan-400" size={22} />학생 위치 찾기</h1><p className="page-subtitle">학번 4·5자리 또는 이름으로 현재 수업 교실을 확인합니다.</p></div>
         <button onClick={() => void load(true)} className="btn-ghost"><RefreshCw size={14} className={loading ? 'animate-spin' : ''} />새로고침</button>
       </header>
-      <form onSubmit={submit} className="card flex gap-2 p-4"><input value={query} onChange={event => setQuery(event.target.value)} className="input-field flex-1 text-base" placeholder="학번 또는 학생 이름 입력" /><button className="btn-primary px-5"><Search size={15} />찾기</button></form>
+      <form onSubmit={submit} className="card flex gap-2 p-4"><input value={query} onChange={event => setQuery(event.target.value)} className="input-field flex-1 text-base" placeholder="4자리 또는 5자리 학번·학생 이름 입력" /><button className="btn-primary px-5"><Search size={15} />찾기</button></form>
       {error && <p className="rounded-xl border border-rose-400/20 bg-rose-500/10 p-3 text-xs text-rose-200">{error}</p>}
       {specialTimetableDay && <p className="rounded-xl border-2 border-amber-400 bg-amber-100 p-3 text-sm font-black text-slate-950">{specialTimetableDay.message} 현재 위치도 {specialTimetableDay.sourceWeekday}요일 수업을 기준으로 안내합니다.</p>}
       {submitted && candidates.length === 0 && !loading && <div className="card py-14 text-center text-sm text-slate-400">일치하는 학생이 없습니다.</div>}

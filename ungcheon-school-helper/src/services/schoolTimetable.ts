@@ -174,6 +174,20 @@ export function findSwapCandidates(
   return candidates
 }
 
+export function findCommonFreeSlots(
+  timetable: SchoolTimetable,
+  teacherIndexes: number[],
+): number[] {
+  const uniqueTeacherIndexes = [...new Set(teacherIndexes)]
+    .filter(index => Number.isInteger(index) && index >= 0 && index < timetable.teachers.length)
+  if (uniqueTeacherIndexes.length < 2) return []
+
+  return Array.from({ length: TOTAL_SLOTS }, (_, slotIndex) => slotIndex)
+    .filter(slotIndex => uniqueTeacherIndexes.every(teacherIndex =>
+      !timetable.teachers[teacherIndex]?.slots[slotIndex]?.value.trim(),
+    ))
+}
+
 export function slotLabel(slotIndex: number) {
   const day = TIMETABLE_DAYS[Math.floor(slotIndex / PERIODS_PER_DAY)]
   return `${day}요일 ${(slotIndex % PERIODS_PER_DAY) + 1}교시`

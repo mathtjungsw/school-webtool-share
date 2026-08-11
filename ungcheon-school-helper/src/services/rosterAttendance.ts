@@ -25,6 +25,7 @@ export interface StudentRosterEntry {
   studentId: string
   name: string
   gender: string
+  /** Legacy compatibility field. Student roster remarks are never imported or shared. */
   remark: string
   grade: string
   className: string
@@ -218,13 +219,11 @@ export function parseStudentRosterWorkbook(bytes: number[]): StudentRosterEntry[
         const inferredClass = studentClassFromId(studentId)
         if (inferredClass !== className) continue
         const previous = byId.get(studentId)
-        const nextRemark = clean(rows[rowIndex]?.[baseColumn + 3])
-        const remarks = [previous?.remark, nextRemark].filter(Boolean)
         byId.set(studentId, {
           studentId,
           name,
           gender: clean(rows[rowIndex]?.[baseColumn + 2]) || previous?.gender || '',
-          remark: [...new Set(remarks)].join(' / '),
+          remark: '',
           grade,
           className,
           number: studentNumberFromId(studentId),
@@ -343,7 +342,7 @@ export function printAttendanceRosters(groups: AttendanceRosterPrintGroup[]): vo
       <td>${escapeHtml(student.name)}</td>
       <td>${escapeHtml(student.gender)}</td>
       <td></td>
-      <td>${escapeHtml(student.remark)}</td>
+      <td></td>
     </tr>`).join('')
     const date = options.date
       ? new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric' })
@@ -400,7 +399,7 @@ export async function downloadAttendanceRosters(
           student.name,
           student.gender,
           '',
-          student.remark,
+          '',
         ]),
     ]
     const sheet = XLSX.utils.aoa_to_sheet(rows)

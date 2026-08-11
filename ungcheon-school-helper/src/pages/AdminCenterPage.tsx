@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import {
   AlertCircle, ArrowLeftRight, BellRing, CheckCircle2, Clock3, ExternalLink,
   FileSpreadsheet, Landmark, Link2, Loader2, MonitorCheck, RefreshCw,
-  Settings, ShieldCheck, UsersRound,
+  Network, Settings, ShieldCheck, UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import { useAdminStore } from '../stores/adminStore'
@@ -29,12 +29,21 @@ function formatDateTime(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('ko-KR')
 }
 
+interface HubDiagnosticResult {
+  checkedAt: string
+  get: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
+  post: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
+}
+
 export default function AdminCenterPage() {
   const isAdmin = useAdminStore(state => state.isAdmin)
   const config = useAppStore(state => state.config)
   const [status, setStatus] = useState<NeisSyncStatus | null>(null)
   const [busy, setBusy] = useState(false)
   const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [diagnosing, setDiagnosing] = useState(false)
+  const [diagnostic, setDiagnostic] = useState<HubDiagnosticResult | null>(null)
+  const [diagnosticError, setDiagnosticError] = useState('')
   const [message, setMessage] = useState('')
   const [warning, setWarning] = useState('')
   const [error, setError] = useState('')
@@ -92,11 +101,24 @@ export default function AdminCenterPage() {
     setError('')
     try {
       const started = await window.electron?.checkForUpdates()
-      setMessage(started === false ? '현재 개발 환경에서는 업데이트 확인을 사용할 수 없습니다.' : '업데이트 확인을 시작했습니다. 새 버전이 있으면 자동으로 내려받습니다.')
+      setMessage(started === false ? '시험판 또는 개발 환경에서는 자동 업데이트 확인이 비활성화됩니다.' : '업데이트 확인을 시작했습니다. 새 버전이 있으면 자동으로 내려받습니다.')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       window.setTimeout(() => setCheckingUpdate(false), 800)
+    }
+  }
+
+  const diagnoseSchoolHub = async () => {
+    setDiagnosing(true)
+    setDiagnosticError('')
+    try {
+      setDiagnostic(await window.electron.schoolHubDiagnose())
+    } catch (cause) {
+      setDiagnostic(null)
+      setDiagnosticError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setDiagnosing(false)
     }
   }
 
@@ -149,6 +171,37 @@ export default function AdminCenterPage() {
           {!warning && status?.lastStatus === 'partial' && status.lastError && <Notice tone="warn">마지막 동기화는 일부만 완료되었습니다. {status.lastError}</Notice>}
           {message && <Notice tone="success">{message}</Notice>}
           {error && <Notice tone="error">{error}</Notice>}
+        </div>
+      </section>
+
+      <section className="card overflow-hidden border border-violet-400/20">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 bg-violet-500/10 p-5">
+          <div>
+            <h2 className="flex items-center gap-2 font-bold text-white"><Network size={18} className="text-violet-400" />학교 공유 서비스 진단</h2>
+            <p className="mt-1.5 max-w-3xl text-xs leading-relaxed text-slate-300">실제 자료를 수정하지 않는 health 요청으로 조회(GET)와 저장 통신 경로(POST)를 각각 확인합니다. 학교 유선망에서 업무센터·교환·대강 등의 저장 가능 여부를 점검할 때 사용하세요.</p>
+          </div>
+          <button type="button" onClick={() => void diagnoseSchoolHub()} disabled={diagnosing || !config.schoolHubUrl?.trim()} className="btn-ghost inline-flex items-center gap-2">
+            {diagnosing ? <Loader2 size={14} className="animate-spin" /> : <Network size={14} />}{diagnosing ? '진단 중...' : '학교 공유 서비스 진단'}
+          </button>
+        </div>
+        <div className="space-y-4 p-5">
+          {!config.schoolHubUrl?.trim() && <Notice tone="warn">환경설정에 학교 공유 서비스 URL을 먼저 입력해 주세요.</Notice>}
+          {diagnostic && (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Status label="조회 통신(GET)" value={diagnostic.get.ok ? `정상 · ${diagnostic.get.elapsedMs}ms` : `실패 · ${diagnostic.get.error}`} good={diagnostic.get.ok} />
+                <Status label="저장 통신 경로(POST)" value={diagnostic.post.ok ? `정상 · ${diagnostic.post.elapsedMs}ms` : `실패 · ${diagnostic.post.error}`} good={diagnostic.post.ok} />
+                <Status label="공유 서비스 버전" value={`버전 ${diagnostic.post.version ?? diagnostic.get.version ?? '-'}`} good={diagnostic.get.ok || diagnostic.post.ok} />
+                <Status label="마지막 진단" value={formatDateTime(diagnostic.checkedAt)} />
+              </div>
+              {diagnostic.get.ok && diagnostic.post.ok
+                ? <Notice tone="success">조회와 저장 통신 경로가 모두 정상입니다. 이 진단은 실제 업무나 자료를 추가·수정하지 않았습니다.</Notice>
+                : diagnostic.get.ok && !diagnostic.post.ok
+                  ? <Notice tone="error">조회는 정상이지만 POST 통신이 실패했습니다. 학교 유선망이 외부 저장 요청을 차단할 가능성이 있습니다.</Notice>
+                  : <Notice tone="error">학교 공유 서비스 연결에 실패했습니다. 네트워크와 공유 서비스 URL을 확인해 주세요.</Notice>}
+            </>
+          )}
+          {diagnosticError && <Notice tone="error">{diagnosticError}</Notice>}
         </div>
       </section>
 

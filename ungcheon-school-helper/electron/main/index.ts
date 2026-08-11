@@ -12,10 +12,18 @@ import { startMonitoring, stopMonitoring, isMonitoringActive } from './notifier'
 import { getWeeklyPlanMonth } from './weekly-plan'
 import { getDutyScheduleMonth } from './duty-schedule'
 import { getCreativeScheduleMonth } from './creative-schedule'
+import { resolveSchoolHubEndpoint, UNGCHEON_SCHOOL_HUB_URL } from './school-hub-endpoint'
+import { buildTimetablePlanHwp, type TimetablePlanDraftInput } from './timetable-plan-hwp'
 
 const execFileAsync = promisify(execFile)
 
 const store = new Store()
+
+// 과거 설치본에서 학교 코드만 저장되고 공유 URL이 누락된 경우가 있었다.
+// 로그인 전에 메인 프로세스가 기본 URL을 복구해 사용자별 재입력을 없앤다.
+if (!String(store.get('config.schoolHubUrl', '')).trim()) {
+  store.set('config.schoolHubUrl', UNGCHEON_SCHOOL_HUB_URL)
+}
 
 let mainWindow: BrowserWindow | null = null
 
@@ -84,7 +92,7 @@ app.whenReady().then(() => {
   createWindow()
 
   // 프로덕션 빌드에서만 자동 업데이트 확인 + 자동 실행 기본값 적용
-  if (!process.env['ELECTRON_RENDERER_URL']) {
+  if (!process.env['ELECTRON_RENDERER_URL'] && !app.getVersion().includes('-preview.')) {
     // app-update.yml이 손상되거나 누락된 설치본에서도 GitHub 공급자를 명시적으로 사용한다.
     autoUpdater.setFeedURL({
       provider: 'github',
@@ -119,6 +127,7 @@ const ALLOWED_CONFIG_KEY_PREFIXES = [
   'wr:', 'club:', 'photo:', 'insa:',
   'assessment:', 'feedback.', 'timetable_plan:',
   'personal.', 'sidebar.', 'pilotLogin.', 'neisSync.', 'notifier.',
+  'staffTasks.',
 ]
 function isAllowedConfigKey(key: string): boolean {
   return ALLOWED_CONFIG_KEY_PREFIXES.some(p => key.startsWith(p))
@@ -141,6 +150,14 @@ ipcMain.handle('config:getAll', () => store.store)
 ipcMain.handle('config:delete', (_, key: string) => {
   if (!isAllowedConfigKey(key)) throw new Error(`허용되지 않는 config 키: ${key}`)
   store.delete(key)
+})
+
+ipcMain.handle('timetablePlan:buildHwp', (_, draft: Record<string, unknown>) => {
+  if (JSON.stringify(draft).length > 200_000) throw new Error('교환보강 계획서 내용이 너무 큽니다.')
+  const templatePath = process.env['ELECTRON_RENDERER_URL']
+    ? join(process.cwd(), 'resources', 'templates', 'exchange-plan-template.hwp')
+    : join(process.resourcesPath, 'templates', 'exchange-plan-template.hwp')
+  return Array.from(buildTimetablePlanHwp(templatePath, draft as unknown as TimetablePlanDraftInput))
 })
 
 // Open external links — http/https only
@@ -186,7 +203,7 @@ autoUpdater.on('error', (error: Error, message?: string) => {
 })
 ipcMain.on('update:install', () => autoUpdater.quitAndInstall())
 ipcMain.handle('update:check', async () => {
-  if (process.env['ELECTRON_RENDERER_URL']) {
+  if (process.env['ELECTRON_RENDERER_URL'] || app.getVersion().includes('-preview.')) {
     mainWindow?.webContents.send('update:none')
     return false
   }
@@ -383,6 +400,36 @@ ipcMain.handle('apiKey:getAll', (): Record<string, string> => {
     out[name] = store.get(apiKeyFallbackKey(name), '') as string
   }
   return out
+})
+
+// 교과세특 개별 인쇄기 — Windows 사용자 계정(DPAPI)으로 암호화된 PC 로컬 저장만 허용.
+// 학교 공유 서비스나 일반 config 저장소에는 평문 학생 자료를 남기지 않는다.
+const SUBJECT_REMARKS_STORE_KEY = 'subjectRemarks:encrypted:v1'
+const SUBJECT_REMARKS_MAX_BYTES = 8_000_000
+
+ipcMain.handle('subjectRemarks:set', (_, value: string) => {
+  if (typeof value !== 'string') throw new Error('저장할 교과세특 자료 형식이 올바르지 않습니다.')
+  if (Buffer.byteLength(value, 'utf8') > SUBJECT_REMARKS_MAX_BYTES) {
+    throw new Error('교과세특 자료가 너무 큽니다. 8MB 이하의 나이스 파일을 사용해 주세요.')
+  }
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('이 PC에서 Windows 암호화 저장을 사용할 수 없어 학생 자료를 저장하지 않았습니다.')
+  }
+  store.set(SUBJECT_REMARKS_STORE_KEY, safeStorage.encryptString(value).toString('base64'))
+})
+
+ipcMain.handle('subjectRemarks:get', (): string => {
+  const encrypted = store.get(SUBJECT_REMARKS_STORE_KEY, '') as string
+  if (!encrypted || !safeStorage.isEncryptionAvailable()) return ''
+  try {
+    return safeStorage.decryptString(Buffer.from(encrypted, 'base64'))
+  } catch {
+    return ''
+  }
+})
+
+ipcMain.handle('subjectRemarks:clear', () => {
+  store.delete(SUBJECT_REMARKS_STORE_KEY)
 })
 
 // Portal certificate password — stored via OS safeStorage (Keychain / DPAPI)
@@ -772,8 +819,7 @@ async function fetchSchoolHub(
 }
 
 async function requestSchoolHub(payload: Record<string, unknown>) {
-  const endpoint = String(store.get('config.schoolHubUrl', '')).trim()
-  if (!endpoint) return { ok: false, error: '학교 공유 서비스 URL이 설정되지 않았습니다.' }
+  const endpoint = resolveSchoolHubEndpoint(store.get('config.schoolHubUrl', ''))
   const action = String(payload.action ?? '')
   const largePayloadActions = new Set(['replaceStudentTimetable', 'replaceStudentRoster', 'replaceStaffRoster', 'replaceNeisSnapshot'])
   const maxRequestLength = largePayloadActions.has(action) ? 8_000_000 : 500_000
@@ -816,6 +862,69 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
 }
 
 ipcMain.handle('schoolHub:request', (_, payload: Record<string, unknown>) => requestSchoolHub(payload))
+
+interface HubDiagnosticAttempt {
+  ok: boolean
+  status: number
+  elapsedMs: number
+  version: number | null
+  error: string
+}
+
+async function diagnoseSchoolHubAttempt(endpoint: string, method: 'GET' | 'POST'): Promise<HubDiagnosticAttempt> {
+  const startedAt = Date.now()
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 15_000)
+  try {
+    const url = new URL(endpoint)
+    if (method === 'GET') {
+      url.searchParams.set('action', 'health')
+      url.searchParams.set('payload', JSON.stringify({ action: 'health' }))
+      url.searchParams.set('_', String(Date.now()))
+    }
+    const response = await net.fetch(url.toString(), {
+      method,
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: method === 'POST'
+        ? { 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': 'no-cache' }
+        : { 'Cache-Control': 'no-cache' },
+      body: method === 'POST' ? JSON.stringify({ action: 'health' }) : undefined,
+    })
+    const body = await response.json() as { ok?: boolean; data?: { version?: unknown }; error?: unknown }
+    const ok = response.ok && body.ok === true
+    return {
+      ok,
+      status: response.status,
+      elapsedMs: Date.now() - startedAt,
+      version: Number.isFinite(Number(body.data?.version)) ? Number(body.data?.version) : null,
+      error: ok ? '' : String(body.error ?? `HTTP ${response.status}`),
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      elapsedMs: Date.now() - startedAt,
+      version: null,
+      error: error instanceof Error ? error.message : String(error),
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+ipcMain.handle('schoolHub:diagnose', async () => {
+  const endpoint = resolveSchoolHubEndpoint(store.get('config.schoolHubUrl', ''))
+  let parsed: URL
+  try { parsed = new URL(endpoint) } catch { throw new Error('학교 공유 서비스 URL이 올바르지 않습니다.') }
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'script.google.com') {
+    throw new Error('Google Apps Script HTTPS 배포 URL만 진단할 수 있습니다.')
+  }
+
+  const get = await diagnoseSchoolHubAttempt(endpoint, 'GET')
+  const post = await diagnoseSchoolHubAttempt(endpoint, 'POST')
+  return { checkedAt: new Date().toISOString(), get, post }
+})
 
 ipcMain.handle('notices:fetch', async () => {
   const result = await requestSchoolHub({ action: 'listNotices' }) as { ok?: boolean; data?: unknown }

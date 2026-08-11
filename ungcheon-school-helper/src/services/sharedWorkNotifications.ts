@@ -63,8 +63,13 @@ export async function loadSharedWorkLastViewedAt(teacherName: string): Promise<s
 export async function markSharedWorkViewed(teacherName: string, viewedAt = new Date().toISOString()) {
   if (!teacherName.trim()) return
   const key = storageKey(teacherName)
-  if (window.electron) await window.electron.configSet(key, viewedAt)
-  else localStorage.setItem(key, viewedAt)
+  if (window.electron) {
+    try {
+      await window.electron.configSet(key, viewedAt)
+    } catch {
+      localStorage.setItem(key, viewedAt)
+    }
+  } else localStorage.setItem(key, viewedAt)
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT, { detail: { teacherName, viewedAt } }))
 }
 

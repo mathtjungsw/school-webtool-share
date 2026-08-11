@@ -378,6 +378,10 @@ export const replaceSharedStaffRoster = (
 
 export const getSharedStudentRoster = (force = false) =>
   cachedHubRequest<SharedStudentRoster | null>('studentRoster', 'studentRoster', { action: 'getStudentRoster' }, force)
+    .then(roster => roster ? {
+      ...roster,
+      students: roster.students.map(student => ({ ...student, remark: '' })),
+    } : null)
 
 export const replaceSharedStudentRoster = (
   students: StudentRosterEntry[],
@@ -386,7 +390,7 @@ export const replaceSharedStudentRoster = (
   sourceFileName = '',
 ) => hubRequest<{ version: number; uploadedAt: string }>({
   action: 'replaceStudentRoster',
-  students,
+  students: students.map(student => ({ ...student, remark: '' })),
   adminPassword,
   uploadedBy,
   sourceFileName,

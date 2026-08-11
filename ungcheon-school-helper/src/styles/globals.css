@@ -490,6 +490,27 @@
 [data-theme="dark"] input::placeholder,
 [data-theme="dark"] textarea::placeholder { color: #cbd5e1 !important; opacity: 1; }
 
+/* 위원회 화면의 입력칸은 테마에 맞춰 배경과 글자색을 함께 변경한다.
+   전역 글자색만 반전되어 흰 배경에 흰 글자가 입력되는 현상을 방지한다. */
+[data-theme="light"] .committee-form-control {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #111827 !important;
+  caret-color: #111827;
+  color-scheme: light;
+}
+[data-theme="dark"] .committee-form-control {
+  background: #0f172a !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+  caret-color: #f8fafc;
+  color-scheme: dark;
+}
+[data-theme="dark"] .committee-form-control option {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+}
+
 /* 황금색 기본 버튼은 두 테마 모두 진한 잉크색이 가장 선명합니다. */
 [data-theme="light"] .btn-primary,
 [data-theme="dark"] .btn-primary,
