@@ -81,6 +81,9 @@ export async function loadTimetablePlanDraft(author = ''): Promise<TimetablePlan
       ...empty.meta,
       ...(candidate.meta ?? {}),
       author: candidate.meta?.author || author,
+      // 작성일은 저장된 초안의 이전 날짜가 아니라 화면을 연 오늘을 기본값으로 사용한다.
+      // 사용자가 날짜 입력칸에서 바꾼 값은 현재 편집 세션 동안 그대로 저장된다.
+      documentDate: empty.meta.documentDate,
     },
     entries: Array.isArray(candidate.entries) ? candidate.entries : [],
   }

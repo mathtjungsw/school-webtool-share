@@ -20,7 +20,7 @@ import {
   subscribePersonalOrganizer, type PersonalTask, type PersonalTaskPriority,
 } from '../services/personalOrganizer'
 import type { CreativeScheduleResult, DutyScheduleEvent, DutyScheduleResult, ScheduleEvent, WeeklyPlanResult } from '../types'
-import { listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
+import { isTimetableChangeAppliedForTeacher, listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
 import { SPECIAL_TIMETABLE_DAYS } from '../services/specialTimetableDays'
 
 type CalendarSource = 'neis' | 'weekly' | 'creative' | 'schoolEvent' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty' | 'timetableChange'
@@ -281,9 +281,9 @@ export default function CalendarPage() {
       source: item.kind === 'activity' ? 'creative' as const : 'schoolEvent' as const,
       label: item.kind === 'activity' ? (item.department || '창의적체험활동') : '창체 학사일정',
     })),
-    ...timetableChanges.filter(item => item.status === 'approved').flatMap(item => {
+    ...timetableChanges.filter(item => isTimetableChangeAppliedForTeacher(item, config.teacherName?.trim() ?? '')).flatMap(item => {
       const dates = [...new Set([item.originalDate, item.replacementDate])]
-      return dates.map(date => ({ id: `timetable-change-${item.id}-${date}`, date, title: timetableChangeSummary(item), source: 'timetableChange' as const, label: '승인된 수업변경' }))
+      return dates.map(date => ({ id: `timetable-change-${item.id}-${date}`, date, title: timetableChangeSummary(item), source: 'timetableChange' as const, label: item.status !== 'approved' && item.requesterAppliedAt ? '나만 우선 반영' : '승인된 수업변경' }))
     }),
     ...committeeEvents.map(item => ({
       id: `committee-${item.id}`,

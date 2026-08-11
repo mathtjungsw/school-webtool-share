@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import { escapeHtml, printHtml } from '../utils/printHtml'
+import { canonicalStudentId, studentIdParts } from './studentId'
 
 type Cell = string | number | boolean | Date | null | undefined
 type Matrix = Cell[][]
@@ -87,11 +88,25 @@ const clean = (value: Cell): string =>
 
 const compact = (value: Cell): string => clean(value).replace(/\s+/g, '')
 
-const studentClassFromId = (studentId: string): string =>
-  String(Number(studentId.length === 4 ? studentId.slice(1, 2) : studentId.slice(1, 3)))
+const studentClassFromId = (studentId: string): string => studentIdParts(studentId).className
 
-const studentNumberFromId = (studentId: string): string =>
-  String(Number(studentId.length === 4 ? studentId.slice(2) : studentId.slice(3)))
+const studentNumberFromId = (studentId: string): string => studentIdParts(studentId).number
+
+export function normalizeStudentRosterEntry(student: StudentRosterEntry): StudentRosterEntry {
+  const parts = studentIdParts(student.studentId)
+  return {
+    ...student,
+    studentId: parts.studentId,
+    grade: parts.grade || student.grade,
+    className: parts.className || student.className,
+    number: parts.number || student.number,
+    remark: '',
+  }
+}
+
+export function normalizeSharedStudentRoster(roster: SharedStudentRoster | null): SharedStudentRoster | null {
+  return roster ? { ...roster, students: roster.students.map(normalizeStudentRosterEntry) } : null
+}
 
 const workbookFromBytes = (bytes: number[]): XLSX.WorkBook =>
   XLSX.read(Uint8Array.from(bytes), {
@@ -212,9 +227,10 @@ export function parseStudentRosterWorkbook(bytes: number[]): StudentRosterEntry[
         : ''
 
       for (let rowIndex = headerRow + 1; rowIndex < rows.length; rowIndex += 1) {
-        const studentId = compact(rows[rowIndex]?.[baseColumn])
+        const rawStudentId = compact(rows[rowIndex]?.[baseColumn])
         const name = clean(rows[rowIndex]?.[baseColumn + 1])
-        if (!/^\d{4,6}$/.test(studentId) || !name) continue
+        if (!/^\d{4,5}$/.test(rawStudentId) || !name) continue
+        const studentId = canonicalStudentId(rawStudentId)
         if (studentId.slice(0, 1) !== grade) continue
         const inferredClass = studentClassFromId(studentId)
         if (inferredClass !== className) continue

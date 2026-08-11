@@ -22,6 +22,7 @@ import {
   type StudentRosterEntry,
 } from '../services/rosterAttendance'
 import type { SharedStudentTimetable } from '../services/studentTimetable'
+import { canonicalStudentId, studentIdParts } from '../services/studentId'
 
 type Tab = 'class' | 'course' | 'manage'
 
@@ -43,15 +44,14 @@ function studentLookupKey(student: {
   className?: string
   number?: string
 }): string {
+  const normalized = canonicalStudentId(student.studentId)
+  if (/^[1-3]\d{3}$/.test(normalized)) return normalized
   const grade = String(student.grade ?? '').replace(/\D/g, '')
   const className = String(Number(String(student.className ?? '').replace(/\D/g, '')))
   const number = String(student.number ?? '').replace(/\D/g, '').padStart(2, '0')
-  if (grade && className && className !== '0' && number !== '00') {
-    return `${grade}${className}${number}`
-  }
-  const digits = String(student.studentId ?? '').replace(/\D/g, '')
-  const padded = digits.match(/^([123])(\d{2})(\d{2})$/)
-  return padded ? `${padded[1]}${Number(padded[2])}${padded[3]}` : digits
+  return grade && className && className !== '0' && number !== '00'
+    ? `${grade}${className}${number}`
+    : normalized
 }
 
 export default function AttendancePrintPage() {
@@ -458,10 +458,17 @@ function ManageRoster({
         <div className="max-h-[560px] overflow-y-auto">
           {filtered.map(student => (
             <div key={student.studentId} className="grid grid-cols-[90px_120px_80px_140px_140px_42px] gap-2 items-center px-4 py-2 border-t border-white/5">
-              <input className="input-field py-1.5 text-xs" value={student.studentId} onChange={event => update(student.studentId, {
-                studentId: event.target.value,
-                number: String(Number(event.target.value.length === 4 ? event.target.value.slice(2) : event.target.value.slice(3))),
-              })} />
+              <input inputMode="numeric" maxLength={5} className="input-field py-1.5 text-xs" value={student.studentId} onChange={event => update(student.studentId, {
+                studentId: event.target.value.replace(/\D/g, '').slice(0, 5),
+              })} onBlur={() => {
+                const parts = studentIdParts(student.studentId)
+                update(student.studentId, {
+                  studentId: parts.studentId,
+                  grade: parts.grade || student.grade,
+                  className: parts.className || student.className,
+                  number: parts.number || student.number,
+                })
+              }} />
               <input className="input-field py-1.5 text-xs" value={student.name} onChange={event => update(student.studentId, { name: event.target.value })} />
               <input className="input-field py-1.5 text-xs" value={student.gender} onChange={event => update(student.studentId, { gender: event.target.value })} />
               <input className="input-field py-1.5 text-xs" value={student.homeroomTeacher} onChange={event => update(student.studentId, { homeroomTeacher: event.target.value })} />

@@ -97,7 +97,7 @@ export default function StudentIdentityAuditPage() {
         <div className="card flex min-h-64 flex-col items-center justify-center border-dashed border-cyan-400/20 p-7 text-center">
           <Upload size={30} className="text-cyan-400" />
           <h2 className="mt-3 font-bold text-white">Excel·한글·PDF 파일 검사</h2>
-          <p className="mt-2 text-xs leading-5 text-slate-400">한 셀에 `10101 홍길동`처럼 함께 있거나<br />학번과 이름이 옆 칸에 나뉜 표를 모두 인식합니다.</p>
+          <p className="mt-2 text-xs leading-5 text-slate-400">한 셀에 `1101 홍길동`처럼 함께 있거나<br />학번과 이름이 옆 칸에 나뉜 표를 모두 인식합니다. 5자리 학번도 4자리로 바꿔 검사합니다.</p>
           <button onClick={() => void inspectFile()} disabled={loading || rosterLoading} className="btn-primary mt-5 flex items-center gap-2 px-5">
             {loading ? <Loader2 size={15} className="animate-spin" /> : <FileCheck2 size={15} />}{loading ? '분석 중...' : '파일 선택·검사'}
           </button>
@@ -111,7 +111,7 @@ export default function StudentIdentityAuditPage() {
             value={pasteText}
             onChange={event => setPasteText(event.target.value)}
             className="input-field mt-3 min-h-36 w-full resize-y font-mono text-xs leading-5"
-            placeholder={'학번\t이름\n10101\t홍길동\n10102 김웅천'}
+            placeholder={'학번\t이름\n1101\t홍길동\n1102 김웅천'}
           />
           <div className="mt-3 flex justify-end gap-2">
             <button onClick={() => { setPasteText(''); setResult(null); setError('') }} className="btn-ghost text-xs">지우기</button>

@@ -42,7 +42,7 @@ import {
   type CommitteeEvent,
   type CommitteeState,
 } from '../services/schoolHub'
-import type { SchoolTimetable, TeacherTimetable } from '../services/schoolTimetable'
+import { schoolTimetableSlotIndex, type SchoolTimetable, type TeacherTimetable } from '../services/schoolTimetable'
 import type { StaffChecklist } from '../services/rosterAttendance'
 import {
   loadPersonalMemo, loadPersonalTasks, savePersonalMemo, savePersonalTasks,
@@ -58,7 +58,7 @@ import {
   SPECIAL_TIMETABLE_DAYS,
 } from '../services/specialTimetableDays'
 import type { CreativeScheduleResult, DutyScheduleResult, MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
-import { listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
+import { isTimetableChangeAppliedForTeacher, listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
 import {
   addDays, eachDayOfInterval, endOfMonth, endOfWeek, format,
   isSameMonth, startOfMonth, startOfWeek,
@@ -610,7 +610,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       source: 'weekly' as const,
     })),
     ...creativeSchedule.events.map(item => ({ date: item.date, eventName: item.title, department: item.kind === 'activity' ? (item.department || '창의적체험활동') : '창체 학사일정', source: item.kind === 'activity' ? 'creative' as const : 'schoolEvent' as const })),
-    ...timetableChanges.filter(item => item.status === 'approved').flatMap(item => [...new Set([item.originalDate, item.replacementDate])].map(date => ({ date: toYmd(date), eventName: timetableChangeSummary(item), department: '승인된 수업변경', source: 'timetableChange' as const }))),
+    ...timetableChanges.filter(item => isTimetableChangeAppliedForTeacher(item, config.teacherName?.trim() ?? '')).flatMap(item => [...new Set([item.originalDate, item.replacementDate])].map(date => ({ date: toYmd(date), eventName: timetableChangeSummary(item), department: item.status !== 'approved' && item.requesterAppliedAt ? '나만 우선 반영' : '승인된 수업변경', source: 'timetableChange' as const }))),
     ...committeeEvents.map(item => ({
       date: toYmd(item.date),
       eventName: `${item.startTime} ${item.title}`,
@@ -723,13 +723,47 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
           </button>
         </div>
       </div>
-      {specialTimetableDay && (
-        <div className="mb-4 flex items-start gap-3 rounded-2xl border-2 border-amber-400 bg-amber-100 px-4 py-3 text-slate-950 shadow-sm">
-          <BellRing size={18} className="mt-0.5 shrink-0 text-amber-700" />
-          <div>
-            <p className="text-sm font-black">{specialTimetableDay.message}</p>
-            <p className="mt-1 text-xs font-semibold text-slate-700">이 날짜의 교사·학급 시간표는 {specialTimetableDay.sourceWeekday}요일 시간표를 기준으로 표시됩니다.</p>
-          </div>
+
+      {(specialTimetableDay || (hasSchool && upcomingCommitteeEvents.length > 0)) && (
+        <div className={`mb-3 grid gap-2 ${specialTimetableDay && hasSchool && upcomingCommitteeEvents.length > 0 ? 'xl:grid-cols-2' : ''}`}>
+          {specialTimetableDay && (
+            <div className="flex min-h-14 items-center gap-2.5 rounded-xl border-2 border-amber-400 bg-amber-100 px-3 py-2 text-slate-950 shadow-sm">
+              <BellRing size={17} className="shrink-0 text-amber-700" />
+              <div className="min-w-0 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-2">
+                <p className="text-sm font-black">{specialTimetableDay.message}</p>
+                <p className="text-[11px] font-semibold text-slate-700">
+                  교사·학급 시간표도 {specialTimetableDay.sourceWeekday}요일 기준으로 표시됩니다.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {hasSchool && upcomingCommitteeEvents.length > 0 && (
+            <div className="flex min-h-14 flex-wrap items-center gap-2 rounded-xl border border-amber-400/35 bg-amber-400/10 px-3 py-2">
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Landmark size={15} className="text-amber-700 dark:text-amber-300" />
+                <p className="text-sm font-black text-slate-950 dark:text-white">내 위원회 일정</p>
+              </div>
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                {upcomingCommitteeEvents.slice(0, 3).map(event => (
+                  <button
+                    key={event.id}
+                    onClick={() => onNavigate('committees')}
+                    className="max-w-full rounded-lg border border-amber-400/30 bg-white/65 px-2.5 py-1 text-left hover:border-amber-500/60 dark:border-white/10 dark:bg-surface-800/70"
+                    title={[event.committeeName, `${event.date} ${event.startTime}~${event.endTime}`, event.location].filter(Boolean).join(' · ')}
+                  >
+                    <span className="block truncate text-[11px] font-bold text-slate-950 dark:text-white">
+                      {event.committeeName}
+                      <span className="ml-1.5 font-semibold text-amber-800 dark:text-amber-300">
+                        {event.date.slice(5)} {event.startTime}~{event.endTime}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => onNavigate('committees')} className="btn-ghost shrink-0 px-2 py-1 text-xs">일정 보기</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -750,33 +784,6 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
 
       {hasSchool && (
         <>
-          {upcomingCommitteeEvents.length > 0 && (
-            <div className="mb-4 rounded-2xl border border-amber-400/25 bg-amber-400/10 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="flex items-center gap-2 text-sm font-bold text-amber-200">
-                    <Landmark size={16} /> 내 위원회 일정
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">환경설정의 이름과 위원 명단이 일치하는 일정만 표시됩니다.</p>
-                </div>
-                <button onClick={() => onNavigate('committees')} className="btn-ghost text-xs">일정 보기</button>
-              </div>
-              <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {upcomingCommitteeEvents.slice(0, 3).map(event => (
-                  <button
-                    key={event.id}
-                    onClick={() => onNavigate('committees')}
-                    className="rounded-xl border border-white/10 bg-surface-800/70 p-3 text-left hover:border-amber-400/35"
-                  >
-                    <p className="text-xs font-bold text-white">{event.committeeName}</p>
-                    <p className="mt-1 text-[11px] text-amber-300">{event.date} · {event.startTime}~{event.endTime}</p>
-                    {event.location && <p className="mt-1 text-[10px] text-slate-500">{event.location}</p>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* ── 좌측: 2주 달력·선택 일정·날씨·급식 / 우측: 주간 시간표 ── */}
           <div className="mb-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,2.25fr)_minmax(380px,0.85fr)]">
             <div className="min-w-0 space-y-4">
@@ -1644,10 +1651,11 @@ function TimetableSection({
             lunch={lunch}
             renderCell={(date, period) => {
               const dayIndex = getTimetableDayIndex(date)
-              const slotIndex = dayIndex * 7 + Number(period) - 1
+              const slotIndex = schoolTimetableSlotIndex(dayIndex, Number(period))
+              if (slotIndex < 0) return null
               const slot = sharedTeacher.slots[slotIndex]
               const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
-              const change = timetableChanges.find(item => item.status === 'approved' && (
+              const change = timetableChanges.find(item => isTimetableChangeAppliedForTeacher(item, sharedTeacher.name) && (
                 (item.originalDate === isoDate && item.originalSlotIndex === slotIndex) ||
                 (item.kind === 'exchange' && item.replacementDate === isoDate && item.replacementSlotIndex === slotIndex)
               ))

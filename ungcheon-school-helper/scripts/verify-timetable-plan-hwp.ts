@@ -103,6 +103,25 @@ if (!changedText.includes('3\r') || !changedText.includes('이\r') || !changedTe
   throw new Error('여러 행 출력 뒤 첫 번째 빈 행의 이하여백 표기가 없습니다.')
 }
 
+const multiPageDraft: TimetablePlanDraftInput = {
+  ...draft,
+  entries: Array.from({ length: 8 }, (_, index) => ({
+    ...draft.entries[0],
+    originalSubject: `결강과목${index + 1}`,
+    replacementSubject: `실시과목${index + 1}`,
+  })),
+}
+const multiPageOutputPath = join(outputDirectory, 'generated-multi-page-sample.hwp')
+writeFileSync(multiPageOutputPath, buildTimetablePlanHwp(templatePath, multiPageDraft))
+const multiPageCompound = CFB.read(readFileSync(multiPageOutputPath), { type: 'buffer' })
+const sectionNames = multiPageCompound.FileIndex.map(entry => entry.name).filter(name => /^Section\d+$/.test(name)).sort()
+if (sectionNames.join(',') !== 'Section0,Section1') throw new Error(`8개 항목 HWP의 구역 수가 올바르지 않습니다: ${sectionNames.join(',')}`)
+const firstPageText = readHwpSectionText(multiPageCompound, 'Section0')
+const secondPageText = readHwpSectionText(multiPageCompound, 'Section1')
+if (!firstPageText.includes('결강과목6') || firstPageText.includes('결강과목7')) throw new Error('첫 페이지에 1~6번 항목이 올바르게 나뉘지 않았습니다.')
+if (!secondPageText.includes('결강과목7') || !secondPageText.includes('결강과목8') || !secondPageText.includes('7\r') || !secondPageText.includes('8\r')) throw new Error('둘째 페이지에 7~8번 항목과 연속 번호가 없습니다.')
+if (readDocumentSectionCount(multiPageCompound) !== 2) throw new Error('HWP 문서 속성의 구역 수가 2로 기록되지 않았습니다.')
+
 const htmlDraft: TimetablePlanDraft = {
   meta: draft.meta,
   entries: draft.entries.map((entry, index) => ({
@@ -114,6 +133,7 @@ const htmlDraft: TimetablePlanDraft = {
 writeFileSync(join(outputDirectory, 'generated-preview.html'), buildTimetablePlanHtml(htmlDraft), 'utf8')
 console.log(`PASS 편집 가능한 원본 HWP 템플릿 생성: ${outputPath}`)
 console.log(`PASS 다른 내용·여러 행 HWP 치환: ${changedOutputPath}`)
+console.log(`PASS 7개 이상 자동 페이지 분리: ${multiPageOutputPath}`)
 
 function extractParagraphText(data: Buffer) {
   let offset = 0
@@ -136,7 +156,28 @@ function extractParagraphText(data: Buffer) {
 
 function readHwpText(path: string) {
   const hwp = CFB.read(readFileSync(path), { type: 'buffer' })
-  const body = hwp.FileIndex.find(entry => entry.name === 'Section0')
+  return readHwpSectionText(hwp, 'Section0')
+}
+
+function readHwpSectionText(hwp: CFB.CFB$Container, sectionName: string) {
+  const body = hwp.FileIndex.find(entry => entry.name === sectionName)
   if (!body?.content) throw new Error('생성된 HWP 본문 스트림이 없습니다.')
   return extractParagraphText(inflateRawSync(Buffer.from(body.content)))
+}
+
+function readDocumentSectionCount(hwp: CFB.CFB$Container) {
+  const docInfo = hwp.FileIndex.find(entry => entry.name === 'DocInfo')
+  if (!docInfo?.content) throw new Error('생성된 HWP 문서 정보 스트림이 없습니다.')
+  const data = inflateRawSync(Buffer.from(docInfo.content))
+  let offset = 0
+  while (offset + 4 <= data.length) {
+    const headerValue = data.readUInt32LE(offset)
+    offset += 4
+    const tag = headerValue & 0x3ff
+    let size = (headerValue >>> 20) & 0xfff
+    if (size === 0xfff) { size = data.readUInt32LE(offset); offset += 4 }
+    if (tag === 16) return data.readUInt16LE(offset)
+    offset += size
+  }
+  throw new Error('HWP 문서 속성 레코드를 찾을 수 없습니다.')
 }

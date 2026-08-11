@@ -24,6 +24,7 @@ import {
   type PersonalTimetable,
   type SharedStudentTimetable,
 } from '../services/studentTimetable'
+import { studentIdsMatch } from '../services/studentId'
 
 interface ImportMessage {
   fileName: string
@@ -168,10 +169,13 @@ export default function StudentTimetablePage() {
   [students, grade])
   const filteredStudents = useMemo(() => {
     const keyword = query.trim().toLowerCase()
+    const isStudentIdQuery = /^\d{4,5}$/.test(keyword)
     return students.filter(student =>
       student.grade === grade &&
       (!className || student.className === className) &&
-      (!keyword || student.studentId.includes(keyword) || student.name.toLowerCase().includes(keyword)),
+      (!keyword || (isStudentIdQuery
+        ? studentIdsMatch(student.studentId, keyword)
+        : student.name.toLowerCase().includes(keyword))),
     )
   }, [students, grade, className, query])
 

@@ -36,6 +36,13 @@ declare global {
       saveFileDialog: (defaultName: string, buffer: number[]) => Promise<boolean>
       saveFilesToDir: (files: { name: string; bytes: number[] }[]) => Promise<number>
       buildTimetablePlanHwp: (draft: import('./services/timetablePlan').TimetablePlanDraft) => Promise<number[]>
+      buildVolunteerHwp: (draft: import('./services/volunteerWork').VolunteerCertificateDraft) => Promise<number[]>
+      storeGeneratedVolunteerHwp: (name: string, bytes: number[]) => Promise<import('./services/volunteerWork').StoredVolunteerHwp>
+      importVolunteerHwp: (filePath: string, allowDuplicate?: boolean) => Promise<import('./services/volunteerWork').StoredVolunteerHwp>
+      listVolunteerHwp: () => Promise<import('./services/volunteerWork').StoredVolunteerHwp[]>
+      parseVolunteerHwp: (id: string) => Promise<import('./services/volunteerWork').ParsedVolunteerForm[]>
+      openVolunteerHwp: (id: string) => Promise<string>
+      deleteVolunteerHwp: (id: string) => Promise<import('./services/volunteerWork').StoredVolunteerHwp>
       parseDocument: (filePath: string) => Promise<any>
       checkJava: () => Promise<boolean>
       checkOcrTools: () => Promise<{ hybrid: boolean; tesseract: boolean }>

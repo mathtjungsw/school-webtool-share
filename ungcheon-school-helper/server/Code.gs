@@ -355,6 +355,21 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.6',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.6',
+    body: [
+      '· 봉사활동 업무 메뉴를 추가했습니다. 전용 Excel 명단으로 웅천고 확인서를 발급하고 나이스 자료와 여러 HWP 확인서를 누적 검증할 수 있습니다.',
+      '· 봉사활동 명단과 확인서 자료는 학교 공유 서버·구글시트로 보내지 않고 현재 PC에만 저장하며 사용자가 직접 비울 수 있습니다.',
+      '· 봉사활동 검증 결과를 활동 내용·기간·시간 열로 나누어 압축하고, 원본 파일명과 Excel 행·HWP 확인서 위치는 마우스를 올릴 때 표시합니다.',
+      '· 학생 학번을 프로그램 전체에서 4자리로 통일하고, 검색과 자료 가져오기에서는 기존 5자리 학번도 같은 학생으로 인식하도록 개선했습니다.',
+      '· 교환·대강의 “나만 우선 반영”, 상대 교사 승인 알림과 날짜별 시간표 반영을 보강하고 교환보강 계획서 다페이지 출력을 개선했습니다.',
+      '· 8월 11일 화요일의 월요일 시간표 운영 안내와 교사·학급 시간표 표시를 반영하고 대시보드 안내 영역을 간결하게 정리했습니다.',
+      '· 출석부·학생 시간표·학생 위치 찾기 등 학생 자료 기능의 학번 처리와 수업 자료 연결을 함께 보정했습니다.',
+      '· 검색도우미와 사용 매뉴얼을 새 기능과 변경된 이용 순서에 맞게 갱신했습니다.'
+    ].join('\n'),
+    date: '2026-08-11'
+  },
+  {
     key: 'v1.1.5',
     title: '[업데이트] 웅천고 업무도우미 v1.1.5',
     body: [
@@ -426,7 +441,7 @@ const GET_READ_ACTIONS = [
 function doGet(e) {
   try {
     const action = String(e && e.parameter && e.parameter.action || '');
-    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 24 } });
+    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 26 } });
     if (GET_READ_ACTIONS.indexOf(action) < 0) throw new Error('GET으로 허용되지 않는 요청입니다.');
 
     const rawPayload = String(e && e.parameter && e.parameter.payload || '{}');
@@ -444,7 +459,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 24 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 26 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
@@ -530,6 +545,7 @@ function doPost(e) {
     if (action === 'listTimetableChanges') return json_({ ok: true, data: listTimetableChanges_(body) });
     if (action === 'createTimetableChange') return json_({ ok: true, data: createTimetableChange_(body) });
     if (action === 'respondTimetableChange') return json_({ ok: true, data: respondTimetableChange_(body) });
+    if (action === 'applyTimetableChangeForRequester') return json_({ ok: true, data: applyTimetableChangeForRequester_(body) });
     if (action === 'cancelTimetableChange') {
       cancelTimetableChange_(body);
       return json_({ ok: true });
@@ -709,8 +725,10 @@ function ensureSheets_() {
     'id', 'kind', 'status', 'requesterName', 'targetTeacherName',
     'originalSlotIndex', 'replacementSlotIndex', 'originalDate', 'replacementDate',
     'originalTeacher', 'replacementTeacher', 'originalClass', 'replacementClass',
-    'originalSubject', 'replacementSubject', 'note', 'createdAt', 'respondedAt', 'responderName', 'updatedAt'
+    'originalSubject', 'replacementSubject', 'note', 'createdAt', 'respondedAt', 'responderName', 'updatedAt',
+    'requesterAppliedAt'
   ]);
+  repairTimetableChangeClassCells_(book);
   ensureDataSheet_(book, NEIS_SYNC_META_SHEET, [
     'version', 'schoolName', 'fromDate', 'toDate', 'fetchedAt', 'uploadedAt',
     'deviceId', 'mealCount', 'scheduleCount', 'timetableCount', 'status', 'lastError'
@@ -808,6 +826,35 @@ function repairStaffHomeroomCells_(book) {
     new Date().toISOString(),
     sheet.getLastRow() - 1
   ]]);
+}
+
+function normalizeTimetableChangeClass_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return String(value.getMonth() + 1) + '-' + String(value.getDate());
+  }
+  const text = String(value == null ? '' : value).trim();
+  const classMatch = text.match(/^([1-3])[-\s]?0?(\d{1,2})$/);
+  return classMatch ? classMatch[1] + '-' + String(Number(classMatch[2])) : text;
+}
+
+function repairTimetableChangeClassCells_(book) {
+  const sheet = book.getSheetByName(TIMETABLE_CHANGES_SHEET);
+  if (!sheet) return;
+  sheet.getRange('L:M').setNumberFormat('@');
+  if (sheet.getLastRow() < 2) return;
+  const range = sheet.getRange(2, 12, sheet.getLastRow() - 1, 2);
+  const values = range.getValues();
+  let changed = false;
+  values.forEach(function(row) {
+    for (let column = 0; column < 2; column++) {
+      const normalized = normalizeTimetableChangeClass_(row[column]);
+      if (Object.prototype.toString.call(row[column]) === '[object Date]' || String(row[column] || '') !== normalized) {
+        row[column] = normalized;
+        changed = true;
+      }
+    }
+  });
+  if (changed) range.setValues(values);
 }
 
 function ensureReleaseNotices_() {
@@ -2015,10 +2062,10 @@ function timetableChangeObject_(row) {
     originalSlotIndex: Number(row.originalSlotIndex) || 0, replacementSlotIndex: Number(row.replacementSlotIndex) || 0,
     originalDate: dateOnly_(row.originalDate), replacementDate: dateOnly_(row.replacementDate),
     originalTeacher: String(row.originalTeacher || ''), replacementTeacher: String(row.replacementTeacher || ''),
-    originalClass: String(row.originalClass || ''), replacementClass: String(row.replacementClass || ''),
+    originalClass: normalizeTimetableChangeClass_(row.originalClass), replacementClass: normalizeTimetableChangeClass_(row.replacementClass),
     originalSubject: String(row.originalSubject || ''), replacementSubject: String(row.replacementSubject || ''),
     note: String(row.note || ''), createdAt: iso_(row.createdAt), respondedAt: iso_(row.respondedAt),
-    responderName: String(row.responderName || '')
+    responderName: String(row.responderName || ''), requesterAppliedAt: iso_(row.requesterAppliedAt)
   };
 }
 
@@ -2031,7 +2078,9 @@ function listTimetableChanges_(body) {
   return readObjects_(TIMETABLE_CHANGES_SHEET).map(timetableChangeObject_).filter(function(item) {
     if (includeSchool) {
       if (item.status !== 'approved') return false;
-    } else if (item.requesterName !== viewer && item.targetTeacherName !== viewer && item.originalTeacher !== viewer && item.replacementTeacher !== viewer) return false;
+    } else {
+      if (item.requesterName !== viewer && item.targetTeacherName !== viewer && item.originalTeacher !== viewer && item.replacementTeacher !== viewer) return false;
+    }
     const firstDate = item.originalDate < item.replacementDate ? item.originalDate : item.replacementDate;
     const lastDate = item.originalDate > item.replacementDate ? item.originalDate : item.replacementDate;
     if (fromDate && lastDate < fromDate) return false;
@@ -2060,14 +2109,16 @@ function createTimetableChange_(body) {
     originalDate, replacementDate, clean_(entry.originalTeacher, 30) || requester, target,
     clean_(entry.originalClass, 20), clean_(entry.replacementClass, 20),
     clean_(entry.originalSubject, 100), clean_(entry.replacementSubject, 100),
-    clean_(entry.note, 200), now, '', '', now
+    clean_(entry.note, 200), now, '', '', now, ''
   ];
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_CHANGES_SHEET).appendRow(row);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_CHANGES_SHEET);
+  sheet.getRange('L:M').setNumberFormat('@');
+  sheet.appendRow(row);
   return timetableChangeObject_({
     id: row[0], kind: row[1], status: row[2], requesterName: row[3], targetTeacherName: row[4],
     originalSlotIndex: row[5], replacementSlotIndex: row[6], originalDate: row[7], replacementDate: row[8],
     originalTeacher: row[9], replacementTeacher: row[10], originalClass: row[11], replacementClass: row[12],
-    originalSubject: row[13], replacementSubject: row[14], note: row[15], createdAt: row[16], respondedAt: '', responderName: ''
+    originalSubject: row[13], replacementSubject: row[14], note: row[15], createdAt: row[16], respondedAt: '', responderName: '', requesterAppliedAt: ''
   });
 }
 
@@ -2090,7 +2141,8 @@ function respondTimetableChange_(body) {
   for (let index = 1; index < values.length; index++) {
     if (String(values[index][idColumn]) !== id) continue;
     if (String(values[index][targetColumn]) !== responder) throw new Error('상대 교사 본인만 응답할 수 있습니다.');
-    if (['pending', 'held', 'rejected'].indexOf(String(values[index][statusColumn])) < 0) throw new Error('이미 처리된 요청입니다.');
+    const currentStatus = String(values[index][statusColumn]);
+    if (['pending', 'held', 'rejected'].indexOf(currentStatus) < 0) throw new Error('이미 처리된 요청입니다.');
     if (decision === 'approved') {
       const candidate = {};
       headers.forEach(function(header, column) { candidate[header] = values[index][column]; });
@@ -2117,6 +2169,38 @@ function respondTimetableChange_(body) {
     return timetableChangeObject_(changed);
   }
   throw new Error('처리할 요청을 찾을 수 없습니다.');
+}
+
+function applyTimetableChangeForRequester_(body) {
+  const id = clean_(body.id, 100);
+  const requester = clean_(body.requesterName, 30);
+  if (!id || !requester) throw new Error('나만 우선 반영할 요청과 교사 이름을 확인해 주세요.');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_CHANGES_SHEET);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(String);
+  const idColumn = headers.indexOf('id');
+  const requesterColumn = headers.indexOf('requesterName');
+  const statusColumn = headers.indexOf('status');
+  const respondedColumn = headers.indexOf('respondedAt');
+  const responderColumn = headers.indexOf('responderName');
+  const updatedColumn = headers.indexOf('updatedAt');
+  const requesterAppliedColumn = headers.indexOf('requesterAppliedAt');
+  for (let index = 1; index < values.length; index++) {
+    if (String(values[index][idColumn]) !== id) continue;
+    if (String(values[index][requesterColumn]) !== requester) throw new Error('요청한 교사 본인만 나만 우선 반영할 수 있습니다.');
+    const currentStatus = String(values[index][statusColumn]);
+    if (['pending', 'held', 'rejected'].indexOf(currentStatus) < 0) throw new Error('나만 우선 반영할 수 없는 요청입니다.');
+    if (requesterAppliedColumn < 0) throw new Error('공유 서비스 업데이트가 필요합니다. 관리자에게 문의해 주세요.');
+    if (values[index][requesterAppliedColumn]) throw new Error('이미 나만 우선 반영된 요청입니다.');
+    const now = new Date().toISOString();
+    sheet.getRange(index + 1, requesterAppliedColumn + 1).setValue(now);
+    sheet.getRange(index + 1, updatedColumn + 1).setValue(now);
+    const changed = {};
+    headers.forEach(function(header, column) { changed[header] = values[index][column]; });
+    changed.requesterAppliedAt = now;
+    return timetableChangeObject_(changed);
+  }
+  throw new Error('나만 우선 반영할 요청을 찾을 수 없습니다.');
 }
 
 function cancelTimetableChange_(body) {

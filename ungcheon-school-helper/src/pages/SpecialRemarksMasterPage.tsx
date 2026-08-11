@@ -13,6 +13,7 @@ import {
   type TabCategory,
   type RemarkStudent,
 } from '../services/specialRemarks'
+import { canonicalStudentId } from '../services/studentId'
 
 const TAB_LIST: { id: TabCategory; label: string; short: string; color: string }[] = [
   { id: '교과세특',              label: '교과세특',           short: '교과',  color: 'violet' },
@@ -137,7 +138,10 @@ export default function SpecialRemarksMasterPage() {
 
   useEffect(() => {
     window.electron?.configGet(key).then(v => {
-      if (Array.isArray(v)) setStudents(v as RemarkStudent[])
+      if (Array.isArray(v)) setStudents((v as RemarkStudent[]).map(student => ({
+        ...student,
+        studentId: canonicalStudentId(student.studentId),
+      })))
       else setStudents([])
     }).catch(() => setStudents([]))
   }, [key])
@@ -150,8 +154,9 @@ export default function SpecialRemarksMasterPage() {
   }, [])
 
   const save = useCallback((next: RemarkStudent[]) => {
-    window.electron?.configSet(key, next)
-    setStudents(next)
+    const normalized = next.map(student => ({ ...student, studentId: canonicalStudentId(student.studentId) }))
+    window.electron?.configSet(key, normalized)
+    setStudents(normalized)
   }, [key])
 
   const handleCurriculumChange = (c: '2015' | '2022') => {
@@ -298,7 +303,7 @@ export default function SpecialRemarksMasterPage() {
         const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws)
         const imported: RemarkStudent[] = rows.map(row => ({
           id: makeId(),
-          studentId: String(row['학번'] ?? row['번호'] ?? ''),
+          studentId: canonicalStudentId(row['학번'] ?? row['번호'] ?? ''),
           name: String(row['이름'] ?? row['성명'] ?? ''),
           activity: String(row['활동내용'] ?? row['활동'] ?? ''),
           generatedRemark: String(row['특기사항'] ?? ''),
@@ -596,8 +601,11 @@ function StudentRow({ index, student, isGenerating, isCopied, targetLen, onUpdat
         <span className="text-xs font-bold text-slate-500 w-6 text-center">{index + 1}</span>
         <input
           value={student.studentId}
-          onChange={e => onUpdate(student.id, 'studentId', e.target.value)}
-          placeholder="학번"
+          onChange={e => {
+            const digits = e.target.value.replace(/\D/g, '').slice(0, 5)
+            onUpdate(student.id, 'studentId', digits.length === 5 ? canonicalStudentId(digits) : digits)
+          }}
+          placeholder="4자리 학번"
           className="w-20 bg-surface-700 border border-white/10 text-white text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
         />
         <input

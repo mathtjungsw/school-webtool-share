@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import clsx from 'clsx'
+import { canonicalStudentId, studentIdsMatch } from '../services/studentId'
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface ScoreStudent {
@@ -106,8 +107,8 @@ function parseFile(data: Uint8Array): ScoreStudent[] {
     let sid: string | null = null, sidC = -1
     for (let c = rng.s.c; c <= Math.min(rng.e.c, rng.s.c + 5); c++) {
       const v = cv(r, c)
-      if (typeof v === 'number' && !isNaN(v) && v > 100000) { sid = String(Math.round(v)); sidC = c; break }
-      if (typeof v === 'string' && /^\d{5,}$/.test(v.trim())) { sid = v.trim(); sidC = c; break }
+      if (typeof v === 'number' && Number.isInteger(v) && /^\d{4,8}$/.test(String(v))) { sid = canonicalStudentId(v); sidC = c; break }
+      if (typeof v === 'string' && /^\d{4,8}$/.test(v.trim())) { sid = canonicalStudentId(v); sidC = c; break }
     }
     if (!sid || sidC < 0) continue
     const name = String(cv(r, sidC + 2) ?? '').trim()
@@ -204,7 +205,8 @@ export default function ExamScorePage() {
   const viewList = useMemo(() => {
     const q = query.trim()
     if (!q) return students
-    return students.filter(s => s.name.includes(q) || s.id.includes(q) || s.classInfo.includes(q))
+    const isStudentIdQuery = /^\d{4,5}$/.test(q)
+    return students.filter(s => s.name.includes(q) || (isStudentIdQuery ? studentIdsMatch(s.id, q) : s.id.includes(q)) || s.classInfo.includes(q))
   }, [students, query])
 
   const grouped = useMemo(() => {
