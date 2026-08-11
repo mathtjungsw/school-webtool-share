@@ -617,7 +617,7 @@ function CalendarView({
               <select
                 value={form.committeeId}
                 onChange={event => setForm(current => ({ ...current, committeeId: event.target.value }))}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
+                className="committee-form-control w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
               >
                 <option value="">명단이 등록된 위원회 선택</option>
                 {available.map(committee => (
@@ -630,25 +630,25 @@ function CalendarView({
                 value={form.title}
                 onChange={event => setForm(current => ({ ...current, title: event.target.value }))}
                 placeholder="비워두면 위원회명이 표시됩니다"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
+                className="committee-form-control w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-indigo-400"
               />
             </Field>
             <div className="grid grid-cols-3 gap-2">
               <Field label="개최일">
-                <input type="date" value={form.date} onChange={event => setForm(current => ({ ...current, date: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-2 py-2.5 text-xs" />
+                <input type="date" value={form.date} onChange={event => setForm(current => ({ ...current, date: event.target.value }))} className="committee-form-control w-full rounded-xl border border-slate-200 px-2 py-2.5 text-xs" />
               </Field>
               <Field label="시작">
-                <input type="time" value={form.startTime} onChange={event => setForm(current => ({ ...current, startTime: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-2 py-2.5 text-xs" />
+                <input type="time" value={form.startTime} onChange={event => setForm(current => ({ ...current, startTime: event.target.value }))} className="committee-form-control w-full rounded-xl border border-slate-200 px-2 py-2.5 text-xs" />
               </Field>
               <Field label="종료">
-                <input type="time" value={form.endTime} onChange={event => setForm(current => ({ ...current, endTime: event.target.value }))} className="w-full rounded-xl border border-slate-200 px-2 py-2.5 text-xs" />
+                <input type="time" value={form.endTime} onChange={event => setForm(current => ({ ...current, endTime: event.target.value }))} className="committee-form-control w-full rounded-xl border border-slate-200 px-2 py-2.5 text-xs" />
               </Field>
             </div>
             <Field label="장소">
-              <input value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} placeholder="예: 본관 2층 회의실" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+              <input value={form.location} onChange={event => setForm(current => ({ ...current, location: event.target.value }))} placeholder="예: 본관 2층 회의실" className="committee-form-control w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
             </Field>
             <Field label="안건">
-              <textarea value={form.agenda} onChange={event => setForm(current => ({ ...current, agenda: event.target.value }))} rows={3} placeholder="주요 안건을 입력하세요" className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+              <textarea value={form.agenda} onChange={event => setForm(current => ({ ...current, agenda: event.target.value }))} rows={3} placeholder="주요 안건을 입력하세요" className="committee-form-control w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
             </Field>
             <div className="rounded-2xl bg-indigo-50 p-3">
               <p className="text-xs font-black text-indigo-800">알림 대상 {assignment?.members.length ?? 0}명</p>
@@ -694,7 +694,7 @@ function CalendarView({
             type="month"
             value={month}
             onChange={event => setMonth(event.target.value)}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold"
+            className="committee-form-control rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold"
           />
         </div>
         <MonthCalendar month={month} events={monthEvents} />

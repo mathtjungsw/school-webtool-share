@@ -39,6 +39,7 @@ const NAV: NavItem[] = [
   { id: 'attendance_print', label: '출석부 출력', icon: UsersRound },
   { id: 'student_locator', label: '학생 위치 찾기', icon: SearchCheck },
   { id: 'student_identity_audit', label: '학생 학번·이름 교정기', icon: ScanSearch },
+  { id: 'subject_remarks_print', label: '교과세특 개별 인쇄기', icon: ScrollText },
   { id: 'staff_roster', label: '교직원 명렬', icon: UsersRound },
   { id: 'committees', label: '각종 위원회 현황', icon: Landmark },
   { id: 'feature_requests', label: '기능개선 요청', icon: MessageSquareText },
@@ -79,6 +80,12 @@ function normalizeOrder(value: unknown) {
     if (appendedIndex >= 0) next.splice(appendedIndex, 1)
     const settingsIndex = next.indexOf('settings')
     next.splice(settingsIndex >= 0 ? settingsIndex + 1 : 0, 0, 'admin_center')
+  }
+  if (!known.includes('subject_remarks_print')) {
+    const appendedIndex = next.indexOf('subject_remarks_print')
+    if (appendedIndex >= 0) next.splice(appendedIndex, 1)
+    const studentAuditIndex = next.indexOf('student_identity_audit')
+    next.splice(studentAuditIndex >= 0 ? studentAuditIndex + 1 : next.length, 0, 'subject_remarks_print')
   }
   return next
 }

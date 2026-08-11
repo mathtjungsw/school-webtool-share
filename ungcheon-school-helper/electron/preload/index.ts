@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld('electron', {
   apiKeyDelete: (name: string) => ipcRenderer.invoke('apiKey:delete', name),
   apiKeyGetAll: (): Promise<Record<string, string>> => ipcRenderer.invoke('apiKey:getAll'),
 
+  // 교과세특 개별 인쇄기 (OS safeStorage 암호화 로컬 저장)
+  subjectRemarksSet: (value: string) => ipcRenderer.invoke('subjectRemarks:set', value),
+  subjectRemarksGet: (): Promise<string> => ipcRenderer.invoke('subjectRemarks:get'),
+  subjectRemarksClear: () => ipcRenderer.invoke('subjectRemarks:clear'),
+
   // Shell
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   openPath: (filePath: string) => ipcRenderer.invoke('shell:openPath', filePath),
@@ -66,6 +71,8 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('dialog:saveFile', defaultName, buffer),
   saveFilesToDir: (files: { name: string; bytes: number[] }[]) =>
     ipcRenderer.invoke('dialog:saveFilesToDir', files),
+  buildTimetablePlanHwp: (draft: unknown): Promise<number[]> =>
+    ipcRenderer.invoke('timetablePlan:buildHwp', draft),
 
   // Document parser (kordoc)
   parseDocument: (filePath: string) =>
@@ -101,6 +108,7 @@ contextBridge.exposeInMainWorld('electron', {
   // 웅천고 공지·부서별 공유 링크
   schoolHubRequest: (request: Record<string, unknown>) =>
     ipcRenderer.invoke('schoolHub:request', request),
+  schoolHubDiagnose: () => ipcRenderer.invoke('schoolHub:diagnose'),
 
   // Auto-launch
   getAutoLaunch: (): Promise<boolean> => ipcRenderer.invoke('app:getAutoLaunch'),
