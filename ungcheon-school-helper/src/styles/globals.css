@@ -446,7 +446,8 @@
 [data-theme="light"] [class*="text-fuchsia-"] { color: #5b21b6 !important; }
 [data-theme="light"] [class*="text-emerald-"],
 [data-theme="light"] [class*="text-green-"],
-[data-theme="light"] [class*="text-teal-"] { color: #065f46 !important; }
+[data-theme="light"] [class*="text-teal-"],
+[data-theme="light"] [class*="text-lime-"] { color: #365314 !important; }
 [data-theme="light"] [class*="text-amber-"],
 [data-theme="light"] [class*="text-yellow-"],
 [data-theme="light"] [class*="text-orange-"] { color: #78350f !important; }
@@ -468,7 +469,8 @@
 [data-theme="dark"] [class*="text-fuchsia-"] { color: #ddd6fe !important; }
 [data-theme="dark"] [class*="text-emerald-"],
 [data-theme="dark"] [class*="text-green-"],
-[data-theme="dark"] [class*="text-teal-"] { color: #a7f3d0 !important; }
+[data-theme="dark"] [class*="text-teal-"],
+[data-theme="dark"] [class*="text-lime-"] { color: #d9f99d !important; }
 [data-theme="dark"] [class*="text-amber-"],
 [data-theme="dark"] [class*="text-yellow-"],
 [data-theme="dark"] [class*="text-orange-"] { color: #fde68a !important; }
@@ -489,6 +491,21 @@
 [data-theme="light"] textarea::placeholder { color: #475569 !important; opacity: 1; }
 [data-theme="dark"] input::placeholder,
 [data-theme="dark"] textarea::placeholder { color: #cbd5e1 !important; opacity: 1; }
+
+/* 시간표의 색상 칸은 배경색과 무관하게 본문·보조정보를 또렷하게 표시한다. */
+[data-theme="light"] .timetable-cell-text,
+[data-theme="light"] .timetable-cell-text * {
+  color: #111827 !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+[data-theme="dark"] .timetable-cell-text,
+[data-theme="dark"] .timetable-cell-text * {
+  color: #f8fafc !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
 
 .volunteer-work-page input:not([type="checkbox"]):not([type="radio"]),
 .volunteer-work-page select,

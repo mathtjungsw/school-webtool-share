@@ -12,7 +12,6 @@ import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 import {
   clearSchoolHubSessionCache,
   getSchoolHubCacheStatus,
-  preloadSchoolHubCache,
 } from '../services/schoolHub'
 import {
   getNeisSyncStatus,
@@ -57,23 +56,12 @@ export default function UngcheonSettingsPage() {
   }, [])
 
   const save = async () => {
-    const hubChanged = isAdmin && draft.schoolHubUrl?.trim() !== config.schoolHubUrl?.trim()
-    await saveConfig(isAdmin ? draft : { ...draft, schoolHubUrl: config.schoolHubUrl })
-    if (hubChanged) {
-      clearSchoolHubSessionCache()
-      if (draft.schoolHubUrl?.trim()) void preloadSchoolHubCache(draft.teacherName ?? '')
-      setCacheStatus(getSchoolHubCacheStatus())
-    }
+    await saveConfig({ ...draft, schoolHubUrl: config.schoolHubUrl })
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }
 
   const testHub = async () => {
-    if (isAdmin) {
-      const hubChanged = draft.schoolHubUrl?.trim() !== config.schoolHubUrl?.trim()
-      await saveConfig({ schoolHubUrl: draft.schoolHubUrl?.trim() })
-      if (hubChanged) clearSchoolHubSessionCache()
-    }
     setHubStatus('testing')
     try {
       const result = await window.electron.schoolHubRequest({ action: 'health' }) as { ok?: boolean }
@@ -219,29 +207,15 @@ export default function UngcheonSettingsPage() {
 
       <Section icon={<Link2 size={17} />} title="학교 공유 서비스">
         <Field
-          label="Google Apps Script 웹 앱 URL"
-          help="공지와 부서별 공유 링크를 모든 교직원 PC에 동기화합니다. URL이 비어 있으면 공유 기능은 읽기 전용 안내 모드로 동작합니다."
+          label="웅천고 공유 서비스"
+          help="공지·명렬·시간표·업무 자료를 모든 교직원 PC에 동기화합니다."
         >
-          {!isAdmin && (
-            <p className="mb-2 flex items-center gap-1.5 text-xs text-amber-400">
-              <LockKeyhole size={12} />
-              사용자 모드에서는 주소를 변경할 수 없습니다. 관리자 모드에서만 수정할 수 있습니다.
+          <div className="flex flex-col gap-3 rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="flex items-center gap-2 text-xs font-semibold text-slate-300">
+              <LockKeyhole size={14} className="text-emerald-400" />
+              공유 서비스 주소가 프로그램에 안전하게 내장되어 있으며 사용자가 변경할 수 없습니다.
             </p>
-          )}
-          <div className="flex gap-2">
-            <input
-              className={`flex-1 ${!isAdmin ? 'cursor-not-allowed opacity-65' : ''}`}
-              value={draft.schoolHubUrl ?? ''}
-              readOnly={!isAdmin}
-              aria-readonly={!isAdmin}
-              onChange={e => {
-                if (!isAdmin) return
-                setDraft({ ...draft, schoolHubUrl: e.target.value })
-                setHubStatus('idle')
-              }}
-              placeholder="https://script.google.com/macros/s/.../exec"
-            />
-            <button onClick={testHub} disabled={!draft.schoolHubUrl || hubStatus === 'testing'} className="btn-ghost px-4">
+            <button onClick={testHub} disabled={hubStatus === 'testing'} className="btn-ghost shrink-0 px-4">
               {hubStatus === 'testing' ? '확인 중' : '연결 확인'}
             </button>
           </div>

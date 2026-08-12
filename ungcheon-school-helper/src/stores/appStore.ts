@@ -92,7 +92,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   saveConfig: async (patch) => {
     if (!window.electron) return
-    const newCfg = { ...get().config, ...patch }
+    const newCfg = {
+      ...get().config,
+      ...patch,
+      // 학교 공유 서비스 주소는 웅천고 전용 고정값이며 환경설정으로 변경하지 않는다.
+      schoolHubUrl: UNGCHEON_DEFAULT_CONFIG.schoolHubUrl,
+    }
 
     // API 키는 safeStorage로 분리 저장
     const API_KEY_FIELDS = ['neisApiKey'] as const
@@ -133,12 +138,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     // API 키는 safeStorage에서 별도 로드 (없으면 기존 plain 값 유지 — 마이그레이션)
     const apiKeys = await window.electron.apiKeyGetAll()
-    const cfg: AppConfig = { ...UNGCHEON_DEFAULT_CONFIG, ...nested, ...apiKeys } as AppConfig
-    // 일부 구버전 PC는 학교 기본정보만 있고 공유 URL만 빈 상태로 남아 있었다.
-    // 로그인과 공용 자료 조회가 막히지 않도록 웅천고 기본 URL을 자동 복구한다.
-    if (!cfg.schoolHubUrl?.trim()) {
-      cfg.schoolHubUrl = UNGCHEON_DEFAULT_CONFIG.schoolHubUrl
-    }
+    const cfg: AppConfig = {
+      ...UNGCHEON_DEFAULT_CONFIG,
+      ...nested,
+      ...apiKeys,
+      schoolHubUrl: UNGCHEON_DEFAULT_CONFIG.schoolHubUrl,
+    } as AppConfig
     // 기존 기본값(true)이 저장된 PC도 이번 업데이트에서 한 번만 꺼짐으로 전환한다.
     // 이후 사용자가 켜거나 끈 선택은 그대로 유지된다.
     if (applyNeisDefaultOff) cfg.showNeisSchedule = false
@@ -152,7 +157,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         patch[`config.${key}`] = value
       }
     }
-    if (!String(nested.schoolHubUrl ?? '').trim()) {
+    if (nested.schoolHubUrl !== UNGCHEON_DEFAULT_CONFIG.schoolHubUrl) {
       patch['config.schoolHubUrl'] = UNGCHEON_DEFAULT_CONFIG.schoolHubUrl
     }
     if (applyNeisDefaultOff) {

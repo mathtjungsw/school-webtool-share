@@ -34,11 +34,9 @@ const execFileAsync = promisify(execFile)
 
 const store = new Store()
 
-// 과거 설치본에서 학교 코드만 저장되고 공유 URL이 누락된 경우가 있었다.
-// 로그인 전에 메인 프로세스가 기본 URL을 복구해 사용자별 재입력을 없앤다.
-if (!String(store.get('config.schoolHubUrl', '')).trim()) {
-  store.set('config.schoolHubUrl', UNGCHEON_SCHOOL_HUB_URL)
-}
+// 웅천고 전용 공유 주소는 프로그램에 내장한다. 과거 PC에 다른 주소가 저장되어
+// 있어도 시작할 때 고정 주소로 덮어써 사용자가 수정할 필요가 없게 한다.
+store.set('config.schoolHubUrl', UNGCHEON_SCHOOL_HUB_URL)
 
 let mainWindow: BrowserWindow | null = null
 
@@ -871,21 +869,31 @@ async function fetchSchoolHub(
       url.searchParams.set('action', action)
       url.searchParams.set('payload', JSON.stringify(payload))
       url.searchParams.set('_', String(Date.now()))
-      return await net.fetch(url.toString(), {
+      const options = {
         method: 'GET',
         signal: controller.signal,
         redirect: 'follow',
         headers: { 'Cache-Control': 'no-cache' },
-      })
+      } as const
+      const response = await net.fetch(url.toString(), options)
+      if (response.status !== 404 && response.status !== 405) return response
+      // Electron 네트워크 계층에서 Google 리디렉션이 404로 캐시된 경우가 있어
+      // Node 네트워크 계층으로 동일한 고정 주소를 한 번 더 확인한다.
+      try { return await fetch(url.toString(), options) }
+      catch { return response }
     }
 
-    return await net.fetch(endpoint, {
+    const options = {
       method: 'POST',
       signal: controller.signal,
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': 'no-cache' },
       body: JSON.stringify(payload),
-    })
+    } as const
+    const response = await net.fetch(endpoint, options)
+    if (!HUB_READ_ACTIONS.has(action) || (response.status !== 404 && response.status !== 405)) return response
+    try { return await fetch(endpoint, options) }
+    catch { return response }
   } finally {
     clearTimeout(timer)
   }

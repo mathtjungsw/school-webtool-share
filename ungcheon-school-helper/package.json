@@ -1,6 +1,6 @@
 {
   "name": "ungcheon-school-helper",
-  "version": "1.1.10-preview.3",
+  "version": "1.1.10-preview.4",
   "description": "웅천고등학교 교직원을 위한 통합 업무 지원 프로그램",
   "main": "out/main/index.js",
   "author": "웅천고등학교",

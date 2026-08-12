@@ -480,8 +480,9 @@ function VerificationTab() {
       const result = await buildComparison(nextFiles, currentRoster)
       setComparison(result)
       const stillUnclassified = result.unclassified.some(item => item.correctionTarget?.sourceId === target.sourceId && item.correctionTarget.formIndex === target.formIndex && item.correctionTarget.participantIndex === target.participantIndex)
-      setSelectedClass(stillUnclassified ? 'unclassified' : `${nextId[0]}-${Number(nextId[1])}`)
-      setMessage(stillUnclassified ? '수정 내용이 학생 명렬과 아직 일치하지 않습니다. 학번과 이름을 다시 확인해 주세요.' : `${nextId} ${nextName} 학생으로 수기 수정했고 해당 반 탭으로 이동했습니다.`)
+      // 여러 OCR 오류를 연속으로 고칠 수 있도록 성공 여부와 관계없이 미분류 탭을 유지한다.
+      setSelectedClass('unclassified')
+      setMessage(stillUnclassified ? '수정 내용이 학생 명렬과 아직 일치하지 않습니다. 학번과 이름을 다시 확인해 주세요.' : `${nextId} ${nextName} 학생으로 수기 수정했습니다. 계속 수정할 수 있도록 미분류 탭을 유지합니다.`)
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
     finally { setBusy(false) }
   }

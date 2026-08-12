@@ -88,6 +88,22 @@ interface DashboardScheduleEvent {
   taskId?: string
 }
 
+type DashboardScheduleSource = DashboardScheduleEvent['source']
+type DashboardSourceVisibility = Record<Exclude<DashboardScheduleSource, 'neis'>, boolean>
+
+const DEFAULT_DASHBOARD_SOURCE_VISIBILITY: DashboardSourceVisibility = {
+  weekly: true,
+  creative: true,
+  schoolEvent: true,
+  committee: true,
+  sharedWork: true,
+  personal: true,
+  gateDuty: true,
+  mealDuty: true,
+  timetableChange: true,
+  pulledLesson: true,
+}
+
 const PORTFOLIO_GROUPS: PortfolioGroup[] = [
   { group: '학사·기록', color: 'amber', items: [
     { id: 'timetable_swap', label: '교환·대강 계획', icon: Shuffle, desc: '후보 시간표·연강 확인과 계획서 출력' },
@@ -281,6 +297,25 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const [error, setError] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
   const showNeis = config.showNeisSchedule !== false
+  const [scheduleSourceVisibility, setScheduleSourceVisibility] = useState<DashboardSourceVisibility>(DEFAULT_DASHBOARD_SOURCE_VISIBILITY)
+
+  useEffect(() => {
+    window.electron?.configGet('dashboard.scheduleSources.v1').then(saved => {
+      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return
+      setScheduleSourceVisibility({
+        ...DEFAULT_DASHBOARD_SOURCE_VISIBILITY,
+        ...(saved as Partial<DashboardSourceVisibility>),
+      })
+    }).catch(() => undefined)
+  }, [])
+
+  const toggleScheduleSource = useCallback((source: keyof DashboardSourceVisibility, visible: boolean) => {
+    setScheduleSourceVisibility(current => {
+      const next = { ...current, [source]: visible }
+      void window.electron?.configSet('dashboard.scheduleSources.v1', next)
+      return next
+    })
+  }, [])
 
   // ── 학교 날씨 (오늘 날씨 / 이후 기간 예보 카드가 공유) ──
   const { data: weather, loading: weatherLoading, displayName: weatherPlace } = useWeather(config.schoolAddress)
@@ -599,7 +634,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
 
   const isToday = selectedDate === todayStr()
   const selYmd = toYmd(selectedDate)
-  const combinedSchedule: DashboardScheduleEvent[] = [
+  const allCombinedSchedule: DashboardScheduleEvent[] = [
     ...(showNeis ? schedule : []).map(item => ({
       date: item.date,
       eventName: item.eventName,
@@ -656,6 +691,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       source: 'pulledLesson' as const,
     })),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.eventName.localeCompare(b.eventName))
+  const combinedSchedule = allCombinedSchedule.filter(event => event.source === 'neis'
+    ? showNeis
+    : scheduleSourceVisibility[event.source])
   const upcomingCommitteeEvents = committeeEvents
     .filter(item => item.date >= todayStr() && item.date <= format(addDays(new Date(), 7), 'yyyy-MM-dd'))
     .sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`))
@@ -820,6 +858,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                     onOpenCalendar={() => onNavigate('calendar')}
                     showNeis={showNeis}
                     onToggleNeis={value => void saveConfig({ showNeisSchedule: value })}
+                    sourceVisibility={scheduleSourceVisibility}
+                    onToggleSource={toggleScheduleSource}
                     creativeScheduleError={creativeScheduleError}
                   />
                 )}
@@ -1041,6 +1081,8 @@ function TwoWeekScheduleCalendar({
   onOpenCalendar,
   showNeis,
   onToggleNeis,
+  sourceVisibility,
+  onToggleSource,
   creativeScheduleError,
 }: {
   selectedDate: string
@@ -1055,6 +1097,8 @@ function TwoWeekScheduleCalendar({
   onOpenCalendar: () => void
   showNeis: boolean
   onToggleNeis: (value: boolean) => void
+  sourceVisibility: DashboardSourceVisibility
+  onToggleSource: (source: keyof DashboardSourceVisibility, visible: boolean) => void
   creativeScheduleError: string
 }) {
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
@@ -1115,20 +1159,20 @@ function TwoWeekScheduleCalendar({
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3 text-[10px]">
-          <span className={clsx('calendar-legend-text flex items-center gap-1', neisConfigured ? 'text-violet-300' : 'text-slate-600')}><span className="h-2 w-2 rounded-full bg-violet-400" />NEIS 학사일정</span>
-          <span className="calendar-legend-text flex items-center gap-1 text-sky-300"><span className="h-2 w-2 rounded-full bg-sky-400" />주간계획</span>
-          <span className="calendar-legend-text flex items-center gap-1 text-teal-300"><span className="h-2 w-2 rounded-full bg-teal-400" />창체</span>
-          <span className="calendar-legend-text flex items-center gap-1 text-indigo-300"><span className="h-2 w-2 rounded-full bg-indigo-400" />창체 학사일정</span>
-          <span className="calendar-legend-text flex items-center gap-1 text-amber-300"><span className="h-2 w-2 rounded-full bg-amber-400" />내 위원회</span>
-          <span className="calendar-legend-text flex items-center gap-1 text-fuchsia-300"><span className="h-2 w-2 rounded-full bg-fuchsia-400" />공유 업무</span>
-          <span className="calendar-legend-text flex items-center gap-1 text-emerald-300"><span className="h-2 w-2 rounded-full bg-emerald-400" />개인 업무</span>
-          <span className="calendar-legend-text flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-cyan-500" />등교지도</span>
-          <span className="calendar-legend-text flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500" />급식지도</span>
-          <span className="calendar-legend-text flex items-center gap-1 text-fuchsia-300"><span className="h-2 w-2 rounded-full bg-fuchsia-400" />수업변경</span>
-          <span className="calendar-legend-text flex items-center gap-1 text-lime-300"><span className="h-2 w-2 rounded-full bg-lime-500" />당김수업</span>
+        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+          <ScheduleSourceToggle label="NEIS 학사일정" checked={showNeis} disabled={!neisConfigured} dot="bg-violet-400" tone="text-violet-300" onChange={onToggleNeis} />
+          <ScheduleSourceToggle label="주간계획" checked={sourceVisibility.weekly} dot="bg-sky-400" tone="text-sky-300" onChange={value => onToggleSource('weekly', value)} />
+          <ScheduleSourceToggle label="창체" checked={sourceVisibility.creative} dot="bg-teal-400" tone="text-teal-300" onChange={value => onToggleSource('creative', value)} />
+          <ScheduleSourceToggle label="창체 학사일정" checked={sourceVisibility.schoolEvent} dot="bg-indigo-400" tone="text-indigo-300" onChange={value => onToggleSource('schoolEvent', value)} />
+          <ScheduleSourceToggle label="내 위원회" checked={sourceVisibility.committee} dot="bg-amber-400" tone="text-amber-300" onChange={value => onToggleSource('committee', value)} />
+          <ScheduleSourceToggle label="공유 업무" checked={sourceVisibility.sharedWork} dot="bg-fuchsia-400" tone="text-fuchsia-300" onChange={value => onToggleSource('sharedWork', value)} />
+          <ScheduleSourceToggle label="개인 업무" checked={sourceVisibility.personal} dot="bg-emerald-400" tone="text-emerald-300" onChange={value => onToggleSource('personal', value)} />
+          <ScheduleSourceToggle label="등교지도" checked={sourceVisibility.gateDuty} dot="bg-cyan-500" onChange={value => onToggleSource('gateDuty', value)} />
+          <ScheduleSourceToggle label="급식지도" checked={sourceVisibility.mealDuty} dot="bg-orange-500" onChange={value => onToggleSource('mealDuty', value)} />
+          <ScheduleSourceToggle label="수업변경" checked={sourceVisibility.timetableChange} dot="bg-fuchsia-400" tone="text-fuchsia-300" onChange={value => onToggleSource('timetableChange', value)} />
+          <ScheduleSourceToggle label="당김수업" checked={sourceVisibility.pulledLesson} dot="bg-lime-500" tone="text-lime-300" onChange={value => onToggleSource('pulledLesson', value)} />
         </div>
-        <div className="flex items-center gap-2"><label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-violet-400/15 bg-violet-500/5 px-2 py-1 text-[10px] text-violet-200"><input type="checkbox" checked={showNeis} onChange={event => onToggleNeis(event.target.checked)} />NEIS 학사일정 켜기</label><button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />월간 캘린더<ArrowUpRight size={11} /></button></div>
+        <button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />월간 캘린더<ArrowUpRight size={11} /></button>
       </div>
 
       {!neisConfigured && (
@@ -1202,6 +1246,13 @@ function TwoWeekScheduleCalendar({
       {!weeklyPlanError && sourceSheetCount > 0 && <p className="mt-2 text-[9px] text-slate-600">교무기획부 주간계획 {sourceSheetCount}개 시트 자동 반영</p>}
     </div>
   )
+}
+
+function ScheduleSourceToggle({ label, checked, dot, tone = '', disabled = false, onChange }: { label: string; checked: boolean; dot: string; tone?: string; disabled?: boolean; onChange: (checked: boolean) => void }) {
+  return <label className={clsx('calendar-legend-text flex cursor-pointer items-center gap-1 rounded-lg border px-1.5 py-1 transition-opacity', checked ? 'border-white/10 bg-white/5' : 'border-transparent opacity-45', tone, disabled && 'cursor-not-allowed opacity-35')}>
+    <input type="checkbox" className="h-3 w-3 accent-violet-500" checked={checked} disabled={disabled} onChange={event => onChange(event.target.checked)} />
+    <span className={clsx('h-2 w-2 rounded-full', dot)} />{label}
+  </label>
 }
 
 function SharedTasksWidget({
@@ -1853,7 +1904,7 @@ function WeekGrid({ weekDates, DAY, todayYmd, currentPeriod, periodRanges = [], 
                   )
                   return (
                     <td key={d} className={clsx(
-                      'py-1 text-center leading-tight rounded-sm',
+                      'timetable-cell-text py-1 text-center leading-tight rounded-sm',
                       cell.colorClass,
                       isIntersection ? 'ring-2 ring-inset ring-intersection' : '',
                     )}>
