@@ -11,7 +11,7 @@ import {
   buildVolunteerRosterTemplate, compareVolunteerRosterSources, createVolunteerRow, emptyVolunteerDraft,
   parseNeisVolunteerWorkbook, parseRosterPaste, parseRosterWorkbook, validateIssuanceDraft, volunteerStudentId,
   type StoredVolunteerHwp, type StoredVolunteerNeisDataset, type VolunteerCertificateDraft,
-  type VolunteerRosterComparisonResult, type VolunteerRosterComparisonRow, type VolunteerStudentRow,
+  type ParsedVolunteerForm, type ParsedVolunteerParticipant, type VolunteerRosterComparisonResult, type VolunteerRosterComparisonRow, type VolunteerStudentRow,
 } from '../services/volunteerWork'
 
 const DRAFT_KEY = 'ungcheon.volunteer.certificateDraft.v1'
@@ -193,6 +193,8 @@ function VerificationTab() {
   const [selectedClass, setSelectedClass] = useState('all')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [editingFile, setEditingFile] = useState<StoredVolunteerHwp | null>(null)
+  const [editingForms, setEditingForms] = useState<ParsedVolunteerForm[]>([])
 
   const refresh = async () => {
     const items = await window.electron.listVolunteerHwp()
@@ -210,7 +212,7 @@ function VerificationTab() {
   useEffect(() => { localStorage.setItem(NEIS_DATASETS_KEY, JSON.stringify(neisDatasets)) }, [neisDatasets])
 
   const importHwp = async () => {
-    const paths = await window.electron.openFilesDialog([{ name: '봉사활동 확인서', extensions: ['hwp'] }])
+    const paths = await window.electron.openFilesDialog([{ name: '봉사활동 확인서(HWP·PDF)', extensions: ['hwp', 'pdf'] }])
     if (!paths.length) return
     setBusy(true)
     try {
@@ -224,15 +226,58 @@ function VerificationTab() {
           ? confirm(`동일한 확인서 파일이 이미 등록되어 있습니다.\n\n기존 파일: ${duplicate.originalName}\n추가 파일: ${fileNameFromPath(path)}\n\n그래도 중복 등록하시겠습니까? 등록하면 검증 결과의 중복 자료에 표시됩니다.`)
           : false
         if (duplicate && !allowDuplicate) { skipped += 1; continue }
+        if (path.toLowerCase().endsWith('.pdf')) {
+          setMessage(`PDF 문서 형식을 확인하고 있습니다: ${fileNameFromPath(path)}\n스캔 문서이면 이 PC에서 오프라인 OCR을 실행하므로 페이지당 수 초가 걸릴 수 있습니다.`)
+        }
         const stored = await window.electron.importVolunteerHwp(path, allowDuplicate)
         current.push(stored)
         added += 1
       }
       await refresh()
       setComparison(null)
-      setMessage(`${added}개 HWP를 이 PC의 검증용 보관함에 추가했습니다.${skipped ? ` 중복 등록을 취소한 ${skipped}개는 건너뛰었습니다.` : ''}`)
+      setMessage(`${added}개 확인서를 이 PC의 검증용 보관함에 추가했습니다.${skipped ? ` 중복 등록을 취소한 ${skipped}개는 건너뛰었습니다.` : ''}`)
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
     finally { setBusy(false) }
+  }
+
+  const editOcr = async (file: StoredVolunteerHwp) => {
+    setBusy(true)
+    try {
+      setEditingForms(await window.electron.parseVolunteerHwp(file.id))
+      setEditingFile(file)
+    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    finally { setBusy(false) }
+  }
+
+  const saveOcr = async () => {
+    if (!editingFile) return
+    setBusy(true)
+    try {
+      await window.electron.updateVolunteerForms(editingFile.id, editingForms)
+      await refresh()
+      setEditingFile(null)
+      setEditingForms([])
+      setComparison(null)
+      setMessage('PDF OCR 확인 결과를 이 PC의 로컬 보관함에 저장했습니다.')
+    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    finally { setBusy(false) }
+  }
+
+  const alignOcrNamesWithRoster = async () => {
+    const currentRoster = roster || await loadRoster(true)
+    if (!currentRoster?.students.length) { setMessage('서버 학생 명렬을 불러오지 못했습니다.'); return }
+    const names = new Map(currentRoster.students.map(student => [volunteerStudentId(student.studentId), student.name]))
+    let changed = 0
+    setEditingForms(current => current.map(form => ({
+      ...form,
+      participants: form.participants.map(student => {
+        const expected = names.get(volunteerStudentId(student.studentId))
+        if (!expected || expected === student.name) return student
+        changed += 1
+        return { ...student, name: expected }
+      }),
+    })))
+    setMessage(`OCR 이름 ${changed}건을 서버 학생 명렬의 학번 기준으로 맞췄습니다. 원본 PDF와 한 번 더 확인한 뒤 저장해 주세요.`)
   }
 
   const importNeis = async () => {
@@ -270,7 +315,7 @@ function VerificationTab() {
   }
 
   const verify = async () => {
-    if (!files.length) { setMessage('먼저 확인서 HWP 파일을 한 개 이상 추가해 주세요.'); return }
+    if (!files.length) { setMessage('먼저 확인서 HWP 또는 PDF 파일을 한 개 이상 추가해 주세요.'); return }
     if (!neisDatasets.length) { setMessage('먼저 나이스 XLS data 파일을 한 개 이상 누적해 주세요.'); return }
     setBusy(true)
     try {
@@ -337,17 +382,22 @@ function VerificationTab() {
           </div>
           <p className="mt-3 text-xs font-semibold text-slate-600 dark:text-slate-300">원본 Excel은 복사하지 않고 검증에 필요한 학번·이름·봉사 기록만 이 PC의 앱 저장소에 보관합니다.</p>
         </Panel>
-        <Panel title="2. 확인서 HWP 누적 보관함" subtitle="넣어 둔 모든 확인서를 한꺼번에 검증하며, 직접 삭제하기 전까지 이 PC에 보관됩니다.">
-          <div className="flex flex-wrap gap-2"><ActionButton onClick={importHwp} icon={<FilePlus2 size={15} />} disabled={busy}>HWP 추가</ActionButton><ActionButton onClick={refresh} icon={<RefreshCw size={15} />}>목록 새로고침</ActionButton></div>
+        <Panel title="2. 확인서 HWP·PDF 누적 보관함" subtitle="텍스트 PDF는 글자를 직접 읽고, 스캔 PDF만 포함된 한국어 오프라인 OCR로 처리합니다.">
+          <div className="flex flex-wrap gap-2"><ActionButton onClick={importHwp} icon={<FilePlus2 size={15} />} disabled={busy}>확인서 추가(HWP·PDF)</ActionButton><ActionButton onClick={refresh} icon={<RefreshCw size={15} />}>목록 새로고침</ActionButton></div>
           <div className="mt-3 rounded-xl border border-blue-300 bg-blue-50 p-3 text-xs font-bold text-blue-950 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-100"><HardDrive size={15} className="mr-1 inline" />앱 전용 로컬 복사본만 보관합니다. 구글시트·학교 공유 서버에는 파일명이나 내용도 보내지 않습니다.</div>
-          <p className="mt-3 text-sm font-bold">누적: <span className="text-emerald-700 dark:text-emerald-300">{files.length}개 HWP · {files.reduce((sum, file) => sum + file.formCount, 0)}개 확인서</span></p>
+          <p className="mt-3 text-sm font-bold">누적: <span className="text-emerald-700 dark:text-emerald-300">{files.length}개 파일 · {files.reduce((sum, file) => sum + file.formCount, 0)}개 확인서</span></p>
         </Panel>
       </div>
 
       <Panel title="보관된 확인서 목록" subtitle="목록에 있는 모든 파일이 전체 누적 검증 대상입니다.">
-        <div className="space-y-2">{files.map(file => <div key={file.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 md:flex-row md:items-center dark:border-slate-700"><div className="min-w-0 flex-1"><b className="block truncate">{file.originalName}</b><small className="font-semibold text-slate-600 dark:text-slate-300">{file.formCount}개 확인서 · {file.activities.join(', ') || '활동명 확인 필요'} · {(file.size / 1024).toFixed(0)}KB</small></div><div className="flex gap-2"><button onClick={() => window.electron.openVolunteerHwp(file.id)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold dark:border-slate-600"><FolderOpen size={14} className="mr-1 inline" />열기</button><button onClick={() => remove(file.id)} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-bold text-rose-700 dark:border-rose-700 dark:text-rose-300"><Trash2 size={14} className="mr-1 inline" />로컬 복사본 삭제</button></div></div>)}</div>
-        {!files.length && <p className="py-8 text-center text-sm font-bold text-slate-600 dark:text-slate-300">보관된 HWP가 없습니다. 위의 `HWP 추가`를 눌러 주세요.</p>}
+        <div className="space-y-2">{files.map(file => <div key={file.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 md:flex-row md:items-center dark:border-slate-700"><div className="min-w-0 flex-1"><b className="block truncate">{file.originalName}</b><small className="font-semibold text-slate-600 dark:text-slate-300">{file.formCount}개 확인서 · {file.fileType === 'pdf' ? `${file.pageCount || file.formCount}쪽 · ${file.analysisMode === 'ocr' ? '오프라인 OCR' : file.analysisMode === 'mixed' ? '텍스트+OCR' : '텍스트 직접 추출'}${file.averageConfidence != null ? ` · 평균 신뢰도 ${file.averageConfidence}%` : ''}` : 'HWP 직접 분석'} · {(file.size / 1024).toFixed(0)}KB</small>{Boolean(file.warnings?.length) && <small className="mt-1 block font-bold text-amber-700 dark:text-amber-300">확인 필요 {file.warnings!.length}건</small>}</div><div className="flex flex-wrap gap-2">{file.fileType === 'pdf' && <button onClick={() => void editOcr(file)} className="rounded-lg border border-amber-400 px-3 py-2 text-xs font-bold text-amber-800 dark:text-amber-200">OCR 결과 확인·수정</button>}<button onClick={() => window.electron.openVolunteerHwp(file.id)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold dark:border-slate-600"><FolderOpen size={14} className="mr-1 inline" />열기</button><button onClick={() => remove(file.id)} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-bold text-rose-700 dark:border-rose-700 dark:text-rose-300"><Trash2 size={14} className="mr-1 inline" />로컬 복사본 삭제</button></div></div>)}</div>
+        {!files.length && <p className="py-8 text-center text-sm font-bold text-slate-600 dark:text-slate-300">보관된 확인서가 없습니다. 위의 `확인서 추가(HWP·PDF)`를 눌러 주세요.</p>}
       </Panel>
+
+      {editingFile && <Panel title={`OCR 결과 확인·수정 · ${editingFile.originalName}`} subtitle="서버 학생 명렬과 대조하기 전에 스캔 인식 결과를 확인합니다. 수정 내용은 이 PC의 로컬 복사본에만 저장됩니다.">
+        <div className="max-h-[520px] space-y-4 overflow-y-auto pr-2">{editingForms.map((form, formIndex) => <div key={form.formIndex} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><div className="grid gap-2 md:grid-cols-3"><label className="text-xs font-bold">활동 내용<input className="input-field mt-1 w-full" value={form.activityContent} onChange={event => setEditingForms(current => current.map((item, index) => index === formIndex ? { ...item, activityContent: event.target.value, activityName: event.target.value } : item))} /></label><label className="text-xs font-bold">활동일<input type="date" className="input-field mt-1 w-full" value={form.startDate} onChange={event => setEditingForms(current => current.map((item, index) => index === formIndex ? { ...item, startDate: event.target.value, endDate: event.target.value } : item))} /></label><p className="self-end pb-2 text-sm font-black">{form.formIndex + 1}쪽 · {form.participants.length}명 인식</p></div><div className="mt-3 overflow-x-auto"><table className="w-full min-w-[640px] text-sm"><thead><tr className="bg-slate-100 dark:bg-slate-800"><th className="p-2">학번</th><th className="p-2">이름</th><th className="p-2">시간</th><th className="p-2">비고</th></tr></thead><tbody>{form.participants.map((student, studentIndex) => <tr key={`${student.studentId}-${studentIndex}`} className="border-t border-slate-200 dark:border-slate-700"><td className="p-1"><input className="input-field w-full text-center" value={student.studentId} onChange={event => updateOcrStudent(setEditingForms, formIndex, studentIndex, { studentId: event.target.value })} /></td><td className="p-1"><input className="input-field w-full" value={student.name} onChange={event => updateOcrStudent(setEditingForms, formIndex, studentIndex, { name: event.target.value })} /></td><td className="p-1"><input className="input-field w-full text-center" value={student.hours ?? ''} onChange={event => updateOcrStudent(setEditingForms, formIndex, studentIndex, { hours: event.target.value ? Number(event.target.value) : null })} /></td><td className="p-1"><input className="input-field w-full" value={student.remarks} onChange={event => updateOcrStudent(setEditingForms, formIndex, studentIndex, { remarks: event.target.value })} /></td></tr>)}</tbody></table></div></div>)}</div>
+        <div className="mt-4 flex flex-wrap justify-end gap-2"><button onClick={() => void alignOcrNamesWithRoster()} className="rounded-xl border border-blue-400 px-4 py-2 font-bold text-blue-800 dark:text-blue-200">학번 기준 명렬 이름 맞춤</button><button onClick={() => { setEditingFile(null); setEditingForms([]) }} className="rounded-xl border border-slate-300 px-4 py-2 font-bold dark:border-slate-600">취소</button><button onClick={() => void saveOcr()} disabled={busy} className="rounded-xl bg-emerald-600 px-5 py-2 font-black text-white disabled:opacity-50">확인 결과 저장</button></div>
+      </Panel>}
 
       <div className="flex flex-col items-stretch gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:flex-row md:items-center dark:border-slate-700 dark:bg-slate-900">
         <div className="flex-1"><p className="font-black">3. 활동 내용·시간 전체 검증</p><p className="text-sm font-semibold text-slate-600 dark:text-slate-300">학생마다 나이스와 확인서의 봉사활동을 여러 행으로 펼쳐 내용과 시간을 일대일로 맞춥니다. 확인서 학번·이름은 서버 학생 명렬로 검증합니다.</p><div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold"><span className={clsx('rounded-full px-2.5 py-1', roster?.students.length ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/50 dark:text-emerald-100' : 'bg-amber-100 text-amber-950 dark:bg-amber-900/50 dark:text-amber-100')}>서버 학생 명렬: {roster?.students.length ? `${roster.students.length}명 불러옴` : rosterLoading ? '불러오는 중…' : '확인 필요'}</span><button onClick={() => void loadRoster(true)} disabled={rosterLoading} className="rounded-full border border-slate-300 px-2.5 py-1 dark:border-slate-600"><RefreshCw size={12} className={clsx('mr-1 inline', rosterLoading && 'animate-spin')} />명렬 새로고침</button></div></div>
@@ -407,6 +457,18 @@ function fileNameFromPath(path: string) {
 
 function classFilterClass(active: boolean, danger = false) {
   return clsx('rounded-full border px-3 py-1.5 text-sm font-black', active ? danger ? 'border-rose-700 bg-rose-700 text-white dark:border-rose-300 dark:bg-rose-300 dark:text-slate-950' : 'border-emerald-700 bg-emerald-700 text-white dark:border-emerald-300 dark:bg-emerald-300 dark:text-slate-950' : danger ? 'border-rose-300 bg-white text-rose-800 dark:border-rose-700 dark:bg-slate-900 dark:text-rose-200' : 'border-slate-300 bg-white text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100')
+}
+
+function updateOcrStudent(
+  setForms: React.Dispatch<React.SetStateAction<ParsedVolunteerForm[]>>,
+  formIndex: number,
+  studentIndex: number,
+  patch: Partial<ParsedVolunteerParticipant>,
+) {
+  setForms(current => current.map((form, currentFormIndex) => currentFormIndex === formIndex ? {
+    ...form,
+    participants: form.participants.map((student, currentStudentIndex) => currentStudentIndex === studentIndex ? { ...student, ...patch } : student),
+  } : form))
 }
 
 function Panel({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {

@@ -26,7 +26,9 @@ import {
   listVolunteerHwpFiles,
   resolveVolunteerHwpPath,
   storeGeneratedVolunteerHwp,
+  updateVolunteerDocumentForms,
 } from './volunteer-storage'
+import { parseVolunteerPdfFile } from './volunteer-pdf'
 
 const execFileAsync = promisify(execFile)
 
@@ -198,17 +200,32 @@ ipcMain.handle('volunteer:storeGeneratedHwp', (_, name: string, bytes: number[])
   })
 })
 
-ipcMain.handle('volunteer:importHwp', (_, filePath: string, allowDuplicate = false) => {
+ipcMain.handle('volunteer:importHwp', async (_, filePath: string, allowDuplicate = false) => {
   const abs = pathResolve(filePath)
-  const forms = parseVolunteerHwpFile(abs)
+  const isPdf = abs.toLowerCase().endsWith('.pdf')
+  const parsed = isPdf ? await parseVolunteerPdfFile(abs) : null
+  const forms = parsed?.forms || parseVolunteerHwpFile(abs)
   return importVolunteerHwpFile(abs, {
     formCount: forms.length,
     activities: forms.map(form => form.activityName),
+    fileType: isPdf ? 'pdf' : 'hwp',
+    pageCount: parsed?.pageCount,
+    analysisMode: parsed?.analysisMode || 'hwp',
+    averageConfidence: parsed?.averageConfidence,
+    warnings: parsed?.warnings || [],
+    forms: isPdf ? forms : undefined,
   }, Boolean(allowDuplicate))
 })
 
 ipcMain.handle('volunteer:listHwp', () => listVolunteerHwpFiles())
-ipcMain.handle('volunteer:parseHwp', (_, id: string) => parseVolunteerHwpFile(resolveVolunteerHwpPath(String(id)).path))
+ipcMain.handle('volunteer:parseHwp', (_, id: string) => {
+  const resolved = resolveVolunteerHwpPath(String(id))
+  return resolved.item.forms || parseVolunteerHwpFile(resolved.path)
+})
+ipcMain.handle('volunteer:updateForms', (_, id: string, forms: unknown) => {
+  if (!Array.isArray(forms) || JSON.stringify(forms).length > 2_000_000) throw new Error('OCR 수정 내용이 올바르지 않습니다.')
+  return updateVolunteerDocumentForms(String(id), forms as any)
+})
 ipcMain.handle('volunteer:openHwp', (_, id: string) => shell.openPath(resolveVolunteerHwpPath(String(id)).path))
 ipcMain.handle('volunteer:deleteHwp', (_, id: string) => deleteVolunteerHwpFile(String(id)))
 

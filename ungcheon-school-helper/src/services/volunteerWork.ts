@@ -31,6 +31,12 @@ export interface StoredVolunteerHwp {
   sha256: string
   formCount: number
   activities: string[]
+  fileType?: 'hwp' | 'pdf'
+  pageCount?: number
+  analysisMode?: 'hwp' | 'text' | 'ocr' | 'mixed'
+  averageConfidence?: number
+  warnings?: string[]
+  forms?: ParsedVolunteerForm[]
 }
 
 export interface StoredVolunteerNeisDataset {

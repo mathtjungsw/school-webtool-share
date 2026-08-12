@@ -4,7 +4,7 @@ import { useAppStore } from './appStore'
 
 const SESSION_NAME_KEY = 'pilotLogin.teacherName'
 const SESSION_EXPIRES_KEY = 'pilotLogin.expiresAt'
-const SESSION_HOURS = 10
+const SESSION_HOURS = 72
 
 interface AuthState {
   ready: boolean

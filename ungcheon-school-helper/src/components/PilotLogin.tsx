@@ -34,7 +34,7 @@ export default function PilotLogin() {
         </form>
         <div className="mt-5 space-y-2 rounded-2xl border border-white/5 bg-white/[0.025] p-4 text-[11px] text-slate-400">
           <p className="flex items-center gap-2 text-amber-300"><ShieldCheck size={14} />시범운영 뒤 비밀번호 생성예정입니다</p>
-          <p className="flex items-center gap-2"><Clock3 size={14} />한 번 로그인하면 이 PC에서 10시간 동안 유지됩니다.</p>
+          <p className="flex items-center gap-2"><Clock3 size={14} />한 번 로그인하면 이 PC에서 72시간 동안 유지됩니다.</p>
         </div>
       </section>
     </main>

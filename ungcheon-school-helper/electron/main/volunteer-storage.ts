@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { createHash, randomUUID } from 'crypto'
 import { basename, extname, join, resolve } from 'path'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'fs'
+import type { ParsedVolunteerForm } from './volunteer-hwp'
 
 export interface StoredVolunteerHwp {
   id: string
@@ -12,6 +13,12 @@ export interface StoredVolunteerHwp {
   sha256: string
   formCount: number
   activities: string[]
+  fileType?: 'hwp' | 'pdf'
+  pageCount?: number
+  analysisMode?: 'hwp' | 'text' | 'ocr' | 'mixed'
+  averageConfidence?: number
+  warnings?: string[]
+  forms?: ParsedVolunteerForm[]
 }
 
 function vaultDirectory() { return join(app.getPath('userData'), 'volunteer-hwp') }
@@ -46,12 +53,13 @@ export function listVolunteerHwpFiles() {
 
 export function importVolunteerHwpFile(
   sourcePath: string,
-  summary: { formCount: number; activities: string[] },
+  summary: Omit<StoredVolunteerHwp, 'id' | 'originalName' | 'storedName' | 'importedAt' | 'size' | 'sha256'>,
   allowDuplicate = false,
 ) {
-  if (extname(sourcePath).toLowerCase() !== '.hwp') throw new Error('HWP 파일만 보관할 수 있습니다.')
+  const extension = extname(sourcePath).toLowerCase()
+  if (!['.hwp', '.pdf'].includes(extension)) throw new Error('HWP 또는 PDF 확인서만 보관할 수 있습니다.')
   const bytes = readFileSync(sourcePath)
-  return storeBytes(basename(sourcePath), bytes, summary, allowDuplicate)
+  return storeBytes(basename(sourcePath), bytes, summary, allowDuplicate, extension)
 }
 
 export function storeGeneratedVolunteerHwp(
@@ -65,8 +73,9 @@ export function storeGeneratedVolunteerHwp(
 function storeBytes(
   originalName: string,
   bytes: Buffer,
-  summary: { formCount: number; activities: string[] },
+  summary: Omit<StoredVolunteerHwp, 'id' | 'originalName' | 'storedName' | 'importedAt' | 'size' | 'sha256'>,
   allowDuplicate = false,
+  extension = '.hwp',
 ) {
   ensureVault()
   const sha256 = createHash('sha256').update(bytes).digest('hex')
@@ -74,7 +83,7 @@ function storeBytes(
   const duplicate = current.find(item => item.sha256 === sha256)
   if (duplicate && !allowDuplicate) return duplicate
   const id = randomUUID()
-  const storedName = `${id}.hwp`
+  const storedName = `${id}${extension}`
   writeFileSync(join(vaultDirectory(), storedName), bytes)
   const item: StoredVolunteerHwp = {
     id,
@@ -85,6 +94,12 @@ function storeBytes(
     sha256,
     formCount: summary.formCount,
     activities: summary.activities.map(String).filter(Boolean),
+    fileType: extension === '.pdf' ? 'pdf' : 'hwp',
+    pageCount: summary.pageCount,
+    analysisMode: summary.analysisMode,
+    averageConfidence: summary.averageConfidence,
+    warnings: summary.warnings || [],
+    forms: summary.forms,
   }
   writeManifest([item, ...current])
   return item
@@ -95,10 +110,25 @@ export function resolveVolunteerHwpPath(id: string) {
   if (!item) throw new Error('보관된 확인서 파일을 찾지 못했습니다.')
   const base = resolve(vaultDirectory())
   const target = resolve(base, item.storedName)
-  if (!target.startsWith(`${base}\\`) || extname(target).toLowerCase() !== '.hwp' || !existsSync(target)) {
+  if (!target.startsWith(`${base}\\`) || !['.hwp', '.pdf'].includes(extname(target).toLowerCase()) || !existsSync(target)) {
     throw new Error('보관된 확인서 경로가 올바르지 않습니다.')
   }
   return { item, path: target }
+}
+
+export function updateVolunteerDocumentForms(id: string, forms: ParsedVolunteerForm[]) {
+  const items = readManifest()
+  const index = items.findIndex(item => item.id === id)
+  if (index < 0) throw new Error('보관된 확인서 파일을 찾지 못했습니다.')
+  items[index] = {
+    ...items[index],
+    forms,
+    formCount: forms.length,
+    activities: [...new Set(forms.map(form => form.activityContent || form.activityName).filter(Boolean))],
+    warnings: [],
+  }
+  writeManifest(items)
+  return items[index]
 }
 
 export function deleteVolunteerHwpFile(id: string) {
