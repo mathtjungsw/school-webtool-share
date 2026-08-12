@@ -393,6 +393,84 @@ function VerificationTab() {
     setMessage(`OCR 이름 ${changed}건을 서버 학생 명렬의 학번 기준으로 맞췄습니다. 원본 PDF와 한 번 더 확인한 뒤 저장해 주세요.`)
   }
 
+  const correctOcrStudentWithRoster = async (formIndex: number, studentIndex: number, mode: 'name' | 'studentId') => {
+    const currentRoster = roster || await loadRoster(true)
+    if (!currentRoster?.students.length) { setMessage('서버 학생 명렬을 불러오지 못했습니다.'); return }
+    const student = editingForms[formIndex]?.participants[studentIndex]
+    if (!student) return
+    if (mode === 'name') {
+      const studentId = volunteerStudentId(student.studentId)
+      const official = currentRoster.students.find(item => volunteerStudentId(item.studentId) === studentId)
+      if (!official) { setMessage(`${student.studentId || '학번 없음'}에 해당하는 학생을 학교 명렬에서 찾지 못했습니다.`); return }
+      updateOcrStudent(setEditingForms, formIndex, studentIndex, {
+        studentId,
+        name: official.name,
+        correctionNote: `OCR 이름맞추기: ${student.name || '-'} → ${official.name}`,
+      })
+      setMessage(`${studentId} 학생 이름을 학교 명렬의 '${official.name}'으로 맞췄습니다.`)
+      return
+    }
+
+    const normalizedName = student.name.replace(/\s+/g, '')
+    let candidates = currentRoster.students.filter(item => item.name.replace(/\s+/g, '') === normalizedName)
+    const currentId = volunteerStudentId(student.studentId)
+    if (/^[1-3]\d{3}$/.test(currentId)) {
+      const sameClass = candidates.filter(item => volunteerStudentId(item.studentId).slice(0, 2) === currentId.slice(0, 2))
+      if (sameClass.length) candidates = sameClass
+    }
+    if (candidates.length !== 1) {
+      setMessage(candidates.length ? `'${student.name}' 동명이인이 ${candidates.length}명이라 학번을 자동으로 정할 수 없습니다.` : `'${student.name}' 학생을 학교 명렬에서 찾지 못했습니다.`)
+      return
+    }
+    const official = candidates[0]
+    const nextId = volunteerStudentId(official.studentId)
+    updateOcrStudent(setEditingForms, formIndex, studentIndex, {
+      studentId: nextId,
+      name: official.name,
+      correctionNote: `OCR 학번맞추기: ${student.studentId || '-'} → ${nextId}`,
+    })
+    setMessage(`${official.name} 학생 학번을 학교 명렬의 ${nextId}로 맞췄습니다.`)
+  }
+
+  const alignOcrFormWithClassRoster = async (formIndex: number) => {
+    const currentRoster = roster || await loadRoster(true)
+    if (!currentRoster?.students.length) { setMessage('서버 학생 명렬을 불러오지 못했습니다.'); return }
+    const form = editingForms[formIndex]
+    if (!form) return
+    const classCounts = new Map<string, number>()
+    for (const participant of form.participants) {
+      const id = volunteerStudentId(participant.studentId)
+      if (/^[1-3]\d{3}$/.test(id)) classCounts.set(id.slice(0, 2), (classCounts.get(id.slice(0, 2)) ?? 0) + 1)
+    }
+    const classKey = [...classCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
+    if (!classKey) { setMessage('이 확인서에서 학년·반을 판단할 수 있는 정상 학번을 찾지 못했습니다.'); return }
+    const classRoster = currentRoster.students.filter(student => volunteerStudentId(student.studentId).slice(0, 2) === classKey)
+    const byId = new Map(classRoster.map(student => [volunteerStudentId(student.studentId), student]))
+    const byName = new Map<string, typeof classRoster>()
+    for (const student of classRoster) {
+      const key = student.name.replace(/\s+/g, '')
+      byName.set(key, [...(byName.get(key) ?? []), student])
+    }
+    let changed = 0
+    setEditingForms(current => current.map((item, index) => index !== formIndex ? item : {
+      ...item,
+      participants: item.participants.map(participant => {
+        const currentId = volunteerStudentId(participant.studentId)
+        const officialById = byId.get(currentId)
+        if (officialById) {
+          if (participant.name === officialById.name && participant.studentId === currentId) return participant
+          changed += 1
+          return { ...participant, studentId: currentId, name: officialById.name, correctionNote: `OCR ${classKey[0]}-${Number(classKey[1])}반 명렬 자동교정` }
+        }
+        const sameName = byName.get(participant.name.replace(/\s+/g, '')) ?? []
+        if (sameName.length !== 1) return participant
+        changed += 1
+        return { ...participant, studentId: volunteerStudentId(sameName[0].studentId), name: sameName[0].name, correctionNote: `OCR ${classKey[0]}-${Number(classKey[1])}반 명렬 자동교정` }
+      }),
+    }))
+    setMessage(`${classKey[0]}학년 ${Number(classKey[1])}반 학교 명렬을 기준으로 OCR 학번·이름 ${changed}건을 맞췄습니다. 저장 전에 원본 PDF와 확인해 주세요.`)
+  }
+
   const importNeis = async () => {
     const paths = await window.electron.openFilesDialog([{ name: '나이스 XLS data', extensions: ['xlsx', 'xls'] }])
     if (!paths.length) return
@@ -555,7 +633,7 @@ function VerificationTab() {
       </Panel>
 
       {editingFile && <Panel title={`OCR 결과 확인·수정 · ${editingFile.originalName}`} subtitle="서버 학생 명렬과 대조하기 전에 스캔 인식 결과를 확인합니다. 수정 내용은 이 PC의 로컬 복사본에만 저장됩니다.">
-        <div className="max-h-[520px] space-y-4 overflow-y-auto pr-2">{editingForms.map((form, formIndex) => <div key={form.formIndex} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><div className="grid gap-2 md:grid-cols-3"><label className="text-xs font-bold">활동 내용<input className="input-field mt-1 w-full" value={form.activityContent} onChange={event => setEditingForms(current => current.map((item, index) => index === formIndex ? { ...item, activityContent: event.target.value, activityName: event.target.value } : item))} /></label><label className="text-xs font-bold">활동일<input type="date" className="input-field mt-1 w-full" value={form.startDate} onChange={event => setEditingForms(current => current.map((item, index) => index === formIndex ? { ...item, startDate: event.target.value, endDate: event.target.value } : item))} /></label><p className="self-end pb-2 text-sm font-black">{form.formIndex + 1}쪽 · {form.participants.length}명 인식</p></div><div className="mt-3 overflow-x-auto"><table className="w-full min-w-[640px] text-sm"><thead><tr className="bg-slate-100 dark:bg-slate-800"><th className="p-2">학번</th><th className="p-2">이름</th><th className="p-2">시간</th><th className="p-2">비고</th></tr></thead><tbody>{form.participants.map((student, studentIndex) => <tr key={`${student.studentId}-${studentIndex}`} className="border-t border-slate-200 dark:border-slate-700"><td className="p-1"><input className="input-field w-full text-center" value={student.studentId} onChange={event => updateOcrStudent(setEditingForms, formIndex, studentIndex, { studentId: event.target.value })} /></td><td className="p-1"><input className="input-field w-full" value={student.name} onChange={event => updateOcrStudent(setEditingForms, formIndex, studentIndex, { name: event.target.value })} /></td><td className="p-1"><input className="input-field w-full text-center" value={student.hours ?? ''} onChange={event => updateOcrStudent(setEditingForms, formIndex, studentIndex, { hours: event.target.value ? Number(event.target.value) : null })} /></td><td className="p-1"><input className="input-field w-full" value={student.remarks} onChange={event => updateOcrStudent(setEditingForms, formIndex, studentIndex, { remarks: event.target.value })} /></td></tr>)}</tbody></table></div></div>)}</div>
+        <div className="max-h-[520px] space-y-4 overflow-y-auto pr-2">{editingForms.map((form, formIndex) => <div key={form.formIndex} className="rounded-xl border border-slate-200 p-3 dark:border-slate-700"><div className="grid gap-2 md:grid-cols-3"><label className="text-xs font-bold">활동 내용<input className="input-field mt-1 w-full" value={form.activityContent} onChange={event => setEditingForms(current => current.map((item, index) => index === formIndex ? { ...item, activityContent: event.target.value, activityName: event.target.value } : item))} /></label><label className="text-xs font-bold">활동일<input type="date" className="input-field mt-1 w-full" value={form.startDate} onChange={event => setEditingForms(current => current.map((item, index) => index === formIndex ? { ...item, startDate: event.target.value, endDate: event.target.value } : item))} /></label><div className="flex items-end justify-between gap-2 pb-1"><p className="text-sm font-black">{form.formIndex + 1}쪽 · {form.participants.length}명 인식</p><button type="button" onClick={() => void alignOcrFormWithClassRoster(formIndex)} className="rounded-lg border border-emerald-400 px-3 py-2 text-xs font-black text-emerald-800 dark:text-emerald-200">이 학급 명렬로 자동교정</button></div></div><div className="mt-3 overflow-x-auto"><table className="w-full min-w-[850px] text-sm"><thead><tr className="bg-slate-100 dark:bg-slate-800"><th className="p-2">학번</th><th className="p-2">이름</th><th className="p-2">시간</th><th className="p-2">비고</th><th className="w-[190px] p-2">학교 명렬 맞춤</th></tr></thead><tbody>{form.participants.map((student, studentIndex) => <tr key={`${student.studentId}-${studentIndex}`} className="border-t border-slate-200 dark:border-slate-700"><td className="p-1"><input className="input-field w-full text-center" value={student.studentId} onChange={event => updateOcrStudent(setEditingForms, formIndex, studentIndex, { studentId: event.target.value })} /></td><td className="p-1"><input className="input-field w-full" value={student.name} onChange={event => updateOcrStudent(setEditingForms, formIndex, studentIndex, { name: event.target.value })} /></td><td className="p-1"><input className="input-field w-full text-center" value={student.hours ?? ''} onChange={event => updateOcrStudent(setEditingForms, formIndex, studentIndex, { hours: event.target.value ? Number(event.target.value) : null })} /></td><td className="p-1"><input className="input-field w-full" value={student.remarks} onChange={event => updateOcrStudent(setEditingForms, formIndex, studentIndex, { remarks: event.target.value })} /></td><td className="p-1"><div className="flex justify-center gap-1"><button type="button" onClick={() => void correctOcrStudentWithRoster(formIndex, studentIndex, 'name')} className="rounded-lg border border-emerald-400 px-2 py-1.5 text-[11px] font-black text-emerald-800 dark:text-emerald-200">이름맞추기</button><button type="button" onClick={() => void correctOcrStudentWithRoster(formIndex, studentIndex, 'studentId')} className="rounded-lg border border-blue-400 px-2 py-1.5 text-[11px] font-black text-blue-800 dark:text-blue-200">학번맞추기</button></div></td></tr>)}</tbody></table></div></div>)}</div>
         <div className="mt-4 flex flex-wrap justify-end gap-2"><button onClick={() => void alignOcrNamesWithRoster()} className="rounded-xl border border-blue-400 px-4 py-2 font-bold text-blue-800 dark:text-blue-200">학번 기준 명렬 이름 맞춤</button><button onClick={() => { setEditingFile(null); setEditingForms([]) }} className="rounded-xl border border-slate-300 px-4 py-2 font-bold dark:border-slate-600">취소</button><button onClick={() => void saveOcr()} disabled={busy} className="rounded-xl bg-emerald-600 px-5 py-2 font-black text-white disabled:opacity-50">확인 결과 저장</button></div>
       </Panel>}
 
