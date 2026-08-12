@@ -355,6 +355,20 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.10',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.10',
+    body: [
+      '· 봉사활동 확인서 발급을 반별·부서별로 분리하고, 반 명렬 전체 불러오기와 결석·결과 등 학생별 예외 문구 출력을 추가했습니다.',
+      '· 봉사활동 검증에 텍스트·스캔 PDF 오프라인 OCR을 지원하고, OCR 화면과 미분류 탭에서 학교 명렬 기준 학번·이름 교정을 할 수 있습니다.',
+      '· OCR·나이스·확인서 자료는 학교 공유 서버로 보내지 않고 현재 PC의 로컬 보관함에서만 처리합니다.',
+      '· 3학년 당김수업을 교사 시간표·대시보드·캘린더에 반영하고 대시보드 일정 종류별 켜기·끄기를 추가했습니다.',
+      '· 학교 공유 서비스 주소를 앱에 고정 내장하여 PC별 URL 오류를 방지하고, 학생 명렬 등 조회 요청의 연결 복구를 강화했습니다.',
+      '· 밝은 모드의 시간표·달력 글자를 더 어둡고 굵게 표시하여 가독성을 개선했습니다.',
+      '· 로그인 유지 시간을 72시간으로 확대하고 검색도우미·사용 매뉴얼을 새 기능에 맞게 갱신했습니다.'
+    ].join('\n'),
+    date: '2026-08-12'
+  },
+  {
     key: 'v1.1.9',
     title: '[긴급 수정] 웅천고 업무도우미 v1.1.9',
     body: [
@@ -463,7 +477,7 @@ const GET_READ_ACTIONS = [
 function doGet(e) {
   try {
     const action = String(e && e.parameter && e.parameter.action || '');
-    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 29 } });
+    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 30 } });
     if (GET_READ_ACTIONS.indexOf(action) < 0) throw new Error('GET으로 허용되지 않는 요청입니다.');
 
     const rawPayload = String(e && e.parameter && e.parameter.payload || '{}');
@@ -481,7 +495,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 29 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 30 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
