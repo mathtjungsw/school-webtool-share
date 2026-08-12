@@ -355,6 +355,19 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.11',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.11',
+    body: [
+      '• 시간표·학생/교직원 명렬·업무·일정 등 학교 공유자료를 Windows 사용자 계정에 묶어 암호화된 로컬 캐시로 보관하고, 화면에는 로컬 자료를 먼저 표시한 뒤 서버 변경분만 백그라운드에서 갱신하도록 개선했습니다.',
+      '• 자료 종류별로 2분·5분·15분·30분 간격의 자동 동기화를 적용하고 환경설정에서 로컬 저장 상태와 마지막 갱신 시각을 확인하거나 저장자료를 비울 수 있게 했습니다.',
+      '• 출석부를 포함한 여러 Excel 다운로드에서 0바이트 파일이 만들어져 Excel이 파일 형식 오류를 표시하던 문제를 수정했습니다.',
+      '• 반별 봉사활동 확인서는 제공된 웅천고 HWPX 원본 양식을 앱에 포함하여 표·테두리·글꼴·배치를 유지한 채 학급 명렬과 입력값이 자동으로 들어가도록 만들었습니다.',
+      '• 반별 봉사활동 확인서에 봉사 날짜·교시·영역·장소·내용, 인정시간 일괄 입력, 결석·지각·조퇴 등 학생별 문구 입력, HWPX·PDF 다운로드와 바로 인쇄 기능을 추가했습니다.',
+      '• 검색 도우미에 새 로컬 자동 동기화 방식과 반별 봉사활동 확인서의 HWPX·PDF·인쇄 사용법을 반영했습니다.'
+    ].join('\n'),
+    date: '2026-08-12'
+  },
+  {
     key: 'v1.1.10',
     title: '[업데이트] 웅천고 업무도우미 v1.1.10',
     body: [
@@ -477,7 +490,7 @@ const GET_READ_ACTIONS = [
 function doGet(e) {
   try {
     const action = String(e && e.parameter && e.parameter.action || '');
-    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 30 } });
+    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 31 } });
     if (GET_READ_ACTIONS.indexOf(action) < 0) throw new Error('GET으로 허용되지 않는 요청입니다.');
 
     const rawPayload = String(e && e.parameter && e.parameter.payload || '{}');
@@ -495,7 +508,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 30 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 31 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);

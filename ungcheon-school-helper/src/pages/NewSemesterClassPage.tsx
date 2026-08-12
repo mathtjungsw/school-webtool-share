@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import * as XLSX from 'xlsx'
+import { binaryToNumberArray } from '../utils/binaryBytes'
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface Student {
@@ -160,7 +161,7 @@ export default function NewSemesterClassPage() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '반배정')
     const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
-    window.electron.saveFileDialog(`반배정_${new Date().toISOString().slice(0,10)}.xlsx`, Array.from(buf))
+    window.electron.saveFileDialog(`반배정_${new Date().toISOString().slice(0,10)}.xlsx`, binaryToNumberArray(buf))
   }
 
   // ── Select / Swap ─────────────────────────────────────────────────

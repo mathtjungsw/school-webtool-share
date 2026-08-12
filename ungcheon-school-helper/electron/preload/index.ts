@@ -75,6 +75,12 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('timetablePlan:buildHwp', draft),
   buildVolunteerHwp: (draft: unknown): Promise<number[]> =>
     ipcRenderer.invoke('volunteer:buildHwp', draft),
+  buildClassVolunteerHwpx: (draft: unknown): Promise<number[]> =>
+    ipcRenderer.invoke('volunteer:buildClassHwpx', draft),
+  buildClassVolunteerPdf: (draft: unknown): Promise<number[]> =>
+    ipcRenderer.invoke('volunteer:buildClassPdf', draft),
+  printClassVolunteer: (draft: unknown): Promise<boolean> =>
+    ipcRenderer.invoke('volunteer:printClass', draft),
   storeGeneratedVolunteerHwp: (name: string, bytes: number[]) =>
     ipcRenderer.invoke('volunteer:storeGeneratedHwp', name, bytes),
   importVolunteerHwp: (filePath: string, allowDuplicate = false) => ipcRenderer.invoke('volunteer:importHwp', filePath, allowDuplicate),
@@ -119,6 +125,11 @@ contextBridge.exposeInMainWorld('electron', {
   schoolHubRequest: (request: Record<string, unknown>) =>
     ipcRenderer.invoke('schoolHub:request', request),
   schoolHubDiagnose: () => ipcRenderer.invoke('schoolHub:diagnose'),
+  schoolHubCacheGetAll: () => ipcRenderer.invoke('schoolHubCache:getAll'),
+  schoolHubCacheSet: (entry: unknown) => ipcRenderer.invoke('schoolHubCache:set', entry),
+  schoolHubCacheDeleteResource: (resource: string) => ipcRenderer.invoke('schoolHubCache:deleteResource', resource),
+  schoolHubCacheClear: () => ipcRenderer.invoke('schoolHubCache:clear'),
+  schoolHubCacheStatus: () => ipcRenderer.invoke('schoolHubCache:status'),
 
   // Auto-launch
   getAutoLaunch: (): Promise<boolean> => ipcRenderer.invoke('app:getAutoLaunch'),

@@ -1,5 +1,5 @@
 import type { TimetablePlanEntry } from './timetablePlan'
-import { hubRequest } from './schoolHub'
+import { cachedHubAction, hubRequest } from './schoolHub'
 
 export type TimetableChangeStatus = 'pending' | 'approved' | 'held' | 'rejected' | 'cancelled'
 export interface TimetableChangeRequest extends TimetablePlanEntry {
@@ -11,8 +11,13 @@ export interface TimetableChangeRequest extends TimetablePlanEntry {
   requesterAppliedAt: string
 }
 
-export const listTimetableChanges = (viewerName: string, fromDate = '', toDate = '', includeSchool = false) =>
-  hubRequest<TimetableChangeRequest[]>({ action: 'listTimetableChanges', viewerName, fromDate, toDate, includeSchool })
+export const listTimetableChanges = (viewerName: string, fromDate = '', toDate = '', includeSchool = false, force = false) =>
+  cachedHubAction<TimetableChangeRequest[]>(
+    `timetableChanges:${viewerName}:${fromDate}:${toDate}:${includeSchool ? 'school' : 'user'}`,
+    'timetableChanges',
+    { action: 'listTimetableChanges', viewerName, fromDate, toDate, includeSchool },
+    force,
+  )
 
 export const createTimetableChange = (entry: TimetablePlanEntry, requesterName: string) =>
   hubRequest<TimetableChangeRequest>({ action: 'createTimetableChange', entry, requesterName })

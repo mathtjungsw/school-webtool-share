@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle, CheckCircle2, Download, FileCheck2, FilePlus2, FolderOpen,
-  HardDrive, HeartHandshake, Plus, RefreshCw, ShieldCheck, Trash2, Upload, XCircle,
+  HardDrive, HeartHandshake, Plus, Printer, RefreshCw, ShieldCheck, Trash2, Upload, XCircle,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAppStore } from '../stores/appStore'
 import { getSharedStudentRoster } from '../services/schoolHub'
 import type { SharedStudentRoster } from '../services/rosterAttendance'
 import {
-  buildVolunteerRosterTemplate, compareVolunteerRosterSources, createVolunteerRow, emptyVolunteerDraft,
-  parseNeisVolunteerWorkbook, parseRosterPaste, parseRosterWorkbook, validateIssuanceDraft, volunteerStudentId,
-  type StoredVolunteerHwp, type StoredVolunteerNeisDataset, type VolunteerCertificateDraft,
+  buildVolunteerRosterTemplate, compareVolunteerRosterSources, createVolunteerRow, emptyClassVolunteerDraft, emptyVolunteerDraft,
+  parseNeisVolunteerWorkbook, parseRosterPaste, parseRosterWorkbook, validateClassIssuanceDraft, validateIssuanceDraft, volunteerStudentId,
+  type ClassVolunteerCertificateDraft, type StoredVolunteerHwp, type StoredVolunteerNeisDataset, type VolunteerCertificateDraft,
   type ParsedVolunteerForm, type ParsedVolunteerParticipant, type VolunteerRosterComparisonResult, type VolunteerRosterComparisonRow, type VolunteerStudentRow,
 } from '../services/volunteerWork'
 
@@ -33,10 +33,163 @@ export default function VolunteerWorkPage() {
           <TabButton active={tab === 'issue-department'} onClick={() => setTab('issue-department')} icon={<FilePlus2 size={17} />} label="봉사활동 확인서(부서별) 발급" />
           <TabButton active={tab === 'verify'} onClick={() => setTab('verify')} icon={<FileCheck2 size={17} />} label="봉사활동 확인서 검증(봉사활동담당자)" />
         </div>
-        {tab === 'issue-class' ? <ClassIssuanceTab /> : tab === 'issue-department' ? <IssuanceTab /> : <VerificationTab />}
+        {tab === 'issue-class' ? <ClassIssuanceTabV2 /> : tab === 'issue-department' ? <IssuanceTab /> : <VerificationTab />}
       </div>
     </div>
   )
+}
+
+function ClassIssuanceTabV2() {
+  const teacherName = useAppStore(state => state.config.teacherName)
+  const [draft, setDraft] = useState<ClassVolunteerCertificateDraft>(() => {
+    const defaults = emptyClassVolunteerDraft(teacherName)
+    try {
+      const saved = JSON.parse(localStorage.getItem(CLASS_DRAFT_KEY) || '{}') as Partial<ClassVolunteerCertificateDraft>
+      const savedStudents = Array.isArray(saved.students)
+        ? saved.students.map(student => ({ ...student, studentId: volunteerStudentId(student.studentId) }))
+        : []
+      const firstId = savedStudents[0]?.studentId || ''
+      return {
+        ...defaults,
+        ...saved,
+        activityName: saved.activityName?.trim() || defaults.activityName,
+        activityContent: saved.activityContent?.trim() || defaults.activityContent,
+        institution: saved.institution?.trim() || defaults.institution,
+        location: saved.location?.trim() || defaults.location,
+        grade: saved.grade || firstId.slice(0, 1),
+        className: saved.className || firstId.slice(1, 2),
+        periodLabel: saved.periodLabel?.trim() || defaults.periodLabel,
+        certificateDate: saved.certificateDate || defaults.certificateDate,
+        confirmTeacher: teacherName || saved.confirmTeacher || '',
+        students: savedStudents,
+      }
+    } catch { return defaults }
+  })
+  const [roster, setRoster] = useState<SharedStudentRoster | null>(null)
+  const [bulkHours, setBulkHours] = useState('2')
+  const [loadingRoster, setLoadingRoster] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const errors = useMemo(() => validateClassIssuanceDraft(draft), [draft])
+  const selectedClass = draft.grade && draft.className ? `${draft.grade}-${draft.className}` : ''
+  const classOptions = useMemo(() => roster
+    ? [...new Set(roster.students.map(student => `${student.grade}-${student.className}`))]
+      .sort((a, b) => a.localeCompare(b, 'ko', { numeric: true }))
+    : [], [roster])
+
+  useEffect(() => { localStorage.setItem(CLASS_DRAFT_KEY, JSON.stringify(draft)) }, [draft])
+  useEffect(() => { void loadClassRoster() }, [])
+  useEffect(() => {
+    if (teacherName && draft.confirmTeacher !== teacherName) setDraft(current => ({ ...current, confirmTeacher: teacherName }))
+  }, [teacherName])
+
+  const update = <K extends keyof ClassVolunteerCertificateDraft>(key: K, value: ClassVolunteerCertificateDraft[K]) => {
+    setDraft(current => ({ ...current, [key]: value }))
+  }
+  const updateStudent = (id: string, patch: Partial<VolunteerStudentRow>) => {
+    setDraft(current => ({ ...current, students: current.students.map(row => row.id === id ? { ...row, ...patch } : row) }))
+  }
+
+  async function loadClassRoster(force = false) {
+    setLoadingRoster(true)
+    try {
+      const next = await getSharedStudentRoster(force)
+      setRoster(next)
+      if (!next?.students.length) setMessage('공유 학생 명렬을 불러오지 못했습니다. 관리자에게 학생 명렬 등록 상태를 확인해 달라고 요청하세요.')
+    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    finally { setLoadingRoster(false) }
+  }
+
+  const chooseClass = (classLabel: string) => {
+    if (!roster || !classLabel) {
+      setDraft(current => ({ ...current, grade: '', className: '', students: [] }))
+      return
+    }
+    const [grade, className] = classLabel.split('-')
+    const students = roster.students
+      .filter(student => student.grade === grade && student.className === className)
+      .sort((a, b) => Number(a.number) - Number(b.number) || a.studentId.localeCompare(b.studentId, 'ko'))
+      .map(student => createVolunteerRow({
+        studentId: volunteerStudentId(student.studentId), name: student.name, hours: bulkHours, remarks: '',
+      }))
+    setDraft(current => ({ ...current, grade, className, students }))
+    setMessage(`${grade}학년 ${className}반 ${students.length}명의 명렬을 불러왔습니다.`)
+  }
+
+  const applyBulkHours = () => {
+    const value = bulkHours.trim()
+    if (!value) { setMessage('일괄 입력할 인정시간을 입력해 주세요.'); return }
+    setDraft(current => ({ ...current, students: current.students.map(student => ({ ...student, hours: value, remarks: '' })) }))
+    setMessage(`전체 학생의 인정시간을 '${value}'(으)로 입력했습니다. 결석·지각·조퇴 학생은 해당 행에서 바꿀 수 있습니다.`)
+  }
+
+  const safeFileName = () => {
+    const activity = draft.activityContent.replace(/[\\/:*?"<>|]/g, '_') || '봉사활동'
+    return `${draft.grade}학년_${draft.className}반_단체봉사활동확인서_${activity}_${draft.startDate}`
+  }
+
+  const saveDocument = async (kind: 'hwpx' | 'pdf') => {
+    if (errors.length) { setMessage(errors[0]); return }
+    setBusy(true)
+    try {
+      const bytes = kind === 'hwpx'
+        ? await window.electron.buildClassVolunteerHwpx(draft)
+        : await window.electron.buildClassVolunteerPdf(draft)
+      const saved = await window.electron.saveFileDialog(`${safeFileName()}.${kind}`, bytes)
+      setMessage(saved
+        ? `${kind.toUpperCase()} 확인서를 저장했습니다.${kind === 'hwpx' ? ' 제공된 원본 HWPX의 표·테두리·글꼴·배치를 유지하고 입력 셀만 교체했습니다.' : ''}`
+        : '저장을 취소했습니다.')
+    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    finally { setBusy(false) }
+  }
+
+  const printDocument = async () => {
+    if (errors.length) { setMessage(errors[0]); return }
+    setBusy(true)
+    try {
+      const printed = await window.electron.printClassVolunteer(draft)
+      setMessage(printed ? '인쇄 작업을 프린터로 보냈습니다.' : '인쇄를 취소했거나 프린터에서 처리하지 못했습니다.')
+    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    finally { setBusy(false) }
+  }
+
+  const exceptions = draft.students.filter(student => !Number.isFinite(Number(student.hours)) || Number(student.hours) <= 0).length
+
+  return <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+    <section className="space-y-5">
+      <Panel title="1. 학급 명렬 불러오기" subtitle="교직원용 공유 명렬에서 선택한 반의 학생을 번호순으로 자동 입력합니다. 원본 명렬은 수정하지 않습니다.">
+        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+          <Field label="학급 선택 *"><select value={selectedClass} onChange={event => chooseClass(event.target.value)}><option value="">학급을 선택하세요</option>{classOptions.map(value => <option key={value} value={value}>{value}반</option>)}</select></Field>
+          <button type="button" onClick={() => void loadClassRoster(true)} disabled={loadingRoster} className="self-end rounded-xl border border-slate-300 px-4 py-3 text-sm font-black dark:border-slate-600"><RefreshCw size={15} className={clsx('mr-1 inline', loadingRoster && 'animate-spin')} />명렬 새로고침</button>
+        </div>
+        <p className="mt-3 rounded-xl bg-blue-50 p-3 text-sm font-bold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">인적 사항은 선택한 학년·반, 총원, 실제 인정시간이 입력된 참여 인원을 기준으로 자동 작성됩니다.</p>
+      </Panel>
+
+      <Panel title="2. 봉사활동 정보 입력" subtitle="제공해주신 반별 HWPX 양식의 항목 순서대로 입력합니다.">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <Field label="봉사활동 날짜 *"><input type="date" value={draft.startDate} onChange={event => { update('startDate', event.target.value); update('endDate', event.target.value) }} /></Field>
+          <Field label="교시·시간 표시 *"><input value={draft.periodLabel} onChange={event => update('periodLabel', event.target.value)} placeholder="예: 5, 6교시" /></Field>
+          <Field label="봉사 영역 *"><select value={draft.area} onChange={event => update('area', event.target.value as ClassVolunteerCertificateDraft['area'])}><option value="neighbor">이웃돕기활동</option><option value="environment">환경보호활동</option><option value="campaign">캠페인활동</option></select></Field>
+          <Field label="활동 기관 *"><input value={draft.institution} onChange={event => update('institution', event.target.value)} /></Field>
+          <Field label="활동 장소 *"><input list="class-volunteer-location-options" value={draft.location} onChange={event => update('location', event.target.value)} /><datalist id="class-volunteer-location-options"><option value="학교 내" /><option value="지역사회" /></datalist></Field>
+          <Field label="확인서 하단 날짜 *"><input type="date" value={draft.certificateDate} onChange={event => update('certificateDate', event.target.value)} /></Field>
+          <Field label="활동 내용 *" wide><input value={draft.activityContent} onChange={event => { update('activityContent', event.target.value); update('activityName', event.target.value) }} /></Field>
+          <Field label="확인자(환경설정 사용자 이름)"><input value={draft.confirmTeacher} readOnly className="bg-slate-100 dark:bg-slate-800" /></Field>
+        </div>
+      </Panel>
+
+      <Panel title="3. 인정시간 입력" subtitle="먼저 전체 학생에게 같은 인정시간을 넣고, 결석·지각·조퇴 학생만 각 행에서 문구로 바꾸세요.">
+        <div className="mb-3 grid gap-3 md:grid-cols-[220px_auto_1fr]">
+          <Field label="전체 인정시간"><input list="class-volunteer-hour-options" value={bulkHours} onChange={event => setBulkHours(event.target.value)} placeholder="예: 2 또는 결석" /><datalist id="class-volunteer-hour-options"><option value="1" /><option value="2" /><option value="결석" /><option value="지각" /><option value="조퇴" /><option value="결과" /></datalist></Field>
+          <button type="button" onClick={applyBulkHours} disabled={!draft.students.length} className="self-end rounded-xl bg-emerald-700 px-4 py-3 text-sm font-black text-white disabled:opacity-50">전체 학생에게 입력</button>
+          <p className="self-end pb-3 text-sm font-bold text-slate-700 dark:text-slate-200">숫자는 출력할 때 ‘시간’이 붙고, 결석·지각·조퇴 등의 문구는 그대로 들어갑니다.</p>
+        </div>
+        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700"><table className="w-full min-w-[620px] text-sm"><thead className="bg-slate-100 dark:bg-slate-800"><tr><th className="w-16 p-2">번호</th><th className="w-24 p-2">학번</th><th className="p-2">이름</th><th className="w-56 p-2">인정시간 또는 사유</th></tr></thead><tbody>{draft.students.map((student, index) => <tr key={student.id} className="border-t border-slate-200 dark:border-slate-700"><td className="p-2 text-center font-bold">{index + 1}</td><td className="p-2 text-center font-black">{student.studentId}</td><td className="p-2 font-bold">{student.name}</td><td className="p-2"><input list="class-volunteer-hour-options" value={student.hours} onChange={event => updateStudent(student.id, { hours: event.target.value, remarks: Number(event.target.value) > 0 ? '' : event.target.value })} placeholder="예: 2, 결석, 지각" /></td></tr>)}</tbody></table>{!draft.students.length && <p className="p-8 text-center text-sm font-bold text-slate-600 dark:text-slate-300">학급을 선택하면 반 전체 명렬이 표시됩니다.</p>}</div>
+      </Panel>
+    </section>
+
+    <aside className="space-y-5"><Panel title="4. 확인하고 발급" subtitle="HWPX는 첨부 원본 양식을 그대로 사용하며 입력값이 들어갈 셀만 바꿉니다."><div className="grid grid-cols-2 gap-3"><Summary label="학급 인원" value={`${draft.students.length}명`} /><Summary label="예외 문구" value={`${exceptions}명`} /><Summary label="양식 정원" value="최대 40명" /><Summary label="확인자" value={draft.confirmTeacher || '-'} /></div>{errors.length > 0 && <div className="mt-4 max-h-40 overflow-y-auto rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-semibold text-rose-900 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-100">{errors.slice(0, 8).map(error => <p key={error}>• {error}</p>)}</div>}<div className="mt-4 grid gap-2"><button disabled={busy || errors.length > 0} onClick={() => void saveDocument('hwpx')} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 font-black text-white disabled:opacity-50"><Download size={18} />{busy ? '문서 만드는 중…' : 'HWPX 다운로드'}</button><button disabled={busy || errors.length > 0} onClick={() => void saveDocument('pdf')} className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-700 px-4 py-3 font-black text-white disabled:opacity-50"><FileCheck2 size={18} />PDF 다운로드</button><button disabled={busy || errors.length > 0} onClick={() => void printDocument()} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-slate-700 bg-white px-4 py-3 font-black text-slate-950 disabled:opacity-50 dark:border-slate-300 dark:bg-slate-900 dark:text-white"><Printer size={18} />바로 인쇄</button></div>{message && <p className="mt-4 rounded-xl bg-slate-100 p-3 text-sm font-bold text-slate-950 dark:bg-slate-800 dark:text-white">{message}</p>}</Panel></aside>
+  </div>
 }
 
 function LocalOnlyNotice() {

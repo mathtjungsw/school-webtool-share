@@ -2,9 +2,10 @@
 import * as XLSX from 'xlsx'
 import type { ExamState, Teacher, Assignments } from './types'
 import { genUnits, uid } from './defaults'
+import { xlsxWorkbookBytes } from '../../utils/binaryBytes'
 
 const yes = (v: unknown): boolean => ['O', 'o', 'Y', 'y', '예', '1', 'true', 'TRUE', 'v', 'V', '○'].includes(String(v ?? '').trim())
-const wbBytes = (wb: XLSX.WorkBook): number[] => Array.from(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as Uint8Array)
+const wbBytes = (wb: XLSX.WorkBook): number[] => xlsxWorkbookBytes(wb)
 
 export async function pickAndImportTeachers(): Promise<Teacher[]> {
   const path = await window.electron?.openFileDialog([{ name: '엑셀/CSV', extensions: ['xlsx', 'xls', 'csv'] }])

@@ -10,8 +10,9 @@ import { useAuthStore } from '../stores/authStore'
 import { useAdminStore } from '../stores/adminStore'
 import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 import {
-  clearSchoolHubSessionCache,
+  clearSchoolHubPersistentCache,
   getSchoolHubCacheStatus,
+  getPersistentSchoolHubCacheStatus,
 } from '../services/schoolHub'
 import {
   getNeisSyncStatus,
@@ -35,6 +36,7 @@ export default function UngcheonSettingsPage() {
   const [hubStatus, setHubStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
   const [autoLaunch, setAutoLaunch] = useState(false)
   const [cacheStatus, setCacheStatus] = useState(() => getSchoolHubCacheStatus())
+  const [persistentCacheStatus, setPersistentCacheStatus] = useState<{ count: number; newestAt: number | null; encrypted: boolean }>({ count: 0, newestAt: null, encrypted: false })
   const [cacheMessage, setCacheMessage] = useState('')
   const [neisSyncStatus, setNeisSyncStatus] = useState<NeisSyncStatus | null>(null)
   const [neisSyncBusy, setNeisSyncBusy] = useState(false)
@@ -51,7 +53,12 @@ export default function UngcheonSettingsPage() {
     getNeisSyncStatus().then(setNeisSyncStatus).catch(() => setNeisSyncStatus(null))
   }, [config.schoolHubUrl, isAdmin])
   useEffect(() => {
-    const timer = window.setInterval(() => setCacheStatus(getSchoolHubCacheStatus()), 1_000)
+    const refresh = () => {
+      setCacheStatus(getSchoolHubCacheStatus())
+      void getPersistentSchoolHubCacheStatus().then(setPersistentCacheStatus).catch(() => undefined)
+    }
+    refresh()
+    const timer = window.setInterval(refresh, 5_000)
     return () => window.clearInterval(timer)
   }, [])
 
@@ -224,23 +231,25 @@ export default function UngcheonSettingsPage() {
         </Field>
       </Section>
 
-      <Section icon={<Database size={17} />} title="공유자료 임시 캐시">
+      <Section icon={<Database size={17} />} title="공유자료 로컬 저장·자동 동기화">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm text-slate-300">현재 실행 중인 프로그램에서 {cacheStatus.count}개 자료를 임시 보관 중입니다.</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">시간표·명렬 등은 메모리에만 저장되어 앱을 종료하면 자동 삭제됩니다. 메뉴에서는 임시자료를 즉시 표시하고 서버 변경 여부를 백그라운드에서 확인합니다.</p>
+            <p className="text-sm text-slate-300">현재 {persistentCacheStatus.count || cacheStatus.persistentCount}개 자료를 PC에 저장하고, {cacheStatus.count}개 자료를 바로 표시할 수 있습니다.</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">시간표·명렬·업무·일정은 로컬 자료를 먼저 표시한 뒤 서버의 변경분만 백그라운드에서 갱신합니다. 학생·교직원 자료는 Windows 사용자 계정에 묶어 암호화합니다.</p>
+            <p className="mt-1 text-[11px] font-semibold text-slate-500">마지막 로컬 갱신: {persistentCacheStatus.newestAt ? new Date(persistentCacheStatus.newestAt).toLocaleString('ko-KR') : '아직 저장된 자료 없음'} · {persistentCacheStatus.encrypted ? '암호화됨' : '암호화 확인 중'}</p>
             {cacheMessage && <p className="mt-2 text-xs text-emerald-400">{cacheMessage}</p>}
           </div>
           <button
             type="button"
-            onClick={() => {
-              clearSchoolHubSessionCache()
+            onClick={async () => {
+              await clearSchoolHubPersistentCache()
               setCacheStatus(getSchoolHubCacheStatus())
-              setCacheMessage('임시 공유자료를 모두 삭제했습니다. 다음 메뉴 진입 시 다시 내려받습니다.')
+              setPersistentCacheStatus({ count: 0, newestAt: null, encrypted: persistentCacheStatus.encrypted })
+              setCacheMessage('PC에 저장된 공유자료를 모두 삭제했습니다. 다음 메뉴 진입 시 서버에서 다시 내려받습니다.')
             }}
             className="btn-ghost inline-flex shrink-0 items-center gap-2 text-rose-300"
           >
-            <Trash2 size={14} />임시 저장자료 모두 삭제
+            <Trash2 size={14} />로컬 저장자료 모두 삭제
           </button>
         </div>
       </Section>

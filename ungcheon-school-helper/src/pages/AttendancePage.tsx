@@ -9,6 +9,7 @@ import clsx from 'clsx'
 import { format, addDays, subDays, eachDayOfInterval, startOfMonth, endOfMonth } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import * as XLSX from 'xlsx'
+import { binaryToNumberArray } from '../utils/binaryBytes'
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface Student { id: string; name: string; number: number }
@@ -121,7 +122,7 @@ export default function AttendancePage() {
     XLSX.utils.book_append_sheet(wb, ws, '출석부')
     const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
     const name = `출석부_${settings.className || '반'}_${format(new Date(), 'yyyyMMdd')}.xlsx`
-    window.electron.saveFileDialog(name, Array.from(buf))
+    window.electron.saveFileDialog(name, binaryToNumberArray(buf))
   }
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [

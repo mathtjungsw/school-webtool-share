@@ -1,0 +1,21 @@
+const { app, BrowserWindow } = require('electron')
+const { readFileSync, writeFileSync } = require('fs')
+const { join } = require('path')
+
+app.whenReady().then(async () => {
+  const root = process.cwd()
+  const outputDir = join(root, 'tmp', 'class-volunteer-output-check')
+  const html = readFileSync(join(outputDir, 'class-volunteer-preview.html'), 'utf8')
+  const window = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true } })
+  await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+  await new Promise(resolve => setTimeout(resolve, 250))
+  const pdf = await window.webContents.printToPDF({ printBackground: true, pageSize: 'A4', preferCSSPageSize: true })
+  const output = join(outputDir, 'class-volunteer-preview.pdf')
+  writeFileSync(output, pdf)
+  console.log(`PASS Electron PDF ${pdf.length} bytes`)
+  window.destroy()
+  app.quit()
+}).catch(error => {
+  console.error(error)
+  app.exit(1)
+})

@@ -37,6 +37,9 @@ declare global {
       saveFilesToDir: (files: { name: string; bytes: number[] }[]) => Promise<number>
       buildTimetablePlanHwp: (draft: import('./services/timetablePlan').TimetablePlanDraft) => Promise<number[]>
       buildVolunteerHwp: (draft: import('./services/volunteerWork').VolunteerCertificateDraft) => Promise<number[]>
+      buildClassVolunteerHwpx: (draft: import('./services/volunteerWork').ClassVolunteerCertificateDraft) => Promise<number[]>
+      buildClassVolunteerPdf: (draft: import('./services/volunteerWork').ClassVolunteerCertificateDraft) => Promise<number[]>
+      printClassVolunteer: (draft: import('./services/volunteerWork').ClassVolunteerCertificateDraft) => Promise<boolean>
       storeGeneratedVolunteerHwp: (name: string, bytes: number[]) => Promise<import('./services/volunteerWork').StoredVolunteerHwp>
       importVolunteerHwp: (filePath: string, allowDuplicate?: boolean) => Promise<import('./services/volunteerWork').StoredVolunteerHwp>
       listVolunteerHwp: () => Promise<import('./services/volunteerWork').StoredVolunteerHwp[]>
@@ -64,6 +67,30 @@ declare global {
         checkedAt: string
         get: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
         post: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
+      }>
+      schoolHubCacheGetAll: () => Promise<Array<{
+        cacheKey: string
+        resource: string
+        data: unknown
+        revision: string
+        signature: string
+        loadedAt: number
+      }>>
+      schoolHubCacheSet: (entry: {
+        cacheKey: string
+        resource: string
+        data: unknown
+        revision: string
+        signature: string
+        loadedAt: number
+      }) => Promise<boolean>
+      schoolHubCacheDeleteResource: (resource: string) => Promise<void>
+      schoolHubCacheClear: () => Promise<void>
+      schoolHubCacheStatus: () => Promise<{
+        count: number
+        newestAt: number | null
+        encrypted: boolean
+        resources: string[]
       }>
       getAutoLaunch: () => Promise<boolean>
       setAutoLaunch: (enable: boolean) => Promise<void>

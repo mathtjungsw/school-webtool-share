@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog, safeStorage, session, net } from 'electron'
-import { join, resolve as pathResolve, basename } from 'path'
+import { join, resolve as pathResolve, basename, extname } from 'path'
 import { pathToFileURL } from 'url'
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync, readdirSync, copyFileSync } from 'fs'
 import { tmpdir } from 'os'
@@ -12,6 +12,14 @@ import { startMonitoring, stopMonitoring, isMonitoringActive } from './notifier'
 import { getWeeklyPlanMonth } from './weekly-plan'
 import { getDutyScheduleMonth } from './duty-schedule'
 import { getCreativeScheduleMonth } from './creative-schedule'
+import {
+  clearPersistentHubCache,
+  deletePersistentHubCacheResource,
+  persistentHubCacheStatus,
+  readPersistentHubCache,
+  writePersistentHubCache,
+  type PersistentHubCacheEntry,
+} from './school-hub-cache'
 import { getSchoolHubEndpointCandidates, resolveSchoolHubEndpoint, UNGCHEON_SCHOOL_HUB_URL } from './school-hub-endpoint'
 import { buildTimetablePlanHwp, type TimetablePlanDraftInput } from './timetable-plan-hwp'
 import {
@@ -29,6 +37,12 @@ import {
   updateVolunteerDocumentForms,
 } from './volunteer-storage'
 import { parseVolunteerPdfFile } from './volunteer-pdf'
+import {
+  buildClassVolunteerHwpx,
+  buildClassVolunteerPdf,
+  printClassVolunteer,
+  type ClassVolunteerDocumentInput,
+} from './class-volunteer-document'
 
 const execFileAsync = promisify(execFile)
 
@@ -186,6 +200,24 @@ ipcMain.handle('volunteer:buildHwp', (_, draft: VolunteerCertificateDraftInput) 
     volunteerTemplatePath('volunteer-double-source.hwp'),
     draft,
   ))
+})
+
+ipcMain.handle('volunteer:buildClassHwpx', async (_, draft: ClassVolunteerDocumentInput) => {
+  if (JSON.stringify(draft).length > 500_000) throw new Error('반별 봉사활동 확인서 입력 내용이 너무 큽니다.')
+  return Array.from(await buildClassVolunteerHwpx(
+    volunteerTemplatePath('class-volunteer-template.hwpx'),
+    draft,
+  ))
+})
+
+ipcMain.handle('volunteer:buildClassPdf', async (_, draft: ClassVolunteerDocumentInput) => {
+  if (JSON.stringify(draft).length > 500_000) throw new Error('반별 봉사활동 확인서 입력 내용이 너무 큽니다.')
+  return Array.from(await buildClassVolunteerPdf(draft))
+})
+
+ipcMain.handle('volunteer:printClass', async (_, draft: ClassVolunteerDocumentInput) => {
+  if (JSON.stringify(draft).length > 500_000) throw new Error('반별 봉사활동 확인서 입력 내용이 너무 큽니다.')
+  return printClassVolunteer(draft)
 })
 
 ipcMain.handle('volunteer:storeGeneratedHwp', (_, name: string, bytes: number[]) => {
@@ -412,10 +444,15 @@ ipcMain.handle('dialog:saveFilesToDir', async (_, files: { name: string; bytes: 
 // File dialog — save
 ipcMain.handle('dialog:saveFile', async (_, defaultName: string, buffer: number[]) => {
   if (!mainWindow) return false
+  const extension = extname(defaultName).replace(/^\./, '').toLowerCase()
+  const formatNames: Record<string, string> = {
+    xlsx: 'Excel 파일', hwp: '한글 문서', hwpx: '한글 표준 문서', pdf: 'PDF 문서',
+    csv: 'CSV 파일', json: 'JSON 파일', zip: 'ZIP 파일',
+  }
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: defaultName,
     filters: [
-      { name: 'Excel 파일', extensions: ['xlsx'] },
+      ...(extension ? [{ name: formatNames[extension] || `${extension.toUpperCase()} 파일`, extensions: [extension] }] : []),
       { name: '모든 파일', extensions: ['*'] },
     ],
   })
@@ -961,6 +998,19 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
 }
 
 ipcMain.handle('schoolHub:request', (_, payload: Record<string, unknown>) => requestSchoolHub(payload))
+ipcMain.handle('schoolHubCache:getAll', () => readPersistentHubCache())
+ipcMain.handle('schoolHubCache:set', (_, entry: PersistentHubCacheEntry) => {
+  if (!entry || typeof entry.cacheKey !== 'string' || typeof entry.resource !== 'string') {
+    throw new Error('로컬 캐시 자료 형식이 올바르지 않습니다.')
+  }
+  return writePersistentHubCache(entry)
+})
+ipcMain.handle('schoolHubCache:deleteResource', (_, resource: string) => {
+  if (typeof resource !== 'string' || resource.length > 50) throw new Error('로컬 캐시 자료 종류가 올바르지 않습니다.')
+  deletePersistentHubCacheResource(resource)
+})
+ipcMain.handle('schoolHubCache:clear', () => clearPersistentHubCache())
+ipcMain.handle('schoolHubCache:status', () => persistentHubCacheStatus())
 
 interface HubDiagnosticAttempt {
   ok: boolean

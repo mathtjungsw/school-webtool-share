@@ -104,6 +104,7 @@ export type HubResource =
   | 'staffChecklists'
   | 'committees'
   | 'sharedNeis'
+  | 'timetableChanges'
 
 interface SyncManifest {
   generatedAt: string
@@ -116,6 +117,7 @@ interface CacheEntry<T = unknown> {
   revision: string
   signature: string
   loadedAt: number
+  request?: Record<string, unknown>
 }
 
 type CacheListener = (data: unknown, cacheKey: string) => void
@@ -131,6 +133,12 @@ let manifestInflight: Promise<SyncManifest | null> | null = null
 let manifestSupported: boolean | null = null
 let preloadInflight: Promise<void> | null = null
 let cacheGeneration = 0
+let persistentCacheHydrated = false
+let persistentCacheInflight: Promise<void> | null = null
+let persistentEntryCount = 0
+let backgroundSyncTimer: number | null = null
+let backgroundSyncRunning = false
+const backgroundLastChecked = new Map<HubResource, number>()
 
 const MUTATION_RESOURCE: Record<string, HubResource | undefined> = {
   addLink: 'links', deleteLink: 'links',
@@ -141,6 +149,22 @@ const MUTATION_RESOURCE: Record<string, HubResource | undefined> = {
   addStaffChecklist: 'staffChecklists', updateStaffChecklist: 'staffChecklists', submitStaffChecklist: 'staffChecklists', deleteStaffChecklist: 'staffChecklists',
   saveCommitteeMembers: 'committees', addCommitteeEvent: 'committees', deleteCommitteeEvent: 'committees',
   replaceNeisSnapshot: 'sharedNeis',
+  createTimetableChange: 'timetableChanges', respondTimetableChange: 'timetableChanges',
+  applyTimetableChangeForRequester: 'timetableChanges', cancelTimetableChange: 'timetableChanges',
+}
+
+const BACKGROUND_INTERVAL_MS: Record<HubResource, number> = {
+  staffChecklists: 2 * 60_000,
+  committees: 2 * 60_000,
+  timetableChanges: 2 * 60_000,
+  timetable: 5 * 60_000,
+  studentTimetable: 5 * 60_000,
+  sharedNeis: 5 * 60_000,
+  links: 15 * 60_000,
+  notices: 15 * 60_000,
+  featureRequests: 15 * 60_000,
+  staffRoster: 30 * 60_000,
+  studentRoster: 30 * 60_000,
 }
 
 function dataSignature(data: unknown) {
@@ -168,6 +192,8 @@ function normalizeHubResourceData(resource: HubResource, data: unknown) {
 
 function notifyResource(resource: HubResource, data: unknown, cacheKey: string) {
   listeners.get(resource)?.forEach(listener => listener(data, cacheKey))
+  if (resource === 'timetableChanges') window.dispatchEvent(new Event('timetableChanges:updated'))
+  if (resource === 'sharedNeis') window.dispatchEvent(new Event('sharedNeis:updated'))
 }
 
 export function subscribeHubResource<T>(resource: HubResource, listener: (data: T, cacheKey: string) => void) {
@@ -181,6 +207,50 @@ export function subscribeHubResource<T>(resource: HubResource, listener: (data: 
   }
 }
 
+async function hydratePersistentSchoolHubCache() {
+  if (persistentCacheHydrated) return
+  if (persistentCacheInflight) return persistentCacheInflight
+  const generation = cacheGeneration
+  persistentCacheInflight = (async () => {
+    try {
+      const entries = await window.electron.schoolHubCacheGetAll()
+      if (generation !== cacheGeneration) return
+      for (const rawEntry of entries) {
+        const resource = rawEntry.resource as HubResource
+        if (!BACKGROUND_INTERVAL_MS[resource] || !rawEntry.cacheKey) continue
+        const data = normalizeHubResourceData(resource, rawEntry.data)
+        sessionCache.set(rawEntry.cacheKey, {
+          resource,
+          data,
+          revision: rawEntry.revision || revisionFromData(data),
+          signature: rawEntry.signature || dataSignature(data),
+          loadedAt: Number(rawEntry.loadedAt) || 0,
+        })
+      }
+      persistentEntryCount = entries.length
+    } catch {
+      persistentEntryCount = 0
+    } finally {
+      persistentCacheHydrated = true
+      persistentCacheInflight = null
+    }
+  })()
+  return persistentCacheInflight
+}
+
+function persistCacheEntry(cacheKey: string, entry: CacheEntry) {
+  void window.electron.schoolHubCacheSet({
+    cacheKey,
+    resource: entry.resource,
+    data: entry.data,
+    revision: entry.revision,
+    signature: entry.signature,
+    loadedAt: entry.loadedAt,
+  }).then(saved => {
+    if (saved) persistentEntryCount = Math.max(persistentEntryCount, sessionCache.size)
+  }).catch(() => undefined)
+}
+
 export function clearSchoolHubSessionCache() {
   cacheGeneration += 1
   sessionCache.clear()
@@ -191,6 +261,16 @@ export function clearSchoolHubSessionCache() {
   manifestSupported = null
   preloadInflight = null
   resourceEpoch.clear()
+  persistentCacheHydrated = false
+  persistentCacheInflight = null
+  backgroundLastChecked.clear()
+}
+
+export async function clearSchoolHubPersistentCache() {
+  clearSchoolHubSessionCache()
+  await window.electron.schoolHubCacheClear()
+  persistentEntryCount = 0
+  persistentCacheHydrated = true
 }
 
 export function invalidateHubResource(resource: HubResource) {
@@ -199,6 +279,7 @@ export function invalidateHubResource(resource: HubResource) {
   }
   resourceEpoch.set(resource, (resourceEpoch.get(resource) ?? 0) + 1)
   manifestLoadedAt = 0
+  void window.electron.schoolHubCacheDeleteResource(resource).catch(() => undefined)
 }
 
 export function getSchoolHubCacheStatus() {
@@ -207,7 +288,12 @@ export function getSchoolHubCacheStatus() {
     count: entries.length,
     newestAt: entries.length ? Math.max(...entries.map(entry => entry.loadedAt)) : null,
     resources: [...new Set(entries.map(entry => entry.resource))],
+    persistentCount: persistentEntryCount,
   }
+}
+
+export async function getPersistentSchoolHubCacheStatus() {
+  return window.electron.schoolHubCacheStatus()
 }
 
 export async function hubRequest<T>(request: Record<string, unknown>): Promise<T> {
@@ -303,7 +389,16 @@ async function fetchAndStore<T>(
     const signature = revision || dataSignature(data)
     const previous = sessionCache.get(cacheKey)
     const changed = !previous || previous.signature !== signature
-    sessionCache.set(cacheKey, { resource, data, revision, signature, loadedAt: Date.now() })
+    const nextEntry: CacheEntry<T> = {
+      resource,
+      data,
+      revision,
+      signature,
+      loadedAt: Date.now(),
+      request,
+    }
+    sessionCache.set(cacheKey, nextEntry)
+    persistCacheEntry(cacheKey, nextEntry)
     if (changed) notifyResource(resource, data, cacheKey)
     return data
   }).finally(() => {
@@ -324,6 +419,7 @@ async function revalidateCachedResource<T>(
   const nextManifest = await refreshSyncManifest()
   const serverRevision = nextManifest?.resources?.[resource] ?? ''
   if (serverRevision && entry.revision === serverRevision) return
+  if (!serverRevision && Date.now() - entry.loadedAt < BACKGROUND_INTERVAL_MS[resource]) return
   try { await fetchAndStore<T>(cacheKey, resource, request, serverRevision) }
   catch { /* 캐시가 있으면 네트워크 오류는 화면을 막지 않는다. */ }
 }
@@ -334,13 +430,24 @@ async function cachedHubRequest<T>(
   request: Record<string, unknown>,
   force = false,
 ): Promise<T> {
+  await hydratePersistentSchoolHubCache()
   const cached = sessionCache.get(cacheKey)
   if (cached && !force) {
+    cached.request = request
     void revalidateCachedResource<T>(cacheKey, resource, request)
     return cached.data as T
   }
   const nextManifest = await refreshSyncManifest()
   return fetchAndStore<T>(cacheKey, resource, request, nextManifest?.resources?.[resource] ?? '')
+}
+
+export function cachedHubAction<T>(
+  cacheKey: string,
+  resource: HubResource,
+  request: Record<string, unknown>,
+  force = false,
+) {
+  return cachedHubRequest<T>(cacheKey, resource, request, force)
 }
 
 export const listLinks = (force = false) =>
@@ -532,7 +639,7 @@ export function preloadSchoolHubCache(viewerName = '') {
   if (preloadInflight) return preloadInflight
   let nextPreload: Promise<void>
   nextPreload = (async () => {
-    await refreshSyncManifest(true)
+    await hydratePersistentSchoolHubCache()
     const requests: Array<Promise<unknown>> = [
       listLinks(),
       listNotices(),
@@ -542,12 +649,56 @@ export function preloadSchoolHubCache(viewerName = '') {
       getSharedStaffRoster(),
       getSharedStudentRoster(),
       listCommitteeState(),
+      cachedHubAction('sharedNeis', 'sharedNeis', { action: 'getNeisSnapshot' }),
     ]
-    if (viewerName.trim()) requests.push(listStaffChecklists(viewerName.trim()))
+    if (viewerName.trim()) {
+      const name = viewerName.trim()
+      requests.push(
+        listStaffChecklists(name),
+        cachedHubAction(`timetableChanges:${name}:::user`, 'timetableChanges', {
+          action: 'listTimetableChanges', viewerName: name, fromDate: '', toDate: '', includeSchool: false,
+        }),
+      )
+    }
     await Promise.allSettled(requests)
   })().finally(() => {
     if (preloadInflight === nextPreload) preloadInflight = null
   })
   preloadInflight = nextPreload
   return nextPreload
+}
+
+async function runSchoolHubBackgroundSync(viewerName: string) {
+  if (backgroundSyncRunning) return
+  backgroundSyncRunning = true
+  try {
+    await hydratePersistentSchoolHubCache()
+    await refreshSyncManifest(true)
+    const now = Date.now()
+    for (const resource of Object.keys(BACKGROUND_INTERVAL_MS) as HubResource[]) {
+      const lastChecked = backgroundLastChecked.get(resource) ?? 0
+      if (now - lastChecked < BACKGROUND_INTERVAL_MS[resource]) continue
+      backgroundLastChecked.set(resource, now)
+      const matching = [...sessionCache.entries()].filter(([, entry]) => entry.resource === resource && entry.request)
+      await Promise.allSettled(matching.map(([cacheKey, entry]) =>
+        revalidateCachedResource(cacheKey, resource, entry.request!),
+      ))
+    }
+    if (viewerName.trim()) void preloadSchoolHubCache(viewerName.trim())
+  } finally {
+    backgroundSyncRunning = false
+  }
+}
+
+export function startSchoolHubBackgroundSync(viewerName: string) {
+  if (backgroundSyncTimer !== null) window.clearInterval(backgroundSyncTimer)
+  void preloadSchoolHubCache(viewerName)
+  const initial = window.setTimeout(() => void runSchoolHubBackgroundSync(viewerName), 5_000)
+  backgroundSyncTimer = window.setInterval(() => void runSchoolHubBackgroundSync(viewerName), 30_000)
+  return () => {
+    window.clearTimeout(initial)
+    if (backgroundSyncTimer !== null) window.clearInterval(backgroundSyncTimer)
+    backgroundSyncTimer = null
+    backgroundSyncRunning = false
+  }
 }

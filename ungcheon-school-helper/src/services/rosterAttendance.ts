@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import { escapeHtml, printHtml } from '../utils/printHtml'
+import { xlsxWorkbookBytes } from '../utils/binaryBytes'
 import { canonicalStudentId, studentIdParts } from './studentId'
 
 type Cell = string | number | boolean | Date | null | undefined
@@ -257,9 +258,6 @@ export function parseStudentRosterWorkbook(bytes: number[]): StudentRosterEntry[
   return students
 }
 
-const workbookBytes = (workbook: XLSX.WorkBook): number[] =>
-  Array.from(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as Uint8Array)
-
 export async function downloadStaffRoster(members: StaffMember[]): Promise<boolean> {
   const rows = sortStaffMembers(members).map((member, index) => ({
     순번: index + 1,
@@ -275,7 +273,7 @@ export async function downloadStaffRoster(members: StaffMember[]): Promise<boole
   XLSX.utils.book_append_sheet(workbook, sheet, '교원명렬')
   return window.electron.saveFileDialog(
     `웅천고_교원명렬_${new Date().toISOString().slice(0, 10)}.xlsx`,
-    workbookBytes(workbook),
+    xlsxWorkbookBytes(workbook),
   )
 }
 
@@ -395,10 +393,9 @@ export function printAttendanceRosters(groups: AttendanceRosterPrintGroup[]): vo
   )
 }
 
-export async function downloadAttendanceRosters(
+export function buildAttendanceRosterWorkbookBytes(
   groups: AttendanceRosterPrintGroup[],
-  fileName: string,
-): Promise<boolean> {
+): number[] {
   const workbook = XLSX.utils.book_new()
   const usedSheetNames = new Set<string>()
   groups.forEach((group, groupIndex) => {
@@ -434,8 +431,15 @@ export async function downloadAttendanceRosters(
     usedSheetNames.add(sheetName)
     XLSX.utils.book_append_sheet(workbook, sheet, sheetName)
   })
+  return xlsxWorkbookBytes(workbook)
+}
+
+export async function downloadAttendanceRosters(
+  groups: AttendanceRosterPrintGroup[],
+  fileName: string,
+): Promise<boolean> {
   return window.electron.saveFileDialog(
     `${fileName.replace(/[\\/:*?"<>|]/g, '_')}.xlsx`,
-    workbookBytes(workbook),
+    buildAttendanceRosterWorkbookBytes(groups),
   )
 }

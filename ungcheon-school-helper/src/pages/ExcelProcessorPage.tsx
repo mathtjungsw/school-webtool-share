@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Upload, FileSpreadsheet, Loader2, Download, CheckCircle2, AlertCircle, Settings2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import clsx from 'clsx'
+import { binaryToNumberArray } from '../utils/binaryBytes'
 
 interface Stats {
   totalRows: number
@@ -131,7 +132,7 @@ export default function ExcelProcessorPage() {
   const [dragging, setDragging] = useState(false)
   const [processing, setProcessing] = useState(false)
   const [stats, setStats] = useState<Stats | null>(null)
-  const [resultBuffer, setResultBuffer] = useState<Uint8Array | null>(null)
+  const [resultBuffer, setResultBuffer] = useState<unknown>(null)
   const [error, setError] = useState('')
   const [options, setOptions] = useState(DEFAULT_OPTIONS)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -185,7 +186,7 @@ export default function ExcelProcessorPage() {
   const handleDownload = async () => {
     if (!resultBuffer || !window.electron) return
     const outName = fileName.replace(/\.xlsx?$/i, '') + '_처리완료.xlsx'
-    await window.electron.saveFileDialog(outName, Array.from(resultBuffer))
+    await window.electron.saveFileDialog(outName, binaryToNumberArray(resultBuffer))
   }
 
   return (

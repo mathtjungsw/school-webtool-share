@@ -1,7 +1,7 @@
 import { addDays, format } from 'date-fns'
 import type { AppConfig, MealInfo, ScheduleEvent, TimetableEntry } from '../types'
 import { getClassInfo, getMealRange, getScheduleRange, getSchoolDetail, getTimetableRange } from './neis'
-import { hubRequest } from './schoolHub'
+import { cachedHubAction, hubRequest } from './schoolHub'
 
 export interface SharedNeisSnapshot {
   version: number
@@ -54,9 +54,6 @@ const SYNC_TOKEN_NAME = 'neisSyncToken'
 
 let schedulerTimer: number | null = null
 let syncInFlight: Promise<SharedNeisSnapshot> | null = null
-let sharedSnapshotCache: SharedNeisSnapshot | null | undefined
-let sharedSnapshotRequest: Promise<SharedNeisSnapshot | null> | null = null
-let sharedSnapshotLoadedAt = 0
 
 function localYmd(date: Date) {
   return format(date, 'yyyyMMdd')
@@ -228,24 +225,18 @@ export async function runNeisSync(config: AppConfig): Promise<SharedNeisSnapshot
     await window.electron.configSet(LAST_SUCCESS_DAY_KEY, localYmd(new Date()))
     const result = { ...uploaded, syncReport: report }
     await window.electron.configSet(LOCAL_SNAPSHOT_KEY, result)
-    sharedSnapshotCache = result
-    sharedSnapshotLoadedAt = Date.now()
     return result
   })().finally(() => { syncInFlight = null })
   return syncInFlight
 }
 
 export function getSharedNeisSnapshot(force = false) {
-  if (!force && sharedSnapshotCache !== undefined && Date.now() - sharedSnapshotLoadedAt < 5 * 60_000) return Promise.resolve(sharedSnapshotCache)
-  if (!force && sharedSnapshotRequest) return sharedSnapshotRequest
-  sharedSnapshotRequest = hubRequest<SharedNeisSnapshot | null>({ action: 'getNeisSnapshot' })
-    .then(value => {
-      sharedSnapshotCache = value
-      sharedSnapshotLoadedAt = Date.now()
-      return value
-    })
-    .finally(() => { sharedSnapshotRequest = null })
-  return sharedSnapshotRequest
+  return cachedHubAction<SharedNeisSnapshot | null>(
+    'sharedNeis',
+    'sharedNeis',
+    { action: 'getNeisSnapshot' },
+    force,
+  )
 }
 
 export function startNeisSyncScheduler(getConfig: () => AppConfig) {

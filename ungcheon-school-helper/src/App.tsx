@@ -4,7 +4,7 @@ import { useNoticeStore } from './stores/noticeStore'
 import Layout from './components/Layout'
 import UpdateModal from './components/UpdateModal'
 import NoticeModal from './components/NoticeModal'
-import { clearSchoolHubSessionCache, preloadSchoolHubCache } from './services/schoolHub'
+import { clearSchoolHubSessionCache, preloadSchoolHubCache, startSchoolHubBackgroundSync } from './services/schoolHub'
 import { useAuthStore } from './stores/authStore'
 import PilotLogin from './components/PilotLogin'
 import { startNeisSyncScheduler } from './services/sharedNeis'
@@ -70,6 +70,11 @@ export default function App() {
     if (!authenticated || !config.schoolHubUrl) return
     return startNeisSyncScheduler(() => useAppStore.getState().config)
   }, [authenticated, config.schoolHubUrl, config.neisApiKey])
+
+  useEffect(() => {
+    if (!authenticated || !config.schoolHubUrl) return
+    return startSchoolHubBackgroundSync(useAuthStore.getState().teacherName)
+  }, [authenticated, config.schoolHubUrl])
 
   if (!useAppStore.getState().isConfigLoaded || !authReady) {
     return <div className="min-h-screen bg-surface-950 grid place-items-center text-sm text-slate-400">시작 준비 중...</div>

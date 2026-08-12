@@ -23,6 +23,13 @@ export interface VolunteerCertificateDraft {
   students: VolunteerStudentRow[]
 }
 
+export interface ClassVolunteerCertificateDraft extends VolunteerCertificateDraft {
+  grade: string
+  className: string
+  periodLabel: string
+  certificateDate: string
+}
+
 export interface StoredVolunteerHwp {
   id: string
   originalName: string
@@ -155,6 +162,33 @@ export function emptyVolunteerDraft(teacherName = ''): VolunteerCertificateDraft
     area: 'neighbor', location: '학교 내', activityContent: '', confirmTeacher: teacherName,
     schoolName: '웅천고등학교', commonRemarks: '', students: [],
   }
+}
+
+export function emptyClassVolunteerDraft(teacherName = ''): ClassVolunteerCertificateDraft {
+  const today = new Date().toISOString().slice(0, 10)
+  return {
+    ...emptyVolunteerDraft(teacherName),
+    activityName: '사제동행 교내 환경정화',
+    activityContent: '사제동행 교내 환경정화',
+    institution: '웅천고등학교',
+    area: 'environment',
+    location: '학교 내',
+    schoolName: '웅천고등학교',
+    grade: '',
+    className: '',
+    periodLabel: '5, 6교시',
+    certificateDate: today,
+  }
+}
+
+export function validateClassIssuanceDraft(draft: ClassVolunteerCertificateDraft) {
+  const errors = validateIssuanceDraft(draft)
+    .filter(error => !error.includes('68'))
+  if (!draft.grade || !draft.className) errors.push('학급을 선택해 주세요.')
+  if (!draft.periodLabel.trim()) errors.push('봉사활동 교시 또는 시간 표시를 입력해 주세요.')
+  if (!draft.certificateDate) errors.push('확인서 하단 날짜를 입력해 주세요.')
+  if (draft.students.length > 40) errors.push('제공된 반별 HWPX 양식은 최대 40명까지 지원합니다.')
+  return [...new Set(errors)]
 }
 
 export function createVolunteerRow(partial: Partial<VolunteerStudentRow> = {}): VolunteerStudentRow {

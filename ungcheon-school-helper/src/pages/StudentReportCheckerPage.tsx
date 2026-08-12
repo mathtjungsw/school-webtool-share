@@ -5,6 +5,7 @@ import {
   ChevronDown, FileDown, ListChecks, Info, FileText, Square,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { binaryToNumberArray } from '../utils/binaryBytes'
 import { useAppStore } from '../stores/appStore'
 import {
   analyzeStudentReport, getCategorySummary,
@@ -112,7 +113,7 @@ export default function StudentReportCheckerPage() {
     }
 
     const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as number[]
-    await window.electron?.saveFileDialog('학생부_점검결과.xlsx', Array.from(buf))
+    await window.electron?.saveFileDialog('학생부_점검결과.xlsx', binaryToNumberArray(buf))
   }
 
   // ── Idle ──────────────────────────────────────────────────────────────────

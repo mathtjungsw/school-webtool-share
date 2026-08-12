@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { Club, ClubStudent } from '../types/club'
+import { binaryToNumberArray, xlsxWorkbookBytes } from '../utils/binaryBytes'
 
 function makeId() {
   return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4)
@@ -38,7 +39,7 @@ const studentOrder = (a: ClubStudent, b: ClubStudent) =>
   a.grade - b.grade || Number(a.classNum) - Number(b.classNum) || a.number - b.number
 
 const wbToBytes = (wb: XLSX.WorkBook): number[] =>
-  Array.from(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as Uint8Array)
+  xlsxWorkbookBytes(wb)
 
 const safeSheetName = (name: string, used: Set<string>): string => {
   // 엑셀 시트명 제약: 31자, 특수문자 \ / ? * [ ] : 제거, 중복 방지
@@ -198,8 +199,7 @@ export function exportResultXlsx(clubs: Club[], students: ClubStudent[]): number
   ws3['!cols'] = [{ wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 5 }, { wch: 7 }, { wch: 9 }, { wch: 9 }]
   XLSX.utils.book_append_sheet(wb, ws3, '통계')
 
-  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as Uint8Array
-  return Array.from(out)
+  return binaryToNumberArray(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }))
 }
 
 // 동아리 일괄 입력 엑셀 템플릿 생성
@@ -213,7 +213,7 @@ export function exportClubTemplate(): number[] {
   const ws = XLSX.utils.aoa_to_sheet(rows)
   ws['!cols'] = [{ wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 5 }, { wch: 16 }]
   XLSX.utils.book_append_sheet(wb, ws, '동아리목록')
-  return Array.from(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as Uint8Array)
+  return xlsxWorkbookBytes(wb)
 }
 
 // 동아리 일괄 입력 엑셀 불러오기
@@ -247,5 +247,5 @@ export function exportStudentTemplate(): number[] {
   const ws = XLSX.utils.aoa_to_sheet(rows)
   ws['!cols'] = [{ wch: 5 }, { wch: 4 }, { wch: 5 }, { wch: 10 }]
   XLSX.utils.book_append_sheet(wb, ws, '학생명렬')
-  return Array.from(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as Uint8Array)
+  return xlsxWorkbookBytes(wb)
 }

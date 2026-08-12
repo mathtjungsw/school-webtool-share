@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import { JAGYEOK, HAKRYEOK, CAREER_TYPES, calcPeriod, calcConversion, type Period, type HobongResult } from './hobong'
+import { binaryToNumberArray } from '../utils/binaryBytes'
 
 export interface CareerRowData {
   content: string
@@ -122,8 +123,7 @@ export function exportHobongXlsx(data: HobongExportData): number[] {
   ]
   XLSX.utils.book_append_sheet(wb, wsD, '데이터')
 
-  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as Uint8Array
-  return Array.from(out)
+  return binaryToNumberArray(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }))
 }
 
 export function exportHobongTemplate(): number[] {
@@ -191,8 +191,7 @@ export function exportHobongTemplate(): number[] {
   wsGuide['!cols'] = [{ wch: 80 }]
   XLSX.utils.book_append_sheet(wb, wsGuide, '사용안내')
 
-  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' }) as Uint8Array
-  return Array.from(out)
+  return binaryToNumberArray(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }))
 }
 
 export function importHobongXlsx(buffer: ArrayBuffer): Partial<HobongExportData> {
