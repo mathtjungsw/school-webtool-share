@@ -12,7 +12,7 @@ import { startMonitoring, stopMonitoring, isMonitoringActive } from './notifier'
 import { getWeeklyPlanMonth } from './weekly-plan'
 import { getDutyScheduleMonth } from './duty-schedule'
 import { getCreativeScheduleMonth } from './creative-schedule'
-import { resolveSchoolHubEndpoint, UNGCHEON_SCHOOL_HUB_URL } from './school-hub-endpoint'
+import { getSchoolHubEndpointCandidates, resolveSchoolHubEndpoint, UNGCHEON_SCHOOL_HUB_URL } from './school-hub-endpoint'
 import { buildTimetablePlanHwp, type TimetablePlanDraftInput } from './timetable-plan-hwp'
 import {
   buildVolunteerCertificateHwp,
@@ -861,14 +861,16 @@ async function fetchSchoolHub(
   payload: Record<string, unknown>,
   action: string,
   timeoutMs: number,
+  forcePost = false,
 ) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    if (HUB_READ_ACTIONS.has(action)) {
+    if (HUB_READ_ACTIONS.has(action) && !forcePost) {
       const url = new URL(endpoint)
       url.searchParams.set('action', action)
       url.searchParams.set('payload', JSON.stringify(payload))
+      url.searchParams.set('_', String(Date.now()))
       return await net.fetch(url.toString(), {
         method: 'GET',
         signal: controller.signal,
@@ -890,40 +892,58 @@ async function fetchSchoolHub(
 }
 
 async function requestSchoolHub(payload: Record<string, unknown>) {
-  const endpoint = resolveSchoolHubEndpoint(store.get('config.schoolHubUrl', ''))
+  const configuredEndpoint = store.get('config.schoolHubUrl', '')
+  const endpointCandidates = getSchoolHubEndpointCandidates(configuredEndpoint)
   const action = String(payload.action ?? '')
   const largePayloadActions = new Set(['replaceStudentTimetable', 'replaceStudentRoster', 'replaceStaffRoster', 'replaceNeisSnapshot'])
   const maxRequestLength = largePayloadActions.has(action) ? 8_000_000 : 500_000
   if (JSON.stringify(payload).length > maxRequestLength) return { ok: false, error: '요청 데이터가 너무 큽니다.' }
   if (!HUB_ACTIONS.has(action)) return { ok: false, error: '허용되지 않는 요청입니다.' }
 
-  let parsed: URL
-  try { parsed = new URL(endpoint) } catch { return { ok: false, error: '공유 서비스 URL이 올바르지 않습니다.' } }
-  if (parsed.protocol !== 'https:' || parsed.hostname !== 'script.google.com') {
-    return { ok: false, error: 'Google Apps Script HTTPS 배포 URL만 사용할 수 있습니다.' }
-  }
-
   const isReadAction = HUB_READ_ACTIONS.has(action)
   const maxAttempts = isReadAction ? 3 : 1
   const timeoutMs = HUB_LARGE_DATA_ACTIONS.has(action) ? 60_000 : 15_000
   let lastError = ''
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      const res = await fetchSchoolHub(endpoint, payload, action, timeoutMs)
-      if (res.ok) return await res.json() as Record<string, unknown>
-
-      lastError = `공유 서비스 HTTP ${res.status}`
-      const canRetryStatus = res.status === 408 || res.status === 429 || res.status >= 500
-      if (!isReadAction || !canRetryStatus || attempt === maxAttempts) {
-        return { ok: false, error: lastError }
-      }
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error)
-      if (!isReadAction || attempt === maxAttempts) break
+  for (const [endpointIndex, endpoint] of endpointCandidates.entries()) {
+    let parsed: URL
+    try { parsed = new URL(endpoint) } catch {
+      lastError = '공유 서비스 URL이 올바르지 않습니다.'
+      continue
+    }
+    if (parsed.protocol !== 'https:' || parsed.hostname !== 'script.google.com') {
+      lastError = 'Google Apps Script HTTPS 배포 URL만 사용할 수 있습니다.'
+      continue
     }
 
-    await waitForHubRetry(attempt === 1 ? 350 : 900)
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        let res = await fetchSchoolHub(endpoint, payload, action, timeoutMs)
+        // 일부 학교망이나 Google 리디렉션 캐시에서 GET만 간헐적으로 404/405가
+        // 발생할 수 있다. 조회 요청은 부작용이 없으므로 같은 요청을 POST로 한 번 더 확인한다.
+        if (isReadAction && (res.status === 404 || res.status === 405)) {
+          res = await fetchSchoolHub(endpoint, payload, action, timeoutMs, true)
+        }
+        if (res.ok) {
+          const result = await res.json() as Record<string, unknown>
+          if (endpointIndex > 0 && endpoint === UNGCHEON_SCHOOL_HUB_URL) {
+            store.set('config.schoolHubUrl', UNGCHEON_SCHOOL_HUB_URL)
+          }
+          return result
+        }
+
+        lastError = `공유 서비스 HTTP ${res.status} (요청: ${action})`
+        const obsoleteDeployment = res.status === 404 || res.status === 410
+        if (obsoleteDeployment && endpointIndex < endpointCandidates.length - 1) break
+        const canRetryStatus = res.status === 408 || res.status === 429 || res.status >= 500
+        if (!isReadAction || !canRetryStatus || attempt === maxAttempts) break
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error)
+        if (!isReadAction || attempt === maxAttempts) break
+      }
+
+      await waitForHubRetry(attempt === 1 ? 350 : 900)
+    }
   }
 
   return {
