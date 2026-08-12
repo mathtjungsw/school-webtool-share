@@ -15,10 +15,11 @@ import {
 } from '../services/volunteerWork'
 
 const DRAFT_KEY = 'ungcheon.volunteer.certificateDraft.v1'
+const CLASS_DRAFT_KEY = 'ungcheon.volunteer.classCertificateDraft.v1'
 const NEIS_DATASETS_KEY = 'ungcheon.volunteer.neisDatasets.v1'
 
 export default function VolunteerWorkPage() {
-  const [tab, setTab] = useState<'issue' | 'verify'>('issue')
+  const [tab, setTab] = useState<'issue-class' | 'issue-department' | 'verify'>('issue-class')
   return (
     <div className="volunteer-work-page min-h-full p-6 lg:p-8 text-slate-900 dark:text-slate-100">
       <div className="mx-auto max-w-[1500px] space-y-5">
@@ -27,11 +28,12 @@ export default function VolunteerWorkPage() {
           <p className="page-subtitle">봉사활동 확인서 발급과 나이스 자료 검증을 한곳에서 처리합니다.</p>
         </header>
         <LocalOnlyNotice />
-        <div className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <TabButton active={tab === 'issue'} onClick={() => setTab('issue')} icon={<FilePlus2 size={17} />} label="봉사활동 확인서 발급" />
+        <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm md:grid-cols-3 dark:border-slate-700 dark:bg-slate-900">
+          <TabButton active={tab === 'issue-class'} onClick={() => setTab('issue-class')} icon={<FilePlus2 size={17} />} label="봉사활동 확인서(반별) 발급" />
+          <TabButton active={tab === 'issue-department'} onClick={() => setTab('issue-department')} icon={<FilePlus2 size={17} />} label="봉사활동 확인서(부서별) 발급" />
           <TabButton active={tab === 'verify'} onClick={() => setTab('verify')} icon={<FileCheck2 size={17} />} label="봉사활동 확인서 검증(봉사활동담당자)" />
         </div>
-        {tab === 'issue' ? <IssuanceTab /> : <VerificationTab />}
+        {tab === 'issue-class' ? <ClassIssuanceTab /> : tab === 'issue-department' ? <IssuanceTab /> : <VerificationTab />}
       </div>
     </div>
   )
@@ -49,6 +51,113 @@ function LocalOnlyNotice() {
       </div>
     </div>
   )
+}
+
+function ClassIssuanceTab() {
+  const teacherName = useAppStore(state => state.config.teacherName)
+  const [draft, setDraft] = useState<VolunteerCertificateDraft>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CLASS_DRAFT_KEY) || '{}') as Partial<VolunteerCertificateDraft>
+      return { ...emptyVolunteerDraft(teacherName), ...saved, students: Array.isArray(saved.students) ? saved.students.map(student => ({ ...student, studentId: volunteerStudentId(student.studentId) })) : [] }
+    } catch { return emptyVolunteerDraft(teacherName) }
+  })
+  const [roster, setRoster] = useState<SharedStudentRoster | null>(null)
+  const [selectedClass, setSelectedClass] = useState('')
+  const [commonHours, setCommonHours] = useState<number | string>(1)
+  const [loadingRoster, setLoadingRoster] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const [storeCopy, setStoreCopy] = useState(true)
+  const errors = useMemo(() => validateIssuanceDraft(draft), [draft])
+  const capacity = draft.students.length <= 20 ? 20 : draft.students.length <= 40 ? 40 : draft.students.length <= 60 ? 60 : 68
+  const classOptions = useMemo(() => roster ? [...new Set(roster.students.map(student => `${student.grade}-${student.className}`))].sort((a, b) => a.localeCompare(b, 'ko', { numeric: true })) : [], [roster])
+
+  useEffect(() => { localStorage.setItem(CLASS_DRAFT_KEY, JSON.stringify(draft)) }, [draft])
+  useEffect(() => { void loadClassRoster() }, [])
+
+  const update = <K extends keyof VolunteerCertificateDraft>(key: K, value: VolunteerCertificateDraft[K]) => setDraft(current => ({ ...current, [key]: value }))
+  const updateStudent = (id: string, patch: Partial<VolunteerStudentRow>) => update('students', draft.students.map(row => row.id === id ? { ...row, ...patch } : row))
+
+  async function loadClassRoster(force = false) {
+    setLoadingRoster(true)
+    try {
+      const next = await getSharedStudentRoster(force)
+      setRoster(next)
+      if (!next?.students.length) setMessage('공유 학생 명렬을 불러오지 못했습니다. 관리자에게 학생 명렬 등록 상태를 확인해 달라고 요청하세요.')
+    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    finally { setLoadingRoster(false) }
+  }
+
+  const chooseClass = (classLabel: string) => {
+    setSelectedClass(classLabel)
+    if (!roster || !classLabel) { update('students', []); return }
+    const [grade, className] = classLabel.split('-')
+    const students = roster.students
+      .filter(student => student.grade === grade && student.className === className)
+      .sort((a, b) => Number(a.number) - Number(b.number) || a.studentId.localeCompare(b.studentId, 'ko'))
+      .map(student => createVolunteerRow({ studentId: volunteerStudentId(student.studentId), name: student.name, hours: commonHours, remarks: '' }))
+    update('students', students)
+    setMessage(`${grade}학년 ${className}반 ${students.length}명의 명렬을 불러왔습니다. 결석·결과 등 예외 학생만 표시해 주세요.`)
+  }
+
+  const changeCommonHours = (value: string) => {
+    const next = value === '' ? '' : Number(value)
+    setCommonHours(next)
+    setDraft(current => ({ ...current, students: current.students.map(student => student.remarks ? student : { ...student, hours: next }) }))
+  }
+
+  const setException = (id: string, reason: string) => {
+    updateStudent(id, { remarks: reason, hours: reason || commonHours })
+  }
+
+  const issueHwp = async () => {
+    if (errors.length) { setMessage(errors[0]); return }
+    setBusy(true)
+    try {
+      const bytes = await window.electron.buildVolunteerHwp(draft)
+      const safeActivity = draft.activityName.replace(/[\\/:*?"<>|]/g, '_')
+      const fileName = `봉사활동_확인서_${selectedClass || '반별'}_${safeActivity}_${draft.startDate}.hwp`
+      const saved = await window.electron.saveFileDialog(fileName, bytes)
+      if (!saved) { setMessage('저장을 취소했습니다.'); return }
+      if (storeCopy) await window.electron.storeGeneratedVolunteerHwp(fileName, bytes)
+      setMessage(`반별 HWP 확인서를 저장했습니다.${storeCopy ? ' 검증용 로컬 보관함에도 복사했습니다.' : ''}`)
+    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    finally { setBusy(false) }
+  }
+
+  return <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+    <section className="space-y-5">
+      <Panel title="1. 반 명렬 불러오기" subtitle="공유 학생 명렬 원본은 수정하지 않고 선택한 반을 발급용 명단으로만 복사합니다.">
+        <div className="grid gap-3 md:grid-cols-[1fr_180px_auto]">
+          <Field label="학급 선택 *"><select value={selectedClass} onChange={event => chooseClass(event.target.value)}><option value="">학급을 선택하세요</option>{classOptions.map(value => <option key={value} value={value}>{value}반</option>)}</select></Field>
+          <Field label="학급 공통 시수 *"><input type="number" min="0.5" step="0.5" value={commonHours} onChange={event => changeCommonHours(event.target.value)} /></Field>
+          <button type="button" onClick={() => void loadClassRoster(true)} disabled={loadingRoster} className="self-end rounded-xl border border-slate-300 px-4 py-3 text-sm font-black dark:border-slate-600"><RefreshCw size={15} className={clsx('mr-1 inline', loadingRoster && 'animate-spin')} />명렬 새로고침</button>
+        </div>
+        <p className="mt-3 rounded-xl bg-blue-50 p-3 text-xs font-bold text-blue-950 dark:bg-blue-950/50 dark:text-blue-100">선택한 반 전체에 공통 시수가 입력됩니다. 예외 사유를 입력한 학생은 시수 대신 `결석`, `결과`, `조퇴` 등의 문구가 확인서에 표시됩니다.</p>
+      </Panel>
+
+      <Panel title="2. 활동 정보 입력" subtitle="봉사활동 확인서에 들어갈 내용을 입력합니다.">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <Field label="봉사활동명 *"><input value={draft.activityName} onChange={event => update('activityName', event.target.value)} /></Field>
+          <Field label="활동 시작일 *"><input type="date" value={draft.startDate} onChange={event => update('startDate', event.target.value)} /></Field>
+          <Field label="활동 종료일 *"><input type="date" value={draft.endDate} onChange={event => update('endDate', event.target.value)} /></Field>
+          <Field label="활동 기관 *"><input value={draft.institution} onChange={event => update('institution', event.target.value)} /></Field>
+          <Field label="활동 장소"><input value={draft.location} onChange={event => update('location', event.target.value)} /></Field>
+          <Field label="활동 영역"><select value={draft.area} onChange={event => update('area', event.target.value as VolunteerCertificateDraft['area'])}><option value="neighbor">이웃돕기활동</option><option value="environment">환경보호활동</option><option value="campaign">캠페인활동</option></select></Field>
+          <Field label="활동 내용 *" wide><input value={draft.activityContent} onChange={event => update('activityContent', event.target.value)} /></Field>
+          <Field label="확인 교사 *"><input value={draft.confirmTeacher} onChange={event => update('confirmTeacher', event.target.value)} /></Field>
+          <Field label="공통 비고"><input value={draft.commonRemarks} onChange={event => update('commonRemarks', event.target.value)} /></Field>
+        </div>
+      </Panel>
+
+      <Panel title="3. 학생별 예외 확인" subtitle="정상 참여 학생은 그대로 두고 결석·결과 등 예외가 있는 학생만 입력합니다.">
+        <datalist id="volunteer-exception-options"><option value="결석" /><option value="결과" /><option value="조퇴" /><option value="지각" /><option value="병결" /><option value="인정결석" /><option value="미참여" /></datalist>
+        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700"><table className="w-full min-w-[650px] text-sm"><thead className="bg-slate-100 dark:bg-slate-800"><tr><th className="w-16 p-2">번호</th><th className="w-24 p-2">학번</th><th className="p-2">이름</th><th className="w-44 p-2">예외 사유</th><th className="w-28 p-2">출력 내용</th></tr></thead><tbody>{draft.students.map((student, index) => <tr key={student.id} className="border-t border-slate-200 dark:border-slate-700"><td className="p-2 text-center font-bold">{index + 1}</td><td className="p-2 text-center font-black">{student.studentId}</td><td className="p-2 font-bold">{student.name}</td><td className="p-2"><input list="volunteer-exception-options" value={student.remarks} onChange={event => setException(student.id, event.target.value)} placeholder="정상 참여 시 비워둠" /></td><td className={clsx('p-2 text-center font-black', student.remarks ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300')}>{student.remarks || `${commonHours}시간`}</td></tr>)}</tbody></table>{!draft.students.length && <p className="p-8 text-center text-sm font-bold text-slate-600 dark:text-slate-300">학급을 선택하면 반 전체 명렬이 표시됩니다.</p>}</div>
+      </Panel>
+    </section>
+
+    <aside className="space-y-5"><Panel title="4. 확인하고 발급" subtitle="반 명렬과 예외 내용을 확인한 뒤 한글 파일을 저장합니다."><div className="grid grid-cols-2 gap-3"><Summary label="학급 인원" value={`${draft.students.length}명`} /><Summary label="예외 학생" value={`${draft.students.filter(student => student.remarks).length}명`} /><Summary label="공통 시수" value={`${commonHours || '-'}시간`} /><Summary label="선택 양식" value={draft.students.length > 68 ? '분할 필요' : `${capacity}명 고정 양식`} /></div>{errors.length > 0 && <div className="mt-4 max-h-40 overflow-y-auto rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-semibold text-rose-900 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-100">{errors.slice(0, 8).map(error => <p key={error}>• {error}</p>)}</div>}<label className="mt-4 flex items-start gap-2 rounded-xl border border-slate-200 p-3 text-sm font-bold dark:border-slate-700"><input type="checkbox" className="mt-1" checked={storeCopy} onChange={event => setStoreCopy(event.target.checked)} /><span>발급한 HWP를 검증용 로컬 보관함에도 저장</span></label><button disabled={busy || errors.length > 0} onClick={() => void issueHwp()} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-black text-white disabled:opacity-50"><Download size={18} />{busy ? 'HWP 만드는 중…' : '반별 한글(HWP) 확인서 저장'}</button>{message && <p className="mt-4 rounded-xl bg-slate-100 p-3 text-sm font-bold dark:bg-slate-800">{message}</p>}</Panel></aside>
+  </div>
 }
 
 function IssuanceTab() {
@@ -192,6 +301,7 @@ function VerificationTab() {
   const [comparison, setComparison] = useState<VolunteerRosterComparisonResult | null>(null)
   const [selectedClass, setSelectedClass] = useState('all')
   const [message, setMessage] = useState('')
+  const [importProgress, setImportProgress] = useState('')
   const [busy, setBusy] = useState(false)
   const [editingFile, setEditingFile] = useState<StoredVolunteerHwp | null>(null)
   const [editingForms, setEditingForms] = useState<ParsedVolunteerForm[]>([])
@@ -215,6 +325,7 @@ function VerificationTab() {
     const paths = await window.electron.openFilesDialog([{ name: '봉사활동 확인서(HWP·PDF)', extensions: ['hwp', 'pdf'] }])
     if (!paths.length) return
     setBusy(true)
+    setImportProgress('확인서 파일을 준비하고 있습니다.')
     try {
       const current = [...files]
       let added = 0
@@ -227,7 +338,9 @@ function VerificationTab() {
           : false
         if (duplicate && !allowDuplicate) { skipped += 1; continue }
         if (path.toLowerCase().endsWith('.pdf')) {
-          setMessage(`PDF 문서 형식을 확인하고 있습니다: ${fileNameFromPath(path)}\n스캔 문서이면 이 PC에서 오프라인 OCR을 실행하므로 페이지당 수 초가 걸릴 수 있습니다.`)
+          setImportProgress(`PDF 문서 형식을 확인하고 있습니다: ${fileNameFromPath(path)} · 스캔 문서이면 이 PC에서 오프라인 OCR을 실행하므로 페이지당 수 초가 걸릴 수 있습니다.`)
+        } else {
+          setImportProgress(`HWP 확인서를 읽고 있습니다: ${fileNameFromPath(path)}`)
         }
         const stored = await window.electron.importVolunteerHwp(path, allowDuplicate)
         current.push(stored)
@@ -237,7 +350,7 @@ function VerificationTab() {
       setComparison(null)
       setMessage(`${added}개 확인서를 이 PC의 검증용 보관함에 추가했습니다.${skipped ? ` 중복 등록을 취소한 ${skipped}개는 건너뛰었습니다.` : ''}`)
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
-    finally { setBusy(false) }
+    finally { setBusy(false); setImportProgress('') }
   }
 
   const editOcr = async (file: StoredVolunteerHwp) => {
@@ -314,25 +427,61 @@ function VerificationTab() {
     finally { setBusy(false) }
   }
 
+  const buildComparison = async (fileList: StoredVolunteerHwp[], currentRoster: SharedStudentRoster) => {
+    const hwpSources = await Promise.all(fileList.map(async file => ({
+      id: file.id,
+      originalName: file.originalName,
+      forms: await window.electron.parseVolunteerHwp(file.id),
+    })))
+    return compareVolunteerRosterSources(neisDatasets, hwpSources, currentRoster.students)
+  }
+
   const verify = async () => {
     if (!files.length) { setMessage('먼저 확인서 HWP 또는 PDF 파일을 한 개 이상 추가해 주세요.'); return }
     if (!neisDatasets.length) { setMessage('먼저 나이스 XLS data 파일을 한 개 이상 누적해 주세요.'); return }
     setBusy(true)
     try {
-      const hwpSources = await Promise.all(files.map(async file => ({
-        id: file.id,
-        originalName: file.originalName,
-        forms: await window.electron.parseVolunteerHwp(file.id),
-      })))
       const currentRoster = roster || await loadRoster(true)
       if (!currentRoster?.students.length) throw new Error('학교 공유 서버의 학생 명렬을 불러오지 못했습니다. 학교 공유 서비스 연결을 확인해 주세요.')
-      const result = compareVolunteerRosterSources(neisDatasets, hwpSources, currentRoster.students)
+      const result = await buildComparison(files, currentRoster)
       setComparison(result)
       setSelectedClass('all')
       const problemCount = result.rows.filter(row => row.status !== 'matched').length + result.unclassified.length + result.duplicates.length
       setMessage(problemCount
         ? `전체 누적 자료 검증을 마쳤습니다. 활동 누락·미분류·중복 확인 항목 ${problemCount}건이 있습니다.`
         : `검증 완료: ${result.rows.length}개 활동 기록의 내용과 시간이 모두 일치합니다.`)
+    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    finally { setBusy(false) }
+  }
+
+  const correctUnclassified = async (row: VolunteerRosterComparisonRow, studentId: string, name: string, correction: string) => {
+    const target = row.correctionTarget
+    if (!target) { setMessage('수정할 확인서 원본 위치를 찾지 못했습니다.'); return }
+    const nextId = volunteerStudentId(studentId)
+    const nextName = name.trim()
+    if (!/^[1-3]\d{3}$/.test(nextId) || !nextName) { setMessage('수정할 4자리 학번과 학생 이름을 확인해 주세요.'); return }
+    setBusy(true)
+    try {
+      const forms = await window.electron.parseVolunteerHwp(target.sourceId)
+      const formPosition = forms.findIndex(form => form.formIndex === target.formIndex)
+      const formIndex = formPosition >= 0 ? formPosition : target.formIndex
+      const participant = forms[formIndex]?.participants[target.participantIndex]
+      if (!participant) throw new Error('수정할 확인서 학생 행을 찾지 못했습니다.')
+      const note = `${correction}: ${participant.studentId || '-'} ${participant.name || '-'} → ${nextId} ${nextName}`
+      const nextForms = forms.map((form, currentFormIndex) => currentFormIndex === formIndex ? {
+        ...form,
+        participants: form.participants.map((student, currentStudentIndex) => currentStudentIndex === target.participantIndex ? { ...student, studentId: nextId, name: nextName, correctionNote: note } : student),
+      } : form)
+      const updated = await window.electron.updateVolunteerForms(target.sourceId, nextForms)
+      const nextFiles = files.map(file => file.id === updated.id ? updated : file)
+      setFiles(nextFiles)
+      const currentRoster = roster || await loadRoster(true)
+      if (!currentRoster?.students.length) throw new Error('학교 공유 서버의 학생 명렬을 불러오지 못했습니다.')
+      const result = await buildComparison(nextFiles, currentRoster)
+      setComparison(result)
+      const stillUnclassified = result.unclassified.some(item => item.correctionTarget?.sourceId === target.sourceId && item.correctionTarget.formIndex === target.formIndex && item.correctionTarget.participantIndex === target.participantIndex)
+      setSelectedClass(stillUnclassified ? 'unclassified' : `${nextId[0]}-${Number(nextId[1])}`)
+      setMessage(stillUnclassified ? '수정 내용이 학생 명렬과 아직 일치하지 않습니다. 학번과 이름을 다시 확인해 주세요.' : `${nextId} ${nextName} 학생으로 수기 수정했고 해당 반 탭으로 이동했습니다.`)
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
     finally { setBusy(false) }
   }
@@ -361,6 +510,15 @@ function VerificationTab() {
     ? [...new Set(comparison.rows.filter(row => row.grade && row.className).map(row => `${row.grade}-${row.className}`))]
       .sort((a, b) => a.localeCompare(b, 'ko', { numeric: true }))
     : [], [comparison])
+  const rosterById = useMemo(() => new Map((roster?.students || []).map(student => [volunteerStudentId(student.studentId), student])), [roster])
+  const rosterByName = useMemo(() => {
+    const map = new Map<string, SharedStudentRoster['students']>()
+    for (const student of roster?.students || []) {
+      const key = student.name.replace(/\s+/g, '')
+      map.set(key, [...(map.get(key) || []), student])
+    }
+    return map
+  }, [roster])
   const visibleRows = useMemo(() => {
     if (!comparison) return []
     if (selectedClass === 'unclassified') return comparison.unclassified
@@ -386,6 +544,7 @@ function VerificationTab() {
           <div className="flex flex-wrap gap-2"><ActionButton onClick={importHwp} icon={<FilePlus2 size={15} />} disabled={busy}>확인서 추가(HWP·PDF)</ActionButton><ActionButton onClick={refresh} icon={<RefreshCw size={15} />}>목록 새로고침</ActionButton></div>
           <div className="mt-3 rounded-xl border border-blue-300 bg-blue-50 p-3 text-xs font-bold text-blue-950 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-100"><HardDrive size={15} className="mr-1 inline" />앱 전용 로컬 복사본만 보관합니다. 구글시트·학교 공유 서버에는 파일명이나 내용도 보내지 않습니다.</div>
           <p className="mt-3 text-sm font-bold">누적: <span className="text-emerald-700 dark:text-emerald-300">{files.length}개 파일 · {files.reduce((sum, file) => sum + file.formCount, 0)}개 확인서</span></p>
+          {importProgress && <div className="mt-3 flex items-start gap-2 rounded-xl border border-sky-300 bg-sky-50 px-3 py-2.5 text-xs font-black leading-relaxed text-sky-950 dark:border-sky-700 dark:bg-sky-950/50 dark:text-sky-100"><RefreshCw size={15} className="mt-0.5 shrink-0 animate-spin" /><span>{importProgress}</span></div>}
         </Panel>
       </div>
 
@@ -411,7 +570,12 @@ function VerificationTab() {
         <div className="mt-5 flex flex-wrap gap-2"><button onClick={() => setSelectedClass('all')} className={classFilterClass(selectedClass === 'all')}>전체 {comparison.rows.length}행</button>{classOptions.map(className => <button key={className} onClick={() => setSelectedClass(className)} className={classFilterClass(selectedClass === className)}>{className}반 {comparison.rows.filter(row => `${row.grade}-${row.className}` === className).length}행</button>)}<button onClick={() => setSelectedClass('unclassified')} className={classFilterClass(selectedClass === 'unclassified', true)}>미분류 {comparison.unclassified.length}행</button></div>
         {selectedClass === 'unclassified' && <div className="mt-4 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-950 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-100">미분류에는 확인서에 사람이 잘못 입력한 것으로 보이는 학번·이름이 모입니다. 나이스 자료는 신뢰하고 별도의 명렬 검사를 하지 않습니다.</div>}
         <p className="mt-3 text-xs font-semibold text-slate-600 dark:text-slate-300">활동 내용·기간·시간 칸에 마우스를 올리면 원본 파일명과 Excel 행 또는 HWP 내 확인서 위치를 볼 수 있습니다.</p>
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700"><table className="w-full min-w-[1360px] table-fixed text-sm"><colgroup><col className="w-[105px]" /><col className="w-[75px]" /><col className="w-[90px]" /><col className="w-[220px]" /><col className="w-[155px]" /><col className="w-[80px]" /><col className="w-[220px]" /><col className="w-[155px]" /><col className="w-[80px]" /><col className="w-[210px]" /></colgroup><thead className="bg-slate-100 dark:bg-slate-800"><tr><th className="p-2">상태</th><th className="p-2">학번</th><th className="p-2">이름</th><th className="p-2 text-left">나이스 활동 내용</th><th className="p-2">기간</th><th className="p-2">시간</th><th className="p-2 text-left">확인서 활동 내용</th><th className="p-2">기간</th><th className="p-2">시간</th><th className="p-2 text-left">판정</th></tr></thead><tbody>{visibleRows.map(row => <RosterComparisonRow key={row.id} row={row} />)}</tbody></table></div>
+        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700"><table className="w-full min-w-[1180px] table-fixed text-xs"><colgroup><col className="w-[78px]" /><col className="w-[62px]" /><col className="w-[72px]" /><col className="w-[170px]" /><col className="w-[120px]" /><col className="w-[58px]" /><col className="w-[170px]" /><col className="w-[120px]" /><col className="w-[58px]" /><col className="w-[272px]" /></colgroup><thead className="bg-slate-100 dark:bg-slate-800"><tr><th className="p-1.5">상태</th><th className="p-1.5">학번</th><th className="p-1.5">이름</th><th className="p-1.5 text-left">나이스 활동 내용</th><th className="p-1.5">기간</th><th className="p-1.5">시간</th><th className="p-1.5 text-left">확인서 활동 내용</th><th className="p-1.5">기간</th><th className="p-1.5">시간</th><th className="p-1.5 text-left">판정·수정</th></tr></thead><tbody>{visibleRows.map(row => {
+          const suggestedName = rosterById.get(row.studentId)?.name || ''
+          const sameName = rosterByName.get(row.displayName.replace(/\s+/g, '')) || []
+          const suggestedId = sameName.length === 1 ? volunteerStudentId(sameName[0].studentId) : ''
+          return <RosterComparisonRow key={row.id} row={row} suggestedName={suggestedName} suggestedId={suggestedId} onCorrect={(studentId, name, correction) => void correctUnclassified(row, studentId, name, correction)} />
+        })}</tbody></table></div>
         {!visibleRows.length && <p className="py-6 text-center text-sm font-bold text-slate-600 dark:text-slate-300">선택한 반의 자료가 없습니다.</p>}
         {comparison.duplicates.length > 0 && <div className="mt-5"><h3 className="font-black text-rose-800 dark:text-rose-200">중복 자료 상세</h3><div className="mt-2 overflow-x-auto rounded-xl border border-rose-200 dark:border-rose-800"><table className="w-full min-w-[850px] text-sm"><thead className="bg-rose-50 dark:bg-rose-950/40"><tr><th className="p-3">자료</th><th className="p-3">학번</th><th className="p-3">이름</th><th className="p-3">중복 횟수</th><th className="p-3 text-left">활동</th></tr></thead><tbody>{comparison.duplicates.map((duplicate, index) => <tr key={`${duplicate.source}-${duplicate.studentId}-${index}`} className="border-t border-rose-200 dark:border-rose-800"><td className="p-3 font-black">{duplicate.source === 'neis' ? '나이스' : '확인서'}</td><td className="p-3 font-bold">{duplicate.studentId}</td><td className="p-3 font-bold">{duplicate.name}</td><td className="p-3 text-center font-black text-rose-700 dark:text-rose-300">{duplicate.count}회</td><td className="cursor-help p-3" title={`원본 파일: ${duplicate.sourceNames.join(', ')}`}><b>{duplicate.activity || '활동명 없음'}</b><small className="ml-2 text-slate-500 dark:text-slate-400">(파일 정보는 마우스를 올려 확인)</small></td></tr>)}</tbody></table></div></div>}
       </Panel>}
@@ -419,7 +583,10 @@ function VerificationTab() {
   )
 }
 
-function RosterComparisonRow({ row }: { row: VolunteerRosterComparisonRow }) {
+function RosterComparisonRow({ row, suggestedName, suggestedId, onCorrect }: { row: VolunteerRosterComparisonRow; suggestedName?: string; suggestedId?: string; onCorrect?: (studentId: string, name: string, correction: string) => void }) {
+  const [manual, setManual] = useState(false)
+  const [manualId, setManualId] = useState(row.studentId)
+  const [manualName, setManualName] = useState(row.displayName === '(이름 없음)' ? '' : row.displayName)
   const status = {
     matched: { label: '일치', icon: CheckCircle2, style: 'text-emerald-800 dark:text-emerald-200' },
     'neis-only': { label: '나이스에만', icon: AlertTriangle, style: 'text-amber-800 dark:text-amber-200' },
@@ -427,14 +594,14 @@ function RosterComparisonRow({ row }: { row: VolunteerRosterComparisonRow }) {
     unclassified: { label: '미분류', icon: XCircle, style: 'text-rose-800 dark:text-rose-200' },
   }[row.status]
   const Icon = status.icon
-  return <tr className={clsx('border-t border-slate-200 align-middle dark:border-slate-700', row.status === 'matched' ? 'bg-emerald-50/40 dark:bg-emerald-950/10' : row.status === 'unclassified' ? 'bg-rose-50/50 dark:bg-rose-950/20' : 'bg-amber-50/30 dark:bg-amber-950/10')}><td className={clsx('whitespace-nowrap p-2 font-black', status.style)}><Icon size={15} className="mr-1 inline" />{status.label}</td><td className="p-2 text-center font-black">{row.studentId || '-'}</td><td className="truncate p-2 text-center font-bold" title={row.displayName}>{row.displayName}</td><ActivitySideCells side={row.neis} /><ActivitySideCells side={row.hwp} /><td className="cursor-help p-2 font-semibold"><p className="line-clamp-2 leading-5" title={row.message}>{row.message}</p></td></tr>
+  return <tr className={clsx('border-t border-slate-200 align-middle dark:border-slate-700', row.status === 'matched' ? 'bg-emerald-50/40 dark:bg-emerald-950/10' : row.status === 'unclassified' ? 'bg-rose-50/50 dark:bg-rose-950/20' : 'bg-amber-50/30 dark:bg-amber-950/10')}><td className={clsx('whitespace-nowrap p-1.5 font-black', status.style)}><Icon size={13} className="mr-1 inline" />{status.label}</td><td className="p-1.5 text-center font-black">{row.studentId || '-'}</td><td className="truncate p-1.5 text-center font-bold" title={row.displayName}>{row.displayName}</td><ActivitySideCells side={row.neis} /><ActivitySideCells side={row.hwp} /><td className="p-1.5 font-semibold"><p className="line-clamp-2 leading-4" title={row.message}>{row.message}</p>{row.status === 'unclassified' && onCorrect && <div className="mt-1.5 flex flex-wrap gap-1">{suggestedId && <button type="button" onClick={() => onCorrect(suggestedId, row.displayName, '학번 맞춤')} className="rounded border border-sky-400 px-1.5 py-1 text-[10px] font-black text-sky-800 dark:text-sky-200">학번맞추기</button>}{suggestedName && <button type="button" onClick={() => onCorrect(row.studentId, suggestedName, '이름 맞춤')} className="rounded border border-emerald-400 px-1.5 py-1 text-[10px] font-black text-emerald-800 dark:text-emerald-200">이름맞추기</button>}<button type="button" onClick={() => setManual(value => !value)} className="rounded border border-amber-400 px-1.5 py-1 text-[10px] font-black text-amber-800 dark:text-amber-200">수기수정</button></div>}{manual && <div className="mt-1.5 grid grid-cols-[72px_1fr_auto] gap-1"><input inputMode="numeric" maxLength={5} value={manualId} onChange={event => setManualId(event.target.value.replace(/\D/g, '').slice(0, 5))} placeholder="학번" className="px-1 py-1 text-[10px]" /><input value={manualName} onChange={event => setManualName(event.target.value)} placeholder="이름" className="px-1 py-1 text-[10px]" /><button type="button" onClick={() => onCorrect?.(manualId, manualName, '직접 입력')} className="rounded bg-amber-500 px-1.5 py-1 text-[10px] font-black text-slate-950">적용</button></div>}</td></tr>
 }
 
 function ActivitySideCells({ side }: { side: VolunteerRosterComparisonRow['neis'] }) {
-  if (!side) return <><td className="p-2 font-bold text-slate-500 dark:text-slate-400">기록 없음</td><td className="p-2 text-center text-slate-500 dark:text-slate-400">-</td><td className="p-2 text-center text-slate-500 dark:text-slate-400">-</td></>
+  if (!side) return <><td className="p-1.5 font-bold text-slate-500 dark:text-slate-400">기록 없음</td><td className="p-1.5 text-center text-slate-500 dark:text-slate-400">-</td><td className="p-1.5 text-center text-slate-500 dark:text-slate-400">-</td></>
   const date = [side.startDate, side.endDate].filter(Boolean).join(' ~ ')
   const sourceTooltip = [`원본 파일: ${side.sourceName}`, side.sourceLocation && `원본 위치: ${side.sourceLocation}`].filter(Boolean).join('\n')
-  return <><td className="cursor-help p-2" title={sourceTooltip}><div className="flex min-w-0 items-center gap-1.5"><p className="truncate font-black">{side.content || '활동 내용 없음'}</p>{side.duplicateCount > 1 && <span className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[11px] font-black text-rose-800 dark:bg-rose-900/50 dark:text-rose-100">{side.duplicateCount}회</span>}</div></td><td className="cursor-help truncate p-2 text-center font-semibold" title={`${date || '기간 미입력'}\n${sourceTooltip}`}>{date || '-'}</td><td className="cursor-help whitespace-nowrap p-2 text-center font-black text-blue-900 dark:text-blue-200" title={sourceTooltip}>{side.hours == null ? '미입력' : `${side.hours}시간`}</td></>
+  return <><td className="cursor-help p-1.5" title={sourceTooltip}><div className="flex min-w-0 items-center gap-1"><p className="truncate font-black">{side.content || '활동 내용 없음'}</p>{side.duplicateCount > 1 && <span className="shrink-0 rounded-full bg-rose-100 px-1 py-0.5 text-[9px] font-black text-rose-800 dark:bg-rose-900/50 dark:text-rose-100">{side.duplicateCount}회</span>}</div></td><td className="cursor-help truncate p-1.5 text-center font-semibold" title={`${date || '기간 미입력'}\n${sourceTooltip}`}>{date || '-'}</td><td className="cursor-help whitespace-nowrap p-1.5 text-center font-black text-blue-900 dark:text-blue-200" title={sourceTooltip}>{side.hours == null ? '미입력' : `${side.hours}시간`}</td></>
 }
 
 function loadNeisDatasets(): StoredVolunteerNeisDataset[] {

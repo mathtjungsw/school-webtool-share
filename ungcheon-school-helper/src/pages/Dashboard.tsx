@@ -59,6 +59,7 @@ import {
 } from '../services/specialTimetableDays'
 import type { CreativeScheduleResult, DutyScheduleResult, MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
 import { isTimetableChangeAppliedForTeacher, listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
+import { listPulledLessonsForTeacher, pulledLessonTitle, type PulledLesson } from '../services/pulledLessons'
 import {
   addDays, eachDayOfInterval, endOfMonth, endOfWeek, format,
   isSameMonth, startOfMonth, startOfWeek,
@@ -81,7 +82,7 @@ interface PortfolioGroup { group: string; color: string; items: PortfolioItem[] 
 interface DashboardScheduleEvent {
   date: string
   eventName: string
-  source: 'neis' | 'weekly' | 'creative' | 'schoolEvent' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty' | 'timetableChange'
+  source: 'neis' | 'weekly' | 'creative' | 'schoolEvent' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty' | 'timetableChange' | 'pulledLesson'
   department?: string
   completed?: boolean
   taskId?: string
@@ -347,6 +348,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const hasNeisApiKey = Boolean(config.schoolHubUrl?.trim())
   const periodRanges = UNGCHEON_PERIOD_RANGES
   const hasTeacher = !!(config.teacherClasses?.length)
+  const pulledLessons = useMemo(() => listPulledLessonsForTeacher(config.teacherName?.trim() ?? ''), [config.teacherName])
 
   useEffect(() => {
     if (!config.schoolHubUrl || !config.teacherName?.trim()) {
@@ -647,6 +649,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       department: '시간표 운영',
       source: 'schoolEvent' as const,
     })),
+    ...pulledLessons.map(item => ({
+      date: toYmd(item.date),
+      eventName: pulledLessonTitle(item),
+      department: '당김수업',
+      source: 'pulledLesson' as const,
+    })),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.eventName.localeCompare(b.eventName))
   const upcomingCommitteeEvents = committeeEvents
     .filter(item => item.date >= todayStr() && item.date <= format(addDays(new Date(), 7), 'yyyy-MM-dd'))
@@ -681,6 +689,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       timetable.filter(t => t.date === getTimetableSourceDate(selYmd))
         .forEach(t => { todaySubjects[String(t.period)] = t.subject })
     }
+    pulledLessons.filter(item => item.date === selectedDate).forEach(item => {
+      todaySubjects[String(item.period)] = `당김 ${item.classLabel} ${item.subject}`
+    })
   }
   const classStatus = isToday ? getClassStatus(periodRanges, currentTime, todaySubjects) : null
   const specialTimetableDay = getSpecialTimetableDay(selectedDate)
@@ -887,6 +898,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                 classStatus={classStatus}
                 onNavigate={onNavigate}
                 timetableChanges={timetableChanges}
+                pulledLessons={pulledLessons}
               />
             </DashCard>
           </div>
@@ -1075,6 +1087,8 @@ function TwoWeekScheduleCalendar({
               ? '창체 학사일정'
               : event.source === 'timetableChange'
                 ? '수업변경'
+                : event.source === 'pulledLesson'
+                  ? '당김수업'
                 : 'NEIS'
   const sourceClass = (event: DashboardScheduleEvent) => event.source === 'weekly'
     ? 'border-sky-400 bg-sky-500/15 text-sky-200'
@@ -1094,6 +1108,8 @@ function TwoWeekScheduleCalendar({
               ? 'border-indigo-400 bg-indigo-500/15 text-indigo-200'
               : event.source === 'timetableChange'
                 ? 'border-fuchsia-400 bg-fuchsia-500/15 text-fuchsia-200 font-semibold'
+                : event.source === 'pulledLesson'
+                  ? 'border-lime-500 bg-lime-500/15 text-lime-100 font-semibold'
                 : 'border-violet-400 bg-violet-500/15 text-violet-200'
 
   return (
@@ -1110,6 +1126,7 @@ function TwoWeekScheduleCalendar({
           <span className="calendar-legend-text flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-cyan-500" />등교지도</span>
           <span className="calendar-legend-text flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500" />급식지도</span>
           <span className="calendar-legend-text flex items-center gap-1 text-fuchsia-300"><span className="h-2 w-2 rounded-full bg-fuchsia-400" />수업변경</span>
+          <span className="calendar-legend-text flex items-center gap-1 text-lime-300"><span className="h-2 w-2 rounded-full bg-lime-500" />당김수업</span>
         </div>
         <div className="flex items-center gap-2"><label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-violet-400/15 bg-violet-500/5 px-2 py-1 text-[10px] text-violet-200"><input type="checkbox" checked={showNeis} onChange={event => onToggleNeis(event.target.checked)} />NEIS 학사일정 켜기</label><button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />월간 캘린더<ArrowUpRight size={11} /></button></div>
       </div>
@@ -1586,7 +1603,7 @@ function ClassStatusBanner({ status }: { status: ClassStatus }) {
 
 // ─── TimetableSection ─────────────────────────────────────────────
 function TimetableSection({
-  timetable, teacherTT, sharedTeacher, selectedDate, config, periodRanges, currentTime, classStatus, onNavigate, timetableChanges
+  timetable, teacherTT, sharedTeacher, selectedDate, config, periodRanges, currentTime, classStatus, onNavigate, timetableChanges, pulledLessons
 }: {
   timetable: TimetableEntry[]
   teacherTT: TimetableEntry[]
@@ -1598,6 +1615,7 @@ function TimetableSection({
   classStatus: ClassStatus | null
   onNavigate: (id: string) => void
   timetableChanges: TimetableChangeRequest[]
+  pulledLessons: PulledLesson[]
 }) {
   const weekDates = getWeekDates(selectedDate)
   const DAY = ['월','화','수','목','금']
@@ -1620,7 +1638,7 @@ function TimetableSection({
     )
   }
 
-  if (!config.grade && !config.classNm && !hasTeacher && !sharedTeacher) {
+  if (!config.grade && !config.classNm && !hasTeacher && !sharedTeacher && pulledLessons.length === 0) {
     return (
       <>
         {classStatus && classStatus.type !== 'weekend' && <ClassStatusBanner status={classStatus} />}
@@ -1650,11 +1668,13 @@ function TimetableSection({
             periodRanges={periodRanges}
             lunch={lunch}
             renderCell={(date, period) => {
+              const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
+              const pulled = pulledLessons.find(item => item.date === isoDate && String(item.period) === period)
+              if (pulled) return { text: `당김 ${pulled.classLabel}`, sub: `${pulled.subject}${pulled.substituteTeacherName ? ' · 보강' : ''}`, colorClass: 'bg-lime-500/20 text-lime-100 ring-1 ring-lime-400/30', isNow: date === todayYmd && period === currentPeriod }
               const dayIndex = getTimetableDayIndex(date)
               const slotIndex = schoolTimetableSlotIndex(dayIndex, Number(period))
               if (slotIndex < 0) return null
               const slot = sharedTeacher.slots[slotIndex]
-              const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
               const change = timetableChanges.find(item => isTimetableChangeAppliedForTeacher(item, sharedTeacher.name) && (
                 (item.originalDate === isoDate && item.originalSlotIndex === slotIndex) ||
                 (item.kind === 'exchange' && item.replacementDate === isoDate && item.replacementSlotIndex === slotIndex)
@@ -1703,6 +1723,9 @@ function TimetableSection({
             periodRanges={periodRanges}
             lunch={lunch}
             renderCell={(date, period) => {
+              const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
+              const pulled = pulledLessons.find(item => item.date === isoDate && String(item.period) === period)
+              if (pulled) return { text: `당김 ${pulled.classLabel}`, sub: `${pulled.subject}${pulled.substituteTeacherName ? ' · 보강' : ''}`, colorClass: 'bg-lime-500/20 text-lime-100 ring-1 ring-lime-400/30', isNow: date === todayYmd && period === currentPeriod }
               const entry = config.teacherClasses!.reduce<{label:string;subject:string;colorIdx:number}|null>((acc, tc, idx) => {
                 if (acc) return acc
                 const found = teacherTT.find(t =>
@@ -1720,6 +1743,17 @@ function TimetableSection({
               return { text: entry.label, sub: entry.subject, colorClass: clsx(c.bg, c.text), isNow }
             }}
           />
+        </div>
+      )}
+
+      {!sharedTeacher && !hasTeacher && pulledLessons.length > 0 && (
+        <div>
+          <div className="mb-2 flex items-center gap-2"><span className="rounded-lg bg-lime-500/15 px-2 py-1 text-[10px] font-semibold text-lime-200">📚 내 당김수업</span><span className="text-[10px] text-slate-500">2026학년도 2학기 계획 반영</span></div>
+          <WeekGrid weekDates={weekDates} DAY={DAY} todayYmd={todayYmd} currentPeriod={isToday(selectedDate) ? currentPeriod : null} periodRanges={periodRanges} lunch={lunch} renderCell={(date, period) => {
+            const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
+            const pulled = pulledLessons.find(item => item.date === isoDate && String(item.period) === period)
+            return pulled ? { text: `당김 ${pulled.classLabel}`, sub: pulled.subject, colorClass: 'bg-lime-500/20 text-lime-100 ring-1 ring-lime-400/30', isNow: date === todayYmd && period === currentPeriod } : null
+          }} />
         </div>
       )}
 

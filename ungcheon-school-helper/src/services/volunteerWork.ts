@@ -5,7 +5,7 @@ export interface VolunteerStudentRow {
   id: string
   studentId: string
   name: string
-  hours: number | ''
+  hours: number | string
   remarks: string
 }
 
@@ -70,6 +70,7 @@ export interface VolunteerActivitySide {
   sourceName: string
   sourceLocation: string
   duplicateCount: number
+  correctionNote?: string
 }
 
 export interface VolunteerRosterComparisonRow {
@@ -82,6 +83,11 @@ export interface VolunteerRosterComparisonRow {
   hwp: VolunteerActivitySide | null
   status: VolunteerRosterStatus
   message: string
+  correctionTarget?: {
+    sourceId: string
+    formIndex: number
+    participantIndex: number
+  }
 }
 
 export interface VolunteerRosterDuplicate {
@@ -104,6 +110,7 @@ export interface ParsedVolunteerParticipant {
   name: string
   hours: number | null
   remarks: string
+  correctionNote?: string
 }
 
 export interface ParsedVolunteerForm {
@@ -398,6 +405,9 @@ export function compareVolunteerRosterSources(
     endDate: form.endDate,
     hours: participant.hours,
     duplicateCount: 1,
+    correctionNote: participant.correctionNote,
+    formIndex: form.formIndex,
+    participantIndex: index,
   }))))
 
   const duplicates = [
@@ -431,6 +441,11 @@ export function compareVolunteerRosterSources(
       hwp: activitySide(entry),
       status: 'unclassified',
       message,
+      correctionTarget: {
+        sourceId: entry.sourceId,
+        formIndex: entry.formIndex ?? 0,
+        participantIndex: entry.participantIndex ?? 0,
+      },
     })
   })
 
@@ -460,6 +475,9 @@ type VolunteerRosterEntry = {
   endDate: string
   hours: number | null
   duplicateCount: number
+  correctionNote?: string
+  formIndex?: number
+  participantIndex?: number
 }
 
 function groupBy<T>(items: T[], keyOf: (item: T) => string) {
@@ -522,7 +540,7 @@ function matchVolunteerStudentActivities(
       neis: activitySide(neis),
       hwp: candidate ? activitySide(candidate) : null,
       status: candidate ? 'matched' : 'neis-only',
-      message: candidate ? '내용과 시간이 일치합니다.' : unmatchedActivityMessage(neis, hwpEntries, 'neis'),
+      message: candidate ? correctionMessage('내용과 시간이 일치합니다.', candidate) : unmatchedActivityMessage(neis, hwpEntries, 'neis'),
     })
   })
 
@@ -536,7 +554,7 @@ function matchVolunteerStudentActivities(
       neis: null,
       hwp: activitySide(hwp),
       status: 'hwp-only',
-      message: unmatchedActivityMessage(hwp, neisEntries, 'hwp'),
+      message: correctionMessage(unmatchedActivityMessage(hwp, neisEntries, 'hwp'), hwp),
     })
   })
   return rows
@@ -575,6 +593,10 @@ function hoursText(hours: number | null) {
   return hours == null ? '시간 없음' : `${hours}시간`
 }
 
+function correctionMessage(message: string, entry: VolunteerRosterEntry) {
+  return entry.correctionNote ? `${message} · 수기 수정: ${entry.correctionNote}` : message
+}
+
 function activitySide(entry: VolunteerRosterEntry): VolunteerActivitySide {
   return {
     content: entry.activity,
@@ -584,6 +606,7 @@ function activitySide(entry: VolunteerRosterEntry): VolunteerActivitySide {
     sourceName: entry.sourceName,
     sourceLocation: entry.sourceLocation,
     duplicateCount: entry.duplicateCount,
+    correctionNote: entry.correctionNote,
   }
 }
 
@@ -606,7 +629,9 @@ export function validateIssuanceDraft(draft: VolunteerCertificateDraft) {
   draft.students.forEach((student, index) => {
     if (!/^[1-3]\d{3}$/.test(volunteerStudentId(student.studentId))) errors.push(`${index + 1}행 학번을 확인해 주세요. 봉사활동 확인서는 4자리 학번을 사용합니다.`)
     if (!student.name.trim()) errors.push(`${index + 1}행 이름을 입력해 주세요.`)
-    if (!Number.isFinite(Number(student.hours)) || Number(student.hours) <= 0) errors.push(`${student.name || index + 1 + '행'}의 실제 시수를 입력해 주세요.`)
+    const numericHours = Number(student.hours)
+    const exceptionText = String(student.hours).trim()
+    if ((!Number.isFinite(numericHours) || numericHours <= 0) && !exceptionText) errors.push(`${student.name || index + 1 + '행'}의 실제 시수 또는 결석·결과 등 예외 사유를 입력해 주세요.`)
     const id = volunteerStudentId(student.studentId)
     if (ids.has(id)) errors.push(`${id} 학번이 중복 입력되어 있습니다.`)
     ids.add(id)

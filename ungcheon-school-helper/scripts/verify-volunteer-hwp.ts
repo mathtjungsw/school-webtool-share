@@ -33,3 +33,20 @@ for (const count of [5, 20, 30, 50, 65]) {
   writeFileSync(target, buffer)
   console.log(`PASS ${count}명 -> ${target}`)
 }
+
+const classBuffer = buildVolunteerCertificateHwp(
+  join(project, 'resources', 'templates', 'volunteer-single-source.hwp'),
+  join(project, 'resources', 'templates', 'volunteer-double-source.hwp'),
+  {
+    activityName: '학급 봉사활동', startDate: '2026-08-12', endDate: '2026-08-12',
+    institution: '웅천고등학교', area: 'environment', location: '교실', activityContent: '교실 환경정리',
+    confirmTeacher: '정승원', students: [
+      { studentId: '1101', name: '학생일', hours: 1 },
+      { studentId: '1102', name: '학생이', hours: '결석' },
+      { studentId: '1103', name: '학생삼', hours: 1 },
+    ],
+  },
+)
+const classParsed = parseVolunteerHwpBuffer(classBuffer)[0]
+if (classParsed.participants.length !== 2 || classParsed.participants.some(student => student.studentId === '1102')) throw new Error('반별 확인서 예외 학생이 검증 참여자로 포함되었습니다.')
+console.log('PASS 반별 공통시수·결석 예외 문구')

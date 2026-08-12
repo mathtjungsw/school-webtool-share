@@ -28,6 +28,7 @@ export interface ParsedVolunteerParticipant {
   name: string
   hours: number | null
   remarks: string
+  correctionNote?: string
 }
 
 export interface ParsedVolunteerForm {
@@ -62,7 +63,7 @@ export function buildVolunteerCertificateHwp(
   students.forEach((student, index) => {
     if (!student.studentId.trim() || !student.name.trim()) throw new Error(`${index + 1}번째 학생의 학번 또는 이름이 비어 있습니다.`)
     const hours = Number(student.hours)
-    if (!Number.isFinite(hours) || hours <= 0) throw new Error(`${student.name} 학생의 실제 봉사 시수를 입력해 주세요.`)
+    if ((!Number.isFinite(hours) || hours <= 0) && !String(student.hours).trim()) throw new Error(`${student.name} 학생의 실제 봉사 시수 또는 예외 사유를 입력해 주세요.`)
   })
 
   const useSingle = students.length <= 20
@@ -189,7 +190,8 @@ function parseForm(cells: CellRange[], formIndex: number): ParsedVolunteerForm {
     let hours = parseHours(rawHours)
     if (hours == null && /[″〃"]/u.test(rawHours)) hours = previousHours[side]
     if (hours != null) previousHours[side] = hours
-    if (studentId || name) participants.push({ studentId, name, hours, remarks: '' })
+    const exception = hours == null ? rawHours.trim() : ''
+    if ((studentId || name) && !/결석|결과|조퇴|지각|미참여|불참|병결|인정결/u.test(exception)) participants.push({ studentId, name, hours, remarks: exception })
   }
   if (isDouble) {
     const rows = capacity / 2
@@ -336,7 +338,8 @@ function formatVolunteerStudentId(value: unknown) {
 }
 function formatHours(value: number | string) {
   const numeric = Number(value)
-  return `${Number.isInteger(numeric) ? numeric.toFixed(0) : String(numeric)}시간`
+  if (Number.isFinite(numeric) && numeric > 0) return `${Number.isInteger(numeric) ? numeric.toFixed(0) : String(numeric)}시간`
+  return String(value).trim()
 }
 
 function areaText(area: VolunteerCertificateDraftInput['area']) {

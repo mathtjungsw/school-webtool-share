@@ -22,8 +22,9 @@ import {
 import type { CreativeScheduleResult, DutyScheduleEvent, DutyScheduleResult, ScheduleEvent, WeeklyPlanResult } from '../types'
 import { isTimetableChangeAppliedForTeacher, listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
 import { SPECIAL_TIMETABLE_DAYS } from '../services/specialTimetableDays'
+import { listPulledLessonsForTeacher, pulledLessonTitle } from '../services/pulledLessons'
 
-type CalendarSource = 'neis' | 'weekly' | 'creative' | 'schoolEvent' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty' | 'timetableChange'
+type CalendarSource = 'neis' | 'weekly' | 'creative' | 'schoolEvent' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty' | 'timetableChange' | 'pulledLesson'
 
 interface CalendarEvent {
   id: string
@@ -52,6 +53,7 @@ const SOURCE_STYLE: Record<CalendarSource, string> = {
   gateDuty: 'duty-event-text border-cyan-500 bg-cyan-500/15 font-semibold',
   mealDuty: 'duty-event-text border-orange-500 bg-orange-500/15 font-semibold',
   timetableChange: 'border-fuchsia-400 bg-fuchsia-500/15 text-fuchsia-200 font-semibold',
+  pulledLesson: 'border-lime-500 bg-lime-500/15 text-lime-100 font-semibold',
 }
 
 function today() { return format(new Date(), 'yyyy-MM-dd') }
@@ -260,6 +262,7 @@ export default function CalendarPage() {
   }, [config.teacherName])
 
   const events = useMemo<CalendarEvent[]>(() => {
+    const pulledLessons = listPulledLessonsForTeacher(config.teacherName?.trim() ?? '', `${monthKey}-01`, `${monthKey}-31`)
     const combined: CalendarEvent[] = [
     ...(showNeis ? schedule : []).map(item => ({
       id: `neis-${item.date}-${item.eventName}`,
@@ -333,10 +336,17 @@ export default function CalendarPage() {
       title: item.title,
       source: 'schoolEvent' as const,
       label: '시간표 운영',
+    })),
+    ...pulledLessons.map(item => ({
+      id: item.id,
+      date: item.date,
+      title: pulledLessonTitle(item),
+      source: 'pulledLesson' as const,
+      label: '당김수업',
     }))]
     return combined.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '') || a.title.localeCompare(b.title, 'ko'))
   },
-  [committeeEvents, config.teacherName, creativeSchedule.events, dutySchedule.events, hideCompleted, schedule, sharedTasks, showNeis, tasks, timetableChanges, weeklyPlan.events])
+  [committeeEvents, config.teacherName, creativeSchedule.events, dutySchedule.events, hideCompleted, monthKey, schedule, sharedTasks, showNeis, tasks, timetableChanges, weeklyPlan.events])
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>()
@@ -441,6 +451,7 @@ export default function CalendarPage() {
               <Legend color="bg-cyan-400" label="등교지도" />
               <Legend color="bg-orange-400" label="급식지도" />
               <Legend color="bg-fuchsia-400" label="수업변경" />
+              <Legend color="bg-lime-500" label="당김수업" />
               <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-violet-400/15 bg-violet-500/5 px-2 py-1 text-violet-200">
                 <input type="checkbox" checked={showNeis} onChange={event => void saveConfig({ showNeisSchedule: event.target.checked })} />NEIS 학사일정 켜기
               </label>
