@@ -920,26 +920,50 @@ function repairTimetableChangeClassCells_(book) {
 }
 
 function ensureReleaseNotices_() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTICES_SHEET);
-  const properties = PropertiesService.getScriptProperties();
-  const shouldReset = properties.getProperty(OFFICIAL_RELEASE_NOTICE_RESET_KEY) !== 'true';
-  if (shouldReset && sheet.getLastRow() > 1) {
-    sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTICES_SHEET);
+    const properties = PropertiesService.getScriptProperties();
+    const shouldReset = properties.getProperty(OFFICIAL_RELEASE_NOTICE_RESET_KEY) !== 'true';
+    if (shouldReset && sheet.getLastRow() > 1) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+    }
+
+    // 동일 제목 공지가 여러 번 등록된 경우 가장 먼저 등록된 한 행만 남깁니다.
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 2) {
+      const titleValues = sheet.getRange(2, 2, lastRow - 1, 1).getDisplayValues();
+      const seenTitles = {};
+      const duplicateRows = [];
+      titleValues.forEach(function(row, index) {
+        const title = String(row[0] || '').trim();
+        if (!title) return;
+        if (seenTitles[title]) duplicateRows.push(index + 2);
+        else seenTitles[title] = true;
+      });
+      duplicateRows.reverse().forEach(function(rowNumber) {
+        sheet.deleteRow(rowNumber);
+      });
+    }
+
+    const existing = readObjects_(NOTICES_SHEET);
+    const titles = {};
+    let maxId = 0;
+    existing.forEach(function(notice) {
+      titles[String(notice.title || '')] = true;
+      maxId = Math.max(maxId, Number(notice.id) || 0);
+    });
+    RELEASE_NOTES.forEach(function(note) {
+      if (titles[note.title]) return;
+      maxId += 1;
+      sheet.appendRow([maxId, note.title, note.body, 'important', note.date, '']);
+      titles[note.title] = true;
+    });
+    if (shouldReset) properties.setProperty(OFFICIAL_RELEASE_NOTICE_RESET_KEY, 'true');
+  } finally {
+    lock.releaseLock();
   }
-  const existing = readObjects_(NOTICES_SHEET);
-  const titles = {};
-  let maxId = 0;
-  existing.forEach(function(notice) {
-    titles[String(notice.title || '')] = true;
-    maxId = Math.max(maxId, Number(notice.id) || 0);
-  });
-  RELEASE_NOTES.forEach(function(note) {
-    if (titles[note.title]) return;
-    maxId += 1;
-    sheet.appendRow([maxId, note.title, note.body, 'important', note.date, '']);
-    titles[note.title] = true;
-  });
-  if (shouldReset) properties.setProperty(OFFICIAL_RELEASE_NOTICE_RESET_KEY, 'true');
 }
 
 function listLinks_() {
