@@ -11,7 +11,7 @@ import {
   FileSpreadsheet, HelpCircle, Waves, SquareStack, CircleDot, Star,
   FileScan, FileCode2, MapPinned, ScanSearch,
   Clapperboard, SquarePen, MessagesSquare, BarChart3, Mic, CalendarRange, UsersRound,
-  ArrowUpRight, BellRing, Check, ListTodo, StickyNote,
+  ArrowUpRight, BellRing, Check, ListTodo, StickyNote, Eye, EyeOff,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -31,6 +31,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useAppStore } from '../stores/appStore'
 import { WeatherTodayView, WeatherForecastView } from '../components/WeatherBar'
+import { QuickOrganizerModal } from '../components/QuickOrganizerModal'
+import { QuickOrganizerTrigger, type QuickOrganizerHint } from '../components/QuickOrganizerTrigger'
 import { useWeather } from '../components/useWeather'
 import { getSharedNeisSnapshot } from '../services/sharedNeis'
 import {
@@ -125,7 +127,7 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
   ]},
   { group: '자료·진로', color: 'sky', items: [
     { id: 'excel_processor', label: 'Excel 전처리', icon: Table2, desc: '공백·날짜·중복 등 데이터 정제' },
-    { id: 'recommended_subjects', label: '대학 권장과목', icon: GraduationCap, desc: '2028 대학·학과별 권장 이수과목 검색' },
+    { id: 'recommended_subjects', label: '대학 권장과목', icon: GraduationCap, desc: '학년별 2027·2028 대학 권장 이수과목 검색' },
   ]},
   { group: '인사행정', color: 'emerald', items: [
     { id: 'payroll', label: '호봉획정 계산기', icon: Calculator, desc: '경력 인정과 초임 호봉 계산' },
@@ -267,6 +269,7 @@ function SortableCard({
 export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => void }) {
   const { config, saveConfig } = useAppStore()
   const [selectedDate, setSelectedDate] = useState(todayStr())
+  const timetableDate = todayStr()
   const [meal, setMeal] = useState<MealInfo[]>([])
   const [nextMeal, setNextMeal] = useState<MealInfo[]>([])
   const [schedule, setSchedule] = useState<ScheduleEvent[]>([])
@@ -291,6 +294,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const [committeeEvents, setCommitteeEvents] = useState<CommitteeEvent[]>([])
   const [sharedTasks, setSharedTasks] = useState<StaffChecklist[]>([])
   const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>([])
+  const [quickAddDate, setQuickAddDate] = useState<string | null>(null)
+  const [quickAddHint, setQuickAddHint] = useState<QuickOrganizerHint | null>(null)
   const [personalMemo, setPersonalMemo] = useState('')
   const [memoLoaded, setMemoLoaded] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -479,7 +484,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     setLoading(true)
     setError('')
     try {
-      const weekDates = getWeekDates(selectedDate)
+      const weekDates = getWeekDates(timetableDate)
       const fromYmdStr = weekDates[0]
       const toYmdStr = weekDates[4]
 
@@ -511,7 +516,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     } finally {
       setLoading(false)
     }
-  }, [selectedDate, config.grade, config.classNm, hasSchool, hasTeacher, config.teacherClasses, hasNeisApiKey])
+  }, [selectedDate, timetableDate, config.grade, config.classNm, hasSchool, hasTeacher, config.teacherClasses, hasNeisApiKey])
 
   useEffect(() => { load() }, [load])
 
@@ -670,7 +675,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       ),
       taskId: task.id,
     })),
-    ...personalTasks.map(task => ({
+    ...personalTasks.filter(task => task.showOnCalendar !== false).map(task => ({
       date: toYmd(task.date),
       eventName: `${task.time ? `${task.time} ` : ''}${task.title}`,
       department: '개인 업무',
@@ -702,9 +707,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   )
 
   const todaySubjects: Record<string, string> = {}
-  if (isToday) {
+  {
     if (sharedTeacher) {
-      const dayIndex = getTimetableDayIndex(selectedDate)
+      const dayIndex = getTimetableDayIndex(timetableDate)
       if (dayIndex >= 0) {
         sharedTeacher.slots
           .slice(dayIndex * 7, (dayIndex + 1) * 7)
@@ -716,7 +721,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       config.teacherClasses.forEach(tc => {
         teacherTT
           .filter(t =>
-            t.date === getTimetableSourceDate(selYmd) &&
+            t.date === getTimetableSourceDate(toYmd(timetableDate)) &&
             t.grade?.trim() === tc.grade &&
             t.classNm?.trim() === tc.classNm &&
             t.subject?.trim() === tc.subject?.trim()
@@ -724,15 +729,15 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
           .forEach(t => { todaySubjects[String(t.period)] = `${tc.grade}-${tc.classNm}반 ${tc.subject}` })
       })
     } else if (config.grade && config.classNm) {
-      timetable.filter(t => t.date === getTimetableSourceDate(selYmd))
+      timetable.filter(t => t.date === getTimetableSourceDate(toYmd(timetableDate)))
         .forEach(t => { todaySubjects[String(t.period)] = t.subject })
     }
-    pulledLessons.filter(item => item.date === selectedDate).forEach(item => {
+    pulledLessons.filter(item => item.date === timetableDate).forEach(item => {
       todaySubjects[String(item.period)] = `당김 ${item.classLabel} ${item.subject}`
     })
   }
-  const classStatus = isToday ? getClassStatus(periodRanges, currentTime, todaySubjects) : null
-  const specialTimetableDay = getSpecialTimetableDay(selectedDate)
+  const classStatus = getClassStatus(periodRanges, currentTime, todaySubjects)
+  const specialTimetableDay = getSpecialTimetableDay(timetableDate)
 
   return (
     <div className="p-5">
@@ -853,6 +858,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                     dutyScheduleError={dutyScheduleError}
                     sourceSheetCount={weeklyPlan.sourceSheets.length}
                     onSelectDate={setSelectedDate}
+                    onQuickAdd={(date, event) => setQuickAddHint({ date, x: event.clientX, y: event.clientY })}
                     neisConfigured={hasNeisApiKey}
                     onOpenHelp={() => onNavigate('help')}
                     onOpenCalendar={() => onNavigate('calendar')}
@@ -931,7 +937,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                 timetable={timetable}
                 teacherTT={teacherTT}
                 sharedTeacher={sharedTeacher}
-                selectedDate={selectedDate}
+                selectedDate={timetableDate}
                 config={config}
                 periodRanges={periodRanges}
                 currentTime={currentTime}
@@ -1063,6 +1069,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
           )
         })}
       </div>
+      <QuickOrganizerModal date={quickAddDate} onClose={() => setQuickAddDate(null)} onSaved={() => void loadPersonalTasks().then(setPersonalTasks)} />
+      <QuickOrganizerTrigger hint={quickAddHint} onClose={() => setQuickAddHint(null)} onOpen={date => { setQuickAddHint(null); setQuickAddDate(date) }} />
     </div>
   )
 }
@@ -1076,6 +1084,7 @@ function TwoWeekScheduleCalendar({
   dutyScheduleError,
   sourceSheetCount,
   onSelectDate,
+  onQuickAdd,
   neisConfigured,
   onOpenHelp,
   onOpenCalendar,
@@ -1092,6 +1101,7 @@ function TwoWeekScheduleCalendar({
   dutyScheduleError: string
   sourceSheetCount: number
   onSelectDate: (date: string) => void
+  onQuickAdd: (date: string, event: React.MouseEvent<HTMLButtonElement>) => void
   neisConfigured: boolean
   onOpenHelp: () => void
   onOpenCalendar: () => void
@@ -1200,7 +1210,10 @@ function TwoWeekScheduleCalendar({
                   <button
                     key={ymd}
                     type="button"
-                    onClick={() => onSelectDate(dateValue)}
+                    onClick={event => {
+                      onSelectDate(dateValue)
+                       if (!(event.target as HTMLElement).closest('[data-calendar-event]')) onQuickAdd(dateValue, event)
+                    }}
                     className={clsx(
                       'min-h-[142px] min-w-0 bg-surface-800/95 p-2 text-left transition-colors hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-amber-400/70',
                       isSelected && 'bg-violet-500/10 ring-2 ring-inset ring-violet-400/70',
@@ -1212,7 +1225,7 @@ function TwoWeekScheduleCalendar({
                     </div>
                     <div className="space-y-1">
                       {dayEvents.slice(0, 5).map((event, index) => (
-                        <div key={`${event.source}-${event.department ?? ''}-${index}`} className={clsx('calendar-event-text rounded border-l-2 px-1.5 py-1 text-[9px] leading-tight', sourceClass(event), event.completed && 'line-through opacity-50')} title={`${sourceLabel(event)} · ${event.eventName}`}>
+                        <div data-calendar-event key={`${event.source}-${event.department ?? ''}-${index}`} className={clsx('calendar-event-text rounded border-l-2 px-1.5 py-1 text-[9px] leading-tight', sourceClass(event), event.completed && 'line-through opacity-50')} title={`${sourceLabel(event)} · ${event.eventName}`}>
                           <span className="block truncate text-[8px] font-black">{sourceLabel(event)}</span>
                           <span className="block truncate">{event.eventName.replace(/\s*\n\s*/g, ' · ')}</span>
                         </div>
@@ -1672,6 +1685,20 @@ function TimetableSection({
   const DAY = ['월','화','수','목','금']
   const todayYmd = toYmd(todayStr())
   const hasTeacher = !!(config.teacherClasses?.length)
+  const selectedYmd = toYmd(selectedDate)
+  const [showClassTimetable, setShowClassTimetable] = useState(true)
+
+  useEffect(() => {
+    void window.electron.configGet('dashboard.classTimetable.visible.v1').then(value => {
+      if (typeof value === 'boolean') setShowClassTimetable(value)
+    })
+  }, [])
+
+  const toggleClassTimetable = () => {
+    const next = !showClassTimetable
+    setShowClassTimetable(next)
+    void window.electron.configSet('dashboard.classTimetable.visible.v1', next)
+  }
 
   const nowMins = currentTime.getHours() * 60 + currentTime.getMinutes()
   const currentPeriod = periodRanges.find(([s, e]) => nowMins >= s && nowMins <= e)?.[2] ?? null
@@ -1715,6 +1742,7 @@ function TimetableSection({
             weekDates={weekDates}
             DAY={DAY}
             todayYmd={todayYmd}
+            selectedYmd={selectedYmd}
             currentPeriod={isToday(selectedDate) ? currentPeriod : null}
             periodRanges={periodRanges}
             lunch={lunch}
@@ -1770,6 +1798,7 @@ function TimetableSection({
             weekDates={weekDates}
             DAY={DAY}
             todayYmd={todayYmd}
+            selectedYmd={selectedYmd}
             currentPeriod={isToday(selectedDate) ? currentPeriod : null}
             periodRanges={periodRanges}
             lunch={lunch}
@@ -1800,7 +1829,7 @@ function TimetableSection({
       {!sharedTeacher && !hasTeacher && pulledLessons.length > 0 && (
         <div>
           <div className="mb-2 flex items-center gap-2"><span className="rounded-lg bg-lime-500/15 px-2 py-1 text-[10px] font-semibold text-lime-200">📚 내 당김수업</span><span className="text-[10px] text-slate-500">2026학년도 2학기 계획 반영</span></div>
-          <WeekGrid weekDates={weekDates} DAY={DAY} todayYmd={todayYmd} currentPeriod={isToday(selectedDate) ? currentPeriod : null} periodRanges={periodRanges} lunch={lunch} renderCell={(date, period) => {
+          <WeekGrid weekDates={weekDates} DAY={DAY} todayYmd={todayYmd} selectedYmd={selectedYmd} currentPeriod={isToday(selectedDate) ? currentPeriod : null} periodRanges={periodRanges} lunch={lunch} renderCell={(date, period) => {
             const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
             const pulled = pulledLessons.find(item => item.date === isoDate && String(item.period) === period)
             return pulled ? { text: `당김 ${pulled.classLabel}`, sub: pulled.subject, colorClass: 'bg-lime-500/20 text-lime-100 ring-1 ring-lime-400/30', isNow: date === todayYmd && period === currentPeriod } : null
@@ -1808,16 +1837,23 @@ function TimetableSection({
         </div>
       )}
 
-      {/* 학생 시간표 */}
+      {/* 학급 시간표 */}
       {config.grade && config.classNm && (
         <div>
-          <span className="text-[10px] font-semibold text-sky-400 bg-sky-500/10 px-2 py-1 rounded-lg mb-2 inline-block">
-            👤 {config.grade}학년 {config.classNm}반
-          </span>
-          <WeekGrid
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="inline-block rounded-lg bg-sky-500/10 px-2 py-1 text-[10px] font-semibold text-sky-400">
+              👥 {config.grade}학년 {config.classNm}반 학급 시간표
+            </span>
+            <button type="button" onClick={toggleClassTimetable} className="btn-ghost flex items-center gap-1 px-2 py-1 text-[10px]" aria-expanded={showClassTimetable}>
+              {showClassTimetable ? <EyeOff size={12} /> : <Eye size={12} />}
+              {showClassTimetable ? '숨기기' : '보이기'}
+            </button>
+          </div>
+          {showClassTimetable && <WeekGrid
             weekDates={weekDates}
             DAY={DAY}
             todayYmd={todayYmd}
+            selectedYmd={selectedYmd}
             currentPeriod={isToday(selectedDate) ? currentPeriod : null}
             periodRanges={periodRanges}
             lunch={lunch}
@@ -1827,7 +1863,7 @@ function TimetableSection({
               const isNow = date === todayYmd && period === currentPeriod
               return { text: entry.subject, sub: '', colorClass: 'bg-sky-500/10 text-sky-300', isNow }
             }}
-          />
+          />}
         </div>
       )}
     </div>
@@ -1836,10 +1872,11 @@ function TimetableSection({
 
 function isToday(dateStr: string) { return dateStr === todayStr() }
 
-function WeekGrid({ weekDates, DAY, todayYmd, currentPeriod, periodRanges = [], lunch, renderCell }: {
+function WeekGrid({ weekDates, DAY, todayYmd, selectedYmd, currentPeriod, periodRanges = [], lunch, renderCell }: {
   weekDates: string[]
   DAY: string[]
   todayYmd: string
+  selectedYmd: string
   currentPeriod: string | null
   periodRanges?: [number, number, string][]
   lunch?: { after: number; start: string; end: string } | null
@@ -1865,7 +1902,7 @@ function WeekGrid({ weekDates, DAY, todayYmd, currentPeriod, periodRanges = [], 
               const isT = d === todayYmd
               const special = getSpecialTimetableDay(d)
               return (
-                <th key={d} className="py-1.5 text-center">
+                <th key={d} className={clsx('py-1.5 text-center', d === selectedYmd && 'timetable-selected-day')}>
                   <div className={clsx('font-semibold', isT ? 'text-violet-400' : 'text-slate-400')}>{DAY[i]}</div>
                   <div className="text-slate-600 font-normal">{d.slice(6)}</div>
                   {special && <div className="mx-auto mt-1 w-fit rounded bg-amber-300 px-1.5 py-0.5 text-[8px] font-black text-slate-950">{special.sourceWeekday} 시간표</div>}
@@ -1898,6 +1935,7 @@ function WeekGrid({ weekDates, DAY, todayYmd, currentPeriod, periodRanges = [], 
                   if (!cell) return (
                     <td key={d} className={clsx(
                       'py-1 text-center',
+                      d === selectedYmd && 'timetable-selected-day',
                       isIntersection ? 'ring-2 ring-inset ring-intersection' : '',
                       'text-slate-700'
                     )}>·</td>
@@ -1906,6 +1944,7 @@ function WeekGrid({ weekDates, DAY, todayYmd, currentPeriod, periodRanges = [], 
                     <td key={d} className={clsx(
                       'timetable-cell-text py-1 text-center leading-tight rounded-sm',
                       cell.colorClass,
+                      d === selectedYmd && 'timetable-selected-day',
                       isIntersection ? 'ring-2 ring-inset ring-intersection' : '',
                     )}>
                       <div className="font-semibold truncate px-0.5">{cell.text}</div>

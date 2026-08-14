@@ -8,6 +8,10 @@ export interface PersonalTask {
   priority: PersonalTaskPriority
   completed: boolean
   memo?: string
+  kind?: 'schedule' | 'task'
+  category?: string
+  showOnCalendar?: boolean
+  scope?: 'personal' | 'department' | 'school'
   createdAt: string
   updatedAt: string
 }
@@ -33,6 +37,10 @@ function normalizeTask(value: unknown): PersonalTask | null {
     priority: task.priority === 'high' || task.priority === 'low' ? task.priority : 'normal',
     completed: Boolean(task.completed),
     memo: typeof task.memo === 'string' ? task.memo : '',
+    kind: task.kind === 'schedule' ? 'schedule' : 'task',
+    category: typeof task.category === 'string' ? task.category : '',
+    showOnCalendar: task.showOnCalendar !== false,
+    scope: task.scope === 'department' || task.scope === 'school' ? task.scope : 'personal',
     createdAt: typeof task.createdAt === 'string' ? task.createdAt : now,
     updatedAt: typeof task.updatedAt === 'string' ? task.updatedAt : now,
   }

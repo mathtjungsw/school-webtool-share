@@ -42,6 +42,13 @@ export async function parseVolunteerPdfFile(filePath: string): Promise<Volunteer
       const textContent = await page.getTextContent()
       const text = textContent.items.map((item: any) => String(item.str || '')).join(' ')
       const normalized = compact(text)
+      const coordinatorForm = parseCoordinatorForm(text, index)
+      if (coordinatorForm) {
+        pageModes.push('text')
+        forms.push(coordinatorForm)
+        confidences.push(100)
+        continue
+      }
       const textBased = text.replace(/\s/g, '').length >= 40
         && /봉사활동/.test(normalized)
         && /(성명|이름)/.test(normalized)
@@ -74,6 +81,29 @@ export async function parseVolunteerPdfFile(filePath: string): Promise<Volunteer
     pageModes,
     averageConfidence: confidences.length ? Math.round(confidences.reduce((a, b) => a + b, 0) / confidences.length) : 0,
     warnings,
+  }
+}
+
+function parseCoordinatorForm(pageText: string, formIndex: number): ParsedVolunteerForm | null {
+  const compactText = pageText.replace(/\s+/g, '')
+  const encoded = compactText.match(/UNGCOORDV1:([A-Za-z0-9+/=]+)/)?.[1]
+  if (!encoded) return null
+  try {
+    const parsed = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8')) as ParsedVolunteerForm
+    if (!parsed || !Array.isArray(parsed.participants)) return null
+    return {
+      ...parsed,
+      formIndex,
+      participants: parsed.participants.map(participant => ({
+        ...participant,
+        studentId: String(participant.studentId || '').replace(/\D/g, '').slice(-4),
+        name: String(participant.name || '').trim(),
+        hours: participant.hours == null ? null : Number(participant.hours),
+        remarks: String(participant.remarks || ''),
+      })),
+    }
+  } catch {
+    return null
   }
 }
 

@@ -39,8 +39,10 @@ declare global {
       buildVolunteerHwp: (draft: import('./services/volunteerWork').VolunteerCertificateDraft) => Promise<number[]>
       buildClassVolunteerHwpx: (draft: import('./services/volunteerWork').ClassVolunteerCertificateDraft) => Promise<number[]>
       buildClassVolunteerPdf: (draft: import('./services/volunteerWork').ClassVolunteerCertificateDraft) => Promise<number[]>
+      buildCoordinatorVolunteerPdf: (draft: import('./services/volunteerWork').CoordinatorVolunteerCertificateDraft) => Promise<number[]>
       printClassVolunteer: (draft: import('./services/volunteerWork').ClassVolunteerCertificateDraft) => Promise<boolean>
       storeGeneratedVolunteerHwp: (name: string, bytes: number[]) => Promise<import('./services/volunteerWork').StoredVolunteerHwp>
+      storeGeneratedVolunteerForms: (title: string, forms: import('./services/volunteerWork').ParsedVolunteerForm[]) => Promise<import('./services/volunteerWork').StoredVolunteerHwp>
       importVolunteerHwp: (filePath: string, allowDuplicate?: boolean) => Promise<import('./services/volunteerWork').StoredVolunteerHwp>
       listVolunteerHwp: () => Promise<import('./services/volunteerWork').StoredVolunteerHwp[]>
       parseVolunteerHwp: (id: string) => Promise<import('./services/volunteerWork').ParsedVolunteerForm[]>
@@ -117,6 +119,19 @@ declare global {
         id: 'all' | 'grade1' | 'grade2' | 'grade3',
         defaultName: string,
       ) => Promise<boolean>
+      schoolInfoSearchSchools: (
+        query: string,
+        force?: boolean,
+      ) => Promise<import('./services/schoolInfo').SchoolInfoSearchResponse>
+      schoolInfoSearchSchoolsByRegion: (
+        sido: string,
+        sgg: string,
+        force?: boolean,
+      ) => Promise<import('./services/schoolInfo').SchoolInfoSearchResponse>
+      schoolInfoGetEvaluationPlan: (
+        request: import('./services/schoolInfo').SchoolInfoEvaluationRequest,
+      ) => Promise<import('./services/schoolInfo').SchoolInfoEvaluationResponse>
+      schoolInfoClearCache: () => Promise<boolean>
     }
   }
 }

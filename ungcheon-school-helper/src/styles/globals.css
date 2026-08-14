@@ -26,6 +26,43 @@
   --shadow-color: rgba(0, 0, 0, 0.24);
 }
 
+/* 학교알리미 평가계획: 밝은 모드에서는 모든 본문을 어둡고 진하게 유지한다. */
+.schoolinfo-plan-surface {
+  background: rgba(2, 6, 23, 0.42);
+}
+
+[data-theme="light"] .schoolinfo-evaluation-tab {
+  color: #0f172a;
+}
+
+[data-theme="light"] .schoolinfo-plan-surface {
+  background: #f8fafc;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .schoolinfo-plan-text {
+  color: #172033 !important;
+  font-weight: 700;
+}
+
+[data-theme="dark"] .schoolinfo-plan-text {
+  color: #f1f5f9 !important;
+}
+
+/* 교환·대강: 동교과 후보는 테마와 관계없이 강한 명도로 구분한다. */
+[data-theme="light"] .same-subject-candidate-text,
+[data-theme="light"] .same-subject-candidate-badge {
+  color: #064e3b !important; /* emerald-900 */
+}
+
+[data-theme="dark"] .same-subject-candidate-text {
+  color: #d1fae5 !important; /* emerald-100 */
+}
+
+[data-theme="dark"] .same-subject-candidate-badge {
+  color: #a7f3d0 !important; /* emerald-200 */
+}
+
 [data-theme="light"] {
   --surface-50:  #17212b;
   --surface-100: #2f3943;
@@ -589,3 +626,48 @@
 [data-theme="dark"] .btn-primary,
 [data-theme="light"] .btn-primary *,
 [data-theme="dark"] .btn-primary * { color: #19222c !important; }
+/* 선택한 날짜의 요일은 시간표 전체 열에서 이어져 보이도록 강조한다. */
+.timetable-selected-day {
+  box-shadow: inset 2px 0 0 rgb(139 92 246 / .9), inset -2px 0 0 rgb(139 92 246 / .9);
+  background-image: linear-gradient(rgb(139 92 246 / .10), rgb(139 92 246 / .10));
+}
+
+/* 위원회 화면은 전역 색상 보정의 영향을 받더라도 항상 읽을 수 있게 한다. */
+[data-theme="light"] .committee-hero,
+[data-theme="dark"] .committee-hero {
+  color: #f8fafc !important;
+}
+[data-theme="light"] .committee-hero-title,
+[data-theme="dark"] .committee-hero-title { color: #ffffff !important; }
+[data-theme="light"] .committee-hero-eyebrow,
+[data-theme="dark"] .committee-hero-eyebrow { color: #7dd3fc !important; }
+[data-theme="light"] .committee-hero-description,
+[data-theme="dark"] .committee-hero-description { color: #cbd5e1 !important; }
+[data-theme="dark"] .committee-page { background: #020617 !important; color: #e2e8f0 !important; }
+[data-theme="dark"] .committee-page .bg-white { background: #0f172a !important; }
+[data-theme="dark"] .committee-page .bg-slate-50 { background: #111827 !important; }
+[data-theme="dark"] .committee-page .bg-slate-100 { background: #1e293b !important; }
+[data-theme="dark"] .committee-page .border-slate-200,
+[data-theme="dark"] .committee-page .border-slate-300 { border-color: #334155 !important; }
+[data-theme="dark"] .committee-page .text-slate-900,
+[data-theme="dark"] .committee-page .text-slate-800,
+[data-theme="dark"] .committee-page .text-slate-700 { color: #f1f5f9 !important; }
+[data-theme="dark"] .committee-page .text-slate-600,
+[data-theme="dark"] .committee-page .text-slate-500 { color: #cbd5e1 !important; }
+
+/* 대학 권장과목·학생부 분석은 두 테마에서 표와 입력값이 선명해야 한다. */
+[data-theme="light"] .recommended-subjects-page { color: #0f172a !important; }
+[data-theme="light"] .recommended-subjects-page .text-white,
+[data-theme="light"] .recommended-subjects-page .text-slate-100,
+[data-theme="light"] .recommended-subjects-page .text-slate-200,
+[data-theme="light"] .recommended-subjects-page .text-slate-300 { color: #172033 !important; }
+[data-theme="light"] .recommended-subjects-page .text-slate-400,
+[data-theme="light"] .recommended-subjects-page .text-slate-500,
+[data-theme="light"] .recommended-subjects-page .text-slate-600 { color: #475569 !important; }
+[data-theme="dark"] .recommended-subjects-page { color: #f8fafc !important; }
+[data-theme="dark"] .recommended-subjects-page input,
+[data-theme="dark"] .recommended-subjects-page select,
+[data-theme="dark"] .recommended-subjects-page textarea { background: #0f172a !important; border-color: #475569 !important; color: #f8fafc !important; }
+[data-theme="light"] .recommended-subjects-page input,
+[data-theme="light"] .recommended-subjects-page select,
+[data-theme="light"] .recommended-subjects-page textarea { background: #ffffff !important; border-color: #cbd5e1 !important; color: #0f172a !important; }

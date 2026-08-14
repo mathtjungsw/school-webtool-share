@@ -4,6 +4,7 @@ import {
   HardDrive, HeartHandshake, Plus, Printer, RefreshCw, ShieldCheck, Trash2, Upload, XCircle,
 } from 'lucide-react'
 import clsx from 'clsx'
+import CoordinatorVolunteerModal from '../components/CoordinatorVolunteerModal'
 import { useAppStore } from '../stores/appStore'
 import { getSharedStudentRoster } from '../services/schoolHub'
 import type { SharedStudentRoster } from '../services/rosterAttendance'
@@ -458,6 +459,7 @@ function VerificationTab() {
   const [busy, setBusy] = useState(false)
   const [editingFile, setEditingFile] = useState<StoredVolunteerHwp | null>(null)
   const [editingForms, setEditingForms] = useState<ParsedVolunteerForm[]>([])
+  const [coordinatorGeneratorOpen, setCoordinatorGeneratorOpen] = useState(false)
 
   const refresh = async () => {
     const items = await window.electron.listVolunteerHwp()
@@ -719,7 +721,7 @@ function VerificationTab() {
   }
 
   const remove = async (id: string) => {
-    if (!confirm('이 PC의 앱 보관함에 있는 복사본만 삭제합니다. 원래 HWP 파일은 삭제되지 않습니다. 계속하시겠습니까?')) return
+    if (!confirm('이 PC의 앱 보관함에 있는 확인서 자료만 삭제합니다. 원래 HWP·PDF 파일과 학교 학생 명렬은 삭제되지 않습니다. 계속하시겠습니까?')) return
     await window.electron.deleteVolunteerHwp(id)
     setComparison(null)
     await refresh()
@@ -773,7 +775,7 @@ function VerificationTab() {
           <p className="mt-3 text-xs font-semibold text-slate-600 dark:text-slate-300">원본 Excel은 복사하지 않고 검증에 필요한 학번·이름·봉사 기록만 이 PC의 앱 저장소에 보관합니다.</p>
         </Panel>
         <Panel title="2. 확인서 HWP·PDF 누적 보관함" subtitle="텍스트 PDF는 글자를 직접 읽고, 스캔 PDF만 포함된 한국어 오프라인 OCR로 처리합니다.">
-          <div className="flex flex-wrap gap-2"><ActionButton onClick={importHwp} icon={<FilePlus2 size={15} />} disabled={busy}>확인서 추가(HWP·PDF)</ActionButton><ActionButton onClick={refresh} icon={<RefreshCw size={15} />}>목록 새로고침</ActionButton></div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap gap-2"><ActionButton onClick={importHwp} icon={<FilePlus2 size={15} />} disabled={busy}>확인서 추가(HWP·PDF)</ActionButton><ActionButton onClick={refresh} icon={<RefreshCw size={15} />}>목록 새로고침</ActionButton></div><button type="button" onClick={() => setCoordinatorGeneratorOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white shadow-sm hover:bg-emerald-800"><FilePlus2 size={16} />봉사활동 확인서 생성(담당자용)</button></div>
           <div className="mt-3 rounded-xl border border-blue-300 bg-blue-50 p-3 text-xs font-bold text-blue-950 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-100"><HardDrive size={15} className="mr-1 inline" />앱 전용 로컬 복사본만 보관합니다. 구글시트·학교 공유 서버에는 파일명이나 내용도 보내지 않습니다.</div>
           <p className="mt-3 text-sm font-bold">누적: <span className="text-emerald-700 dark:text-emerald-300">{files.length}개 파일 · {files.reduce((sum, file) => sum + file.formCount, 0)}개 확인서</span></p>
           {importProgress && <div className="mt-3 flex items-start gap-2 rounded-xl border border-sky-300 bg-sky-50 px-3 py-2.5 text-xs font-black leading-relaxed text-sky-950 dark:border-sky-700 dark:bg-sky-950/50 dark:text-sky-100"><RefreshCw size={15} className="mt-0.5 shrink-0 animate-spin" /><span>{importProgress}</span></div>}
@@ -781,7 +783,7 @@ function VerificationTab() {
       </div>
 
       <Panel title="보관된 확인서 목록" subtitle="목록에 있는 모든 파일이 전체 누적 검증 대상입니다.">
-        <div className="space-y-2">{files.map(file => <div key={file.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 md:flex-row md:items-center dark:border-slate-700"><div className="min-w-0 flex-1"><b className="block truncate">{file.originalName}</b><small className="font-semibold text-slate-600 dark:text-slate-300">{file.formCount}개 확인서 · {file.fileType === 'pdf' ? `${file.pageCount || file.formCount}쪽 · ${file.analysisMode === 'ocr' ? '오프라인 OCR' : file.analysisMode === 'mixed' ? '텍스트+OCR' : '텍스트 직접 추출'}${file.averageConfidence != null ? ` · 평균 신뢰도 ${file.averageConfidence}%` : ''}` : 'HWP 직접 분석'} · {(file.size / 1024).toFixed(0)}KB</small>{Boolean(file.warnings?.length) && <small className="mt-1 block font-bold text-amber-700 dark:text-amber-300">확인 필요 {file.warnings!.length}건</small>}</div><div className="flex flex-wrap gap-2">{file.fileType === 'pdf' && <button onClick={() => void editOcr(file)} className="rounded-lg border border-amber-400 px-3 py-2 text-xs font-bold text-amber-800 dark:text-amber-200">OCR 결과 확인·수정</button>}<button onClick={() => window.electron.openVolunteerHwp(file.id)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold dark:border-slate-600"><FolderOpen size={14} className="mr-1 inline" />열기</button><button onClick={() => remove(file.id)} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-bold text-rose-700 dark:border-rose-700 dark:text-rose-300"><Trash2 size={14} className="mr-1 inline" />로컬 복사본 삭제</button></div></div>)}</div>
+        <div className="space-y-2">{files.map(file => <div key={file.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 md:flex-row md:items-center dark:border-slate-700"><div className="min-w-0 flex-1"><div className="flex min-w-0 flex-wrap items-center gap-2"><b className="block truncate">{file.originalName}</b>{file.fileType === 'generated' && <span className="shrink-0 rounded-full bg-violet-100 px-2 py-1 text-[10px] font-black text-violet-900 dark:bg-violet-900/50 dark:text-violet-100">수기 생성한 확인서</span>}</div><small className="font-semibold text-slate-600 dark:text-slate-300">{file.formCount}개 확인서 · {file.fileType === 'pdf' ? `${file.pageCount || file.formCount}쪽 · ${file.analysisMode === 'ocr' ? '오프라인 OCR' : file.analysisMode === 'mixed' ? '텍스트+OCR' : '텍스트 직접 추출'}${file.averageConfidence != null ? ` · 평균 신뢰도 ${file.averageConfidence}%` : ''}` : file.fileType === 'generated' ? '담당자 직접 입력 · OCR 없이 검증' : 'HWP 직접 분석'} · {(file.size / 1024).toFixed(0)}KB</small>{Boolean(file.warnings?.length) && <small className="mt-1 block font-bold text-amber-700 dark:text-amber-300">확인 필요 {file.warnings!.length}건</small>}</div><div className="flex flex-wrap gap-2">{file.fileType === 'pdf' && <button onClick={() => void editOcr(file)} className="rounded-lg border border-amber-400 px-3 py-2 text-xs font-bold text-amber-800 dark:text-amber-200">OCR 결과 확인·수정</button>}{file.fileType !== 'generated' && <button onClick={() => window.electron.openVolunteerHwp(file.id)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold dark:border-slate-600"><FolderOpen size={14} className="mr-1 inline" />열기</button>}<button onClick={() => remove(file.id)} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-bold text-rose-700 dark:border-rose-700 dark:text-rose-300"><Trash2 size={14} className="mr-1 inline" />로컬 복사본 삭제</button></div></div>)}</div>
         {!files.length && <p className="py-8 text-center text-sm font-bold text-slate-600 dark:text-slate-300">보관된 확인서가 없습니다. 위의 `확인서 추가(HWP·PDF)`를 눌러 주세요.</p>}
       </Panel>
 
@@ -811,6 +813,7 @@ function VerificationTab() {
         {!visibleRows.length && <p className="py-6 text-center text-sm font-bold text-slate-600 dark:text-slate-300">선택한 반의 자료가 없습니다.</p>}
         {comparison.duplicates.length > 0 && <div className="mt-5"><h3 className="font-black text-rose-800 dark:text-rose-200">중복 자료 상세</h3><div className="mt-2 overflow-x-auto rounded-xl border border-rose-200 dark:border-rose-800"><table className="w-full min-w-[850px] text-sm"><thead className="bg-rose-50 dark:bg-rose-950/40"><tr><th className="p-3">자료</th><th className="p-3">학번</th><th className="p-3">이름</th><th className="p-3">중복 횟수</th><th className="p-3 text-left">활동</th></tr></thead><tbody>{comparison.duplicates.map((duplicate, index) => <tr key={`${duplicate.source}-${duplicate.studentId}-${index}`} className="border-t border-rose-200 dark:border-rose-800"><td className="p-3 font-black">{duplicate.source === 'neis' ? '나이스' : '확인서'}</td><td className="p-3 font-bold">{duplicate.studentId}</td><td className="p-3 font-bold">{duplicate.name}</td><td className="p-3 text-center font-black text-rose-700 dark:text-rose-300">{duplicate.count}회</td><td className="cursor-help p-3" title={`원본 파일: ${duplicate.sourceNames.join(', ')}`}><b>{duplicate.activity || '활동명 없음'}</b><small className="ml-2 text-slate-500 dark:text-slate-400">(파일 정보는 마우스를 올려 확인)</small></td></tr>)}</tbody></table></div></div>}
       </Panel>}
+      <CoordinatorVolunteerModal open={coordinatorGeneratorOpen} onClose={() => setCoordinatorGeneratorOpen(false)} onApplied={async () => { await refresh(); setComparison(null) }} />
     </div>
   )
 }

@@ -26,6 +26,7 @@ import {
   buildVolunteerCertificateHwp,
   parseVolunteerHwpBuffer,
   parseVolunteerHwpFile,
+  type ParsedVolunteerForm,
   type VolunteerCertificateDraftInput,
 } from './volunteer-hwp'
 import {
@@ -34,15 +35,25 @@ import {
   listVolunteerHwpFiles,
   resolveVolunteerHwpPath,
   storeGeneratedVolunteerHwp,
+  storeGeneratedVolunteerForms,
   updateVolunteerDocumentForms,
 } from './volunteer-storage'
 import { parseVolunteerPdfFile } from './volunteer-pdf'
 import {
   buildClassVolunteerHwpx,
   buildClassVolunteerPdf,
+  buildCoordinatorVolunteerPdf,
   printClassVolunteer,
   type ClassVolunteerDocumentInput,
+  type CoordinatorVolunteerDocumentInput,
 } from './class-volunteer-document'
+import {
+  clearSchoolInfoEvaluationCache,
+  getSchoolInfoEvaluationPlan,
+  searchSchoolInfoSchools,
+  searchSchoolInfoSchoolsByRegion,
+  type SchoolInfoEvaluationRequest,
+} from './schoolinfo'
 
 const execFileAsync = promisify(execFile)
 
@@ -155,6 +166,7 @@ const ALLOWED_CONFIG_KEY_PREFIXES = [
   'assessment:', 'feedback.', 'timetable_plan:',
   'personal.', 'sidebar.', 'pilotLogin.', 'neisSync.', 'notifier.',
   'staffTasks.',
+  'recommendedSubjects.',
 ]
 function isAllowedConfigKey(key: string): boolean {
   return ALLOWED_CONFIG_KEY_PREFIXES.some(p => key.startsWith(p))
@@ -215,6 +227,11 @@ ipcMain.handle('volunteer:buildClassPdf', async (_, draft: ClassVolunteerDocumen
   return Array.from(await buildClassVolunteerPdf(draft))
 })
 
+ipcMain.handle('volunteer:buildCoordinatorPdf', async (_, draft: CoordinatorVolunteerDocumentInput) => {
+  if (JSON.stringify(draft).length > 2_000_000) throw new Error('담당자용 봉사활동 확인서 입력 내용이 너무 큽니다.')
+  return Array.from(await buildCoordinatorVolunteerPdf(draft))
+})
+
 ipcMain.handle('volunteer:printClass', async (_, draft: ClassVolunteerDocumentInput) => {
   if (JSON.stringify(draft).length > 500_000) throw new Error('반별 봉사활동 확인서 입력 내용이 너무 큽니다.')
   return printClassVolunteer(draft)
@@ -228,6 +245,12 @@ ipcMain.handle('volunteer:storeGeneratedHwp', (_, name: string, bytes: number[])
     formCount: forms.length,
     activities: forms.map(form => form.activityName),
   })
+})
+
+ipcMain.handle('volunteer:storeGeneratedForms', (_, title: string, forms: unknown) => {
+  if (typeof title !== 'string' || title.length > 150) throw new Error('수기 생성 확인서 제목이 올바르지 않습니다.')
+  if (!Array.isArray(forms) || JSON.stringify(forms).length > 2_000_000) throw new Error('수기 생성 확인서 내용이 올바르지 않습니다.')
+  return storeGeneratedVolunteerForms(title, forms as ParsedVolunteerForm[])
 })
 
 ipcMain.handle('volunteer:importHwp', async (_, filePath: string, allowDuplicate = false) => {
@@ -387,6 +410,18 @@ ipcMain.handle('curriculum:savePdf', async (_, id: CurriculumPdfId, defaultName:
   copyFileSync(sourcePath, result.filePath)
   return true
 })
+
+// 학교알리미 공개 평가계획 조회. 학생·교직원 정보는 받거나 전송하지 않는다.
+ipcMain.handle('schoolinfo:searchSchools', (_, query: string, force = false) =>
+  searchSchoolInfoSchools(query, force === true)
+)
+ipcMain.handle('schoolinfo:searchSchoolsByRegion', (_, sido: string, sgg: string, force = false) =>
+  searchSchoolInfoSchoolsByRegion(sido, sgg, force === true)
+)
+ipcMain.handle('schoolinfo:getEvaluationPlan', (_, request: SchoolInfoEvaluationRequest) =>
+  getSchoolInfoEvaluationPlan(request)
+)
+ipcMain.handle('schoolinfo:clearCache', () => clearSchoolInfoEvaluationCache())
 
 // Auto-launch (Windows 시작 프로그램)
 ipcMain.handle('app:getAutoLaunch', () => {

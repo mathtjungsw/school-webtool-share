@@ -13,7 +13,7 @@ export interface StoredVolunteerHwp {
   sha256: string
   formCount: number
   activities: string[]
-  fileType?: 'hwp' | 'pdf'
+  fileType?: 'hwp' | 'pdf' | 'generated'
   pageCount?: number
   analysisMode?: 'hwp' | 'text' | 'ocr' | 'mixed'
   averageConfidence?: number
@@ -70,6 +70,21 @@ export function storeGeneratedVolunteerHwp(
   return storeBytes(originalName.toLowerCase().endsWith('.hwp') ? originalName : `${originalName}.hwp`, bytes, summary)
 }
 
+export function storeGeneratedVolunteerForms(title: string, forms: ParsedVolunteerForm[]) {
+  const cleanTitle = String(title || '').trim()
+  if (!cleanTitle) throw new Error('수기 생성 확인서의 제목을 입력해 주세요.')
+  if (!forms.length) throw new Error('수기 생성 확인서에 반영할 학생 자료가 없습니다.')
+  const bytes = Buffer.from(JSON.stringify(forms, null, 2), 'utf8')
+  return storeBytes(`${cleanTitle} · 수기 생성한 확인서`, bytes, {
+    formCount: forms.length,
+    activities: [...new Set(forms.map(form => form.activityContent || form.activityName).filter(Boolean))],
+    analysisMode: 'text',
+    averageConfidence: 100,
+    warnings: [],
+    forms,
+  }, false, '.json')
+}
+
 function storeBytes(
   originalName: string,
   bytes: Buffer,
@@ -94,7 +109,7 @@ function storeBytes(
     sha256,
     formCount: summary.formCount,
     activities: summary.activities.map(String).filter(Boolean),
-    fileType: extension === '.pdf' ? 'pdf' : 'hwp',
+    fileType: extension === '.pdf' ? 'pdf' : extension === '.json' ? 'generated' : 'hwp',
     pageCount: summary.pageCount,
     analysisMode: summary.analysisMode,
     averageConfidence: summary.averageConfidence,
@@ -110,7 +125,7 @@ export function resolveVolunteerHwpPath(id: string) {
   if (!item) throw new Error('보관된 확인서 파일을 찾지 못했습니다.')
   const base = resolve(vaultDirectory())
   const target = resolve(base, item.storedName)
-  if (!target.startsWith(`${base}\\`) || !['.hwp', '.pdf'].includes(extname(target).toLowerCase()) || !existsSync(target)) {
+  if (!target.startsWith(`${base}\\`) || !['.hwp', '.pdf', '.json'].includes(extname(target).toLowerCase()) || !existsSync(target)) {
     throw new Error('보관된 확인서 경로가 올바르지 않습니다.')
   }
   return { item, path: target }

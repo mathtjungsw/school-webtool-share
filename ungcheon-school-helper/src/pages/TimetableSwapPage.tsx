@@ -8,7 +8,7 @@ import { useAdminStore } from '../stores/adminStore'
 import { useAppStore } from '../stores/appStore'
 import TeacherSchedulePreview from '../components/timetable/TeacherSchedulePreview'
 import TimetablePlanEditor from '../components/timetable/TimetablePlanEditor'
-import { getSchoolTimetable, replaceSchoolTimetable, subscribeHubResource } from '../services/schoolHub'
+import { getSchoolTimetable, getSharedStaffRoster, replaceSchoolTimetable, subscribeHubResource } from '../services/schoolHub'
 import {
   chooseAndParseTimetable,
   findCommonFreeSlots,
@@ -23,6 +23,7 @@ import {
   createEmptyPlanDraft,
   findSubstitutionCandidates,
   loadTimetablePlanDraft,
+  rankSubstitutionCandidates,
   saveTimetablePlanDraft,
   simulateExchange,
   simulateSubstitution,
@@ -34,6 +35,7 @@ import {
 } from '../services/timetablePlanDocument'
 import { applyTimetableChangeForRequester, cancelTimetableChange, createTimetableChange, listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
 import type { TimetablePlanEntry } from '../services/timetablePlan'
+import type { SharedStaffRoster } from '../services/rosterAttendance'
 
 type ViewMode = 'exchange' | 'substitution' | 'common_free' | 'plan'
 type PreviewSelection = {
@@ -59,6 +61,7 @@ export default function TimetableSwapPage() {
   const [planDraft, setPlanDraft] = useState<TimetablePlanDraft>(() => createEmptyPlanDraft(config.teacherName))
   const [planLoaded, setPlanLoaded] = useState(false)
   const [changeRequests, setChangeRequests] = useState<TimetableChangeRequest[]>([])
+  const [staffRoster, setStaffRoster] = useState<SharedStaffRoster | null>(null)
   const configured = Boolean(config.schoolHubUrl)
 
   const load = useCallback(async () => {
@@ -83,6 +86,13 @@ export default function TimetableSwapPage() {
     setSelectedSlot(null)
     setPreview(null)
   }), [])
+
+  const loadStaffRoster = useCallback(async () => {
+    if (!configured) return setStaffRoster(null)
+    try { setStaffRoster(await getSharedStaffRoster()) } catch { setStaffRoster(null) }
+  }, [configured])
+  useEffect(() => { void loadStaffRoster() }, [loadStaffRoster])
+  useEffect(() => subscribeHubResource<SharedStaffRoster | null>('staffRoster', setStaffRoster), [])
 
   useEffect(() => {
     loadTimetablePlanDraft(config.teacherName?.trim() || '').then(draft => {
@@ -138,8 +148,14 @@ export default function TimetableSwapPage() {
   }, [candidates])
   const substitutionCandidates = useMemo(() => {
     if (!timetable || selectedSlot === null) return []
-    return findSubstitutionCandidates(timetable, teacherIndex, selectedSlot)
-  }, [timetable, teacherIndex, selectedSlot])
+    const candidateIndexes = findSubstitutionCandidates(timetable, teacherIndex, selectedSlot)
+    return rankSubstitutionCandidates(
+      candidateIndexes,
+      timetable.teachers[teacherIndex],
+      timetable.teachers,
+      staffRoster?.members ?? [],
+    )
+  }, [staffRoster, timetable, teacherIndex, selectedSlot])
 
   const previewSimulation = useMemo(() => {
     if (!timetable || selectedSlot === null || !preview) return null
@@ -279,7 +295,7 @@ export default function TimetableSwapPage() {
               <Upload size={14} /> {uploading ? '분석·업로드 중...' : '새 시간표 업로드'}
             </button>
           )}
-          <button onClick={load} disabled={loading} className="btn-ghost flex items-center gap-2">
+          <button onClick={() => { void load(); void loadStaffRoster() }} disabled={loading} className="btn-ghost flex items-center gap-2">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> 새로고침
           </button>
         </div>
@@ -396,6 +412,9 @@ export default function TimetableSwapPage() {
             {viewMode === 'exchange'
               ? <Legend className="bg-slate-700/70 border-slate-500/40" text="색상 제한으로 교환 불가" icon={<LockKeyhole size={11} />} />
               : <Legend className="bg-violet-500/20 border-violet-400/35" text="색상 제한 수업도 대강 선택 가능" />}
+            {viewMode === 'substitution' && (
+              <Legend className="bg-emerald-500/25 border-emerald-400/60" text="동교과 공강 교사 · 우선 표시" />
+            )}
           </div>
 
           <section className="grid lg:grid-cols-5 gap-3">
@@ -496,7 +515,8 @@ export default function TimetableSwapPage() {
                         />
                       )
                     })
-                  : substitutionCandidates.map(candidateIndex => {
+                  : substitutionCandidates.map(candidate => {
+                      const candidateIndex = candidate.teacherIndex
                       const substitute = timetable.teachers[candidateIndex]
                       const dayIndex = Math.floor(selectedSlot / PERIODS_PER_DAY)
                       const dayLoad = substitute.slots
@@ -506,7 +526,8 @@ export default function TimetableSwapPage() {
                         <CandidateButton
                           key={candidateIndex}
                           name={substitute.label}
-                          badge="현재 공강"
+                          badge={candidate.isSameSubject ? '동교과 · 현재 공강' : '현재 공강'}
+                          sameSubject={candidate.isSameSubject}
                           active={preview?.mode === 'substitution' && preview.teacherIndex === candidateIndex}
                           onClick={() => setPreview({
                             mode: 'substitution',
@@ -514,6 +535,7 @@ export default function TimetableSwapPage() {
                             partnerSlotIndex: selectedSlot,
                           })}
                           rows={[
+                            ['담당 교과', candidate.teacherSubject || '교과 미등록'],
                             ['대강 수업', oneLine(teacher.slots[selectedSlot].value)],
                             ['당일 수업', `${slotDay(selectedSlot)}요일 현재 ${dayLoad}시간 · 대강 후 ${dayLoad + 1}시간`],
                           ]}
@@ -823,12 +845,14 @@ function ModeButton({
 function CandidateButton({
   name,
   badge,
+  sameSubject = false,
   rows,
   active,
   onClick,
 }: {
   name: string
   badge: string
+  sameSubject?: boolean
   rows: [string, string][]
   active: boolean
   onClick: () => void
@@ -840,15 +864,23 @@ function CandidateButton({
       className={clsx(
         'rounded-xl border p-4 text-left transition-colors',
         active
-          ? 'border-violet-400/70 bg-violet-500/15 ring-1 ring-violet-400/40'
-          : 'border-orange-400/40 bg-orange-500/10 hover:bg-orange-500/15',
+          ? sameSubject
+            ? 'border-emerald-400/80 bg-emerald-500/20 ring-2 ring-emerald-400/45'
+            : 'border-violet-400/70 bg-violet-500/15 ring-1 ring-violet-400/40'
+          : sameSubject
+            ? 'border-emerald-400/60 bg-emerald-500/15 hover:bg-emerald-500/25'
+            : 'border-orange-400/40 bg-orange-500/10 hover:bg-orange-500/15',
       )}
     >
       <span className="flex items-center justify-between gap-2">
-        <span className={clsx('font-bold', active ? 'text-violet-300' : 'text-orange-400')}>{name}</span>
+        <span className={clsx('font-bold', sameSubject ? 'same-subject-candidate-text' : active ? 'text-violet-300' : 'text-orange-400')}>{name}</span>
         <span className={clsx(
           'text-[10px] font-semibold rounded-full px-2 py-1',
-          active ? 'bg-violet-500/20 text-violet-300' : 'bg-orange-500/20 text-orange-400',
+          sameSubject
+            ? 'same-subject-candidate-badge bg-emerald-400/25 ring-1 ring-emerald-300/50'
+            : active
+              ? 'bg-violet-500/20 text-violet-300'
+              : 'bg-orange-500/20 text-orange-400',
         )}>{badge}</span>
       </span>
       <span className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-xs">

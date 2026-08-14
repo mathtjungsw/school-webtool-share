@@ -4,7 +4,7 @@ import {
   ArrowLeftRight, Bell, BookOpen, Calculator, CalendarDays, CalendarRange,
   Check, ClipboardCheck, FileCode2, FileDown, FileScan, FilePenLine, FileText,
   GripVertical, HelpCircle, Landmark, LayoutDashboard, Link2, ListRestart,
-  HeartHandshake, MapPinned, MessageSquareText, ScanSearch, ScrollText, SearchCheck, Settings, ShieldCheck, Table2, UsersRound, Wrench,
+  Building2, HeartHandshake, MapPinned, MessageSquareText, ScanSearch, ScrollText, SearchCheck, Settings, ShieldCheck, Table2, UsersRound, Wrench,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -39,6 +39,7 @@ const NAV: NavItem[] = [
   { id: 'attendance_print', label: '출석부 출력', icon: UsersRound },
   { id: 'volunteer_work', label: '봉사활동 업무', icon: HeartHandshake },
   { id: 'student_locator', label: '학생 위치 찾기', icon: SearchCheck },
+  { id: 'schoolinfo_evaluation', label: '타학교 평가계획', icon: Building2 },
   { id: 'student_identity_audit', label: '학생 학번·이름 교정기', icon: ScanSearch },
   { id: 'subject_remarks_print', label: '교과세특 개별 인쇄기', icon: ScrollText },
   { id: 'staff_roster', label: '교직원 명렬', icon: UsersRound },
@@ -93,6 +94,12 @@ function normalizeOrder(value: unknown) {
     if (appendedIndex >= 0) next.splice(appendedIndex, 1)
     const attendanceIndex = next.indexOf('attendance_print')
     next.splice(attendanceIndex >= 0 ? attendanceIndex + 1 : next.length, 0, 'volunteer_work')
+  }
+  if (!known.includes('schoolinfo_evaluation')) {
+    const appendedIndex = next.indexOf('schoolinfo_evaluation')
+    if (appendedIndex >= 0) next.splice(appendedIndex, 1)
+    const locatorIndex = next.indexOf('student_locator')
+    next.splice(locatorIndex >= 0 ? locatorIndex + 1 : next.length, 0, 'schoolinfo_evaluation')
   }
   return next
 }

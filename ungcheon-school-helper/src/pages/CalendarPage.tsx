@@ -10,6 +10,8 @@ import {
 import { ko } from 'date-fns/locale'
 import clsx from 'clsx'
 import { useAppStore } from '../stores/appStore'
+import { QuickOrganizerModal } from '../components/QuickOrganizerModal'
+import { QuickOrganizerTrigger, type QuickOrganizerHint } from '../components/QuickOrganizerTrigger'
 import { getSharedNeisSnapshot } from '../services/sharedNeis'
 import {
   listCommitteeState, listStaffChecklists, subscribeHubResource, type CommitteeEvent, type CommitteeState,
@@ -145,6 +147,8 @@ export default function CalendarPage() {
   const [message, setMessage] = useState('')
   const [hideCompleted, setHideCompleted] = useState(false)
   const [neisSnapshotAvailable, setNeisSnapshotAvailable] = useState<boolean | null>(null)
+  const [quickAddDate, setQuickAddDate] = useState<string | null>(null)
+  const [quickAddHint, setQuickAddHint] = useState<QuickOrganizerHint | null>(null)
 
   const monthKey = format(viewDate, 'yyyy-MM')
   const hasNeis = Boolean(config.schoolHubUrl?.trim())
@@ -320,7 +324,7 @@ export default function CalendarPage() {
       label: task.departmentNames.length ? task.departmentNames.join(' · ') : '공유 업무',
       completed,
     })}),
-    ...tasks.filter(task => !hideCompleted || !task.completed).map(task => ({
+    ...tasks.filter(task => task.showOnCalendar !== false && (!hideCompleted || !task.completed)).map(task => ({
       id: `personal-${task.id}`,
       date: task.date,
       title: task.title,
@@ -476,14 +480,18 @@ export default function CalendarPage() {
                 const dayEvents = eventsByDate.get(date) ?? []
                 const currentMonth = isSameMonth(day, viewDate)
                 return (
-                  <button key={date} type="button" onClick={() => selectDay(date)} className={clsx(
+                  <button key={date} type="button" onClick={event => {
+                    selectDay(date)
+                    if ((event.target as HTMLElement).closest('[data-calendar-event]')) { setQuickAddHint(null); return }
+                    setQuickAddHint({ date, x: event.clientX, y: event.clientY })
+                  }} className={clsx(
                     'min-h-[116px] min-w-0 bg-surface-800/95 p-1.5 text-left transition-colors hover:bg-white/5',
                     selectedDate === date && 'ring-2 ring-inset ring-emerald-400/70 bg-emerald-500/5',
                     !currentMonth && 'opacity-35',
                   )}>
                     <span className={clsx('mb-1 grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold', date === today() ? 'bg-amber-400 text-slate-950' : index % 7 === 0 ? 'text-rose-400' : index % 7 === 6 ? 'text-sky-400' : 'text-slate-300')}>{format(day, 'd')}</span>
                     <div className="space-y-1">
-                      {dayEvents.slice(0, 4).map(event => <div key={event.id} className={clsx('calendar-event-text truncate rounded border-l-2 px-1 py-0.5 text-[9px]', SOURCE_STYLE[event.source], event.completed && 'line-through opacity-50')} title={`${event.label} · ${event.title}`}>{event.time && <span className="mr-1">{event.time}</span>}{event.title}</div>)}
+                      {dayEvents.slice(0, 4).map(event => <div data-calendar-event key={event.id} className={clsx('calendar-event-text truncate rounded border-l-2 px-1 py-0.5 text-[9px]', SOURCE_STYLE[event.source], event.completed && 'line-through opacity-50')} title={`${event.label} · ${event.title}`}>{event.time && <span className="mr-1">{event.time}</span>}{event.title}</div>)}
                       {dayEvents.length > 4 && <span className="block pl-1 text-[8px] font-bold text-slate-500">+{dayEvents.length - 4}개</span>}
                     </div>
                   </button>
@@ -529,6 +537,8 @@ export default function CalendarPage() {
           </form>
         </aside>
       </div>
+      <QuickOrganizerModal date={quickAddDate} onClose={() => setQuickAddDate(null)} onSaved={() => void loadPersonalTasks().then(setTasks)} />
+      <QuickOrganizerTrigger hint={quickAddHint} onClose={() => setQuickAddHint(null)} onOpen={date => { setQuickAddHint(null); setQuickAddDate(date) }} />
     </div>
   )
 }

@@ -30,6 +30,18 @@ export interface ClassVolunteerCertificateDraft extends VolunteerCertificateDraf
   certificateDate: string
 }
 
+export interface CoordinatorVolunteerCertificateDraft {
+  documentTitle: string
+  activityContent: string
+  startDate: string
+  endDate: string
+  grade: string
+  hours: number | string
+  confirmTeacher: string
+  schoolName: string
+  students: VolunteerStudentRow[]
+}
+
 export interface StoredVolunteerHwp {
   id: string
   originalName: string
@@ -38,7 +50,7 @@ export interface StoredVolunteerHwp {
   sha256: string
   formCount: number
   activities: string[]
-  fileType?: 'hwp' | 'pdf'
+  fileType?: 'hwp' | 'pdf' | 'generated'
   pageCount?: number
   analysisMode?: 'hwp' | 'text' | 'ocr' | 'mixed'
   averageConfidence?: number
@@ -179,6 +191,41 @@ export function emptyClassVolunteerDraft(teacherName = ''): ClassVolunteerCertif
     periodLabel: '5, 6교시',
     certificateDate: today,
   }
+}
+
+export function emptyCoordinatorVolunteerDraft(teacherName = ''): CoordinatorVolunteerCertificateDraft {
+  const today = new Date().toISOString().slice(0, 10)
+  return {
+    documentTitle: '',
+    activityContent: '',
+    startDate: today,
+    endDate: today,
+    grade: '',
+    hours: 1,
+    confirmTeacher: teacherName,
+    schoolName: '웅천고등학교',
+    students: [],
+  }
+}
+
+export function validateCoordinatorVolunteerDraft(draft: CoordinatorVolunteerCertificateDraft) {
+  const errors: string[] = []
+  if (!draft.documentTitle.trim()) errors.push('확인서 제목을 입력해 주세요.')
+  if (!draft.activityContent.trim()) errors.push('활동 내용을 입력해 주세요.')
+  if (!draft.startDate || !draft.endDate) errors.push('활동 기간을 입력해 주세요.')
+  if (draft.startDate && draft.endDate && draft.startDate > draft.endDate) errors.push('활동 종료일은 시작일보다 빠를 수 없습니다.')
+  if (!/^[1-3]$/.test(draft.grade)) errors.push('학년을 선택해 주세요.')
+  const hours = Number(String(draft.hours).trim())
+  if (!Number.isFinite(hours) || hours <= 0 || hours > 24) errors.push('인정 시간은 0보다 크고 24 이하인 숫자로 입력해 주세요.')
+  if (!draft.students.length) errors.push('확인서에 포함할 학생이 없습니다.')
+  const ids = new Set<string>()
+  for (const student of draft.students) {
+    const studentId = volunteerStudentId(student.studentId)
+    if (!new RegExp(`^${draft.grade}\\d{3}$`).test(studentId)) errors.push(`${student.name || '이름 없음'} 학생의 학번을 확인해 주세요.`)
+    if (ids.has(studentId)) errors.push(`${studentId} 학번이 명단에 중복되어 있습니다.`)
+    ids.add(studentId)
+  }
+  return [...new Set(errors)]
 }
 
 export function validateClassIssuanceDraft(draft: ClassVolunteerCertificateDraft) {

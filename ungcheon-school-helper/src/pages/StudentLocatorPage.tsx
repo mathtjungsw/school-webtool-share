@@ -27,6 +27,19 @@ function normalizedIdMatch(studentId: string, query: string) {
   return studentIdsMatch(studentId, query)
 }
 
+function surroundingPeriods(now = new Date()) {
+  const minutes = now.getHours() * 60 + now.getMinutes()
+  const withMinutes = UNGCHEON_PERIOD_PLAN.map(item => {
+    const [sh, sm] = item.start.split(':').map(Number)
+    const [eh, em] = item.end.split(':').map(Number)
+    return { ...item, startMinutes: sh * 60 + sm, endMinutes: eh * 60 + em }
+  })
+  return {
+    previous: [...withMinutes].reverse().find(item => item.endMinutes < minutes),
+    next: withMinutes.find(item => item.startMinutes > minutes),
+  }
+}
+
 function canonicalizeTimetableStudent(item: PersonalTimetable): PersonalTimetable {
   const studentId = canonicalStudentId(item.student.studentId)
   return studentId === item.student.studentId
@@ -116,26 +129,34 @@ export default function StudentLocatorPage() {
   const dayIndex = getTimetableDayIndex(dateKey)
   const day = specialTimetableDay?.sourceWeekday ?? DAY_NAMES[clock.getDay()]
   const period = currentPeriod(clock)
-  const personalSlot = selected && day && period ? selected.slots[`${day}${period.period}`] : undefined
-  const neisSlot = selected && day && period
-    ? sharedNeis?.timetables.find(item =>
+  const adjacent = !period ? surroundingPeriods(clock) : null
+
+  const resolveSlot = (periodNumber: number) => {
+    if (!selected || !day) return undefined
+    const personalSlot = selected.slots[`${day}${periodNumber}`]
+    const neisSlot = sharedNeis?.timetables.find(item =>
       item.date === dateKey.replace(/-/g, '') &&
       String(Number(item.grade)) === String(Number(selected.student.grade)) &&
       String(Number(item.classNm)) === String(Number(selected.student.className)) &&
-      Number(item.period) === Number(period.period),
+      Number(item.period) === periodNumber,
     )
-    : undefined
-  const baseSlot = personalSlot?.subject ? personalSlot : neisSlot && day && period ? {
-    day,
-    period: Number(period.period),
-    subject: neisSlot.subject,
-    teacher: neisSlot.teacher,
-    classroom: neisSlot.classroom,
-    raw: '',
-    selectedCourse: false,
-  } : personalSlot
-  const slotIndex = period ? schoolTimetableSlotIndex(dayIndex, Number(period.period)) : -1
-  const slot = selected && slotIndex >= 0 ? applyStudentLessonOverride(baseSlot, selected.student.classLabel, dateKey, slotIndex, changes) : baseSlot
+    const baseSlot = personalSlot?.subject ? personalSlot : neisSlot ? {
+      day,
+      period: periodNumber,
+      subject: neisSlot.subject,
+      teacher: neisSlot.teacher,
+      classroom: neisSlot.classroom,
+      raw: '',
+      selectedCourse: false,
+    } : personalSlot
+    const slotIndex = schoolTimetableSlotIndex(dayIndex, periodNumber)
+    return slotIndex >= 0
+      ? applyStudentLessonOverride(baseSlot, selected.student.classLabel, dateKey, slotIndex, changes)
+      : baseSlot
+  }
+  const slot = period ? resolveSlot(Number(period.period)) : undefined
+  const previousSlot = adjacent?.previous ? resolveSlot(Number(adjacent.previous.period)) : undefined
+  const nextSlot = adjacent?.next ? resolveSlot(Number(adjacent.next.period)) : undefined
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-6">
@@ -150,10 +171,46 @@ export default function StudentLocatorPage() {
       {candidates.length > 1 && !selected && <section className="card"><h2 className="font-black text-slate-100">동명이인·검색 후보 {candidates.length}명</h2><p className="mt-1 text-xs font-semibold text-slate-400">학번과 학급을 확인해 학생을 선택하세요.</p><div className="mt-4 grid gap-2 sm:grid-cols-2">{candidates.map(item => <button key={item.student.studentId} onClick={() => setSelected(item)} className="rounded-xl border-2 border-slate-400/30 bg-surface-900 p-3 text-left hover:border-cyan-500"><p className="font-black text-slate-100">{item.student.name}</p><p className="mt-1 text-xs font-bold text-cyan-400">{item.student.studentId} · {item.student.classLabel}반 {item.student.number}번</p></button>)}</div></section>}
       {selected && <section className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
         <div className="card"><p className="text-lg font-black text-white">{selected.student.name}</p><p className="mt-1 text-sm text-slate-400">{selected.student.studentId} · {selected.student.classLabel}반 {selected.student.number}번</p><div className="mt-4 rounded-xl bg-white/[0.03] p-3 text-xs text-slate-400"><Clock3 size={14} className="mb-2 text-amber-300" />{clock.toLocaleString('ko-KR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}<br />{period ? `${period.period}교시 ${period.start}~${period.end}` : '현재 정규 수업 시간이 아닙니다.'}</div></div>
-        <div className="card border-cyan-400/15"><h2 className="flex items-center gap-2 font-bold text-white"><MapPin size={17} className="text-cyan-400" />현재 위치</h2>{!day ? <p className="mt-6 text-sm text-slate-400">주말에는 현재 수업이 없습니다.</p> : !period ? <p className="mt-6 text-sm text-slate-400">현재 정규 수업 시간이 아닙니다.</p> : slot?.subject ? <><div className="mt-5 grid gap-3 sm:grid-cols-3"><Info label="수업" value={slot.subject} /><Info label="교실" value={slot.classroom || `${selected.student.classLabel}반 교실`} /><Info label="담당 교사" value={slot.teacher || '-'} /></div>{'effectiveChange' in slot && <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">승인된 교환·대강 일정이 오늘 시간표에 반영되었습니다.</p>}</> : <p className="mt-6 text-sm text-slate-400">{day}요일 {period.period}교시는 등록된 수업이 없습니다.</p>}<p className="mt-5 text-[11px] text-slate-500">관리자가 업로드한 학생별 시간표와 학교 공용 NEIS 학급시간표를 함께 사용하며, 실제 NEIS 입력을 대신하지 않는 편의 기능입니다.</p></div>
+        <div className="card border-cyan-400/15">
+          <h2 className="flex items-center gap-2 font-bold text-white"><MapPin size={17} className="text-cyan-400" />현재 위치</h2>
+          {!day ? <p className="mt-6 text-sm text-slate-400">주말에는 현재 수업이 없습니다.</p> : period ? (
+            slot?.subject
+              ? <LessonLocation label={`${period.period}교시`} slot={slot} defaultClassroom={`${selected.student.classLabel}반 교실`} />
+              : <p className="mt-6 text-sm text-slate-400">{day}요일 {period.period}교시는 등록된 수업이 없습니다.</p>
+          ) : (
+            <div className="mt-5 grid gap-3 xl:grid-cols-2">
+              <AdjacentLesson label="앞시간" period={adjacent?.previous} slot={previousSlot} defaultClassroom={`${selected.student.classLabel}반 교실`} />
+              <AdjacentLesson label="뒷시간" period={adjacent?.next} slot={nextSlot} defaultClassroom={`${selected.student.classLabel}반 교실`} />
+            </div>
+          )}
+          <p className="mt-5 text-[11px] text-slate-500">쉬는 시간에는 직전 수업 교실과 다음 수업 교실을 함께 안내합니다. 승인된 교환·대강 일정도 반영하며, 실제 NEIS 입력을 대신하지 않는 편의 기능입니다.</p>
+        </div>
       </section>}
     </div>
   )
 }
 
 function Info({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-white/5 bg-white/[0.025] p-4"><p className="text-[10px] text-slate-500">{label}</p><p className="mt-2 text-base font-bold text-white">{value}</p></div> }
+
+type LocatedSlot = ReturnType<typeof applyStudentLessonOverride>
+
+function LessonLocation({ label, slot, defaultClassroom }: { label: string; slot: NonNullable<LocatedSlot>; defaultClassroom: string }) {
+  return <div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4">
+    <p className="mb-3 text-xs font-black text-cyan-300">{label}</p>
+    <div className="grid gap-3 sm:grid-cols-3"><Info label="수업" value={slot.subject} /><Info label="교실" value={slot.classroom || defaultClassroom} /><Info label="담당 교사" value={slot.teacher || '-'} /></div>
+    {'effectiveChange' in slot && <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">승인된 교환·대강 일정이 반영되었습니다.</p>}
+  </div>
+}
+
+function AdjacentLesson({ label, period, slot, defaultClassroom }: {
+  label: '앞시간' | '뒷시간'
+  period?: (typeof UNGCHEON_PERIOD_PLAN)[number] & { startMinutes: number; endMinutes: number }
+  slot?: LocatedSlot
+  defaultClassroom: string
+}) {
+  return <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4">
+    <p className="text-xs font-black text-cyan-300">{label}{period ? ` · ${period.period}교시 (${period.start}~${period.end})` : ''}</p>
+    {!period ? <p className="mt-3 text-sm text-slate-400">{label} 수업이 없습니다.</p> : slot?.subject ? <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3"><Info label="수업" value={slot.subject} /><Info label="교실" value={slot.classroom || defaultClassroom} /><Info label="담당 교사" value={slot.teacher || '-'} /></div> : <p className="mt-3 text-sm text-slate-400">등록된 수업이 없습니다.</p>}
+    {slot && 'effectiveChange' in slot && <p className="mt-3 text-[11px] font-semibold text-amber-300">승인된 수업 변경 반영</p>}
+  </div>
+}

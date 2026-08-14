@@ -40,6 +40,7 @@ const FormCenterPage = lazy(() => import('../pages/FormCenterPage'))
 const TeacherToolsPage = lazy(() => import('../pages/TeacherToolsPage'))
 const TeacherTransferScorePage = lazy(() => import('../pages/TeacherTransferScorePage'))
 const StudentLocatorPage = lazy(() => import('../pages/StudentLocatorPage'))
+const SchoolInfoEvaluationPage = lazy(() => import('../pages/SchoolInfoEvaluationPage'))
 const StudentIdentityAuditPage = lazy(() => import('../pages/StudentIdentityAuditPage'))
 const SubjectRemarksPrintPage = lazy(() => import('../pages/SubjectRemarksPrintPage'))
 const AdminCenterPage = lazy(() => import('../pages/AdminCenterPage'))
@@ -76,6 +77,7 @@ const PAGES: Record<string, React.ComponentType> = {
   teacher_tools: TeacherToolsPage,
   transfer_score: TeacherTransferScorePage,
   student_locator: StudentLocatorPage,
+  schoolinfo_evaluation: SchoolInfoEvaluationPage,
   student_identity_audit: StudentIdentityAuditPage,
   subject_remarks_print: SubjectRemarksPrintPage,
   admin_center: AdminCenterPage,

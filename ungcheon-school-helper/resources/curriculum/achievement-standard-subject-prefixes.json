@@ -1,0 +1,2739 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-14",
+  "school": "창원시 웅천고등학교",
+  "subjectAuthority": {
+    "workbook": "C:/MYBOX/2026. 교육과정부/1. 편성표/2026학년도 웅천고등학교 학교교육과정 편성표(0721).xlsx",
+    "sheet": "2026 전학년",
+    "subjectColumn": "D",
+    "note": "시간표 표기가 아니라 교육과정 편성표의 정식 과목명을 기준으로 함. 음악↔미술은 공식 코드 검색상 음악·미술로 분리함."
+  },
+  "curriculumSources": [
+    {
+      "revision": "2022",
+      "notice": "교육부 고시 제2022-33호",
+      "url": "https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=141&boardSeq=93458&lev=0"
+    },
+    {
+      "revision": "2022",
+      "notice": "국가교육위원회 고시 제2024-3호",
+      "url": "https://ncic.go.kr/board/B0033.cs?act=read&bwrId=2116"
+    },
+    {
+      "revision": "2015",
+      "notice": "교육부 고시 제2015-74호 및 후속 개정",
+      "url": "https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=141&boardSeq=60747&lev=0"
+    },
+    {
+      "revision": "2015",
+      "notice": "국가교육위원회 고시 제2024-1호",
+      "url": "https://ncic.go.kr/board/B0033.cs?act=read&bwrId=2114"
+    }
+  ],
+  "normalization": {
+    "unicode": "NFC",
+    "hyphens": "Normalize Unicode hyphen variants to -",
+    "whitespace": "Allow whitespace inside brackets",
+    "matching": "Require the numeric achievement-standard suffix immediately after codePrefix; never use startsWith alone."
+  },
+  "summary": {
+    "totalSubjects": 94,
+    "revision2022": 57,
+    "revision2015": 37,
+    "openedSubjects": 85,
+    "notOpenedSubjects": [
+      "문학과 영상",
+      "중국어",
+      "경제",
+      "논술",
+      "동아시아사",
+      "언어와 매체",
+      "영미 문학 읽기",
+      "영어 회화",
+      "음악 전공 실기"
+    ],
+    "verified": 93,
+    "nonVerified": [
+      {
+        "subject": "프로그래밍",
+        "status": "no-coded-standards-in-source"
+      }
+    ]
+  },
+  "records": [
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "공통국어1",
+      "codePrefix": "10공국1",
+      "matchPattern": "\\[\\s*10공국1(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10공국1-01-01",
+        "10공국1-01-02",
+        "10공국1-02-01"
+      ],
+      "sourceFile": "[별책5] 국어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 1,
+          "sourceRow": 5,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "공통국어1"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "공통국어2",
+      "codePrefix": "10공국2",
+      "matchPattern": "\\[\\s*10공국2(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10공국2-01-01",
+        "10공국2-01-02",
+        "10공국2-01-03"
+      ],
+      "sourceFile": "[별책5] 국어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 2,
+          "sourceRow": 6,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "공통국어2"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "공통수학1",
+      "codePrefix": "10공수1",
+      "matchPattern": "\\[\\s*10공수1(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10공수1-01-01",
+        "10공수1-01-02",
+        "10공수1-01-03"
+      ],
+      "sourceFile": "[별책8] 수학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 1,
+          "sourceRow": 9,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "공통수학1"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "공통수학2",
+      "codePrefix": "10공수2",
+      "matchPattern": "\\[\\s*10공수2(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10공수2-01-01",
+        "10공수2-01-02",
+        "10공수2-01-03"
+      ],
+      "sourceFile": "[별책8] 수학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 2,
+          "sourceRow": 10,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "공통수학2"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "공통영어1",
+      "codePrefix": "10공영1",
+      "matchPattern": "\\[\\s*10공영1(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10공영1-01-01",
+        "10공영1-01-02",
+        "10공영1-01-03"
+      ],
+      "sourceFile": "[별책14] 영어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 1,
+          "sourceRow": 14,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "공통영어1"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "공통영어2",
+      "codePrefix": "10공영2",
+      "matchPattern": "\\[\\s*10공영2(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10공영2-01-01",
+        "10공영2-01-02",
+        "10공영2-01-03"
+      ],
+      "sourceFile": "[별책14] 영어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 2,
+          "sourceRow": 15,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "공통영어2"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "과학탐구실험1",
+      "codePrefix": "10과탐1",
+      "matchPattern": "\\[\\s*10과탐1(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10과탐1-01-01",
+        "10과탐1-01-02",
+        "10과탐1-02-01"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 1,
+          "sourceRow": 24,
+          "credits": 1,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "과학탐구실험1"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "과학탐구실험2",
+      "codePrefix": "10과탐2",
+      "matchPattern": "\\[\\s*10과탐2(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10과탐2-01-01",
+        "10과탐2-01-02",
+        "10과탐2-01-03"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 2,
+          "sourceRow": 25,
+          "credits": 1,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "과학탐구실험2"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "미술",
+      "codePrefix": "12미",
+      "matchPattern": "\\[\\s*12미(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12미01-01",
+        "12미01-02",
+        "12미01-03"
+      ],
+      "sourceFile": "[별책13] 미술과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 1,
+          "sourceRow": 31,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 1,
+          "semester": 2,
+          "sourceRow": 31,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "음악↔미술"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "음악",
+      "codePrefix": "12음",
+      "matchPattern": "\\[\\s*12음(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12음01-01",
+        "12음01-02",
+        "12음01-03"
+      ],
+      "sourceFile": "[별책12] 음악과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 1,
+          "sourceRow": 31,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 1,
+          "semester": 2,
+          "sourceRow": 31,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "음악↔미술"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "체육1",
+      "codePrefix": "12체육1",
+      "matchPattern": "\\[\\s*12체육1(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12체육1-01-01",
+        "12체육1-01-02",
+        "12체육1-01-03"
+      ],
+      "sourceFile": "[별책11] 체육과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 1,
+          "sourceRow": 26,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "체육1"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "체육2",
+      "codePrefix": "12체육2",
+      "matchPattern": "\\[\\s*12체육2(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12체육2-01-01",
+        "12체육2-01-02",
+        "12체육2-01-03"
+      ],
+      "sourceFile": "[별책11] 체육과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 2,
+          "sourceRow": 27,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "체육2"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "통합과학1",
+      "codePrefix": "10통과1",
+      "matchPattern": "\\[\\s*10통과1(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10통과1-01-01",
+        "10통과1-01-02",
+        "10통과1-01-03"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 1,
+          "sourceRow": 22,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "통합과학1"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "통합과학2",
+      "codePrefix": "10통과2",
+      "matchPattern": "\\[\\s*10통과2(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10통과2-01-01",
+        "10통과2-01-02",
+        "10통과2-01-03"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 2,
+          "sourceRow": 23,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "통합과학2"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "통합사회1",
+      "codePrefix": "10통사1",
+      "matchPattern": "\\[\\s*10통사1(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10통사1-01-01",
+        "10통사1-01-02",
+        "10통사1-02-01"
+      ],
+      "sourceFile": "[별책7] 사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 1,
+          "sourceRow": 20,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "통합사회1"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "통합사회2",
+      "codePrefix": "10통사2",
+      "matchPattern": "\\[\\s*10통사2(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10통사2-01-01",
+        "10통사2-01-02",
+        "10통사2-01-03"
+      ],
+      "sourceFile": "[별책7] 사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 2,
+          "sourceRow": 21,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "통합사회2"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "한국사1",
+      "codePrefix": "10한사1",
+      "matchPattern": "\\[\\s*10한사1(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10한사1-01-01",
+        "10한사1-01-02",
+        "10한사1-01-03"
+      ],
+      "sourceFile": "[별책7] 사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 1,
+          "sourceRow": 18,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "한국사1"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "한국사2",
+      "codePrefix": "10한사2",
+      "matchPattern": "\\[\\s*10한사2(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "10한사2-01-01",
+        "10한사2-01-02",
+        "10한사2-01-03"
+      ],
+      "sourceFile": "[별책7] 사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 1,
+          "semester": 2,
+          "sourceRow": 19,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "한국사2"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "기하",
+      "codePrefix": "12기하",
+      "matchPattern": "\\[\\s*12기하(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12기하01-01",
+        "12기하01-02",
+        "12기하01-03"
+      ],
+      "sourceFile": "[별책8] 수학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 52,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "기하"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "기후변화와 지속가능한 세계",
+      "codePrefix": "12기지",
+      "matchPattern": "\\[\\s*12기지(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12기지01-01",
+        "12기지01-02",
+        "12기지02-01"
+      ],
+      "sourceFile": "[별책7] 사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 59,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "기후변화와 지속가능한 세계"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "논술",
+      "codePrefix": "12논술",
+      "matchPattern": "\\[\\s*12논술(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12논술01-01",
+        "12논술01-02",
+        "12논술01-03"
+      ],
+      "sourceFile": "[별책19] 고등학교 교양 교과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 33,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "논술"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "대수",
+      "codePrefix": "12대수",
+      "matchPattern": "\\[\\s*12대수(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12대수01-01",
+        "12대수01-02",
+        "12대수01-03"
+      ],
+      "sourceFile": "[별책8] 수학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 11,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "대수"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "도시의 미래 탐구",
+      "codePrefix": "12도탐",
+      "matchPattern": "\\[\\s*12도탐(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12도탐01-01",
+        "12도탐01-02",
+        "12도탐01-03"
+      ],
+      "sourceFile": "[별책7] 사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 55,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "도시의 미래 탐구"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "독서와 작문",
+      "codePrefix": "12독작",
+      "matchPattern": "\\[\\s*12독작(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12독작01-01",
+        "12독작01-02",
+        "12독작01-03"
+      ],
+      "sourceFile": "[별책5] 국어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 8,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "독서와 작문"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "동아시아 역사 기행",
+      "codePrefix": "12동역",
+      "matchPattern": "\\[\\s*12동역(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12동역-01-01",
+        "12동역-01-02",
+        "12동역01-01"
+      ],
+      "sourceFile": "[별책7] 사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 56,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "동아시아 역사 기행"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "문학",
+      "codePrefix": "12문학",
+      "matchPattern": "\\[\\s*12문학(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12문학01-01",
+        "12문학01-02",
+        "12문학01-03"
+      ],
+      "sourceFile": "[별책5] 국어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 7,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "문학"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "문학과 영상",
+      "codePrefix": "12문영",
+      "matchPattern": "\\[\\s*12문영(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12문영01-01",
+        "12문영01-02",
+        "12문영01-03"
+      ],
+      "sourceFile": "[별책5] 국어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 51,
+          "credits": 3,
+          "openFlag": "X",
+          "isOpened": false
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "문학과 영상"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "물리학",
+      "codePrefix": "12물리",
+      "matchPattern": "\\[\\s*12물리(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12물리01-01",
+        "12물리01-02",
+        "12물리01-03"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 43,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "물리학"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "물질과 에너지",
+      "codePrefix": "12물에",
+      "matchPattern": "\\[\\s*12물에(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12물에01-01",
+        "12물에01-02",
+        "12물에01-03"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 61,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "물질과 에너지"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "미디어 영어",
+      "codePrefix": "12미영",
+      "matchPattern": "\\[\\s*12미영(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12미영01-01",
+        "12미영01-02",
+        "12미영01-03"
+      ],
+      "sourceFile": "[별책14] 영어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 37,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "미디어 영어"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "미적분Ⅰ",
+      "codePrefix": "12미적Ⅰ",
+      "matchPattern": "\\[\\s*12미적Ⅰ(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12미적Ⅰ-01-01",
+        "12미적Ⅰ-01-02",
+        "12미적Ⅰ-01-03"
+      ],
+      "sourceFile": "[별책8] 수학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 13,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "미적분Ⅰ"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "법과 사회",
+      "codePrefix": "12법사",
+      "matchPattern": "\\[\\s*12법사(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12법사01-01",
+        "12법사01-02",
+        "12법사01-03"
+      ],
+      "sourceFile": "[별책7] 사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 58,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "법과 사회"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "사회와 문화",
+      "codePrefix": "12사문",
+      "matchPattern": "\\[\\s*12사문(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12사문01-01",
+        "12사문01-02",
+        "12사문01-03"
+      ],
+      "sourceFile": "[별책7] 사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 54,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "사회와 문화"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "생명과학",
+      "codePrefix": "12생과",
+      "matchPattern": "\\[\\s*12생과(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12생과01-01",
+        "12생과01-02",
+        "12생과01-03"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 45,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "생명과학"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "세계 문화와 영어",
+      "codePrefix": "12세영",
+      "matchPattern": "\\[\\s*12세영(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12세영01-01",
+        "12세영01-02",
+        "12세영01-03"
+      ],
+      "sourceFile": "[별책14] 영어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 53,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "세계 문화와 영어"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "세계사",
+      "codePrefix": "12세사",
+      "matchPattern": "\\[\\s*12세사(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12세사01-01",
+        "12세사01-02",
+        "12세사01-03"
+      ],
+      "sourceFile": "[별책7] 사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 40,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "세계사"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "세계시민과 지리",
+      "codePrefix": "12세지",
+      "matchPattern": "\\[\\s*12세지(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12세지01-01",
+        "12세지01-02",
+        "12세지01-03"
+      ],
+      "sourceFile": "[별책7] 사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 39,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "세계시민과 지리"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "세포와 물질대사",
+      "codePrefix": "12세포",
+      "matchPattern": "\\[\\s*12세포(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12세포01-01",
+        "12세포01-02",
+        "12세포01-03"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 62,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "세포와 물질대사"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "스포츠 생활1",
+      "codePrefix": "12스생1",
+      "matchPattern": "\\[\\s*12스생1(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12스생1-01-01",
+        "12스생1-01-02",
+        "12스생1-01-03"
+      ],
+      "sourceFile": "[별책11] 체육과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 28,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "스포츠 생활1"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "스포츠 생활2",
+      "codePrefix": "12스생2",
+      "matchPattern": "\\[\\s*12스생2(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12스생2-01-01",
+        "12스생2-01-02",
+        "12스생2-01-03"
+      ],
+      "sourceFile": "[별책11] 체육과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 29,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "스포츠 생활2"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "역학과 에너지",
+      "codePrefix": "12역학",
+      "matchPattern": "\\[\\s*12역학(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12역학01-01",
+        "12역학01-02",
+        "12역학01-03"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 60,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "역학과 에너지"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "영어 독해와 작문",
+      "codePrefix": "12영독",
+      "matchPattern": "\\[\\s*12영독(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12영독01-01",
+        "12영독01-02",
+        "12영독01-03"
+      ],
+      "sourceFile": "[별책14] 영어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 16,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "영어 독해와 작문"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "영어Ⅰ",
+      "codePrefix": "12영Ⅰ",
+      "matchPattern": "\\[\\s*12영Ⅰ(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12영Ⅰ-01-01",
+        "12영Ⅰ-01-02",
+        "12영Ⅰ-01-03"
+      ],
+      "sourceFile": "[별책14] 영어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 17,
+          "credits": 4,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "영어Ⅰ"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "윤리문제 탐구",
+      "codePrefix": "12윤탐",
+      "matchPattern": "\\[\\s*12윤탐(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12윤탐01-01",
+        "12윤탐01-02",
+        "12윤탐02-01"
+      ],
+      "sourceFile": "[별책6] 도덕과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 42,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "윤리문제 탐구"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "융합과학 탐구",
+      "codePrefix": "12융탐",
+      "matchPattern": "\\[\\s*12융탐(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12융탐01-01",
+        "12융탐01-02",
+        "12융탐01-03"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 64,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "융합과학 탐구"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "인공지능 수학",
+      "codePrefix": "12인수",
+      "matchPattern": "\\[\\s*12인수(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12인수01-01",
+        "12인수01-02",
+        "12인수01-03"
+      ],
+      "sourceFile": "[별책8] 수학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 36,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "인공지능 수학"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "인문학과 윤리",
+      "codePrefix": "12인윤",
+      "matchPattern": "\\[\\s*12인윤(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12인윤01-01",
+        "12인윤01-02",
+        "12인윤02-01"
+      ],
+      "sourceFile": "[별책6] 도덕과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 57,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "인문학과 윤리"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "일본어",
+      "codePrefix": "12일어",
+      "matchPattern": "\\[\\s*12일어(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12일어01-01",
+        "12일어01-02",
+        "12일어01-03"
+      ],
+      "sourceFile": "[별책16] 제2외국어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 48,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 48,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "일본어"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "정보",
+      "codePrefix": "12정",
+      "matchPattern": "\\[\\s*12정(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12정01-01",
+        "12정01-02",
+        "12정01-03"
+      ],
+      "sourceFile": "[별책10] 실과(기술가정)정보과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 47,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 47,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "정보"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "정치",
+      "codePrefix": "12정치",
+      "matchPattern": "\\[\\s*12정치(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12정치01-01",
+        "12정치01-02",
+        "12정치01-03"
+      ],
+      "sourceFile": "[별책7] 사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 41,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "정치"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "주제 탐구 독서",
+      "codePrefix": "12주탐",
+      "matchPattern": "\\[\\s*12주탐(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12주탐01-01",
+        "12주탐01-02",
+        "12주탐01-03"
+      ],
+      "sourceFile": "[별책5] 국어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 50,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "주제 탐구 독서"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "중국어",
+      "codePrefix": "12중어",
+      "matchPattern": "\\[\\s*12중어(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12중어01-01",
+        "12중어01-02",
+        "12중어01-03"
+      ],
+      "sourceFile": "[별책16] 제2외국어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 49,
+          "credits": 3,
+          "openFlag": "X",
+          "isOpened": false
+        },
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 49,
+          "credits": 3,
+          "openFlag": "X",
+          "isOpened": false
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "중국어"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "지구과학",
+      "codePrefix": "12지구",
+      "matchPattern": "\\[\\s*12지구(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12지구01-01",
+        "12지구01-02",
+        "12지구01-03"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 46,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "지구과학"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "지구시스템과학",
+      "codePrefix": "12지시",
+      "matchPattern": "\\[\\s*12지시(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12지시01-01",
+        "12지시01-02",
+        "12지시01-03"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 2,
+          "sourceRow": 63,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "지구시스템과학"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "현대사회와 윤리",
+      "codePrefix": "12현윤",
+      "matchPattern": "\\[\\s*12현윤(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12현윤01-01",
+        "12현윤01-02",
+        "12현윤02-01"
+      ],
+      "sourceFile": "[별책6] 도덕과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 38,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "현대사회와 윤리"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "화학",
+      "codePrefix": "12화학",
+      "matchPattern": "\\[\\s*12화학(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12화학01-01",
+        "12화학01-02",
+        "12화학01-03"
+      ],
+      "sourceFile": "[별책9] 과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 44,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "화학"
+    },
+    {
+      "curriculumRevision": "2022",
+      "officialSubjectName": "확률과 통계",
+      "codePrefix": "12확통",
+      "matchPattern": "\\[\\s*12확통(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12확통01-01",
+        "12확통01-02",
+        "12확통01-03"
+      ],
+      "sourceFile": "[별책8] 수학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 2,
+          "semester": 1,
+          "sourceRow": 12,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "확률과 통계"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "경제",
+      "codePrefix": "12경제",
+      "matchPattern": "\\[\\s*12경제(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12경제01-01",
+        "12경제01-02",
+        "12경제01-03"
+      ],
+      "sourceFile": "별책7_사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 78,
+          "credits": 3,
+          "openFlag": "X",
+          "isOpened": false
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 78,
+          "credits": 3,
+          "openFlag": "X",
+          "isOpened": false
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "경제"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "경제 수학",
+      "codePrefix": "12경수",
+      "matchPattern": "\\[\\s*12경수(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12경수01-01",
+        "12경수01-02",
+        "12경수01-03"
+      ],
+      "sourceFile": "별책8_수학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 70,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 70,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "경제 수학"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "과학과제 연구",
+      "codePrefix": "12과연",
+      "matchPattern": "\\[\\s*12과연(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12과연01-01",
+        "12과연01-02",
+        "12과연01-03"
+      ],
+      "sourceFile": "별책20_과학 계열 전문 교과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 94,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 94,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "과학과제 연구"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "교육학",
+      "codePrefix": "12교육",
+      "matchPattern": "\\[\\s*12교육(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12교육01-01",
+        "12교육01-02",
+        "12교육01-03"
+      ],
+      "sourceFile": "별책19_고등학교 교양 교과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 86,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 86,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "교육학"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "논술",
+      "codePrefix": "12논술",
+      "matchPattern": "\\[\\s*12논술(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12논술01-01",
+        "12논술01-02",
+        "12논술01-03"
+      ],
+      "sourceFile": "별책19_고등학교 교양 교과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 89,
+          "credits": 2,
+          "openFlag": "X",
+          "isOpened": false
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 89,
+          "credits": 2,
+          "openFlag": "X",
+          "isOpened": false
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "논술"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "동아시아사",
+      "codePrefix": "12동사",
+      "matchPattern": "\\[\\s*12동사(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12동사01-01",
+        "12동사01-02",
+        "12동사01-03"
+      ],
+      "sourceFile": "별책7_사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 75,
+          "credits": 3,
+          "openFlag": "X",
+          "isOpened": false
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 75,
+          "credits": 3,
+          "openFlag": "X",
+          "isOpened": false
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "동아시아사"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "물리학Ⅱ",
+      "codePrefix": "12물리Ⅱ",
+      "matchPattern": "\\[\\s*12물리Ⅱ(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12물리Ⅱ01-01",
+        "12물리Ⅱ01-02",
+        "12물리Ⅱ01-03"
+      ],
+      "sourceFile": "별책9_과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 79,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 79,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "물리학Ⅱ"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "미술 전공 실기",
+      "codePrefix": "12미전",
+      "matchPattern": "\\[\\s*12미전(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12미전01-01",
+        "12미전01-02",
+        "12미전01-03"
+      ],
+      "sourceFile": "별책22_예술 계열 전문 교과(보통 교과 연극 과목 포함) 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 98,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 98,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "미술 전공 실기"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "미술 창작",
+      "codePrefix": "12미창",
+      "matchPattern": "\\[\\s*12미창(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12미창01-01",
+        "12미창01-02",
+        "12미창01-03"
+      ],
+      "sourceFile": "별책13_미술과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 84,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 84,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "미술 창작"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "미적분",
+      "codePrefix": "12미적",
+      "matchPattern": "\\[\\s*12미적(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12미적01-01",
+        "12미적01-02",
+        "12미적01-03"
+      ],
+      "sourceFile": "별책8_수학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 68,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 68,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "미적분"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "보건",
+      "codePrefix": "12보",
+      "matchPattern": "\\[\\s*12보(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12보01-01",
+        "12보01-02",
+        "12보02-01"
+      ],
+      "sourceFile": "별책19_고등학교 교양 교과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 87,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 87,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "보건"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "사회문제 탐구",
+      "codePrefix": "12사탐",
+      "matchPattern": "\\[\\s*12사탐(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12사탐01-01",
+        "12사탐01-02",
+        "12사탐01-03"
+      ],
+      "sourceFile": "별책7_사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 93,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 93,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "사회문제 탐구"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "생명과학Ⅱ",
+      "codePrefix": "12생과Ⅱ",
+      "matchPattern": "\\[\\s*12생과Ⅱ(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12생과Ⅱ01-01",
+        "12생과Ⅱ01-02",
+        "12생과Ⅱ02-01"
+      ],
+      "sourceFile": "별책9_과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 81,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 81,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "생명과학Ⅱ"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "수학과제 탐구",
+      "codePrefix": "12수과",
+      "matchPattern": "\\[\\s*12수과(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12수과01-01",
+        "12수과01-02",
+        "12수과01-03"
+      ],
+      "sourceFile": "별책8_수학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 91,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 91,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "수학과제 탐구"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "스포츠 경기 체력",
+      "codePrefix": "12스체",
+      "matchPattern": "\\[\\s*12스체(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12스체01-01",
+        "12스체01-02",
+        "12스체01-03"
+      ],
+      "sourceFile": "별책21_체육 계열 전문 교과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 96,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 96,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "스포츠 경기 체력"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "스포츠 생활",
+      "codePrefix": "12스생",
+      "matchPattern": "\\[\\s*12스생(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12스생01-01",
+        "12스생01-02",
+        "12스생01-03"
+      ],
+      "sourceFile": "별책11_체육과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 30,
+          "credits": 1,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 30,
+          "credits": 1,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "스포츠 생활"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "실용 경제",
+      "codePrefix": "12실경",
+      "matchPattern": "\\[\\s*12실경(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12실경01-01",
+        "12실경01-02",
+        "12실경01-03"
+      ],
+      "sourceFile": "별책19_고등학교 교양 교과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 88,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 88,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "실용 경제"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "심리학",
+      "codePrefix": "12심리",
+      "matchPattern": "\\[\\s*12심리(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12심리01-01",
+        "12심리01-02",
+        "12심리01-03"
+      ],
+      "sourceFile": "별책19_고등학교 교양 교과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 85,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 85,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "심리학"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "심화 국어",
+      "codePrefix": "12심국",
+      "matchPattern": "\\[\\s*12심국(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12심국01-01",
+        "12심국01-02",
+        "12심국01-03"
+      ],
+      "sourceFile": "별책5_국어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 67,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 67,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "심화 국어"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "언어와 매체",
+      "codePrefix": "12언매",
+      "matchPattern": "\\[\\s*12언매(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12언매01-01",
+        "12언매01-02",
+        "12언매01-03"
+      ],
+      "sourceFile": "별책5_국어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 65,
+          "credits": 3,
+          "openFlag": "X",
+          "isOpened": false
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 65,
+          "credits": 3,
+          "openFlag": "X",
+          "isOpened": false
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "언어와 매체"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "영미 문학 읽기",
+      "codePrefix": "12영문",
+      "matchPattern": "\\[\\s*12영문(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12영문03-01",
+        "12영문03-02",
+        "12영문03-03"
+      ],
+      "sourceFile": "별책14_영어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 92,
+          "credits": 2,
+          "openFlag": "X",
+          "isOpened": false
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 92,
+          "credits": 2,
+          "openFlag": "X",
+          "isOpened": false
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "영미 문학 읽기"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "영어 독해와 작문",
+      "codePrefix": "12영독",
+      "matchPattern": "\\[\\s*12영독(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12영독03-01",
+        "12영독03-02",
+        "12영독03-03"
+      ],
+      "sourceFile": "별책14_영어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 71,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 71,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "영어 독해와 작문"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "영어 회화",
+      "codePrefix": "12영회",
+      "matchPattern": "\\[\\s*12영회(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12영회01-01",
+        "12영회01-02",
+        "12영회01-03"
+      ],
+      "sourceFile": "별책14_영어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 72,
+          "credits": 3,
+          "openFlag": "X",
+          "isOpened": false
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 72,
+          "credits": 3,
+          "openFlag": "X",
+          "isOpened": false
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "영어 회화"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "영어권 문화",
+      "codePrefix": "12영화",
+      "matchPattern": "\\[\\s*12영화(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12영화01-01",
+        "12영화01-02",
+        "12영화01-03"
+      ],
+      "sourceFile": "별책14_영어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 73,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 73,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "영어권 문화"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "윤리와 사상",
+      "codePrefix": "윤사",
+      "matchPattern": "\\[\\s*윤사(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "윤사01-01",
+        "윤사01-02",
+        "윤사02-01"
+      ],
+      "sourceFile": "별책6_도덕과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 77,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 77,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "윤리와 사상"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "음악 연주",
+      "codePrefix": "12음연",
+      "matchPattern": "\\[\\s*12음연(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12음연01-01",
+        "12음연01-02",
+        "12음연01-03"
+      ],
+      "sourceFile": "별책12_음악과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 83,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 83,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "음악 연주"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "음악 전공 실기",
+      "codePrefix": "12음전",
+      "matchPattern": "\\[\\s*12음전(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12음전01-01",
+        "12음전01-02",
+        "12음전02-01"
+      ],
+      "sourceFile": "별책22_예술 계열 전문 교과(보통 교과 연극 과목 포함) 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 97,
+          "credits": 2,
+          "openFlag": "X",
+          "isOpened": false
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 97,
+          "credits": 2,
+          "openFlag": "X",
+          "isOpened": false
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "음악 전공 실기"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "일본어Ⅱ",
+      "codePrefix": "12일Ⅱ",
+      "matchPattern": "\\[\\s*12일Ⅱ(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12일Ⅱ-01-01",
+        "12일Ⅱ-01-02",
+        "12일Ⅱ-01-03"
+      ],
+      "sourceFile": "별책16_제2외국어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 95,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 95,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "일본어Ⅱ"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "정치와 법",
+      "codePrefix": "12정법",
+      "matchPattern": "\\[\\s*12정법(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12정법01-01",
+        "12정법01-02",
+        "12정법01-03"
+      ],
+      "sourceFile": "별책7_사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 76,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 76,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "정치와 법"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "지구과학Ⅱ",
+      "codePrefix": "12지과Ⅱ",
+      "matchPattern": "\\[\\s*12지과Ⅱ(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12지과Ⅱ01-01",
+        "12지과Ⅱ01-02",
+        "12지과Ⅱ01-03"
+      ],
+      "sourceFile": "별책9_과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 82,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 82,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "지구과학Ⅱ"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "프로그래밍",
+      "codePrefix": null,
+      "matchPattern": null,
+      "status": "no-coded-standards-in-source",
+      "exampleCodes": [],
+      "sourceFile": "별책36_정보·통신 교과 교육과정.pdf",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 99,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "2015 직업계고 전문교과 원문은 이 과목의 성취기준을 서술형으로 제시하며 대괄호 코드가 없다.",
+      "sourceOfficialLabel": "프로그래밍"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "한국지리",
+      "codePrefix": "12한지",
+      "matchPattern": "\\[\\s*12한지(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12한지01-01",
+        "12한지01-02",
+        "12한지01-03"
+      ],
+      "sourceFile": "별책7_사회과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 74,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 74,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "한국지리"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "현대문학 감상",
+      "codePrefix": "12현감",
+      "matchPattern": "\\[\\s*12현감(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12현감01-01",
+        "12현감01-02",
+        "12현감01-03"
+      ],
+      "sourceFile": "별책22_예술 계열 전문 교과(보통 교과 연극 과목 포함) 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 90,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 90,
+          "credits": 2,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "현대문학 감상"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "화법과 작문",
+      "codePrefix": "12화작",
+      "matchPattern": "\\[\\s*12화작(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12화작01-01",
+        "12화작01-02",
+        "12화작01-03"
+      ],
+      "sourceFile": "별책5_국어과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 66,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 66,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "화법과 작문"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "화학Ⅱ",
+      "codePrefix": "12화학Ⅱ",
+      "matchPattern": "\\[\\s*12화학Ⅱ(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12화학Ⅱ01-01",
+        "12화학Ⅱ01-02",
+        "12화학Ⅱ01-03"
+      ],
+      "sourceFile": "별책9_과학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 80,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 80,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "화학Ⅱ"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "확률과 통계",
+      "codePrefix": "12확통",
+      "matchPattern": "\\[\\s*12확통(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12확통01-01",
+        "12확통01-02",
+        "12확통01-03"
+      ],
+      "sourceFile": "별책8_수학과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 69,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 69,
+          "credits": 3,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "확률과 통계"
+    },
+    {
+      "curriculumRevision": "2015",
+      "officialSubjectName": "환경",
+      "codePrefix": "12환경",
+      "matchPattern": "\\[\\s*12환경(?:-?\\d{2})-\\d{2}\\s*\\]",
+      "status": "verified",
+      "exampleCodes": [
+        "12환경01-02",
+        "12환경01-03",
+        "12환경01-05"
+      ],
+      "sourceFile": "별책19_고등학교 교양 교과 교육과정.md",
+      "offeredAtUngcheon": [
+        {
+          "grade": 3,
+          "semester": 1,
+          "sourceRow": 34,
+          "credits": 1,
+          "openFlag": "O",
+          "isOpened": true
+        },
+        {
+          "grade": 3,
+          "semester": 2,
+          "sourceRow": 34,
+          "credits": 1,
+          "openFlag": "O",
+          "isOpened": true
+        }
+      ],
+      "notes": "",
+      "sourceOfficialLabel": "환경"
+    }
+  ]
+}

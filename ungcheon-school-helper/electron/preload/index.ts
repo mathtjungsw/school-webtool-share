@@ -79,10 +79,14 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('volunteer:buildClassHwpx', draft),
   buildClassVolunteerPdf: (draft: unknown): Promise<number[]> =>
     ipcRenderer.invoke('volunteer:buildClassPdf', draft),
+  buildCoordinatorVolunteerPdf: (draft: unknown): Promise<number[]> =>
+    ipcRenderer.invoke('volunteer:buildCoordinatorPdf', draft),
   printClassVolunteer: (draft: unknown): Promise<boolean> =>
     ipcRenderer.invoke('volunteer:printClass', draft),
   storeGeneratedVolunteerHwp: (name: string, bytes: number[]) =>
     ipcRenderer.invoke('volunteer:storeGeneratedHwp', name, bytes),
+  storeGeneratedVolunteerForms: (title: string, forms: unknown[]) =>
+    ipcRenderer.invoke('volunteer:storeGeneratedForms', title, forms),
   importVolunteerHwp: (filePath: string, allowDuplicate = false) => ipcRenderer.invoke('volunteer:importHwp', filePath, allowDuplicate),
   listVolunteerHwp: () => ipcRenderer.invoke('volunteer:listHwp'),
   parseVolunteerHwp: (id: string) => ipcRenderer.invoke('volunteer:parseHwp', id),
@@ -158,4 +162,13 @@ contextBridge.exposeInMainWorld('electron', {
     id: 'all' | 'grade1' | 'grade2' | 'grade3',
     defaultName: string,
   ): Promise<boolean> => ipcRenderer.invoke('curriculum:savePdf', id, defaultName),
+
+  // 학교알리미 공개 평가계획(개인정보를 전송하지 않는 읽기 전용 연동)
+  schoolInfoSearchSchools: (query: string, force = false) =>
+    ipcRenderer.invoke('schoolinfo:searchSchools', query, force),
+  schoolInfoSearchSchoolsByRegion: (sido: string, sgg: string, force = false) =>
+    ipcRenderer.invoke('schoolinfo:searchSchoolsByRegion', sido, sgg, force),
+  schoolInfoGetEvaluationPlan: (request: unknown) =>
+    ipcRenderer.invoke('schoolinfo:getEvaluationPlan', request),
+  schoolInfoClearCache: () => ipcRenderer.invoke('schoolinfo:clearCache'),
 })

@@ -114,17 +114,17 @@ export default function SchoolCommitteesPage() {
   }, [filter, query])
 
   return (
-    <div className="min-h-full bg-slate-50 p-5 text-slate-800">
+    <div className="committee-page min-h-full bg-slate-50 p-5 text-slate-800">
       <div className="mx-auto max-w-[1500px] space-y-4">
-        <header className="rounded-3xl bg-gradient-to-br from-indigo-950 via-slate-900 to-sky-950 p-6 text-white shadow-xl shadow-slate-900/10">
+        <header className="committee-hero rounded-3xl bg-gradient-to-br from-indigo-950 via-slate-900 to-sky-950 p-6 text-white shadow-xl shadow-slate-900/10">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-sky-300">
+              <div className="committee-hero-eyebrow mb-2 flex items-center gap-2 text-xs font-semibold text-sky-300">
                 <Landmark size={15} />
                 경상남도교육청 2026. 4. 1. 기준 · 고등학교 적용 항목
               </div>
-              <h1 className="text-2xl font-black tracking-tight">학교 내 각종위원회</h1>
-              <p className="mt-2 text-sm text-slate-300">
+              <h1 className="committee-hero-title text-2xl font-black tracking-tight">학교 내 각종위원회</h1>
+              <p className="committee-hero-description mt-2 text-sm text-slate-300">
                 공식 기준표를 확인하고 위원 명단과 개최 일정을 한곳에서 관리합니다.
               </p>
             </div>

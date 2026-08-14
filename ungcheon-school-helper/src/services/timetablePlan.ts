@@ -1,5 +1,6 @@
-import type { SchoolTimetable, SchoolTimetableSlot } from './schoolTimetable'
+import type { SchoolTimetable, SchoolTimetableSlot, TeacherTimetable } from './schoolTimetable'
 import { PERIODS_PER_DAY, TIMETABLE_DAYS } from './schoolTimetable'
+import type { StaffMember } from './rosterAttendance'
 
 export type TimetablePlanKind = 'exchange' | 'substitution' | 'change'
 
@@ -123,6 +124,87 @@ export function findSubstitutionCandidates(
       !teacher.slots[selectedSlotIndex]?.locked,
     )
     .map(({ index }) => index)
+}
+
+const RELATED_SUBJECT_GROUPS = [
+  new Set(['과학', '물리', '물리학', '화학', '생물', '생명과학', '지구과학']),
+  new Set(['사회', '지리', '일반사회', '역사', '윤리']),
+]
+
+export interface RankedSubstitutionCandidate {
+  teacherIndex: number
+  isSameSubject: boolean
+  teacherSubject: string
+  selectedTeacherSubject: string
+}
+
+function normalizeTeacherName(value: string) {
+  return value
+    .normalize('NFKC')
+    .replace(/\s+/g, '')
+    .replace(/(?:선생님|교사)$/u, '')
+    .toLocaleLowerCase('ko-KR')
+}
+
+function normalizeSubjectToken(value: string) {
+  return value
+    .normalize('NFKC')
+    .replace(/\s+/g, '')
+    .replace(/교과$/u, '')
+    .replace(/과$/u, '')
+    .toLocaleLowerCase('ko-KR')
+}
+
+function subjectTokens(value: string) {
+  return value
+    .replace(/[()\[\]{}]/g, ',')
+    .split(/[,/·ㆍ|&＋+;\n]+/u)
+    .map(normalizeSubjectToken)
+    .filter(Boolean)
+}
+
+/** 교직원 명렬의 교과명 또는 과학·사회 예외군을 기준으로 동교과인지 판정한다. */
+export function areSameTeachingSubject(left: string, right: string) {
+  const leftTokens = subjectTokens(left)
+  const rightTokens = subjectTokens(right)
+  if (!leftTokens.length || !rightTokens.length) return false
+  if (leftTokens.some(token => rightTokens.includes(token))) return true
+  return RELATED_SUBJECT_GROUPS.some(group =>
+    leftTokens.some(token => group.has(token)) &&
+    rightTokens.some(token => group.has(token)),
+  )
+}
+
+function findStaffSubject(name: string, members: StaffMember[]) {
+  const key = normalizeTeacherName(name)
+  if (!key) return ''
+  return members.find(member => normalizeTeacherName(member.name) === key)?.subject?.trim() ?? ''
+}
+
+/** 기존 공강 후보 순서는 유지하면서 동교과 후보만 안정적으로 앞으로 이동한다. */
+export function rankSubstitutionCandidates(
+  candidateIndexes: number[],
+  selectedTeacher: TeacherTimetable,
+  teachers: TeacherTimetable[],
+  staffMembers: StaffMember[],
+): RankedSubstitutionCandidate[] {
+  const selectedTeacherSubject = findStaffSubject(selectedTeacher.name, staffMembers)
+  return candidateIndexes
+    .map((teacherIndex, originalOrder) => {
+      const teacherSubject = findStaffSubject(teachers[teacherIndex]?.name ?? '', staffMembers)
+      return {
+        teacherIndex,
+        originalOrder,
+        isSameSubject: areSameTeachingSubject(selectedTeacherSubject, teacherSubject),
+        teacherSubject,
+        selectedTeacherSubject,
+      }
+    })
+    .sort((left, right) =>
+      Number(right.isSameSubject) - Number(left.isSameSubject) ||
+      left.originalOrder - right.originalOrder,
+    )
+    .map(({ originalOrder: _originalOrder, ...candidate }) => candidate)
 }
 
 export function simulateExchange(
