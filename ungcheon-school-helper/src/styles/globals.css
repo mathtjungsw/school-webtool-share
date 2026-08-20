@@ -633,16 +633,35 @@
 }
 
 /* 위원회 화면은 전역 색상 보정의 영향을 받더라도 항상 읽을 수 있게 한다. */
-[data-theme="light"] .committee-hero,
-[data-theme="dark"] .committee-hero {
-  color: #f8fafc !important;
+[data-theme="light"] .committee-hero {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 55%, #eff6ff 100%) !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 12px 30px rgb(15 23 42 / .08) !important;
 }
-[data-theme="light"] .committee-hero-title,
+[data-theme="light"] .committee-hero-title { color: #0f172a !important; }
+[data-theme="light"] .committee-hero-eyebrow { color: #0369a1 !important; }
+[data-theme="light"] .committee-hero-description { color: #334155 !important; }
+[data-theme="light"] .committee-tab-active { background: #ffffff !important; color: #0f172a !important; border: 1px solid #cbd5e1 !important; }
+[data-theme="light"] .committee-tab-inactive { background: #e2e8f0 !important; color: #1e293b !important; border: 1px solid #cbd5e1 !important; }
+[data-theme="light"] .committee-tab-inactive:hover { background: #cbd5e1 !important; }
+[data-theme="light"] .committee-refresh-button { background: #e0f2fe !important; color: #0c4a6e !important; border: 1px solid #7dd3fc !important; }
+[data-theme="light"] .committee-refresh-button:hover { background: #bae6fd !important; }
+[data-theme="light"] .committee-direct-panel { background: #f8fafc !important; }
+[data-theme="light"] .committee-direct-add-button,
+[data-theme="light"] .committee-save-button { background: #4f46e5 !important; color: #ffffff !important; }
+[data-theme="light"] .committee-direct-add-button *,
+[data-theme="light"] .committee-save-button * { color: #ffffff !important; }
+[data-theme="dark"] .committee-hero { color: #f8fafc !important; }
 [data-theme="dark"] .committee-hero-title { color: #ffffff !important; }
-[data-theme="light"] .committee-hero-eyebrow,
 [data-theme="dark"] .committee-hero-eyebrow { color: #7dd3fc !important; }
-[data-theme="light"] .committee-hero-description,
 [data-theme="dark"] .committee-hero-description { color: #cbd5e1 !important; }
+[data-theme="dark"] .committee-tab-active { background: #f8fafc !important; color: #0f172a !important; }
+[data-theme="dark"] .committee-tab-inactive { background: #1e293b !important; color: #f8fafc !important; border: 1px solid #475569 !important; }
+[data-theme="dark"] .committee-refresh-button { background: #1e293b !important; color: #f8fafc !important; border: 1px solid #475569 !important; }
+[data-theme="dark"] .committee-direct-panel { background: #111827 !important; }
+[data-theme="dark"] .committee-direct-add-button,
+[data-theme="dark"] .committee-save-button { background: #6366f1 !important; color: #ffffff !important; }
 [data-theme="dark"] .committee-page { background: #020617 !important; color: #e2e8f0 !important; }
 [data-theme="dark"] .committee-page .bg-white { background: #0f172a !important; }
 [data-theme="dark"] .committee-page .bg-slate-50 { background: #111827 !important; }
@@ -671,3 +690,14 @@
 [data-theme="light"] .recommended-subjects-page input,
 [data-theme="light"] .recommended-subjects-page select,
 [data-theme="light"] .recommended-subjects-page textarea { background: #ffffff !important; border-color: #cbd5e1 !important; color: #0f172a !important; }
+html[data-theme='light'] .committee-calendar-event {
+  background: #e0e7ff !important;
+  color: #312e81 !important;
+  border: 1px solid #a5b4fc !important;
+}
+
+html[data-theme='dark'] .committee-calendar-event {
+  background: #312e81 !important;
+  color: #eef2ff !important;
+  border: 1px solid #6366f1 !important;
+}

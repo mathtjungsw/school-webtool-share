@@ -124,10 +124,20 @@ export function parseVolunteerHwpBuffer(buffer: Buffer): ParsedVolunteerForm[] {
   sectionEntries.forEach(entry => {
     const bytes = Buffer.from(entry.content!)
     const records = parseRecords(compressed ? inflateRawSync(bytes) : bytes)
-    findTableStarts(records).forEach(start => {
-      const end = findTopLevelTableEnd(records, start)
+    const tableStarts = findTableStarts(records)
+    tableStarts.forEach((start, tableIndex) => {
+      // 여러 확인서를 한 HWP에 연속으로 붙인 문서는 표 사이에 level 0 문단이
+      // 없을 수 있다. 이 경우 문단만 기준으로 끝을 찾으면 뒤의 모든 확인서를
+      // 첫 표에 포함해 학생과 활동을 잘못 연결한다. 다음 최상위 표 시작을
+      // 절대 경계로 사용해 각 확인서를 독립적으로 읽는다.
+      const nextTableStart = tableStarts[tableIndex + 1] ?? records.length
+      const end = Math.min(findTopLevelTableEnd(records, start), nextTableStart)
       const cells = findCellRanges(records, start, end)
       if (cells.length < 30 || !cells[0]?.text.includes('봉사활동 확인서')) return
+      const certificateTitleCount = cells.filter(cell => cell.text.includes('봉사활동 확인서')).length
+      if (certificateTitleCount !== 1) {
+        throw new Error('확인서 표 경계를 정확히 구분하지 못했습니다. 여러 확인서가 한 표로 읽혀 판독을 중단했습니다.')
+      }
       forms.push(parseForm(cells, forms.length))
     })
   })
@@ -181,6 +191,9 @@ function buildCellValues(
 function parseForm(cells: CellRange[], formIndex: number): ParsedVolunteerForm {
   const isDouble = cells[16]?.text.replace(/\s/g, '').includes('번호')
   const capacity = isDouble ? Math.max(0, Math.round((cells.length - 23) / 4)) : 20
+  if (capacity < 1 || capacity > 68) {
+    throw new Error(`문서 내 ${formIndex + 1}번째 확인서의 학생 명단 표 범위가 올바르지 않습니다.`)
+  }
   const participants: ParsedVolunteerParticipant[] = []
   const previousHours: Array<number | null> = [null, null]
   const readStudent = (start: number, side: number) => {

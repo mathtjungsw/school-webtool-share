@@ -355,6 +355,19 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.13',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.13',
+    body: [
+      '· 자주 쓰는 메뉴를 누른 순서대로 위에 고정하고, 사용하지 않는 메뉴를 숨긴 뒤 환경설정에서 복원할 수 있게 했습니다.',
+      '· 대시보드와 통합 캘린더의 일정 종류를 각각 켜고 끌 수 있게 하고, 대시보드 2주 달력은 일정이 많아도 모두 표시하도록 개선했습니다.',
+      '· 내 위원회 일정과 배부받은 미완료 업무를 한 줄 카드로 압축해 좌우 병렬 배치하고, 캘린더에도 미완료 업무 바로가기를 추가했습니다.',
+      '· 업무센터를 내 업무·업무 만들기 등으로 정리하고, 업무 요약을 누르면 세부 내용이 펼쳐지며 저장 직후 대시보드와 캘린더에 반영되도록 개선했습니다.',
+      '· 타학교 평가계획의 지역 후보를 먼저 들어온 최대 50개교 중 12개교 무작위 방식으로 바꾸고, 파일 목록 확인 실패 시에도 MCP 원문 검색을 계속하도록 복구했습니다.',
+      '· 여러 봉사활동 확인서가 한 HWP에 들어 있을 때 학생과 활동이 잘못 연결되는 문제를 차단하고, 위원회 화면의 밝은 모드 배경과 글자 대비를 개선했습니다.'
+    ].join('\n'),
+    date: '2026-08-20'
+  },
+  {
     key: 'v1.1.12',
     title: '[업데이트] 웅천고 업무도우미 v1.1.12',
     body: [
@@ -943,6 +956,39 @@ function ensureReleaseNotices_() {
         else seenTitles[title] = true;
       });
       duplicateRows.reverse().forEach(function(rowNumber) {
+        sheet.deleteRow(rowNumber);
+      });
+    }
+
+    // 제목의 버전만 다르고 내용이 같은 공식 업데이트 공지는 더 높은 버전만 남깁니다.
+    // 사용자가 직접 작성한 일반 공지는 본문이 같아도 삭제하지 않습니다.
+    const contentLastRow = sheet.getLastRow();
+    if (contentLastRow > 2) {
+      const noticeValues = sheet.getRange(2, 1, contentLastRow - 1, 3).getDisplayValues();
+      const byBody = {};
+      const duplicateContentRows = [];
+      noticeValues.forEach(function(row, index) {
+        const id = Number(row[0]) || 0;
+        const title = String(row[1] || '').trim();
+        const bodyKey = String(row[2] || '').replace(/\s+/g, ' ').trim();
+        const versionMatch = title.match(/^\[(?:업데이트|긴급 수정|첫 배포)\].*?v(\d+)\.(\d+)\.(\d+)$/);
+        if (!versionMatch || !bodyKey) return;
+        const versionScore = Number(versionMatch[1]) * 100000000 + Number(versionMatch[2]) * 10000 + Number(versionMatch[3]);
+        const current = { rowNumber: index + 2, id: id, versionScore: versionScore };
+        const previous = byBody[bodyKey];
+        if (!previous) {
+          byBody[bodyKey] = current;
+          return;
+        }
+        if (current.versionScore > previous.versionScore ||
+            (current.versionScore === previous.versionScore && current.id > previous.id)) {
+          duplicateContentRows.push(previous.rowNumber);
+          byBody[bodyKey] = current;
+        } else {
+          duplicateContentRows.push(current.rowNumber);
+        }
+      });
+      duplicateContentRows.sort(function(a, b) { return b - a; }).forEach(function(rowNumber) {
         sheet.deleteRow(rowNumber);
       });
     }

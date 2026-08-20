@@ -134,7 +134,7 @@ export default function SchoolCommitteesPage() {
               </span>
               <button
                 onClick={() => void load()}
-                className="flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold hover:bg-white/20"
+                className="committee-refresh-button flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold"
               >
                 <RefreshCw size={14} /> 새로고침
               </button>
@@ -280,7 +280,7 @@ function TabButton({
     <button
       onClick={onClick}
       className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${
-        active ? 'bg-white text-slate-950 shadow-lg' : 'bg-white/10 text-slate-300 hover:bg-white/20'
+        active ? 'committee-tab-active shadow-lg' : 'committee-tab-inactive'
       }`}
     >
       <Icon size={16} /> {children}
@@ -461,7 +461,7 @@ function MemberEditor({
           <button
             disabled={busy}
             onClick={() => void onSave(members)}
-            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="committee-save-button flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-50"
           >
             {busy ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
             명단 저장
@@ -477,7 +477,7 @@ function MemberEditor({
 
       {editable && (
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 p-3">
+          <div className="committee-direct-panel rounded-2xl border border-slate-200 p-3">
             <p className="mb-2 text-xs font-black text-slate-700">교직원 명렬에서 선택</p>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
@@ -510,13 +510,13 @@ function MemberEditor({
                 value={directName}
                 onChange={event => setDirectName(event.target.value)}
                 placeholder="성명 또는 외부위원"
-                className="rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-indigo-400"
+                className="committee-form-control rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-indigo-400"
               />
               <input
                 value={directRole}
                 onChange={event => setDirectRole(event.target.value)}
                 placeholder="역할"
-                className="rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-indigo-400"
+                className="committee-form-control rounded-xl border border-slate-200 px-3 py-2 text-xs outline-none focus:border-indigo-400"
               />
             </div>
             <button
@@ -524,7 +524,7 @@ function MemberEditor({
                 add(directName, directRole, 'direct')
                 setDirectName('')
               }}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white"
+              className="committee-direct-add-button mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold"
             >
               <UserPlus size={14} /> 직접 입력 위원 추가
             </button>
@@ -688,7 +688,7 @@ function CalendarView({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-black text-slate-900">위원회 일정</h2>
-            <p className="mt-1 text-xs text-slate-500">등록된 위원에게만 개인 대시보드 달력과 알림에 표시됩니다.</p>
+            <p className="mt-1 text-xs font-semibold text-slate-600">이 위원회 캘린더에는 내 소속 여부와 관계없이 학교의 모든 위원회 일정이 표시됩니다. 개인 대시보드·통합 캘린더에는 내 위원회만 표시됩니다.</p>
           </div>
           <input
             type="month"
@@ -753,7 +753,7 @@ function MonthCalendar({ month, events }: { month: string; events: CommitteeEven
                 <>
                   <span className={`text-[11px] font-bold ${index % 7 === 0 ? 'text-rose-500' : 'text-slate-500'}`}>{day}</span>
                   {dayEvents.slice(0, 2).map(event => (
-                    <div key={event.id} title={`${event.committeeName} ${event.startTime}`} className="mt-1 truncate rounded bg-indigo-100 px-1.5 py-1 text-[10px] font-bold text-indigo-700">
+                    <div key={event.id} title={`${event.committeeName} ${event.startTime}`} className="committee-calendar-event mt-1 truncate rounded px-1.5 py-1 text-[10px] font-bold">
                       {event.startTime} {event.committeeName}
                     </div>
                   ))}

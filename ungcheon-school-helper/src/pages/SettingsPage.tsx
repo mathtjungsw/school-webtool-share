@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Search, Check, Loader2, School, User, Save, AlertCircle, Zap, Eye, EyeOff, Calendar, Clock, GraduationCap, Plus, Trash2, Power } from 'lucide-react'
+import { Search, Check, Loader2, School, User, Save, AlertCircle, Zap, Eye, EyeOff, Calendar, Clock, GraduationCap, Plus, Trash2, Power, PanelLeft, RotateCcw } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { searchSchool, getTimetableRange, NEIS_API_KEY } from '../services/neis'
 import { testConnection } from '../services/llm'
 import type { SchoolInfo } from '../types'
 import clsx from 'clsx'
 import { HelpContent } from './HelpPage'
+import { SIDEBAR_MENU_OPTIONS } from '../components/Sidebar'
 
 const BREAK_MINUTES = 10
 
@@ -61,6 +62,7 @@ export default function SettingsPage() {
   )
   const [secondLocationName, setSecondLocationName] = useState(config.secondLocationName ?? '')
   const [autoLaunch, setAutoLaunch] = useState<boolean | null>(null)
+  const [hiddenMenus, setHiddenMenus] = useState<string[]>([])
   const [tcGrade, setTcGrade] = useState('1')
   const [tcClassNm, setTcClassNm] = useState('1')
   const [tcSubject, setTcSubject] = useState('')
@@ -95,7 +97,27 @@ export default function SettingsPage() {
 
   useEffect(() => {
     window.electron?.getAutoLaunch().then(v => setAutoLaunch(v)).catch(() => {})
+    window.electron?.configGet('sidebar.hiddenMenus.v1').then(value => {
+      setHiddenMenus(Array.isArray(value) ? value.map(String) : [])
+    }).catch(() => undefined)
   }, [])
+
+  const restoreMenu = (id: string) => {
+    setHiddenMenus(current => {
+      const next = current.filter(item => item !== id)
+      void window.electron?.configSet('sidebar.hiddenMenus.v1', next).then(() => {
+        window.dispatchEvent(new Event('sidebar:preferences-updated'))
+      })
+      return next
+    })
+  }
+
+  const restoreAllMenus = () => {
+    setHiddenMenus([])
+    void window.electron?.configSet('sidebar.hiddenMenus.v1', []).then(() => {
+      window.dispatchEvent(new Event('sidebar:preferences-updated'))
+    })
+  }
 
   useEffect(() => {
     setGrade(config.grade ?? '')
@@ -410,6 +432,23 @@ export default function SettingsPage() {
                 ))}
               </select>
             </div>
+          </div>
+        </Section>
+
+        <Section icon={<PanelLeft size={16} className="text-amber-400" />} title="숨긴 메뉴 관리">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs leading-relaxed text-slate-500">사이드바에서 숨긴 메뉴를 이 PC에 다시 표시합니다. 기능과 자료는 삭제되지 않습니다.</p>
+              <button type="button" onClick={restoreAllMenus} disabled={!hiddenMenus.length} className="btn-ghost flex shrink-0 items-center gap-1.5 text-xs disabled:opacity-40"><RotateCcw size={13} />전체 복원</button>
+            </div>
+            {hiddenMenus.length ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {hiddenMenus.map(id => {
+                  const option = SIDEBAR_MENU_OPTIONS.find(item => item.id === id)
+                  return <button key={id} type="button" onClick={() => restoreMenu(id)} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2.5 text-left text-xs font-semibold text-slate-200 hover:border-amber-400/30 hover:bg-amber-400/5"><span>{option?.label ?? id}</span><span className="text-[10px] text-amber-300">복원</span></button>
+                })}
+              </div>
+            ) : <div className="rounded-xl border border-dashed border-white/10 py-6 text-center text-xs text-slate-500">현재 숨긴 메뉴가 없습니다.</div>}
           </div>
         </Section>
 

@@ -74,6 +74,7 @@
     "src/services/personalOrganizer.ts",
     "src/services/studentTranscript.ts",
     "src/services/schoolInfo.ts",
+    "src/services/schoolInfoCandidates.ts",
     "src/services/sharedWorkNotifications.ts",
     "src/services/schoolTimetable.ts",
     "src/services/timetablePlan.ts",

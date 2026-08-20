@@ -25,8 +25,16 @@ import type { CreativeScheduleResult, DutyScheduleEvent, DutyScheduleResult, Sch
 import { isTimetableChangeAppliedForTeacher, listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
 import { SPECIAL_TIMETABLE_DAYS } from '../services/specialTimetableDays'
 import { listPulledLessonsForTeacher, pulledLessonTitle } from '../services/pulledLessons'
+import { isSharedWorkComplete } from '../services/sharedWorkNotifications'
 
 type CalendarSource = 'neis' | 'weekly' | 'creative' | 'schoolEvent' | 'committee' | 'sharedWork' | 'personal' | 'gateDuty' | 'mealDuty' | 'timetableChange' | 'pulledLesson'
+type CalendarSourceVisibility = Record<Exclude<CalendarSource, 'neis'>, boolean>
+
+const CALENDAR_SOURCE_VISIBILITY_KEY = 'dashboard.scheduleSources.v1'
+const DEFAULT_CALENDAR_SOURCE_VISIBILITY: CalendarSourceVisibility = {
+  weekly: true, creative: true, schoolEvent: true, committee: true, sharedWork: true,
+  personal: true, gateDuty: true, mealDuty: true, timetableChange: true, pulledLesson: true,
+}
 
 interface CalendarEvent {
   id: string
@@ -149,10 +157,28 @@ export default function CalendarPage() {
   const [neisSnapshotAvailable, setNeisSnapshotAvailable] = useState<boolean | null>(null)
   const [quickAddDate, setQuickAddDate] = useState<string | null>(null)
   const [quickAddHint, setQuickAddHint] = useState<QuickOrganizerHint | null>(null)
+  const [sourceVisibility, setSourceVisibility] = useState<CalendarSourceVisibility>(DEFAULT_CALENDAR_SOURCE_VISIBILITY)
 
   const monthKey = format(viewDate, 'yyyy-MM')
   const hasNeis = Boolean(config.schoolHubUrl?.trim())
-  const showNeis = config.showNeisSchedule !== false
+  const showNeis = config.showNeisSchedule === true
+
+  useEffect(() => {
+    void window.electron?.configGet(CALENDAR_SOURCE_VISIBILITY_KEY).then(value => {
+      if (value && typeof value === 'object') {
+        setSourceVisibility({ ...DEFAULT_CALENDAR_SOURCE_VISIBILITY, ...(value as Partial<CalendarSourceVisibility>) })
+      }
+    })
+  }, [])
+
+  const setSourceVisible = (source: Exclude<CalendarSource, 'neis'>, checked: boolean) => {
+    setSourceVisibility(current => {
+      const next = { ...current, [source]: checked }
+      void window.electron?.configSet(CALENDAR_SOURCE_VISIBILITY_KEY, next)
+      window.dispatchEvent(new CustomEvent('calendar:source-visibility-updated', { detail: next }))
+      return next
+    })
+  }
 
   const loadMonth = useCallback(async (force = false) => {
     const year = Number(format(viewDate, 'yyyy'))
@@ -243,6 +269,12 @@ export default function CalendarPage() {
   }, [config.officeCode, config.schoolCode, config.schoolHubUrl, config.teacherName, hasNeis, viewDate])
 
   useEffect(() => { void loadMonth() }, [loadMonth])
+
+  useEffect(() => {
+    const refresh = () => void loadMonth(true)
+    window.addEventListener('staffChecklists:updated', refresh)
+    return () => window.removeEventListener('staffChecklists:updated', refresh)
+  }, [loadMonth])
 
   useEffect(() => subscribePersonalOrganizer(change => {
     if (change.kind === 'tasks') setTasks(change.value)
@@ -348,9 +380,11 @@ export default function CalendarPage() {
       source: 'pulledLesson' as const,
       label: '당김수업',
     }))]
-    return combined.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '') || a.title.localeCompare(b.title, 'ko'))
+    return combined
+      .filter(event => event.source === 'neis' || sourceVisibility[event.source])
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '') || a.title.localeCompare(b.title, 'ko'))
   },
-  [committeeEvents, config.teacherName, creativeSchedule.events, dutySchedule.events, hideCompleted, monthKey, schedule, sharedTasks, showNeis, tasks, timetableChanges, weeklyPlan.events])
+  [committeeEvents, config.teacherName, creativeSchedule.events, dutySchedule.events, hideCompleted, monthKey, schedule, sharedTasks, showNeis, sourceVisibility, tasks, timetableChanges, weeklyPlan.events])
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>()
@@ -367,6 +401,9 @@ export default function CalendarPage() {
   const incomplete = tasks.filter(task => !task.completed)
   const overdue = incomplete.filter(task => task.date < today()).length
   const todayCount = incomplete.filter(task => task.date === today()).length
+  const incompleteSharedTasks = sharedTasks
+    .filter(task => task.targetNames.includes(config.teacherName?.trim() ?? '') && !isSharedWorkComplete(task, config.teacherName?.trim() ?? ''))
+    .sort((a, b) => (a.deadline || '9999-99-99').localeCompare(b.deadline || '9999-99-99'))
 
   const selectDay = (date: string) => {
     setSelectedDate(date)
@@ -436,6 +473,13 @@ export default function CalendarPage() {
         <Summary label="기한 지남" value={overdue} tone="rose" />
       </div>
 
+      {incompleteSharedTasks.length > 0 && (
+        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('app:navigate', { detail: 'staff_tasks' }))} className="card flex w-full items-center justify-between gap-4 border-rose-400/25 bg-rose-500/8 px-4 py-3 text-left">
+          <div className="min-w-0"><p className="font-bold text-rose-200">배부받은 미완료 업무 {incompleteSharedTasks.length}건</p><p className="mt-1 truncate text-xs text-slate-300">{incompleteSharedTasks.slice(0, 3).map(task => `${task.title}${task.deadline ? ` (${task.deadline})` : ''}`).join(' · ')}</p></div>
+          <span className="shrink-0 text-xs font-bold text-rose-200">업무센터에서 보기 →</span>
+        </button>
+      )}
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <section className="card p-4">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -446,19 +490,16 @@ export default function CalendarPage() {
             </div>
             <div className="flex flex-wrap items-center gap-3 text-[10px]">
               <Legend color="bg-violet-400" label="NEIS" />
-              <Legend color="bg-sky-400" label="주간계획" />
-              <Legend color="bg-teal-400" label="창의적체험활동" />
-              <Legend color="bg-indigo-400" label="창체 학사일정" />
-              <Legend color="bg-amber-400" label="내 위원회" />
-              <Legend color="bg-rose-400" label="공유 업무" />
-              <Legend color="bg-emerald-400" label="개인 업무" />
-              <Legend color="bg-cyan-400" label="등교지도" />
-              <Legend color="bg-orange-400" label="급식지도" />
-              <Legend color="bg-fuchsia-400" label="수업변경" />
-              <Legend color="bg-lime-500" label="당김수업" />
               <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-violet-400/15 bg-violet-500/5 px-2 py-1 text-violet-200">
                 <input type="checkbox" checked={showNeis} onChange={event => void saveConfig({ showNeisSchedule: event.target.checked })} />NEIS 학사일정 켜기
               </label>
+              {([
+                ['weekly', '주간계획', 'bg-sky-400'], ['creative', '창체', 'bg-teal-400'], ['schoolEvent', '창체 학사일정', 'bg-indigo-400'],
+                ['committee', '내 위원회', 'bg-amber-400'], ['sharedWork', '공유 업무', 'bg-rose-400'], ['personal', '개인 업무', 'bg-emerald-400'],
+                ['gateDuty', '등교지도', 'bg-cyan-400'], ['mealDuty', '급식지도', 'bg-orange-400'], ['timetableChange', '수업변경', 'bg-fuchsia-400'], ['pulledLesson', '당김수업', 'bg-lime-500'],
+              ] as Array<[Exclude<CalendarSource, 'neis'>, string, string]>).map(([source, label, color]) => (
+                <label key={source} className="flex cursor-pointer items-center gap-1 rounded-lg border border-white/10 px-2 py-1 font-semibold text-slate-300"><input type="checkbox" checked={sourceVisibility[source]} onChange={event => setSourceVisible(source, event.target.checked)} /><span className={`h-2 w-2 rounded-full ${color}`} />{label}</label>
+              ))}
               <label className="flex cursor-pointer items-center gap-1.5 text-slate-400">
                 <input type="checkbox" checked={hideCompleted} onChange={event => setHideCompleted(event.target.checked)} />완료 숨김
               </label>

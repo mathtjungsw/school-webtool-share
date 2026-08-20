@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeftRight, Bell, BookOpen, Calculator, CalendarDays, CalendarRange,
   Check, ClipboardCheck, FileCode2, FileDown, FileScan, FilePenLine, FileText,
-  GripVertical, HelpCircle, Landmark, LayoutDashboard, Link2, ListRestart,
+  GripVertical, HelpCircle, Landmark, LayoutDashboard, Link2, ListRestart, Pin, PinOff, EyeOff,
   Building2, HeartHandshake, MapPinned, MessageSquareText, ScanSearch, ScrollText, SearchCheck, Settings, ShieldCheck, Table2, UsersRound, Wrench,
   type LucideIcon,
 } from 'lucide-react'
@@ -69,6 +69,9 @@ const LEGACY_DEFAULT_ORDER = [
   'insa_analysis', 'pdf_extractor', 'file_parser', 'notifier',
 ]
 const NAV_BY_ID = new Map(NAV.map(item => [item.id, item]))
+export const SIDEBAR_MENU_OPTIONS = NAV.map(({ id, label }) => ({ id, label }))
+const SIDEBAR_PINNED_KEY = 'sidebar.pinnedMenus.v1'
+const SIDEBAR_HIDDEN_KEY = 'sidebar.hiddenMenus.v1'
 
 function normalizeOrder(value: unknown) {
   const saved = Array.isArray(value) ? value.map(String) : []
@@ -118,25 +121,62 @@ export default function Sidebar({
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [menuOrder, setMenuOrder] = useState(DEFAULT_ORDER)
+  const [pinnedMenus, setPinnedMenus] = useState<string[]>([])
+  const [hiddenMenus, setHiddenMenus] = useState<string[]>([])
   const config = useAppStore(s => s.config)
   const isAdmin = useAdminStore(s => s.isAdmin)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const isExpanded = expanded || editing
 
-  useEffect(() => {
-    void window.electron?.configGet('sidebar.menuOrder').then(value => setMenuOrder(normalizeOrder(value)))
+  const loadPreferences = useCallback(() => {
+    void Promise.all([
+      window.electron?.configGet('sidebar.menuOrder'),
+      window.electron?.configGet(SIDEBAR_PINNED_KEY),
+      window.electron?.configGet(SIDEBAR_HIDDEN_KEY),
+    ]).then(([order, pinned, hidden]) => {
+      setMenuOrder(normalizeOrder(order))
+      setPinnedMenus(Array.isArray(pinned) ? pinned.map(String).filter(id => NAV_BY_ID.has(id)) : [])
+      setHiddenMenus(Array.isArray(hidden) ? hidden.map(String).filter(id => NAV_BY_ID.has(id) && id !== 'settings') : [])
+    })
   }, [])
 
-  const orderedItems = useMemo(() =>
-    menuOrder
+  useEffect(() => {
+    loadPreferences()
+    window.addEventListener('sidebar:preferences-updated', loadPreferences)
+    return () => window.removeEventListener('sidebar:preferences-updated', loadPreferences)
+  }, [loadPreferences])
+
+  const orderedItems = useMemo(() => {
+    const pinned = pinnedMenus.filter(id => menuOrder.includes(id))
+    const orderedIds = [...pinned, ...menuOrder.filter(id => !pinned.includes(id))]
+    return orderedIds
       .map(id => NAV_BY_ID.get(id))
       .filter((item): item is NavItem => Boolean(item))
-      .filter(item => item.id !== 'admin_center' || isAdmin),
-  [isAdmin, menuOrder])
+      .filter(item => !hiddenMenus.includes(item.id))
+      .filter(item => item.id !== 'admin_center' || isAdmin)
+  }, [hiddenMenus, isAdmin, menuOrder, pinnedMenus])
 
   const saveOrder = (next: string[]) => {
     setMenuOrder(next)
     void window.electron?.configSet('sidebar.menuOrder', next)
+  }
+
+  const togglePinned = (id: string) => {
+    setPinnedMenus(current => {
+      const next = current.includes(id) ? current.filter(item => item !== id) : [...current, id]
+      void window.electron?.configSet(SIDEBAR_PINNED_KEY, next)
+      return next
+    })
+  }
+
+  const hideMenu = (id: string) => {
+    if (id === 'settings') return
+    setHiddenMenus(current => {
+      const next = [...new Set([...current, id])]
+      void window.electron?.configSet(SIDEBAR_HIDDEN_KEY, next)
+      return next
+    })
+    if (currentPage === id) onNavigate('dashboard')
   }
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
@@ -196,7 +236,10 @@ export default function Sidebar({
                 expanded={isExpanded}
                 editing={editing}
                 active={currentPage === item.id}
+                pinned={pinnedMenus.includes(item.id)}
                 onClick={() => onNavigate(item.id)}
+                onTogglePinned={() => togglePinned(item.id)}
+                onHide={() => hideMenu(item.id)}
               />
             ))}
           </SortableContext>
@@ -213,13 +256,16 @@ export default function Sidebar({
 }
 
 function NavButton({
-  item, expanded, editing, active, onClick,
+  item, expanded, editing, active, pinned, onClick, onTogglePinned, onHide,
 }: {
   item: NavItem
   expanded: boolean
   editing: boolean
   active: boolean
+  pinned: boolean
   onClick: () => void
+  onTogglePinned: () => void
+  onHide: () => void
 }) {
   const Icon = item.icon
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -231,7 +277,7 @@ function NavButton({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.45 : 1 }}
-      className="relative mx-1.5"
+      className="group relative mx-1.5"
     >
       <button
         type="button"
@@ -239,7 +285,7 @@ function NavButton({
         title={!expanded ? item.label : undefined}
         className={clsx(
           'relative flex h-9 w-full items-center rounded-xl px-3 transition-colors',
-          editing ? 'cursor-default pr-9' : '',
+          editing ? 'cursor-default pr-9' : expanded ? 'pr-16' : '',
           active ? 'bg-amber-400/20 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5',
         )}
       >
@@ -258,6 +304,30 @@ function NavButton({
         >
           <GripVertical size={14} />
         </button>
+      )}
+      {expanded && !editing && (
+        <div className="pointer-events-none absolute right-1 top-1 flex opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+          <button
+            type="button"
+            onClick={event => { event.stopPropagation(); onTogglePinned() }}
+            className={clsx('grid h-7 w-7 place-items-center rounded-lg hover:bg-white/10', pinned ? 'text-amber-300' : 'text-slate-500 hover:text-amber-300')}
+            title={pinned ? `${item.label} 고정 해제` : `${item.label} 위에 고정`}
+            aria-label={pinned ? `${item.label} 고정 해제` : `${item.label} 위에 고정`}
+          >
+            {pinned ? <PinOff size={13} /> : <Pin size={13} />}
+          </button>
+          {item.id !== 'settings' && (
+            <button
+              type="button"
+              onClick={event => { event.stopPropagation(); onHide() }}
+              className="grid h-7 w-7 place-items-center rounded-lg text-slate-500 hover:bg-white/10 hover:text-rose-300"
+              title={`${item.label} 메뉴 숨기기`}
+              aria-label={`${item.label} 메뉴 숨기기`}
+            >
+              <EyeOff size={13} />
+            </button>
+          )}
+        </div>
       )}
     </div>
   )

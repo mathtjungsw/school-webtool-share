@@ -24,6 +24,7 @@ import {
   type SchoolInfoEvaluationResponse,
   type SchoolInfoSchool,
 } from '../services/schoolInfo'
+import { sampleSchoolInfoCandidates } from '../services/schoolInfoCandidates'
 
 type ResultState =
   | { status: 'loading' }
@@ -96,6 +97,7 @@ export default function SchoolInfoEvaluationTab() {
   const [foundation, setFoundation] = useState('전체')
   const [selectedSchools, setSelectedSchools] = useState<SchoolInfoSchool[]>([])
   const [matchedSchools, setMatchedSchools] = useState<SchoolInfoSchool[]>([])
+  const [candidateShuffleSeed, setCandidateShuffleSeed] = useState(() => Date.now())
 
   const [results, setResults] = useState<Record<string, ResultState>>({})
   const [evaluationBusy, setEvaluationBusy] = useState(false)
@@ -114,13 +116,15 @@ export default function SchoolInfoEvaluationTab() {
   }, [subjectName, subjects])
 
   const candidateSchools = useMemo(() => {
-    return recommendationPool.filter((school) => {
+    const filtered = recommendationPool.filter((school) => {
       if (candidateMode === 'region' && sido && school.sido !== sido) return false
       if (candidateMode === 'region' && sgg !== ALL_SGG && school.sgg !== sgg) return false
       if (foundation !== '전체' && school.foundation !== foundation) return false
       return true
-    }).slice(0, 12)
-  }, [candidateMode, foundation, recommendationPool, sgg, sido])
+    })
+    if (candidateMode !== 'region') return filtered.slice(0, 12)
+    return sampleSchoolInfoCandidates(filtered, candidateShuffleSeed)
+  }, [candidateMode, candidateShuffleSeed, foundation, recommendationPool, sgg, sido])
 
   const loadRecommendations = async (force = false) => {
     const regions = sgg === ALL_SGG ? (SCHOOL_INFO_REGIONS[sido] ?? []) : [sgg]
@@ -139,6 +143,7 @@ export default function SchoolInfoEvaluationTab() {
       })
       if (!schools.length && failedRegions) throw new Error('선택한 지역의 학교 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.')
       setRecommendationPool(uniqueSchools(schools))
+      setCandidateShuffleSeed(Date.now())
       setCandidateMode('region')
       setMatchedSchools([])
       setSelectedSchools([])
@@ -303,7 +308,7 @@ export default function SchoolInfoEvaluationTab() {
               <select value={sgg} onChange={(event) => { setSgg(event.target.value); setRecommendationPool([]); setMatchedSchools([]); setSelectedSchools([]) }}><option value={ALL_SGG}>{sido} 전체 시·군·구</option>{(SCHOOL_INFO_REGIONS[sido] ?? []).map((region) => <option key={region} value={region}>{region}</option>)}</select>
               <select value={foundation} onChange={(event) => setFoundation(event.target.value)}><option>전체</option><option>공립</option><option>사립</option></select>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2"><button type="button" onClick={() => void loadRecommendations(false)} disabled={recommendationBusy} className="btn-secondary flex items-center gap-1.5 px-3 py-2 text-xs font-bold">{recommendationBusy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}지역 후보 불러오기</button><span className="text-[9px] font-semibold text-slate-500">학교 종류는 공개 검색 자료에서 정확히 구분되지 않아 필터링하지 않습니다. 지역이 넓으면 최대 12개 후보부터 확인합니다.</span></div>
+            <div className="mt-2 flex flex-wrap items-center gap-2"><button type="button" onClick={() => void loadRecommendations(false)} disabled={recommendationBusy} className="btn-secondary flex items-center gap-1.5 px-3 py-2 text-xs font-bold">{recommendationBusy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}지역 후보 불러오기</button><button type="button" onClick={() => { setCandidateShuffleSeed(Date.now()); setMatchedSchools([]); setSelectedSchools([]) }} disabled={recommendationBusy || candidateMode !== 'region' || recommendationPool.length < 2} className="btn-ghost flex items-center gap-1 px-2 py-1.5 text-[10px] font-bold"><RefreshCw size={11} />후보 다시 섞기</button><span className="text-[9px] font-semibold text-slate-500">지역·설립 조건에 맞춰 먼저 들어온 최대 50곳 중 12곳을 무작위로 검사합니다. 12곳보다 적으면 모두 검사합니다.</span></div>
           </div>
 
           {(schoolSearchError || cacheMessage) && <p className={clsx('mt-2 rounded-lg px-3 py-2 text-[11px] font-bold', schoolSearchError ? 'bg-rose-500/10 text-rose-700 dark:text-rose-200' : 'bg-sky-500/10 text-sky-800 dark:text-sky-200')}>{schoolSearchError || cacheMessage}</p>}
@@ -383,5 +388,5 @@ function EvaluationPreview({ data, subject, expanded, onToggleExpanded }: { data
     : data.matchStatus === 'not-found'
       ? { label: '해당 과목 없음', tone: 'rose' }
       : { label: data.achievementCodePrefix ? `코드 미확인 · ${data.achievementCodePrefix}` : '성취기준 코드 없음 · 원문 확인', tone: 'amber' }
-  return <article className="rounded-2xl border border-white/10 bg-black/[0.02] p-4 dark:bg-white/[0.025]"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-base font-black">{data.school.name}</p><p className="mt-1 text-[11px] font-bold text-slate-500">{data.school.sido} {data.school.sgg} · {data.school.foundation} · {data.year}학년도 {data.semester}학기 · {data.grade}학년 · {data.subject}</p></div><div className="flex gap-1.5"><span className={clsx('rounded-lg border px-2 py-1 text-[10px] font-black', status.tone === 'emerald' ? 'border-emerald-400/30 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200' : status.tone === 'rose' ? 'border-rose-400/30 bg-rose-500/15 text-rose-800 dark:text-rose-200' : 'border-amber-400/30 bg-amber-500/15 text-amber-800 dark:text-amber-200')}>{status.label}</span>{data.cached && <span className="rounded-lg border border-sky-400/25 bg-sky-500/10 px-2 py-1 text-[10px] font-black text-sky-800 dark:text-sky-200">로컬 캐시</span>}</div></div>{data.scope === 'document' && data.matchStatus !== 'not-found' && <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 p-2.5 text-[10px] font-bold leading-4 text-amber-800 dark:text-amber-200"><AlertTriangle size={13} className="mt-0.5 shrink-0" />이 학교 자료는 과목별 표가 분리되지 않아 학년 전체 문서가 표시됩니다. 과목명과 원본을 함께 확인해 주세요.</div>}<div className="schoolinfo-plan-surface mt-3 max-h-[36rem] overflow-auto rounded-xl border border-white/10 p-3"><HighlightedPlan text={shownText} subject={subject} />{truncated && <p className="mt-3 text-center text-[10px] font-bold text-slate-500">아래 내용이 더 있습니다.</p>}</div><div className="mt-3 flex flex-wrap items-center gap-2">{(truncated || expanded) && <button type="button" onClick={onToggleExpanded} className="btn-ghost px-2 py-1.5 text-[11px] font-bold">{expanded ? '내용 접기' : '전체 내용 보기'}</button>}{data.primaryFile && <button type="button" onClick={() => window.electron.openExternal(data.primaryFile!.downloadUrl)} className="btn-secondary flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold"><ExternalLink size={12} />원본 평가계획 열기</button>}<span className="ml-auto text-[9px] font-semibold text-slate-500">조회 {new Date(data.fetchedAt).toLocaleString('ko-KR')}</span></div></article>
+  return <article className="rounded-2xl border border-white/10 bg-black/[0.02] p-4 dark:bg-white/[0.025]"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-base font-black">{data.school.name}</p><p className="mt-1 text-[11px] font-bold text-slate-500">{data.school.sido} {data.school.sgg} · {data.school.foundation} · {data.year}학년도 {data.semester}학기 · {data.grade}학년 · {data.subject}</p></div><div className="flex gap-1.5"><span className={clsx('rounded-lg border px-2 py-1 text-[10px] font-black', status.tone === 'emerald' ? 'border-emerald-400/30 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200' : status.tone === 'rose' ? 'border-rose-400/30 bg-rose-500/15 text-rose-800 dark:text-rose-200' : 'border-amber-400/30 bg-amber-500/15 text-amber-800 dark:text-amber-200')}>{status.label}</span>{data.cached && <span className="rounded-lg border border-sky-400/25 bg-sky-500/10 px-2 py-1 text-[10px] font-black text-sky-800 dark:text-sky-200">로컬 캐시</span>}</div></div>{data.fileIndexWarning && <div className="mt-3 flex items-start gap-2 rounded-xl border border-sky-400/25 bg-sky-500/10 p-2.5 text-[10px] font-bold leading-4 text-sky-900 dark:text-sky-100"><AlertTriangle size={13} className="mt-0.5 shrink-0" />{data.fileIndexWarning}</div>}{data.scope === 'document' && data.matchStatus !== 'not-found' && <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-400/20 bg-amber-500/10 p-2.5 text-[10px] font-bold leading-4 text-amber-800 dark:text-amber-200"><AlertTriangle size={13} className="mt-0.5 shrink-0" />이 학교 자료는 과목별 표가 분리되지 않아 학년 전체 문서가 표시됩니다. 과목명과 원본을 함께 확인해 주세요.</div>}<div className="schoolinfo-plan-surface mt-3 max-h-[36rem] overflow-auto rounded-xl border border-white/10 p-3"><HighlightedPlan text={shownText} subject={subject} />{truncated && <p className="mt-3 text-center text-[10px] font-bold text-slate-500">아래 내용이 더 있습니다.</p>}</div><div className="mt-3 flex flex-wrap items-center gap-2">{(truncated || expanded) && <button type="button" onClick={onToggleExpanded} className="btn-ghost px-2 py-1.5 text-[11px] font-bold">{expanded ? '내용 접기' : '전체 내용 보기'}</button>}{data.primaryFile && <button type="button" onClick={() => window.electron.openExternal(data.primaryFile!.downloadUrl)} className="btn-secondary flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-bold"><ExternalLink size={12} />원본 평가계획 열기</button>}<span className="ml-auto text-[9px] font-semibold text-slate-500">조회 {new Date(data.fetchedAt).toLocaleString('ko-KR')}</span></div></article>
 }

@@ -301,7 +301,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentTime, setCurrentTime] = useState(new Date())
-  const showNeis = config.showNeisSchedule !== false
+  const showNeis = config.showNeisSchedule === true
   const [scheduleSourceVisibility, setScheduleSourceVisibility] = useState<DashboardSourceVisibility>(DEFAULT_DASHBOARD_SOURCE_VISIBILITY)
 
   useEffect(() => {
@@ -312,6 +312,15 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
         ...(saved as Partial<DashboardSourceVisibility>),
       })
     }).catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    const onVisibility = (event: Event) => {
+      const detail = (event as CustomEvent<Partial<DashboardSourceVisibility>>).detail
+      if (detail) setScheduleSourceVisibility(current => ({ ...current, ...detail }))
+    }
+    window.addEventListener('calendar:source-visibility-updated', onVisibility)
+    return () => window.removeEventListener('calendar:source-visibility-updated', onVisibility)
   }, [])
 
   const toggleScheduleSource = useCallback((source: keyof DashboardSourceVisibility, visible: boolean) => {
@@ -420,6 +429,14 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
         }
       })
     return () => { cancelled = true }
+  }, [config.schoolHubUrl, config.teacherName])
+
+  useEffect(() => {
+    const name = config.teacherName?.trim()
+    if (!config.schoolHubUrl || !name) return
+    const refresh = () => { void listStaffChecklists(name, '', true).then(setSharedTasks).catch(() => undefined) }
+    window.addEventListener('staffChecklists:updated', refresh)
+    return () => window.removeEventListener('staffChecklists:updated', refresh)
   }, [config.schoolHubUrl, config.teacherName])
 
   useEffect(() => {
@@ -702,6 +719,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const upcomingCommitteeEvents = committeeEvents
     .filter(item => item.date >= todayStr() && item.date <= format(addDays(new Date(), 7), 'yyyy-MM-dd'))
     .sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`))
+  const incompleteAssignedTasks = sharedTasks
+    .filter(task => task.targetNames.includes(config.teacherName?.trim() ?? '') && !isSharedWorkComplete(task, config.teacherName?.trim() ?? ''))
+    .sort((a, b) => (a.deadline || '9999-99-99').localeCompare(b.deadline || '9999-99-99'))
   const selectedWeekNotes = weeklyPlan.notes.filter(note =>
     note.weekStart <= selYmd && note.weekEnd >= selYmd,
   )
@@ -778,45 +798,50 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
         </div>
       </div>
 
-      {(specialTimetableDay || (hasSchool && upcomingCommitteeEvents.length > 0)) && (
-        <div className={`mb-3 grid gap-2 ${specialTimetableDay && hasSchool && upcomingCommitteeEvents.length > 0 ? 'xl:grid-cols-2' : ''}`}>
-          {specialTimetableDay && (
-            <div className="flex min-h-14 items-center gap-2.5 rounded-xl border-2 border-amber-400 bg-amber-100 px-3 py-2 text-slate-950 shadow-sm">
-              <BellRing size={17} className="shrink-0 text-amber-700" />
-              <div className="min-w-0 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-2">
-                <p className="text-sm font-black">{specialTimetableDay.message}</p>
-                <p className="text-[11px] font-semibold text-slate-700">
-                  교사·학급 시간표도 {specialTimetableDay.sourceWeekday}요일 기준으로 표시됩니다.
-                </p>
-              </div>
-            </div>
-          )}
+      {specialTimetableDay && (
+        <div className="mb-2 flex min-h-11 items-center gap-2.5 rounded-xl border-2 border-amber-400 bg-amber-100 px-3 py-1.5 text-slate-950 shadow-sm">
+          <BellRing size={16} className="shrink-0 text-amber-700" />
+          <div className="min-w-0 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-2">
+            <p className="truncate text-sm font-black">{specialTimetableDay.message}</p>
+            <p className="truncate text-[11px] font-semibold text-slate-700">
+              교사·학급 시간표도 {specialTimetableDay.sourceWeekday}요일 기준으로 표시됩니다.
+            </p>
+          </div>
+        </div>
+      )}
 
-          {hasSchool && upcomingCommitteeEvents.length > 0 && (
-            <div className="flex min-h-14 flex-wrap items-center gap-2 rounded-xl border border-amber-400/35 bg-amber-400/10 px-3 py-2">
-              <div className="flex shrink-0 items-center gap-1.5">
-                <Landmark size={15} className="text-amber-700 dark:text-amber-300" />
-                <p className="text-sm font-black text-slate-950 dark:text-white">내 위원회 일정</p>
-              </div>
-              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                {upcomingCommitteeEvents.slice(0, 3).map(event => (
-                  <button
-                    key={event.id}
-                    onClick={() => onNavigate('committees')}
-                    className="max-w-full rounded-lg border border-amber-400/30 bg-white/65 px-2.5 py-1 text-left hover:border-amber-500/60 dark:border-white/10 dark:bg-surface-800/70"
-                    title={[event.committeeName, `${event.date} ${event.startTime}~${event.endTime}`, event.location].filter(Boolean).join(' · ')}
-                  >
-                    <span className="block truncate text-[11px] font-bold text-slate-950 dark:text-white">
-                      {event.committeeName}
-                      <span className="ml-1.5 font-semibold text-amber-800 dark:text-amber-300">
-                        {event.date.slice(5)} {event.startTime}~{event.endTime}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => onNavigate('committees')} className="btn-ghost shrink-0 px-2 py-1 text-xs">일정 보기</button>
-            </div>
+      {((hasSchool && upcomingCommitteeEvents.length > 0) || incompleteAssignedTasks.length > 0) && (
+        <div className={`mb-2 grid gap-2 ${(hasSchool && upcomingCommitteeEvents.length > 0) && incompleteAssignedTasks.length > 0 ? 'lg:grid-cols-2' : ''}`}>
+          {hasSchool && upcomingCommitteeEvents.length > 0 && (() => {
+            const event = upcomingCommitteeEvents[0]
+            return (
+              <button
+                type="button"
+                onClick={() => onNavigate('committees')}
+                title={[event.committeeName, `${event.date} ${event.startTime}~${event.endTime}`, event.location].filter(Boolean).join(' · ')}
+                className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-left hover:border-amber-500/70"
+              >
+                <Landmark size={15} className="shrink-0 text-amber-700 dark:text-amber-300" />
+                <span className="shrink-0 text-xs font-black text-slate-950 dark:text-white">내 위원회 일정</span>
+                <span className="min-w-0 flex-1 truncate rounded-md bg-white/65 px-2 py-1 text-[11px] font-bold text-slate-950 dark:bg-surface-800/70 dark:text-white">
+                  {event.committeeName}
+                  <span className="ml-1.5 font-semibold text-amber-800 dark:text-amber-300">{event.date.slice(5)} {event.startTime}~{event.endTime}</span>
+                </span>
+                {upcomingCommitteeEvents.length > 1 && <span className="shrink-0 text-[10px] font-black text-amber-800 dark:text-amber-200">+{upcomingCommitteeEvents.length - 1}건</span>}
+                <span className="shrink-0 text-[10px] font-bold text-amber-900 dark:text-amber-100">일정 보기 →</span>
+              </button>
+            )
+          })()}
+
+          {incompleteAssignedTasks.length > 0 && (
+            <button type="button" onClick={() => onNavigate('staff_tasks')} className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-rose-400/40 bg-rose-500/10 px-3 py-1.5 text-left hover:border-rose-500/70">
+              <ClipboardCheck size={15} className="shrink-0 text-rose-700 dark:text-rose-300" />
+              <span className="shrink-0 text-xs font-black text-slate-950 dark:text-white">미완료 업무 {incompleteAssignedTasks.length}건</span>
+              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-700 dark:text-slate-200">
+                {incompleteAssignedTasks.slice(0, 2).map(task => `${task.title}${task.deadline ? ` · ${task.deadline}` : ''}`).join(' / ')}
+              </span>
+              <span className="shrink-0 text-[10px] font-bold text-rose-800 dark:text-rose-200">업무센터 →</span>
+            </button>
           )}
         </div>
       )}
@@ -1224,13 +1249,12 @@ function TwoWeekScheduleCalendar({
                       <span className={clsx('grid h-6 w-6 place-items-center rounded-full text-[11px] font-black', isTodayCell ? 'bg-amber-400 text-slate-950' : dayIndex === 0 ? 'text-rose-300' : dayIndex === 6 ? 'text-sky-300' : 'text-slate-200')}>{format(day, 'd')}</span>
                     </div>
                     <div className="space-y-1">
-                      {dayEvents.slice(0, 5).map((event, index) => (
+                      {dayEvents.map((event, index) => (
                         <div data-calendar-event key={`${event.source}-${event.department ?? ''}-${index}`} className={clsx('calendar-event-text rounded border-l-2 px-1.5 py-1 text-[9px] leading-tight', sourceClass(event), event.completed && 'line-through opacity-50')} title={`${sourceLabel(event)} · ${event.eventName}`}>
                           <span className="block truncate text-[8px] font-black">{sourceLabel(event)}</span>
                           <span className="block truncate">{event.eventName.replace(/\s*\n\s*/g, ' · ')}</span>
                         </div>
                       ))}
-                      {dayEvents.length > 5 && <span className="block pl-1 text-[8px] font-semibold text-slate-500">+{dayEvents.length - 5}개 더보기</span>}
                     </div>
                   </button>
                 )

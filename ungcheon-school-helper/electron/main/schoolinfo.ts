@@ -232,6 +232,81 @@ function parseMcpPayload(raw: string) {
   return text
 }
 
+async function callSchoolInfoMcp(toolName: 'find_school' | 'search_school', args: Record<string, unknown>) {
+  const raw = await fetchText(SCHOOLINFO_MCP_URL, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json, text/event-stream',
+      'mcp-protocol-version': '2025-06-18',
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'tools/call',
+      params: { name: toolName, arguments: args },
+    }),
+  })
+  return parseMcpPayload(raw)
+}
+
+function fallbackSchoolCode(sido: string, sgg: string, name: string) {
+  return `mcp:${sido}:${sgg}:${name}`
+}
+
+function schoolFromFallback(input: {
+  name: string
+  sido: string
+  sgg: string
+  foundation: string
+  address?: string
+}) : SchoolInfoSchool {
+  const schoolCode = fallbackSchoolCode(input.sido, input.sgg, input.name)
+  return {
+    name: input.name,
+    shlIdfCd: schoolCode,
+    schoolCode,
+    sido: input.sido,
+    sgg: input.sgg,
+    dong: '',
+    kind: '고등학교',
+    foundation: input.foundation,
+    address: input.address ?? `${input.sido} ${input.sgg}`,
+  }
+}
+
+function parseRegionSchoolFallback(markdown: string, sido: string, sgg: string) {
+  const schools: SchoolInfoSchool[] = []
+  for (const line of markdown.split(/\r?\n/)) {
+    const match = line.trim().match(/^-\s+(.+?)\s+\(([^,()]+),\s*(.+)\)$/)
+    if (!match) continue
+    const [, name, foundation, address] = match
+    if (!name.endsWith('고등학교')) continue
+    schools.push(schoolFromFallback({ name, sido, sgg, foundation, address }))
+  }
+  return schools
+}
+
+function parseNamedSchoolFallback(markdown: string) {
+  const schools: SchoolInfoSchool[] = []
+  for (const line of markdown.split(/\r?\n/)) {
+    const match = line.trim().match(/^-\s+(.+?)\s+—\s+(.+?)\s+·\s+([^·]+?)\s+·\s+([^·]+?)\s*$/)
+    if (!match) continue
+    const [, name, location, kind, foundation] = match
+    if (kind.trim() !== '고등학교') continue
+    const locationMatch = location.trim().match(/^(.+?(?:특별자치도|특별자치시|특별시|광역시|도))\s+(.+)$/)
+    if (!locationMatch) continue
+    schools.push(schoolFromFallback({
+      name,
+      sido: locationMatch[1],
+      sgg: locationMatch[2],
+      foundation: foundation.trim(),
+      address: location.trim(),
+    }))
+  }
+  return schools
+}
+
 function subjectSegments(markdown: string, subject: string, achievementRecord: AchievementStandardSubjectRecord | null) {
   const segments = markdown.split(/\n\s*---\s*\n/g)
   const codeMatched = segments.filter((segment) => hasAchievementStandardCode(segment, achievementRecord))
@@ -301,12 +376,21 @@ export async function searchSchoolInfoSchools(query: string, force = false) {
     const cached = cacheGet<{ schools: SchoolInfoSchool[]; fetchedAt: string }>(cacheKey)
     if (cached) return { ...cached, cached: true }
   }
-  const data = parseJson<{ schools?: SchoolInfoSchool[] }>(
-    await fetchText(`${SCHOOLINFO_WEB_ORIGIN}/api/searchName?word=${encodeURIComponent(word)}`),
-  )
+  let schools: SchoolInfoSchool[] = []
+  let source: 'web' | 'mcp' = 'web'
+  try {
+    const data = parseJson<{ schools?: SchoolInfoSchool[] }>(
+      await fetchText(`${SCHOOLINFO_WEB_ORIGIN}/api/searchName?word=${encodeURIComponent(word)}`),
+    )
+    schools = (data.schools ?? []).filter((school) => school.kind === '고등학교')
+  } catch {
+    source = 'mcp'
+    schools = parseNamedSchoolFallback(await callSchoolInfoMcp('find_school', { name: word }))
+  }
   const value = {
-    schools: (data.schools ?? []).filter((school) => school.kind === '고등학교').slice(0, 30),
+    schools: schools.slice(0, 30),
     fetchedAt: new Date().toISOString(),
+    source,
   }
   cacheSet(cacheKey, value, SEARCH_TTL_MS)
   return { ...value, cached: false }
@@ -324,12 +408,21 @@ export async function searchSchoolInfoSchoolsByRegion(sidoInput: string, sggInpu
     if (cached) return { ...cached, cached: true }
   }
   const params = new URLSearchParams({ sido, sgg, kind: '고등학교', name: '' })
-  const data = parseJson<{ schools?: SchoolInfoSchool[]; error?: string }>(
-    await fetchText(`${SCHOOLINFO_WEB_ORIGIN}/api/search?${params.toString()}`),
-  )
-  if (data.error) throw new Error(data.error)
+  let schools: SchoolInfoSchool[] = []
+  let source: 'web' | 'mcp' = 'web'
+  try {
+    const data = parseJson<{ schools?: SchoolInfoSchool[]; error?: string }>(
+      await fetchText(`${SCHOOLINFO_WEB_ORIGIN}/api/search?${params.toString()}`),
+    )
+    if (data.error) throw new Error(data.error)
+    schools = data.schools ?? []
+  } catch {
+    source = 'mcp'
+    const markdown = await callSchoolInfoMcp('search_school', { sido, sgg, kind: '고등학교', name: '' })
+    schools = parseRegionSchoolFallback(markdown, sido, sgg)
+  }
   const value = {
-    schools: (data.schools ?? []).map((school) => ({
+    schools: schools.map((school) => ({
       ...school,
       sido: school.sido || sido,
       sgg: school.sgg || sgg,
@@ -337,6 +430,7 @@ export async function searchSchoolInfoSchoolsByRegion(sidoInput: string, sggInpu
       kind: school.kind || '고등학교',
     })).filter((school) => school.kind === '고등학교'),
     fetchedAt: new Date().toISOString(),
+    source,
   }
   cacheSet(cacheKey, value, SEARCH_TTL_MS)
   return { ...value, cached: false }
@@ -354,19 +448,23 @@ export async function getSchoolInfoEvaluationPlan(request: SchoolInfoEvaluationR
   if (!dataset) throw new Error('내장 성취기준 코드 데이터를 읽지 못했습니다. 시험판을 다시 설치해 주세요.')
   const achievementRecord = findAchievementStandardRecord(dataset, subject, grade)
 
-  const cacheKey = `evaluation-v6-recent3semesters:${school.schoolCode || school.shlIdfCd}:${year}:${semester}:${grade}:${normalizeSubject(subject)}`
+  const cacheKey = `evaluation-v7-mcp-file-index-fallback:${school.schoolCode || school.shlIdfCd}:${year}:${semester}:${grade}:${normalizeSubject(subject)}`
   if (!request.force) {
     const cached = cacheGet<Record<string, unknown>>(cacheKey)
     if (cached) return { ...cached, cached: true }
   }
 
-  const files = await listEvaluationFiles(school, year)
-  if (!files.length) {
-    throw new Error(`${school.name}의 ${year}학년도 교수·학습 및 평가 운영 계획 파일을 찾지 못했습니다. 학교알리미 공개 시기나 원본 공시 여부를 확인해 주세요.`)
+  let files: SchoolInfoEvaluationFile[] = []
+  let fileIndexWarning = ''
+  try {
+    files = await listEvaluationFiles(school, year)
+    if (!files.length) fileIndexWarning = '평가파일 목록에서는 자료를 확인하지 못했지만 MCP 원문 검색을 계속했습니다.'
+  } catch (error) {
+    fileIndexWarning = `평가파일 목록 확인 실패(${error instanceof Error ? error.message : String(error)}). MCP 원문 검색은 계속 진행했습니다.`
   }
   const gradeFile = files.find((file) => file.filename.includes(`${grade}학년`))
   if (files.some((file) => /\d학년/.test(file.filename)) && !gradeFile) {
-    throw new Error(`${school.name}의 ${grade}학년 평가계획 파일을 찾지 못했습니다. 다른 학년 또는 학기를 선택해 주세요.`)
+    fileIndexWarning = `${school.name}의 ${grade}학년 파일을 목록에서 확인하지 못했지만 MCP 원문 검색을 계속했습니다.`
   }
 
   const args = {
@@ -418,6 +516,7 @@ export async function getSchoolInfoEvaluationPlan(request: SchoolInfoEvaluationR
     matchedAchievementCodes,
     files,
     primaryFile: gradeFile ?? files[0] ?? null,
+    fileIndexWarning: fileIndexWarning || undefined,
     fetchedAt: new Date().toISOString(),
     privacyNote: '학생·교직원 자료는 전송하지 않으며, 학교명·학년도·학기·학년·과목명만 조회에 사용합니다.',
   }

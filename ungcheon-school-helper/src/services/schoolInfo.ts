@@ -42,6 +42,7 @@ export interface SchoolInfoEvaluationResponse {
   matchedAchievementCodes: string[]
   files: SchoolInfoEvaluationFile[]
   primaryFile: SchoolInfoEvaluationFile | null
+  fileIndexWarning?: string
   fetchedAt: string
   cached: boolean
   privacyNote: string

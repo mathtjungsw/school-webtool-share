@@ -542,6 +542,11 @@ export const listStaffChecklists = (viewerName: string, adminPassword = '', forc
     adminPassword,
   }, force)
 
+const notifyStaffChecklistUpdated = <T>(result: T) => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('staffChecklists:updated'))
+  return result
+}
+
 export const addStaffChecklist = (input: {
   title: string
   description: string
@@ -554,7 +559,7 @@ export const addStaffChecklist = (input: {
   items: string[]
   targetNames: string[]
   departmentNames: string[]
-}) => hubRequest<{ id: string }>({ action: 'addStaffChecklist', ...input })
+}) => hubRequest<{ id: string }>({ action: 'addStaffChecklist', ...input }).then(notifyStaffChecklistUpdated)
 
 export const updateStaffChecklist = (input: {
   checklistId: string
@@ -570,7 +575,7 @@ export const updateStaffChecklist = (input: {
   items: string[]
   targetNames: string[]
   departmentNames: string[]
-}) => hubRequest<{ updatedAt: string }>({ action: 'updateStaffChecklist', ...input })
+}) => hubRequest<{ updatedAt: string }>({ action: 'updateStaffChecklist', ...input }).then(notifyStaffChecklistUpdated)
 
 export const submitStaffChecklist = (
   checklistId: string,
@@ -583,7 +588,7 @@ export const submitStaffChecklist = (
   teacherName,
   checkedItemIds,
   memo,
-})
+}).then(notifyStaffChecklistUpdated)
 
 export const deleteStaffChecklist = (
   checklistId: string,
@@ -594,7 +599,7 @@ export const deleteStaffChecklist = (
   checklistId,
   viewerName,
   adminPassword,
-})
+}).then(notifyStaffChecklistUpdated)
 
 export const listCommitteeState = (force = false) =>
   cachedHubRequest<CommitteeState>('committees', 'committees', { action: 'listCommitteeState' }, force)

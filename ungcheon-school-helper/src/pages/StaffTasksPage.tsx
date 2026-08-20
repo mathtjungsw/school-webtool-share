@@ -68,15 +68,15 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     if (!config.schoolHubUrl) return
     setLoading(true)
     setError('')
     try {
       const [nextRoster, nextChecklists] = await Promise.all([
-        getSharedStaffRoster(),
+        getSharedStaffRoster(force),
         mode === 'checklists' && teacherName
-          ? listStaffChecklists(teacherName, isAdmin ? adminPassword : '')
+          ? listStaffChecklists(teacherName, isAdmin ? adminPassword : '', force)
           : Promise.resolve([]),
       ])
       setRoster(nextRoster)
@@ -89,6 +89,11 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
   }, [adminPassword, config.schoolHubUrl, isAdmin, mode, teacherName])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const refresh = () => void load(true)
+    window.addEventListener('staffChecklists:updated', refresh)
+    return () => window.removeEventListener('staffChecklists:updated', refresh)
+  }, [load])
   useEffect(() => subscribeHubResource<SharedStaffRoster | null>('staffRoster', data => setRoster(data)), [])
   useEffect(() => {
     if (!teacherName) return
@@ -119,7 +124,7 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
           <h1 className="page-title flex items-center gap-2"><PageIcon size={22} className="text-amber-400" />{pageTitle}</h1>
           <p className="page-subtitle">{pageSubtitle}</p>
         </div>
-        <button onClick={load} disabled={loading} className="btn-ghost flex items-center gap-1.5">
+        <button onClick={() => void load(true)} disabled={loading} className="btn-ghost flex items-center gap-1.5">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />새로고침
         </button>
       </header>
@@ -168,7 +173,7 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
           checklists={checklists}
           isAdmin={isAdmin}
           adminPassword={adminPassword}
-          onChanged={load}
+          onChanged={() => load(true)}
           onError={setError}
           onSuccess={setSuccess}
         />
@@ -179,7 +184,7 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
           isAdmin={isAdmin}
           adminPassword={adminPassword}
           uploadedBy={teacherName || '관리자'}
-          onChanged={load}
+          onChanged={() => load(true)}
           onError={setError}
           onSuccess={setSuccess}
         />
@@ -189,7 +194,7 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
   )
 }
 
-type WorkView = 'assigned' | 'created' | 'department' | 'personal'
+type WorkView = 'assigned' | 'created' | 'department' | 'personal' | 'create'
 type SharedLayout = 'list' | 'calendar'
 type AssignedFilter = 'all' | 'new' | 'today' | 'dueSoon' | 'overdue'
 
@@ -315,6 +320,7 @@ function ChecklistTab(props: {
       linkUrl: task.linkUrl, itemsText: task.items.map(item => item.label).join('\n'),
       targetNames: task.targetNames, departmentNames: task.departmentNames,
     })
+    setView('create')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const duplicateTask = (task: StaffChecklist) => {
@@ -374,19 +380,19 @@ function ChecklistTab(props: {
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-surface-800 p-1.5">
         <div className="flex flex-wrap gap-1">
           {([
-            ['assigned', '내 업무'], ['created', '내가 만든 업무'], ['department', '부서 업무'], ['personal', '개인 업무'],
+            ['assigned', '내 업무'], ['created', '내가 만든 업무'], ['department', '부서 업무'], ['personal', '개인 업무'], ['create', '업무 만들기'],
           ] as Array<[WorkView, string]>).map(([id, label]) => (
             <button key={id} onClick={() => { setView(id); if (id === 'assigned') setAssignedFilter('all') }} className={clsx('rounded-lg px-3 py-2 text-xs font-semibold', view === id ? 'bg-amber-400/15 text-amber-300' : 'text-slate-500 hover:text-slate-200')}>{label}</button>
           ))}
         </div>
-        {view !== 'personal' && <div className="flex gap-1"><button onClick={() => setLayout('list')} className={clsx('btn-ghost p-2', layout === 'list' && 'text-amber-300')} title="목록 보기"><LayoutList size={14} /></button><button onClick={() => setLayout('calendar')} className={clsx('btn-ghost p-2', layout === 'calendar' && 'text-amber-300')} title="달력 보기"><CalendarDays size={14} /></button></div>}
+        {view !== 'personal' && view !== 'create' && <div className="flex gap-1"><button onClick={() => setLayout('list')} className={clsx('btn-ghost p-2', layout === 'list' && 'text-amber-300')} title="목록 보기"><LayoutList size={14} /></button><button onClick={() => setLayout('calendar')} className={clsx('btn-ghost p-2', layout === 'calendar' && 'text-amber-300')} title="달력 보기"><CalendarDays size={14} /></button></div>}
       </div>
 
       {view === 'personal' ? (
         <PersonalWorkPanel tasks={personalTasks} onTasksChanged={setPersonalTasks} onSuccess={onSuccess} />
       ) : (
-        <div className="grid items-start gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
-          <form onSubmit={submit} className="card sticky top-4 space-y-3">
+        <div className={view === 'create' ? 'mx-auto w-full max-w-3xl' : ''}>
+          {view === 'create' && <form onSubmit={submit} className="card space-y-3">
             <div className="flex items-start justify-between gap-2"><div><h2 className="font-bold text-white">{form.id ? '공유 업무 수정' : '새 공유 업무'}</h2><p className="mt-1 text-[11px] text-slate-500">전체·부서·개별 교원에게 배부할 수 있습니다.</p></div>{form.id && <button type="button" onClick={resetForm} className="text-[10px] text-slate-500 hover:text-white">새 업무</button>}</div>
             <input required maxLength={100} className="input-field" placeholder="업무 제목" value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} />
             <textarea maxLength={1000} className="input-field min-h-20 resize-y" placeholder="업무 설명·안내" value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} />
@@ -400,11 +406,11 @@ function ChecklistTab(props: {
               <div className="grid max-h-40 grid-cols-2 gap-1 overflow-y-auto pr-1">{sortStaffMembers(members).map(member => <label key={member.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] text-slate-300 hover:bg-white/5"><input type="checkbox" checked={form.targetNames.includes(member.name)} onChange={event => setForm(current => ({ ...current, targetNames: event.target.checked ? [...new Set([...current.targetNames, member.name])] : current.targetNames.filter(name => name !== member.name) }))} /><span className="truncate">{member.name}{member.department ? ` · ${member.department}` : ''}</span></label>)}</div>
             </div>
             <button disabled={saving || !teacherName} className="btn-primary flex w-full items-center justify-center gap-1.5"><Save size={14} />{saving ? '저장 중...' : form.id ? '업무 수정 저장' : '공유 업무 배부'}</button>
-          </form>
+          </form>}
 
-          {layout === 'calendar'
+          {view !== 'create' && (layout === 'calendar'
             ? <SharedWorkCalendar tasks={visible} month={viewMonth} onMonthChange={setViewMonth} />
-            : <div className="space-y-3">{view === 'assigned' && assignedFilter !== 'all' && <div className="flex items-center justify-between rounded-xl border border-violet-500/15 bg-violet-500/5 px-4 py-2.5 text-xs text-violet-200"><span>자동 분류: {{ new: '새로 배부', today: '오늘 마감', dueSoon: '마감 임박', overdue: '기한 초과' }[assignedFilter]}</span><button onClick={() => setAssignedFilter('all')} className="text-[10px] text-slate-400 hover:text-white">전체 보기</button></div>}{visible.map(task => <SharedTaskCard key={task.id} checklist={task} teacherName={teacherName} isNew={newTaskIds.has(task.id)} isAdmin={isAdmin} adminPassword={adminPassword} onEdit={editTask} onDuplicate={duplicateTask} onChanged={onChanged} onError={onError} onSuccess={onSuccess} />)}{visible.length === 0 && <div className="card py-14 text-center text-sm text-slate-500">해당하는 업무가 없습니다.</div>}</div>}
+            : <div className="space-y-3">{view === 'assigned' && assignedFilter !== 'all' && <div className="flex items-center justify-between rounded-xl border border-violet-500/15 bg-violet-500/5 px-4 py-2.5 text-xs text-violet-200"><span>자동 분류: {{ new: '새로 배부', today: '오늘 마감', dueSoon: '마감 임박', overdue: '기한 초과' }[assignedFilter]}</span><button onClick={() => setAssignedFilter('all')} className="text-[10px] text-slate-400 hover:text-white">전체 보기</button></div>}{visible.map(task => <SharedTaskCard key={task.id} checklist={task} teacherName={teacherName} isNew={newTaskIds.has(task.id)} isAdmin={isAdmin} adminPassword={adminPassword} onEdit={editTask} onDuplicate={duplicateTask} onChanged={onChanged} onError={onError} onSuccess={onSuccess} />)}{visible.length === 0 && <div className="card py-14 text-center text-sm text-slate-500">해당하는 업무가 없습니다.</div>}</div>)}
         </div>
       )}
     </div>
@@ -426,6 +432,7 @@ function SharedTaskCard(props: {
   const [checked, setChecked] = useState<string[]>(own?.checkedItemIds ?? [])
   const [memo, setMemo] = useState(own?.memo ?? '')
   const [saving, setSaving] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const assigned = checklist.targetNames.includes(teacherName)
   const canManage = checklist.canManage || isAdmin
   const doneCount = checklist.responses.filter(response => checklist.items.every(item => response.checkedItemIds.includes(item.id))).length
@@ -449,9 +456,10 @@ function SharedTaskCard(props: {
   }
   return (
     <article className={clsx('card p-5', checklist.priority === 'high' && checklist.status !== 'completed' && 'border-rose-500/20')}>
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-white">{checklist.title}</h2>{isNew && <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-bold text-violet-200">새 업무</span>}<span className={clsx('rounded-full px-2 py-0.5 text-[10px]', STATUS_STYLE[checklist.status])}>{STATUS_LABEL[checklist.status]}</span><span className={clsx('rounded-full px-2 py-0.5 text-[10px]', checklist.priority === 'high' ? 'bg-rose-500/12 text-rose-300' : 'bg-white/5 text-slate-500')}>우선순위 {PRIORITY_LABEL[checklist.priority]}</span></div><p className="mt-1 text-[10px] text-slate-600">{checklist.creatorName} 작성 · {checklist.startDate || '-'} 시작 · {checklist.deadline || '마감 미지정'}</p>{checklist.departmentNames.length > 0 && <p className="mt-1 text-[10px] text-sky-400">{checklist.departmentNames.join(' · ')}</p>}{checklist.description && <p className="mt-3 whitespace-pre-wrap text-xs text-slate-400">{checklist.description}</p>}{checklist.linkUrl && <a href={checklist.linkUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] text-sky-300 hover:underline"><ExternalLink size={11} />관련 자료 열기</a>}</div><div className="flex flex-shrink-0 gap-1">{canManage && <button onClick={() => onEdit(checklist)} className="btn-ghost p-2" title="수정"><Pencil size={13} /></button>}<button onClick={() => onDuplicate(checklist)} className="btn-ghost p-2" title="복제"><ClipboardCopy size={13} /></button>{canManage && <button onClick={remove} className="btn-ghost p-2 text-rose-400" title="삭제"><Trash2 size={13} /></button>}</div></div>
+      <div className="flex items-start justify-between gap-3"><button type="button" onClick={() => setExpanded(value => !value)} className="min-w-0 flex-1 text-left"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-white">{checklist.title}</h2>{isNew && <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-bold text-violet-200">새 업무</span>}<span className={clsx('rounded-full px-2 py-0.5 text-[10px]', STATUS_STYLE[checklist.status])}>{STATUS_LABEL[checklist.status]}</span><span className={clsx('rounded-full px-2 py-0.5 text-[10px]', checklist.priority === 'high' ? 'bg-rose-500/12 text-rose-300' : 'bg-white/5 text-slate-500')}>우선순위 {PRIORITY_LABEL[checklist.priority]}</span></div><p className="mt-1 text-[11px] font-semibold text-slate-400">마감 {checklist.deadline || '미지정'} · {checklist.creatorName} 작성{checklist.departmentNames.length ? ` · ${checklist.departmentNames.join(' · ')}` : ''}</p></button><div className="flex flex-shrink-0 gap-1"><button type="button" onClick={() => setExpanded(value => !value)} className="btn-ghost p-2" title={expanded ? '세부 내용 접기' : '세부 내용 보기'}>{expanded ? <ArrowUp size={13} /> : <ArrowDown size={13} />}</button>{canManage && <button onClick={() => onEdit(checklist)} className="btn-ghost p-2" title="수정"><Pencil size={13} /></button>}<button onClick={() => onDuplicate(checklist)} className="btn-ghost p-2" title="복제"><ClipboardCopy size={13} /></button>{canManage && <button onClick={remove} className="btn-ghost p-2 text-rose-400" title="삭제"><Trash2 size={13} /></button>}</div></div>
+      {expanded && <>{checklist.description && <p className="mt-3 whitespace-pre-wrap text-xs text-slate-400">{checklist.description}</p>}{checklist.linkUrl && <a href={checklist.linkUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] text-sky-300 hover:underline"><ExternalLink size={11} />관련 자료 열기</a>}
       {assigned && <div className="mt-4 space-y-2 rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-3">{checklist.items.map(item => <label key={item.id} className="flex items-start gap-2 text-xs text-slate-300"><input type="checkbox" className="mt-0.5" checked={checked.includes(item.id)} disabled={checklist.closed} onChange={event => setChecked(current => event.target.checked ? [...new Set([...current, item.id])] : current.filter(id => id !== item.id))} /><span className={checked.includes(item.id) ? 'text-slate-500 line-through' : ''}>{item.label}</span></label>)}<div className="flex gap-2 pt-1"><input className="input-field flex-1 text-xs" maxLength={300} placeholder="진행 메모(선택)" value={memo} onChange={event => setMemo(event.target.value)} disabled={checklist.closed} /><button onClick={save} disabled={saving || checklist.closed} className="btn-primary flex items-center gap-1.5 px-4"><Save size={13} />{saving ? '저장 중' : '저장'}</button></div></div>}
-      {checklist.canManage && <div className="mt-4"><div className="mb-2 flex items-center justify-between text-xs"><span className="font-semibold text-slate-300">대상자 진행 현황</span><div className="flex items-center gap-2"><button onClick={copyIncomplete} disabled={!incompleteNames.length} className="text-[10px] text-sky-300 disabled:text-slate-600">미완료자 복사</button><span className="text-emerald-300">{doneCount}/{checklist.targetNames.length}명 완료</span></div></div><div className="mb-3 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-emerald-500" style={{ width: `${checklist.targetNames.length ? doneCount / checklist.targetNames.length * 100 : 0}%` }} /></div><div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{checklist.targetNames.map(name => { const response = checklist.responses.find(item => item.teacherName === name); const itemCount = response?.checkedItemIds.filter(id => checklist.items.some(item => item.id === id)).length ?? 0; const complete = itemCount === checklist.items.length; return <div key={name} className={clsx('rounded-lg border px-2.5 py-2 text-[11px]', complete ? 'border-emerald-500/20 bg-emerald-500/7' : 'border-white/5 bg-white/[0.02]')}><div className="flex justify-between gap-2"><span className="text-slate-300">{name}</span><span className={complete ? 'text-emerald-300' : 'text-slate-600'}>{itemCount}/{checklist.items.length}</span></div>{response?.memo && <p className="mt-1 truncate text-[9px] text-slate-600" title={response.memo}>{response.memo}</p>}</div>})}</div></div>}
+      {checklist.canManage && <div className="mt-4"><div className="mb-2 flex items-center justify-between text-xs"><span className="font-semibold text-slate-300">대상자 진행 현황</span><div className="flex items-center gap-2"><button onClick={copyIncomplete} disabled={!incompleteNames.length} className="text-[10px] text-sky-300 disabled:text-slate-600">미완료자 복사</button><span className="text-emerald-300">{doneCount}/{checklist.targetNames.length}명 완료</span></div></div><div className="mb-3 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-emerald-500" style={{ width: `${checklist.targetNames.length ? doneCount / checklist.targetNames.length * 100 : 0}%` }} /></div><div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{checklist.targetNames.map(name => { const response = checklist.responses.find(item => item.teacherName === name); const itemCount = response?.checkedItemIds.filter(id => checklist.items.some(item => item.id === id)).length ?? 0; const complete = itemCount === checklist.items.length; return <div key={name} className={clsx('rounded-lg border px-2.5 py-2 text-[11px]', complete ? 'border-emerald-500/20 bg-emerald-500/7' : 'border-white/5 bg-white/[0.02]')}><div className="flex justify-between gap-2"><span className="text-slate-300">{name}</span><span className={complete ? 'text-emerald-300' : 'text-slate-600'}>{itemCount}/{checklist.items.length}</span></div>{response?.memo && <p className="mt-1 truncate text-[9px] text-slate-600" title={response.memo}>{response.memo}</p>}</div>})}</div></div>}</>}
     </article>
   )
 }
