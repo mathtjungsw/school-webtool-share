@@ -81,6 +81,7 @@
     "src/services/timetablePlanDocument.ts",
     "src/services/timetableChanges.ts",
     "src/services/effectiveTimetable.ts",
+    "src/services/helpClassSchedule.ts",
     "src/services/studentIdentityAudit.ts",
     "src/services/subjectRemarksPrint.ts",
     "src/services/volunteerWork.ts",

@@ -39,10 +39,11 @@ export function applyStudentLessonOverride(
   slotIndex: number,
   changes: TimetableChangeRequest[],
 ) {
+  if (!slot) return undefined
   const classCode = normalizeClassCode(classLabel)
   const override = approvedLessonOverrides(changes).find(item =>
     item.date === date && item.slotIndex === slotIndex && normalizeClassCode(item.className) === classCode,
   )
-  return override ? { ...slot, subject: override.subject || slot?.subject || '', teacher: override.teacher, effectiveChange: true } : slot
+  return override ? { ...slot, subject: override.subject || slot.subject, teacher: override.teacher, effectiveChange: true } : slot
 }
 

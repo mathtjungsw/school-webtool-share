@@ -355,6 +355,18 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.14',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.14',
+    body: [
+      '· 학생 위치 찾기에 2026학년도 2학기 도움반 학생 개인 시간표를 반영했습니다.',
+      '· 개인 시간표에서 색칠된 수업은 해당 요일·교시에 학생 위치를 도움반으로 안내합니다.',
+      '· 색칠되어 있어도 동아리 수업은 도움반으로 처리하지 않으며, 일반 학생과 일반 수업 위치는 기존 방식대로 표시합니다.',
+      '· 쉬는 시간에는 앞시간과 뒷시간을 각각 판정하고, 월요일 시간표 대체 운영일과 승인된 교환·대강에도 도움반 위치 안내가 유지됩니다.',
+      '· 검색 도우미와 사용 안내에도 도움반 위치 확인 방법을 추가했습니다.'
+    ].join('\n'),
+    date: '2026-08-20'
+  },
+  {
     key: 'v1.1.13',
     title: '[업데이트] 웅천고 업무도우미 v1.1.13',
     body: [
@@ -516,7 +528,7 @@ const GET_READ_ACTIONS = [
 function doGet(e) {
   try {
     const action = String(e && e.parameter && e.parameter.action || '');
-    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 31 } });
+    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 32 } });
     if (GET_READ_ACTIONS.indexOf(action) < 0) throw new Error('GET으로 허용되지 않는 요청입니다.');
 
     const rawPayload = String(e && e.parameter && e.parameter.payload || '{}');
@@ -534,7 +546,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 31 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 32 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);

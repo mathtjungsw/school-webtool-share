@@ -11,6 +11,7 @@ import { useAppStore } from '../stores/appStore'
 import { getSpecialTimetableDay, getTimetableDayIndex, localDateKey } from '../services/specialTimetableDays'
 import { canonicalStudentId, studentIdsMatch } from '../services/studentId'
 import { schoolTimetableSlotIndex } from '../services/schoolTimetable'
+import { applyHelpClassLocation } from '../services/helpClassSchedule'
 
 const DAY_NAMES: Array<StudentTimetableDay | ''> = ['', '월', '화', '수', '목', '금', '']
 
@@ -150,9 +151,10 @@ export default function StudentLocatorPage() {
       selectedCourse: false,
     } : personalSlot
     const slotIndex = schoolTimetableSlotIndex(dayIndex, periodNumber)
-    return slotIndex >= 0
+    const effectiveSlot = slotIndex >= 0
       ? applyStudentLessonOverride(baseSlot, selected.student.classLabel, dateKey, slotIndex, changes)
       : baseSlot
+    return applyHelpClassLocation(effectiveSlot, selected.student, day, periodNumber)
   }
   const slot = period ? resolveSlot(Number(period.period)) : undefined
   const previousSlot = adjacent?.previous ? resolveSlot(Number(adjacent.previous.period)) : undefined
@@ -183,7 +185,7 @@ export default function StudentLocatorPage() {
               <AdjacentLesson label="뒷시간" period={adjacent?.next} slot={nextSlot} defaultClassroom={`${selected.student.classLabel}반 교실`} />
             </div>
           )}
-          <p className="mt-5 text-[11px] text-slate-500">쉬는 시간에는 직전 수업 교실과 다음 수업 교실을 함께 안내합니다. 승인된 교환·대강 일정도 반영하며, 실제 NEIS 입력을 대신하지 않는 편의 기능입니다.</p>
+          <p className="mt-5 text-[11px] text-slate-500">쉬는 시간에는 직전 수업 교실과 다음 수업 교실을 함께 안내합니다. 도움반 학생은 색칠된 개인 시간표를 기준으로 위치를 안내하며 동아리는 제외합니다. 승인된 교환·대강 일정도 반영하며, 실제 NEIS 입력을 대신하지 않는 편의 기능입니다.</p>
         </div>
       </section>}
     </div>
@@ -198,6 +200,7 @@ function LessonLocation({ label, slot, defaultClassroom }: { label: string; slot
   return <div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-4">
     <p className="mb-3 text-xs font-black text-cyan-300">{label}</p>
     <div className="grid gap-3 sm:grid-cols-3"><Info label="수업" value={slot.subject} /><Info label="교실" value={slot.classroom || defaultClassroom} /><Info label="담당 교사" value={slot.teacher || '-'} /></div>
+    {'helpClass' in slot && <p className="mt-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-[11px] font-bold text-emerald-200">도움반 개인 시간표의 색칠된 수업입니다. 위치를 도움반으로 안내합니다.</p>}
     {'effectiveChange' in slot && <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">승인된 교환·대강 일정이 반영되었습니다.</p>}
   </div>
 }
@@ -211,6 +214,7 @@ function AdjacentLesson({ label, period, slot, defaultClassroom }: {
   return <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-4">
     <p className="text-xs font-black text-cyan-300">{label}{period ? ` · ${period.period}교시 (${period.start}~${period.end})` : ''}</p>
     {!period ? <p className="mt-3 text-sm text-slate-400">{label} 수업이 없습니다.</p> : slot?.subject ? <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3"><Info label="수업" value={slot.subject} /><Info label="교실" value={slot.classroom || defaultClassroom} /><Info label="담당 교사" value={slot.teacher || '-'} /></div> : <p className="mt-3 text-sm text-slate-400">등록된 수업이 없습니다.</p>}
+    {slot && 'helpClass' in slot && <p className="mt-3 text-[11px] font-bold text-emerald-300">도움반 수업 · 위치 도움반</p>}
     {slot && 'effectiveChange' in slot && <p className="mt-3 text-[11px] font-semibold text-amber-300">승인된 수업 변경 반영</p>}
   </div>
 }
