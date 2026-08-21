@@ -18,6 +18,8 @@ import {
 const DRAFT_KEY = 'ungcheon.volunteer.certificateDraft.v1'
 const CLASS_DRAFT_KEY = 'ungcheon.volunteer.classCertificateDraft.v1'
 const NEIS_DATASETS_KEY = 'ungcheon.volunteer.neisDatasets.v1'
+const MANUAL_DECISIONS_KEY = 'ungcheon.volunteer.manualDecisions.v1'
+type ManualDecision = 'confirmed' | 'deleted'
 
 export default function VolunteerWorkPage() {
   const [tab, setTab] = useState<'issue-class' | 'issue-department' | 'verify'>('issue-class')
@@ -460,6 +462,8 @@ function VerificationTab() {
   const [editingFile, setEditingFile] = useState<StoredVolunteerHwp | null>(null)
   const [editingForms, setEditingForms] = useState<ParsedVolunteerForm[]>([])
   const [coordinatorGeneratorOpen, setCoordinatorGeneratorOpen] = useState(false)
+  const [coordinatorSource, setCoordinatorSource] = useState<StoredVolunteerHwp | null>(null)
+  const [manualDecisions, setManualDecisions] = useState<Record<string, ManualDecision>>(loadManualDecisions)
 
   const refresh = async () => {
     const items = await window.electron.listVolunteerHwp()
@@ -475,6 +479,17 @@ function VerificationTab() {
   }
   useEffect(() => { void refresh(); void loadRoster() }, [])
   useEffect(() => { localStorage.setItem(NEIS_DATASETS_KEY, JSON.stringify(neisDatasets)) }, [neisDatasets])
+  useEffect(() => { localStorage.setItem(MANUAL_DECISIONS_KEY, JSON.stringify(manualDecisions)) }, [manualDecisions])
+
+  const openGenerated = async (file: StoredVolunteerHwp) => {
+    setBusy(true)
+    try {
+      const forms = file.forms?.length ? file.forms : await window.electron.parseVolunteerHwp(file.id)
+      setCoordinatorSource({ ...file, forms })
+      setCoordinatorGeneratorOpen(true)
+    } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
+    finally { setBusy(false) }
+  }
 
   const importHwp = async () => {
     const paths = await window.electron.openFilesDialog([{ name: '봉사활동 확인서(HWP·PDF)', extensions: ['hwp', 'pdf'] }])
@@ -678,11 +693,16 @@ function VerificationTab() {
       if (!currentRoster?.students.length) throw new Error('학교 공유 서버의 학생 명렬을 불러오지 못했습니다. 학교 공유 서비스 연결을 확인해 주세요.')
       const result = await buildComparison(files, currentRoster)
       setComparison(result)
+      const validIds = new Set([...result.rows, ...result.unclassified].map(manualDecisionKey))
+      setManualDecisions(current => Object.fromEntries(Object.entries(current).filter(([id]) => validIds.has(id))))
       setSelectedClass('all')
-      const problemCount = result.rows.filter(row => row.status !== 'matched').length + result.unclassified.length + result.duplicates.length
+      const problemCount = result.rows.filter(row => row.status !== 'matched'
+        && !(row.status === 'neis-only' && manualDecisions[manualDecisionKey(row)] === 'confirmed')
+        && !(row.status === 'hwp-only' && manualDecisions[manualDecisionKey(row)] === 'deleted')).length
+        + result.unclassified.length + result.duplicates.length
       setMessage(problemCount
-        ? `전체 누적 자료 검증을 마쳤습니다. 활동 누락·미분류·중복 확인 항목 ${problemCount}건이 있습니다.`
-        : `검증 완료: ${result.rows.length}개 활동 기록의 내용과 시간이 모두 일치합니다.`)
+        ? `전체 누적 자료 검증을 마쳤습니다. 활동 누락·미분류·중복 미처리 항목 ${problemCount}건이 있습니다.`
+        : `검증 완료: ${result.rows.length}개 활동 기록이 일치하거나 수기 처리되었습니다.`)
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)) }
     finally { setBusy(false) }
   }
@@ -735,11 +755,13 @@ function VerificationTab() {
 
   const counts = useMemo(() => comparison ? {
     matched: comparison.rows.filter(row => row.status === 'matched').length,
-    neisOnly: comparison.rows.filter(row => row.status === 'neis-only').length,
-    hwpOnly: comparison.rows.filter(row => row.status === 'hwp-only').length,
+    neisOnly: comparison.rows.filter(row => row.status === 'neis-only' && manualDecisions[manualDecisionKey(row)] !== 'confirmed').length,
+    hwpOnly: comparison.rows.filter(row => row.status === 'hwp-only' && manualDecisions[manualDecisionKey(row)] !== 'deleted').length,
+    manualConfirmed: comparison.rows.filter(row => manualDecisions[manualDecisionKey(row)] === 'confirmed').length,
+    manualDeleted: comparison.rows.filter(row => manualDecisions[manualDecisionKey(row)] === 'deleted').length,
     unclassified: comparison.unclassified.length,
     duplicates: comparison.duplicates.length,
-  } : { matched: 0, neisOnly: 0, hwpOnly: 0, unclassified: 0, duplicates: 0 }, [comparison])
+  } : { matched: 0, neisOnly: 0, hwpOnly: 0, manualConfirmed: 0, manualDeleted: 0, unclassified: 0, duplicates: 0 }, [comparison, manualDecisions])
   const classOptions = useMemo(() => comparison
     ? [...new Set(comparison.rows.filter(row => row.grade && row.className).map(row => `${row.grade}-${row.className}`))]
       .sort((a, b) => a.localeCompare(b, 'ko', { numeric: true }))
@@ -775,7 +797,7 @@ function VerificationTab() {
           <p className="mt-3 text-xs font-semibold text-slate-600 dark:text-slate-300">원본 Excel은 복사하지 않고 검증에 필요한 학번·이름·봉사 기록만 이 PC의 앱 저장소에 보관합니다.</p>
         </Panel>
         <Panel title="2. 확인서 HWP·PDF 누적 보관함" subtitle="텍스트 PDF는 글자를 직접 읽고, 스캔 PDF만 포함된 한국어 오프라인 OCR로 처리합니다.">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap gap-2"><ActionButton onClick={importHwp} icon={<FilePlus2 size={15} />} disabled={busy}>확인서 추가(HWP·PDF)</ActionButton><ActionButton onClick={refresh} icon={<RefreshCw size={15} />}>목록 새로고침</ActionButton></div><button type="button" onClick={() => setCoordinatorGeneratorOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white shadow-sm hover:bg-emerald-800"><FilePlus2 size={16} />봉사활동 확인서 생성(담당자용)</button></div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap gap-2"><ActionButton onClick={importHwp} icon={<FilePlus2 size={15} />} disabled={busy}>확인서 추가(HWP·PDF)</ActionButton><ActionButton onClick={refresh} icon={<RefreshCw size={15} />}>목록 새로고침</ActionButton></div><button type="button" onClick={() => { setCoordinatorSource(null); setCoordinatorGeneratorOpen(true) }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-black text-white shadow-sm hover:bg-emerald-800"><FilePlus2 size={16} />봉사활동 확인서 생성(담당자용)</button></div>
           <div className="mt-3 rounded-xl border border-blue-300 bg-blue-50 p-3 text-xs font-bold text-blue-950 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-100"><HardDrive size={15} className="mr-1 inline" />앱 전용 로컬 복사본만 보관합니다. 구글시트·학교 공유 서버에는 파일명이나 내용도 보내지 않습니다.</div>
           <p className="mt-3 text-sm font-bold">누적: <span className="text-emerald-700 dark:text-emerald-300">{files.length}개 파일 · {files.reduce((sum, file) => sum + file.formCount, 0)}개 확인서</span></p>
           {importProgress && <div className="mt-3 flex items-start gap-2 rounded-xl border border-sky-300 bg-sky-50 px-3 py-2.5 text-xs font-black leading-relaxed text-sky-950 dark:border-sky-700 dark:bg-sky-950/50 dark:text-sky-100"><RefreshCw size={15} className="mt-0.5 shrink-0 animate-spin" /><span>{importProgress}</span></div>}
@@ -783,7 +805,7 @@ function VerificationTab() {
       </div>
 
       <Panel title="보관된 확인서 목록" subtitle="목록에 있는 모든 파일이 전체 누적 검증 대상입니다.">
-        <div className="space-y-2">{files.map(file => <div key={file.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 md:flex-row md:items-center dark:border-slate-700"><div className="min-w-0 flex-1"><div className="flex min-w-0 flex-wrap items-center gap-2"><b className="block truncate">{file.originalName}</b>{file.fileType === 'generated' && <span className="shrink-0 rounded-full bg-violet-100 px-2 py-1 text-[10px] font-black text-violet-900 dark:bg-violet-900/50 dark:text-violet-100">수기 생성한 확인서</span>}</div><small className="font-semibold text-slate-600 dark:text-slate-300">{file.formCount}개 확인서 · {file.fileType === 'pdf' ? `${file.pageCount || file.formCount}쪽 · ${file.analysisMode === 'ocr' ? '오프라인 OCR' : file.analysisMode === 'mixed' ? '텍스트+OCR' : '텍스트 직접 추출'}${file.averageConfidence != null ? ` · 평균 신뢰도 ${file.averageConfidence}%` : ''}` : file.fileType === 'generated' ? '담당자 직접 입력 · OCR 없이 검증' : 'HWP 직접 분석'} · {(file.size / 1024).toFixed(0)}KB</small>{Boolean(file.warnings?.length) && <small className="mt-1 block font-bold text-amber-700 dark:text-amber-300">확인 필요 {file.warnings!.length}건</small>}</div><div className="flex flex-wrap gap-2">{file.fileType === 'pdf' && <button onClick={() => void editOcr(file)} className="rounded-lg border border-amber-400 px-3 py-2 text-xs font-bold text-amber-800 dark:text-amber-200">OCR 결과 확인·수정</button>}{file.fileType !== 'generated' && <button onClick={() => window.electron.openVolunteerHwp(file.id)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold dark:border-slate-600"><FolderOpen size={14} className="mr-1 inline" />열기</button>}<button onClick={() => remove(file.id)} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-bold text-rose-700 dark:border-rose-700 dark:text-rose-300"><Trash2 size={14} className="mr-1 inline" />로컬 복사본 삭제</button></div></div>)}</div>
+        <div className="space-y-2">{files.map(file => <div key={file.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 p-3 md:flex-row md:items-center dark:border-slate-700"><div className="min-w-0 flex-1"><div className="flex min-w-0 flex-wrap items-center gap-2"><b className="block truncate">{file.originalName}</b>{file.fileType === 'generated' && <span className="shrink-0 rounded-full bg-violet-100 px-2 py-1 text-[10px] font-black text-violet-900 dark:bg-violet-900/50 dark:text-violet-100">수기 생성한 확인서</span>}</div><small className="font-semibold text-slate-600 dark:text-slate-300">{file.formCount}개 확인서 · {file.fileType === 'pdf' ? `${file.pageCount || file.formCount}쪽 · ${file.analysisMode === 'ocr' ? '오프라인 OCR' : file.analysisMode === 'mixed' ? '텍스트+OCR' : '텍스트 직접 추출'}${file.averageConfidence != null ? ` · 평균 신뢰도 ${file.averageConfidence}%` : ''}` : file.fileType === 'generated' ? '담당자 직접 입력 · OCR 없이 검증' : 'HWP 직접 분석'} · {(file.size / 1024).toFixed(0)}KB</small>{Boolean(file.warnings?.length) && <small className="mt-1 block font-bold text-amber-700 dark:text-amber-300">확인 필요 {file.warnings!.length}건</small>}</div><div className="flex flex-wrap gap-2">{file.fileType === 'pdf' && <button onClick={() => void editOcr(file)} className="rounded-lg border border-amber-400 px-3 py-2 text-xs font-bold text-amber-800 dark:text-amber-200">OCR 결과 확인·수정</button>}{file.fileType === 'generated' ? <button onClick={() => void openGenerated(file)} className="rounded-lg border border-violet-400 px-3 py-2 text-xs font-black text-violet-900 dark:text-violet-100"><FolderOpen size={14} className="mr-1 inline" />내용 보기·수정</button> : <button onClick={() => window.electron.openVolunteerHwp(file.id)} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold dark:border-slate-600"><FolderOpen size={14} className="mr-1 inline" />열기</button>}<button onClick={() => remove(file.id)} className="rounded-lg border border-rose-300 px-3 py-2 text-xs font-bold text-rose-700 dark:border-rose-700 dark:text-rose-300"><Trash2 size={14} className="mr-1 inline" />로컬 복사본 삭제</button></div></div>)}</div>
         {!files.length && <p className="py-8 text-center text-sm font-bold text-slate-600 dark:text-slate-300">보관된 확인서가 없습니다. 위의 `확인서 추가(HWP·PDF)`를 눌러 주세요.</p>}
       </Panel>
 
@@ -799,7 +821,7 @@ function VerificationTab() {
 
       {message && <p className="rounded-xl bg-slate-100 p-4 text-sm font-bold dark:bg-slate-800">{message}</p>}
       {comparison && <Panel title="검증 결과" subtitle={`학생 ${new Set(comparison.rows.map(row => row.studentId)).size}명 · 활동 비교 ${comparison.rows.length}행 · 확인서 미분류 ${comparison.unclassified.length}행`}>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Summary label="내용·시간 일치" value={`${counts.matched}행`} tone="emerald" /><Summary label="나이스에만 있음" value={`${counts.neisOnly}행`} tone="amber" /><Summary label="확인서에만 있음" value={`${counts.hwpOnly}행`} tone="amber" /><Summary label="미분류" value={`${counts.unclassified}행`} tone={counts.unclassified ? 'rose' : 'emerald'} /><Summary label="중복 자료" value={`${counts.duplicates}건`} tone={counts.duplicates ? 'rose' : 'emerald'} /></div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7"><Summary label="내용·기간·시간 일치" value={`${counts.matched}행`} tone="emerald" /><Summary label="나이스에만 있음" value={`${counts.neisOnly}행`} tone="amber" /><Summary label="확인서에만 있음" value={`${counts.hwpOnly}행`} tone="amber" /><Summary label="수기 확인" value={`${counts.manualConfirmed}행`} tone="emerald" /><Summary label="수기 삭제" value={`${counts.manualDeleted}행`} tone="slate" /><Summary label="미분류" value={`${counts.unclassified}행`} tone={counts.unclassified ? 'rose' : 'emerald'} /><Summary label="중복 자료" value={`${counts.duplicates}건`} tone={counts.duplicates ? 'rose' : 'emerald'} /></div>
         {!counts.neisOnly && !counts.hwpOnly && !counts.unclassified && !counts.duplicates && <div className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-50 p-5 font-black text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-100"><CheckCircle2 />모든 활동의 내용과 시간이 누락·중복 없이 정상적으로 일치합니다.</div>}
         <div className="mt-5 flex flex-wrap gap-2"><button onClick={() => setSelectedClass('all')} className={classFilterClass(selectedClass === 'all')}>전체 {comparison.rows.length}행</button>{classOptions.map(className => <button key={className} onClick={() => setSelectedClass(className)} className={classFilterClass(selectedClass === className)}>{className}반 {comparison.rows.filter(row => `${row.grade}-${row.className}` === className).length}행</button>)}<button onClick={() => setSelectedClass('unclassified')} className={classFilterClass(selectedClass === 'unclassified', true)}>미분류 {comparison.unclassified.length}행</button></div>
         {selectedClass === 'unclassified' && <div className="mt-4 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-950 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-100">미분류에는 확인서에 사람이 잘못 입력한 것으로 보이는 학번·이름이 모입니다. 나이스 자료는 신뢰하고 별도의 명렬 검사를 하지 않습니다.</div>}
@@ -808,28 +830,50 @@ function VerificationTab() {
           const suggestedName = rosterById.get(row.studentId)?.name || ''
           const sameName = rosterByName.get(row.displayName.replace(/\s+/g, '')) || []
           const suggestedId = sameName.length === 1 ? volunteerStudentId(sameName[0].studentId) : ''
-          return <RosterComparisonRow key={row.id} row={row} suggestedName={suggestedName} suggestedId={suggestedId} onCorrect={(studentId, name, correction) => void correctUnclassified(row, studentId, name, correction)} />
+          const decisionKey = manualDecisionKey(row)
+          return <RosterComparisonRow key={row.id} row={row} manualDecision={manualDecisions[decisionKey]} onManualDecision={decision => setManualDecisions(current => decision ? { ...current, [decisionKey]: decision } : Object.fromEntries(Object.entries(current).filter(([id]) => id !== decisionKey)))} suggestedName={suggestedName} suggestedId={suggestedId} onCorrect={(studentId, name, correction) => void correctUnclassified(row, studentId, name, correction)} />
         })}</tbody></table></div>
         {!visibleRows.length && <p className="py-6 text-center text-sm font-bold text-slate-600 dark:text-slate-300">선택한 반의 자료가 없습니다.</p>}
         {comparison.duplicates.length > 0 && <div className="mt-5"><h3 className="font-black text-rose-800 dark:text-rose-200">중복 자료 상세</h3><div className="mt-2 overflow-x-auto rounded-xl border border-rose-200 dark:border-rose-800"><table className="w-full min-w-[850px] text-sm"><thead className="bg-rose-50 dark:bg-rose-950/40"><tr><th className="p-3">자료</th><th className="p-3">학번</th><th className="p-3">이름</th><th className="p-3">중복 횟수</th><th className="p-3 text-left">활동</th></tr></thead><tbody>{comparison.duplicates.map((duplicate, index) => <tr key={`${duplicate.source}-${duplicate.studentId}-${index}`} className="border-t border-rose-200 dark:border-rose-800"><td className="p-3 font-black">{duplicate.source === 'neis' ? '나이스' : '확인서'}</td><td className="p-3 font-bold">{duplicate.studentId}</td><td className="p-3 font-bold">{duplicate.name}</td><td className="p-3 text-center font-black text-rose-700 dark:text-rose-300">{duplicate.count}회</td><td className="cursor-help p-3" title={`원본 파일: ${duplicate.sourceNames.join(', ')}`}><b>{duplicate.activity || '활동명 없음'}</b><small className="ml-2 text-slate-500 dark:text-slate-400">(파일 정보는 마우스를 올려 확인)</small></td></tr>)}</tbody></table></div></div>}
       </Panel>}
-      <CoordinatorVolunteerModal open={coordinatorGeneratorOpen} onClose={() => setCoordinatorGeneratorOpen(false)} onApplied={async () => { await refresh(); setComparison(null) }} />
+      <CoordinatorVolunteerModal source={coordinatorSource} open={coordinatorGeneratorOpen} onClose={() => { setCoordinatorGeneratorOpen(false); setCoordinatorSource(null) }} onApplied={async () => { await refresh(); setComparison(null) }} />
     </div>
   )
 }
 
-function RosterComparisonRow({ row, suggestedName, suggestedId, onCorrect }: { row: VolunteerRosterComparisonRow; suggestedName?: string; suggestedId?: string; onCorrect?: (studentId: string, name: string, correction: string) => void }) {
+function RosterComparisonRow({ row, manualDecision, onManualDecision, suggestedName, suggestedId, onCorrect }: {
+  row: VolunteerRosterComparisonRow
+  manualDecision?: ManualDecision
+  onManualDecision?: (decision?: ManualDecision) => void
+  suggestedName?: string
+  suggestedId?: string
+  onCorrect?: (studentId: string, name: string, correction: string) => void
+}) {
   const [manual, setManual] = useState(false)
   const [manualId, setManualId] = useState(row.studentId)
   const [manualName, setManualName] = useState(row.displayName === '(이름 없음)' ? '' : row.displayName)
-  const status = {
+  const baseStatus = {
     matched: { label: '일치', icon: CheckCircle2, style: 'text-emerald-800 dark:text-emerald-200' },
     'neis-only': { label: '나이스에만', icon: AlertTriangle, style: 'text-amber-800 dark:text-amber-200' },
     'hwp-only': { label: '확인서에만', icon: AlertTriangle, style: 'text-amber-800 dark:text-amber-200' },
     unclassified: { label: '미분류', icon: XCircle, style: 'text-rose-800 dark:text-rose-200' },
   }[row.status]
+  const status = manualDecision === 'confirmed'
+    ? { label: '수기 확인', icon: CheckCircle2, style: 'text-emerald-800 dark:text-emerald-200' }
+    : manualDecision === 'deleted'
+      ? { label: '수기 삭제', icon: Trash2, style: 'text-slate-700 dark:text-slate-200' }
+      : baseStatus
   const Icon = status.icon
-  return <tr className={clsx('border-t border-slate-200 align-middle dark:border-slate-700', row.status === 'matched' ? 'bg-emerald-50/40 dark:bg-emerald-950/10' : row.status === 'unclassified' ? 'bg-rose-50/50 dark:bg-rose-950/20' : 'bg-amber-50/30 dark:bg-amber-950/10')}><td className={clsx('whitespace-nowrap p-1.5 font-black', status.style)}><Icon size={13} className="mr-1 inline" />{status.label}</td><td className="p-1.5 text-center font-black">{row.studentId || '-'}</td><td className="truncate p-1.5 text-center font-bold" title={row.displayName}>{row.displayName}</td><ActivitySideCells side={row.neis} /><ActivitySideCells side={row.hwp} /><td className="p-1.5 font-semibold"><p className="line-clamp-2 leading-4" title={row.message}>{row.message}</p>{row.status === 'unclassified' && onCorrect && <div className="mt-1.5 flex flex-wrap gap-1">{suggestedId && <button type="button" onClick={() => onCorrect(suggestedId, row.displayName, '학번 맞춤')} className="rounded border border-sky-400 px-1.5 py-1 text-[10px] font-black text-sky-800 dark:text-sky-200">학번맞추기</button>}{suggestedName && <button type="button" onClick={() => onCorrect(row.studentId, suggestedName, '이름 맞춤')} className="rounded border border-emerald-400 px-1.5 py-1 text-[10px] font-black text-emerald-800 dark:text-emerald-200">이름맞추기</button>}<button type="button" onClick={() => setManual(value => !value)} className="rounded border border-amber-400 px-1.5 py-1 text-[10px] font-black text-amber-800 dark:text-amber-200">수기수정</button></div>}{manual && <div className="mt-1.5 grid grid-cols-[72px_1fr_auto] gap-1"><input inputMode="numeric" maxLength={5} value={manualId} onChange={event => setManualId(event.target.value.replace(/\D/g, '').slice(0, 5))} placeholder="학번" className="px-1 py-1 text-[10px]" /><input value={manualName} onChange={event => setManualName(event.target.value)} placeholder="이름" className="px-1 py-1 text-[10px]" /><button type="button" onClick={() => onCorrect?.(manualId, manualName, '직접 입력')} className="rounded bg-amber-500 px-1.5 py-1 text-[10px] font-black text-slate-950">적용</button></div>}</td></tr>
+  const rowTone = manualDecision === 'confirmed'
+    ? 'bg-emerald-100/80 dark:bg-emerald-950/35'
+    : manualDecision === 'deleted'
+      ? 'bg-slate-200/90 text-slate-600 dark:bg-slate-800/80 dark:text-slate-300'
+      : row.status === 'matched'
+        ? 'bg-emerald-50/40 dark:bg-emerald-950/10'
+        : row.status === 'unclassified'
+          ? 'bg-rose-50/50 dark:bg-rose-950/20'
+          : 'bg-amber-50/30 dark:bg-amber-950/10'
+  return <tr className={clsx('border-t border-slate-200 align-middle dark:border-slate-700', rowTone)}><td className={clsx('whitespace-nowrap p-1.5 font-black', status.style)}><Icon size={13} className="mr-1 inline" />{status.label}</td><td className="p-1.5 text-center font-black">{row.studentId || '-'}</td><td className="truncate p-1.5 text-center font-bold" title={row.displayName}>{row.displayName}</td><ActivitySideCells side={row.neis} /><ActivitySideCells side={row.hwp} /><td className="p-1.5 font-semibold"><p className="line-clamp-2 leading-4" title={row.message}>{manualDecision === 'confirmed' ? '나이스 기록을 수기로 확인했습니다. 원본 자료는 변경하지 않았습니다.' : manualDecision === 'deleted' ? '확인서 기록을 검증 목록에서 수기 삭제 처리했습니다. 원본 자료는 변경하지 않았습니다.' : row.message}</p>{!manualDecision && row.status === 'neis-only' && <button type="button" onClick={() => onManualDecision?.('confirmed')} className="mt-1.5 rounded border border-emerald-500 bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">수기 확인</button>}{!manualDecision && row.status === 'hwp-only' && <button type="button" onClick={() => onManualDecision?.('deleted')} className="mt-1.5 rounded border border-slate-500 bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-900 dark:bg-slate-800 dark:text-slate-100">수기 삭제</button>}{manualDecision && <button type="button" onClick={() => onManualDecision?.()} className="mt-1.5 rounded border border-blue-400 bg-white px-2 py-1 text-[10px] font-black text-blue-900 no-underline dark:bg-slate-900 dark:text-blue-100">되돌리기</button>}{row.status === 'unclassified' && onCorrect && <div className="mt-1.5 flex flex-wrap gap-1">{suggestedId && <button type="button" onClick={() => onCorrect(suggestedId, row.displayName, '학번 맞춤')} className="rounded border border-sky-400 px-1.5 py-1 text-[10px] font-black text-sky-800 dark:text-sky-200">학번맞추기</button>}{suggestedName && <button type="button" onClick={() => onCorrect(row.studentId, suggestedName, '이름 맞춤')} className="rounded border border-emerald-400 px-1.5 py-1 text-[10px] font-black text-emerald-800 dark:text-emerald-200">이름맞추기</button>}<button type="button" onClick={() => setManual(value => !value)} className="rounded border border-amber-400 px-1.5 py-1 text-[10px] font-black text-amber-800 dark:text-amber-200">수기수정</button></div>}{manual && <div className="mt-1.5 grid grid-cols-[72px_1fr_auto] gap-1"><input inputMode="numeric" maxLength={5} value={manualId} onChange={event => setManualId(event.target.value.replace(/\D/g, '').slice(0, 5))} placeholder="학번" className="px-1 py-1 text-[10px]" /><input value={manualName} onChange={event => setManualName(event.target.value)} placeholder="이름" className="px-1 py-1 text-[10px]" /><button type="button" onClick={() => onCorrect?.(manualId, manualName, '직접 입력')} className="rounded bg-amber-500 px-1.5 py-1 text-[10px] font-black text-slate-950">적용</button></div>}</td></tr>
 }
 
 function ActivitySideCells({ side }: { side: VolunteerRosterComparisonRow['neis'] }) {
@@ -845,6 +889,21 @@ function loadNeisDatasets(): StoredVolunteerNeisDataset[] {
     if (!Array.isArray(parsed)) return []
     return parsed.filter(dataset => dataset && typeof dataset.id === 'string' && Array.isArray(dataset.records))
   } catch { return [] }
+}
+
+function loadManualDecisions(): Record<string, ManualDecision> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(MANUAL_DECISIONS_KEY) || '{}')
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return Object.fromEntries(Object.entries(parsed).filter(([, value]) => value === 'confirmed' || value === 'deleted')) as Record<string, ManualDecision>
+  } catch { return {} }
+}
+
+function manualDecisionKey(row: VolunteerRosterComparisonRow) {
+  const sideKey = (side: VolunteerRosterComparisonRow['neis']) => side
+    ? [side.content, side.startDate, side.endDate, side.hours ?? '', side.sourceName, side.sourceLocation].join('|')
+    : '-'
+  return `${row.id}::${sideKey(row.neis)}::${sideKey(row.hwp)}`
 }
 
 async function hashBytes(bytes: number[]) {

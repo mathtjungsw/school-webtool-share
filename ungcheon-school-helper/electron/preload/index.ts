@@ -90,7 +90,7 @@ contextBridge.exposeInMainWorld('electron', {
   importVolunteerHwp: (filePath: string, allowDuplicate = false) => ipcRenderer.invoke('volunteer:importHwp', filePath, allowDuplicate),
   listVolunteerHwp: () => ipcRenderer.invoke('volunteer:listHwp'),
   parseVolunteerHwp: (id: string) => ipcRenderer.invoke('volunteer:parseHwp', id),
-  updateVolunteerForms: (id: string, forms: unknown[]) => ipcRenderer.invoke('volunteer:updateForms', id, forms),
+  updateVolunteerForms: (id: string, forms: unknown[], title?: string) => ipcRenderer.invoke('volunteer:updateForms', id, forms, title),
   openVolunteerHwp: (id: string) => ipcRenderer.invoke('volunteer:openHwp', id),
   deleteVolunteerHwp: (id: string) => ipcRenderer.invoke('volunteer:deleteHwp', id),
 

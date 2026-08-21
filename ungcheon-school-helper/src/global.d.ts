@@ -46,7 +46,7 @@ declare global {
       importVolunteerHwp: (filePath: string, allowDuplicate?: boolean) => Promise<import('./services/volunteerWork').StoredVolunteerHwp>
       listVolunteerHwp: () => Promise<import('./services/volunteerWork').StoredVolunteerHwp[]>
       parseVolunteerHwp: (id: string) => Promise<import('./services/volunteerWork').ParsedVolunteerForm[]>
-      updateVolunteerForms: (id: string, forms: import('./services/volunteerWork').ParsedVolunteerForm[]) => Promise<import('./services/volunteerWork').StoredVolunteerHwp>
+      updateVolunteerForms: (id: string, forms: import('./services/volunteerWork').ParsedVolunteerForm[], title?: string) => Promise<import('./services/volunteerWork').StoredVolunteerHwp>
       openVolunteerHwp: (id: string) => Promise<string>
       deleteVolunteerHwp: (id: string) => Promise<import('./services/volunteerWork').StoredVolunteerHwp>
       parseDocument: (filePath: string) => Promise<any>

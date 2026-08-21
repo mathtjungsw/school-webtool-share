@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileCheck2, RefreshCw, RotateCcw, Search, ShieldCheck, Trash2, UserRoundCheck, X } from 'lucide-react'
+import { FileCheck2, Pencil, RefreshCw, RotateCcw, Search, ShieldCheck, Trash2, UserRoundCheck, X } from 'lucide-react'
 import clsx from 'clsx'
 import { getSharedStudentRoster } from '../services/schoolHub'
 import type { SharedStudentRoster, StudentRosterEntry } from '../services/rosterAttendance'
@@ -10,6 +10,7 @@ import {
   volunteerStudentId,
   type CoordinatorVolunteerCertificateDraft,
   type ParsedVolunteerForm,
+  type StoredVolunteerHwp,
 } from '../services/volunteerWork'
 import { useAppStore } from '../stores/appStore'
 
@@ -17,11 +18,12 @@ interface Props {
   open: boolean
   onClose: () => void
   onApplied?: () => void | Promise<void>
+  source?: StoredVolunteerHwp | null
 }
 
 const fieldClass = 'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-bold text-slate-950 outline-none focus:border-emerald-600 dark:border-slate-600 dark:bg-slate-950 dark:text-white'
 
-export default function CoordinatorVolunteerModal({ open, onClose, onApplied }: Props) {
+export default function CoordinatorVolunteerModal({ open, onClose, onApplied, source }: Props) {
   const teacherName = useAppStore(state => state.config.teacherName)
   const [draft, setDraft] = useState<CoordinatorVolunteerCertificateDraft>(() => emptyCoordinatorVolunteerDraft(teacherName))
   const [roster, setRoster] = useState<SharedStudentRoster | null>(null)
@@ -32,6 +34,8 @@ export default function CoordinatorVolunteerModal({ open, onClose, onApplied }: 
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [editingEnabled, setEditingEnabled] = useState(true)
+  const [originalDraft, setOriginalDraft] = useState<CoordinatorVolunteerCertificateDraft | null>(null)
 
   const gradeStudents = useMemo(() => (roster?.students || [])
     .filter(student => student.grade === draft.grade)
@@ -65,9 +69,19 @@ export default function CoordinatorVolunteerModal({ open, onClose, onApplied }: 
 
   useEffect(() => {
     if (!open) return
-    setDraft(current => ({ ...current, confirmTeacher: teacherName || current.confirmTeacher }))
+    const nextDraft = source?.forms?.length
+      ? coordinatorDraftFromStored(source, teacherName)
+      : emptyCoordinatorVolunteerDraft(teacherName)
+    setDraft(nextDraft)
+    setOriginalDraft(source?.forms?.length ? nextDraft : null)
+    setSelectedIds(new Set(nextDraft.students.map(student => volunteerStudentId(student.studentId))))
+    setEditingEnabled(!source)
+    setSearch('')
+    setClassFilter('all')
+    setShowExcluded(false)
+    setMessage('')
     void loadRoster()
-  }, [open])
+  }, [open, source?.id])
 
   async function loadRoster(force = false) {
     setLoading(true)
@@ -116,9 +130,14 @@ export default function CoordinatorVolunteerModal({ open, onClose, onApplied }: 
     setBusy(true)
     try {
       const forms = buildVerificationForms(certificateDraft)
-      await window.electron.storeGeneratedVolunteerForms(draft.documentTitle, forms)
+      if (source) await window.electron.updateVolunteerForms(source.id, forms, draft.documentTitle)
+      else await window.electron.storeGeneratedVolunteerForms(draft.documentTitle, forms)
       await onApplied?.()
-      setMessage(`'${draft.documentTitle}'을 수기 생성한 확인서로 검증 보관함에 바로 반영했습니다. PDF를 만들거나 다시 올릴 필요가 없습니다.`)
+      setOriginalDraft(certificateDraft)
+      setEditingEnabled(false)
+      setMessage(source
+        ? `'${draft.documentTitle}'의 변경 내용을 같은 로컬 확인서에 저장했습니다. 새 항목이 중복 생성되지 않습니다.`
+        : `'${draft.documentTitle}'을 수기 생성한 확인서로 검증 보관함에 바로 반영했습니다. PDF를 만들거나 다시 올릴 필요가 없습니다.`)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error))
     } finally { setBusy(false) }
@@ -128,13 +147,16 @@ export default function CoordinatorVolunteerModal({ open, onClose, onApplied }: 
   return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="봉사활동 확인서 생성 담당자용">
     <div className="flex max-h-[94vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-3xl border border-slate-300 bg-slate-50 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
       <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4 dark:border-slate-700 dark:bg-slate-900">
-        <div><h2 className="flex items-center gap-2 text-xl font-black"><UserRoundCheck className="text-emerald-600" />봉사활동 확인서 생성(담당자용)</h2><p className="mt-1 text-sm font-bold text-slate-600 dark:text-slate-300">스캔 확인서를 눈으로 확인하면서 해당 학년 명렬에서 미참여 학생만 제외한 뒤, 별도 파일 없이 검증 자료에 바로 반영합니다.</p></div>
-        <button type="button" onClick={onClose} className="rounded-xl border border-slate-300 p-2 dark:border-slate-600" aria-label="닫기"><X /></button>
+        <div><h2 className="flex items-center gap-2 text-xl font-black"><UserRoundCheck className="text-emerald-600" />{source ? '담당자용 확인서 내용 보기·수정' : '봉사활동 확인서 생성(담당자용)'}</h2><p className="mt-1 text-sm font-bold text-slate-600 dark:text-slate-300">{source ? '로컬에 보관된 수기 확인서를 미리보고, 필요할 때 같은 항목에 변경 내용을 저장합니다.' : '스캔 확인서를 눈으로 확인하면서 해당 학년 명렬에서 미참여 학생만 제외한 뒤, 별도 파일 없이 검증 자료에 바로 반영합니다.'}</p></div>
+        <div className="flex gap-2">{source && !editingEnabled && <button type="button" onClick={() => setEditingEnabled(true)} className="rounded-xl bg-amber-400 px-4 py-2 text-sm font-black text-slate-950"><Pencil size={15} className="mr-1 inline" />수정하기</button>}<button type="button" onClick={onClose} className="rounded-xl border border-slate-300 p-2 dark:border-slate-600" aria-label="닫기"><X /></button></div>
       </header>
 
       <div className="overflow-y-auto p-5">
         <div className="mb-4 flex items-start gap-2 rounded-2xl border border-blue-300 bg-blue-50 p-4 text-sm font-bold text-blue-950 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-100"><ShieldCheck className="mt-0.5 shrink-0" size={20} /><span>학교 공유 명렬은 처음 불러올 때만 사용합니다. 작성 명단과 반영 자료는 이 PC에서만 처리하며 서버·구글시트·외부 서비스로 전송하지 않습니다. 원본 학생 명렬도 수정하지 않습니다.</span></div>
 
+        {source && !editingEnabled && <div className="mb-4 rounded-xl border border-violet-300 bg-violet-50 p-3 text-sm font-black text-violet-950 dark:border-violet-700 dark:bg-violet-950/50 dark:text-violet-100">현재는 미리보기 상태입니다. 내용을 바꾸려면 상단의 ‘수정하기’를 눌러 주세요.</div>}
+
+        <div className={clsx(source && !editingEnabled && 'pointer-events-none opacity-75')} aria-disabled={Boolean(source && !editingEnabled)}>
         <section className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
             <label className="text-sm font-black xl:col-span-2">확인서 제목 *<input className={`${fieldClass} mt-1.5`} value={draft.documentTitle} onChange={event => setDraft(current => ({ ...current, documentTitle: event.target.value }))} placeholder="예: 2학년 8월 단체봉사활동 확인서" /></label>
@@ -177,14 +199,50 @@ export default function CoordinatorVolunteerModal({ open, onClose, onApplied }: 
             {!displayedStudents.length && <p className="p-8 text-center text-sm font-bold text-slate-600 dark:text-slate-300">{draft.grade ? '현재 조건에 표시할 학생이 없습니다.' : '학년을 선택하면 전체 명렬이 표시됩니다.'}</p>}
           </div>
         </section>
+        </div>
 
         <section className="mt-4 grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 lg:grid-cols-[1fr_auto] dark:border-slate-700 dark:bg-slate-900">
-          <div><h3 className="font-black">반영 전 확인</h3><p className="mt-1 text-sm font-bold text-slate-600 dark:text-slate-300">{draft.documentTitle || '제목 미입력'} · {draft.grade || '-'}학년 · {draft.activityContent || '활동 내용 미입력'} · {draft.startDate || '-'} ~ {draft.endDate || '-'} · {draft.hours || '-'}시간 · 포함 {selectedStudents.length}명 · 제외 {excludedStudents.length}명</p>{errors.length > 0 && <div className="mt-3 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-900 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-100">{errors.slice(0, 5).map(error => <p key={error}>• {error}</p>)}</div>}{message && <p className="mt-3 rounded-xl bg-slate-100 p-3 text-sm font-bold dark:bg-slate-800">{message}</p>}</div>
-          <button type="button" onClick={() => void applyToVerification()} disabled={busy || errors.length > 0} className="self-end rounded-xl bg-emerald-700 px-6 py-3 font-black text-white disabled:opacity-50"><FileCheck2 size={18} className="mr-2 inline" />{busy ? '검증 자료에 반영 중…' : '검증 자료로 바로 반영'}</button>
+          <div><h3 className="font-black">{source ? '저장 전 확인' : '반영 전 확인'}</h3><p className="mt-1 text-sm font-bold text-slate-600 dark:text-slate-300">{draft.documentTitle || '제목 미입력'} · {draft.grade || '-'}학년 · {draft.activityContent || '활동 내용 미입력'} · {draft.startDate || '-'} ~ {draft.endDate || '-'} · {draft.hours || '-'}시간 · 포함 {selectedStudents.length}명 · 제외 {excludedStudents.length}명</p>{source && originalDraft && editingEnabled && <p className="mt-2 rounded-xl bg-amber-50 p-3 text-sm font-black text-amber-950 dark:bg-amber-950/40 dark:text-amber-100">변경 요약: {coordinatorChangeSummary(originalDraft, certificateDraft)}</p>}{errors.length > 0 && <div className="mt-3 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-900 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-100">{errors.slice(0, 5).map(error => <p key={error}>• {error}</p>)}</div>}{message && <p className="mt-3 rounded-xl bg-slate-100 p-3 text-sm font-bold dark:bg-slate-800">{message}</p>}</div>
+          {(!source || editingEnabled) && <button type="button" onClick={() => void applyToVerification()} disabled={busy || errors.length > 0} className="self-end rounded-xl bg-emerald-700 px-6 py-3 font-black text-white disabled:opacity-50"><FileCheck2 size={18} className="mr-2 inline" />{busy ? '저장 중…' : source ? '같은 확인서에 변경 저장' : '검증 자료로 바로 반영'}</button>}
         </section>
       </div>
     </div>
   </div>
+}
+
+function coordinatorDraftFromStored(source: StoredVolunteerHwp, teacherName = ''): CoordinatorVolunteerCertificateDraft {
+  const forms = source.forms || []
+  const first = forms[0]
+  const students = forms.flatMap(form => form.participants).map(student => createVolunteerRow({
+    studentId: volunteerStudentId(student.studentId),
+    name: student.name,
+    hours: student.hours ?? '',
+    remarks: student.remarks || '',
+  }))
+  return {
+    documentTitle: source.originalName.replace(/\s*·\s*수기 생성한 확인서\s*$/, ''),
+    activityContent: first?.activityContent || first?.activityName || '',
+    startDate: first?.startDate || '',
+    endDate: first?.endDate || first?.startDate || '',
+    grade: volunteerStudentId(students[0]?.studentId || '').slice(0, 1),
+    hours: students[0]?.hours ?? '',
+    confirmTeacher: first?.confirmTeacher || teacherName,
+    schoolName: first?.institution || '웅천고등학교',
+    students,
+  }
+}
+
+function coordinatorChangeSummary(before: CoordinatorVolunteerCertificateDraft, after: CoordinatorVolunteerCertificateDraft) {
+  const changes: string[] = []
+  if (before.documentTitle !== after.documentTitle) changes.push('제목')
+  if (before.activityContent !== after.activityContent) changes.push('활동 내용')
+  if (before.startDate !== after.startDate || before.endDate !== after.endDate) changes.push('기간')
+  if (String(before.hours) !== String(after.hours)) changes.push('시간')
+  if (before.grade !== after.grade) changes.push('학년')
+  const beforeIds = before.students.map(student => volunteerStudentId(student.studentId)).sort().join(',')
+  const afterIds = after.students.map(student => volunteerStudentId(student.studentId)).sort().join(',')
+  if (beforeIds !== afterIds) changes.push(`참여 명단(${before.students.length}명 → ${after.students.length}명)`)
+  return changes.length ? changes.join(' · ') : '아직 바뀐 내용이 없습니다.'
 }
 
 function buildVerificationForms(draft: CoordinatorVolunteerCertificateDraft): ParsedVolunteerForm[] {

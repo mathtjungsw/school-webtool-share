@@ -275,9 +275,10 @@ ipcMain.handle('volunteer:parseHwp', (_, id: string) => {
   const resolved = resolveVolunteerHwpPath(String(id))
   return resolved.item.forms || parseVolunteerHwpFile(resolved.path)
 })
-ipcMain.handle('volunteer:updateForms', (_, id: string, forms: unknown) => {
+ipcMain.handle('volunteer:updateForms', (_, id: string, forms: unknown, title?: string) => {
   if (!Array.isArray(forms) || JSON.stringify(forms).length > 2_000_000) throw new Error('OCR 수정 내용이 올바르지 않습니다.')
-  return updateVolunteerDocumentForms(String(id), forms as any)
+  if (title != null && String(title).length > 200) throw new Error('확인서 제목이 너무 깁니다.')
+  return updateVolunteerDocumentForms(String(id), forms as any, title == null ? undefined : String(title))
 })
 ipcMain.handle('volunteer:openHwp', (_, id: string) => shell.openPath(resolveVolunteerHwpPath(String(id)).path))
 ipcMain.handle('volunteer:deleteHwp', (_, id: string) => deleteVolunteerHwpFile(String(id)))

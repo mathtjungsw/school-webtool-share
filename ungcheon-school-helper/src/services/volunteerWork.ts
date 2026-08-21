@@ -124,6 +124,46 @@ export interface VolunteerRosterComparisonResult {
   duplicates: VolunteerRosterDuplicate[]
 }
 
+export interface VolunteerDateRange {
+  startDate: string
+  endDate: string
+}
+
+/** 점·슬래시·한글 날짜와 단일 날짜/동일일 범위를 같은 값으로 정규화한다. */
+export function normalizeVolunteerDateRange(startValue: string, endValue = ''): VolunteerDateRange {
+  const startDates = extractVolunteerDates(startValue)
+  const endDates = extractVolunteerDates(endValue)
+  const startDate = startDates[0] || endDates[0] || ''
+  const endDate = endDates.at(-1) || startDates.at(-1) || startDate
+  return { startDate, endDate }
+}
+
+export function volunteerDateRangesMatch(
+  aStart: string,
+  aEnd: string,
+  bStart: string,
+  bEnd: string,
+) {
+  const a = normalizeVolunteerDateRange(aStart, aEnd)
+  const b = normalizeVolunteerDateRange(bStart, bEnd)
+  // OCR 등으로 한쪽 날짜를 읽지 못한 경우에는 기존의 내용·시간 판정을 유지한다.
+  if (!a.startDate || !b.startDate) return true
+  return a.startDate === b.startDate && a.endDate === b.endDate
+}
+
+function extractVolunteerDates(value: string) {
+  const text = String(value || '').trim()
+  const values: string[] = []
+  const pattern = /(20\d{2})\s*(?:년|[.\/-])\s*(\d{1,2})\s*(?:월|[.\/-])\s*(\d{1,2})\s*(?:일|\.)?/g
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(text))) {
+    const month = Number(match[2])
+    const day = Number(match[3])
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) values.push(`${match[1]}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
+  }
+  return values
+}
+
 export interface ParsedVolunteerParticipant {
   studentId: string
   name: string
@@ -435,8 +475,7 @@ export function validateVolunteerForms(forms: ParsedVolunteerForm[], neis: NeisV
       const neisEndDate = endDates.at(-1) || ''
       const institutions = [...new Set(candidates.map(record => record.institution).filter(Boolean))]
       if (student.hours != null && neisHours !== student.hours) issues.push(issue('error', 'hours', studentId, student.name, '동일 활동의 나이스 시수 합계와 확인서 시수가 서로 다릅니다.', `${student.hours}시간`, neisHours == null ? '빈칸' : `${neisHours}시간`))
-      if (form.startDate && neisStartDate && form.startDate !== neisStartDate) issues.push(issue('warning', 'date', studentId, student.name, '활동 시작일이 서로 다릅니다.', form.startDate, neisStartDate))
-      if (form.endDate && neisEndDate && form.endDate !== neisEndDate) issues.push(issue('warning', 'date', studentId, student.name, '활동 종료일이 서로 다릅니다.', form.endDate, neisEndDate))
+      if (form.startDate && neisStartDate && !volunteerDateRangesMatch(form.startDate, form.endDate, neisStartDate, neisEndDate)) issues.push(issue('warning', 'date', studentId, student.name, '활동 기간이 서로 다릅니다.', [form.startDate, form.endDate].filter(Boolean).join(' ~ '), [neisStartDate, neisEndDate].filter(Boolean).join(' ~ ')))
       if (form.institution && institutions.length && !institutions.some(institution => textMatches(form.institution, institution))) issues.push(issue('warning', 'institution', studentId, student.name, '활동 기관·장소 표기가 서로 다릅니다.', form.institution, institutions.join(' / ')))
     })
     const formIds = new Set(form.participants.map(student => volunteerStudentId(student.studentId)))
@@ -468,8 +507,7 @@ export function compareVolunteerRosterSources(
     studentId: volunteerStudentId(record.studentId),
     name: record.name.trim(),
     activity: record.activityContent.trim(),
-    startDate: record.startDate,
-    endDate: record.endDate,
+    ...normalizeVolunteerDateRange(record.startDate, record.endDate),
     hours: record.hours,
     duplicateCount: 1,
   })))
@@ -482,8 +520,7 @@ export function compareVolunteerRosterSources(
     studentId: volunteerStudentId(participant.studentId),
     name: participant.name.trim(),
     activity: (form.activityContent || form.activityName).trim(),
-    startDate: form.startDate,
-    endDate: form.endDate,
+    ...normalizeVolunteerDateRange(form.startDate, form.endDate),
     hours: participant.hours,
     duplicateCount: 1,
     correctionNote: participant.correctionNote,
@@ -575,8 +612,8 @@ function markDuplicateVolunteerEntries(entries: VolunteerRosterEntry[], source: 
     entry.studentId,
     normalize(entry.name),
     normalizeMeaningful(entry.activity),
-    entry.startDate,
-    entry.endDate,
+    normalizeVolunteerDateRange(entry.startDate, entry.endDate).startDate,
+    normalizeVolunteerDateRange(entry.startDate, entry.endDate).endDate,
     entry.hours ?? '',
   ].join('|'))
   return [...grouped.values()].filter(group => group.length > 1).map(group => {
@@ -642,7 +679,9 @@ function matchVolunteerStudentActivities(
 }
 
 function volunteerActivitiesMatch(a: VolunteerRosterEntry, b: VolunteerRosterEntry) {
-  return volunteerActivityContentMatches(a.activity, b.activity) && volunteerHoursMatch(a.hours, b.hours)
+  return volunteerActivityContentMatches(a.activity, b.activity)
+    && volunteerHoursMatch(a.hours, b.hours)
+    && volunteerDateRangesMatch(a.startDate, a.endDate, b.startDate, b.endDate)
 }
 
 function volunteerActivityContentMatches(a: string, b: string) {
@@ -659,7 +698,9 @@ function volunteerHoursMatch(a: number | null, b: number | null) {
 function volunteerActivityMatchScore(a: VolunteerRosterEntry, b: VolunteerRosterEntry) {
   const x = normalizeMeaningful(a.activity)
   const y = normalizeMeaningful(b.activity)
-  return (x === y ? 100 : 60) + (volunteerHoursMatch(a.hours, b.hours) ? 20 : 0)
+  return (x === y ? 100 : 60)
+    + (volunteerHoursMatch(a.hours, b.hours) ? 20 : 0)
+    + (volunteerDateRangesMatch(a.startDate, a.endDate, b.startDate, b.endDate) ? 10 : 0)
 }
 
 function unmatchedActivityMessage(entry: VolunteerRosterEntry, opposite: VolunteerRosterEntry[], side: 'neis' | 'hwp') {
@@ -667,7 +708,18 @@ function unmatchedActivityMessage(entry: VolunteerRosterEntry, opposite: Volunte
   if (sameContent && !volunteerHoursMatch(entry.hours, sameContent.hours)) {
     return `상대 자료에 같은 내용이 있으나 시간이 다릅니다. 나이스 ${side === 'neis' ? hoursText(entry.hours) : hoursText(sameContent.hours)} / 확인서 ${side === 'hwp' ? hoursText(entry.hours) : hoursText(sameContent.hours)}`
   }
+  if (sameContent && volunteerHoursMatch(entry.hours, sameContent.hours)
+    && !volunteerDateRangesMatch(entry.startDate, entry.endDate, sameContent.startDate, sameContent.endDate)) {
+    const neisPeriod = side === 'neis' ? periodText(entry) : periodText(sameContent)
+    const hwpPeriod = side === 'hwp' ? periodText(entry) : periodText(sameContent)
+    return `상대 자료에 같은 내용과 시간이 있으나 기간이 다릅니다. 나이스 ${neisPeriod} / 확인서 ${hwpPeriod}`
+  }
   return side === 'neis' ? '나이스에만 있는 활동입니다.' : '확인서에만 있는 활동입니다.'
+}
+
+function periodText(entry: VolunteerRosterEntry) {
+  const range = normalizeVolunteerDateRange(entry.startDate, entry.endDate)
+  return range.startDate === range.endDate ? range.startDate : `${range.startDate}~${range.endDate}`
 }
 
 function hoursText(hours: number | null) {

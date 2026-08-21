@@ -131,15 +131,28 @@ export function resolveVolunteerHwpPath(id: string) {
   return { item, path: target }
 }
 
-export function updateVolunteerDocumentForms(id: string, forms: ParsedVolunteerForm[]) {
+export function updateVolunteerDocumentForms(id: string, forms: ParsedVolunteerForm[], title?: string) {
   const items = readManifest()
   const index = items.findIndex(item => item.id === id)
   if (index < 0) throw new Error('보관된 확인서 파일을 찾지 못했습니다.')
+  const current = items[index]
+  const generatedBytes = current.fileType === 'generated'
+    ? Buffer.from(JSON.stringify(forms, null, 2), 'utf8')
+    : null
+  const cleanTitle = String(title || '').trim()
+  if (current.fileType === 'generated' && generatedBytes) {
+    writeFileSync(join(vaultDirectory(), current.storedName), generatedBytes)
+  }
   items[index] = {
-    ...items[index],
+    ...current,
+    originalName: current.fileType === 'generated' && cleanTitle
+      ? `${cleanTitle.replace(/[\\/:*?"<>|]/g, '_')} · 수기 생성한 확인서`
+      : current.originalName,
     forms,
     formCount: forms.length,
     activities: [...new Set(forms.map(form => form.activityContent || form.activityName).filter(Boolean))],
+    size: generatedBytes?.length ?? current.size,
+    sha256: generatedBytes ? createHash('sha256').update(generatedBytes).digest('hex') : current.sha256,
     warnings: [],
   }
   writeManifest(items)
