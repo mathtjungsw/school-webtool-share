@@ -18,6 +18,7 @@ import clsx from 'clsx'
 import { useAppStore } from '../stores/appStore'
 import { useAdminStore } from '../stores/adminStore'
 import schoolLogo from '../assets/ungcheon-logo.png'
+import { isSidebarExpanded, normalizeSidebarExpandedPinned, SIDEBAR_EXPANDED_PINNED_KEY } from '../services/sidebarPreferences'
 
 interface NavItem {
   id: string
@@ -118,7 +119,8 @@ export default function Sidebar({
   onOpenLog: () => void
   logErrorCount: number
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const [expandedPinned, setExpandedPinned] = useState(true)
   const [editing, setEditing] = useState(false)
   const [menuOrder, setMenuOrder] = useState(DEFAULT_ORDER)
   const [pinnedMenus, setPinnedMenus] = useState<string[]>([])
@@ -126,17 +128,19 @@ export default function Sidebar({
   const config = useAppStore(s => s.config)
   const isAdmin = useAdminStore(s => s.isAdmin)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
-  const isExpanded = expanded || editing
+  const isExpanded = isSidebarExpanded(expandedPinned, hovered, editing)
 
   const loadPreferences = useCallback(() => {
     void Promise.all([
       window.electron?.configGet('sidebar.menuOrder'),
       window.electron?.configGet(SIDEBAR_PINNED_KEY),
       window.electron?.configGet(SIDEBAR_HIDDEN_KEY),
-    ]).then(([order, pinned, hidden]) => {
+      window.electron?.configGet(SIDEBAR_EXPANDED_PINNED_KEY),
+    ]).then(([order, pinned, hidden, expandedPin]) => {
       setMenuOrder(normalizeOrder(order))
       setPinnedMenus(Array.isArray(pinned) ? pinned.map(String).filter(id => NAV_BY_ID.has(id)) : [])
       setHiddenMenus(Array.isArray(hidden) ? hidden.map(String).filter(id => NAV_BY_ID.has(id) && id !== 'settings') : [])
+      setExpandedPinned(normalizeSidebarExpandedPinned(expandedPin))
     })
   }, [])
 
@@ -159,6 +163,14 @@ export default function Sidebar({
   const saveOrder = (next: string[]) => {
     setMenuOrder(next)
     void window.electron?.configSet('sidebar.menuOrder', next)
+  }
+
+  const toggleExpandedPinned = () => {
+    setExpandedPinned(current => {
+      const next = !current
+      void window.electron?.configSet(SIDEBAR_EXPANDED_PINNED_KEY, next)
+      return next
+    })
   }
 
   const togglePinned = (id: string) => {
@@ -191,8 +203,8 @@ export default function Sidebar({
     <motion.aside
       animate={{ width: isExpanded ? 226 : 58 }}
       transition={{ duration: 0.22 }}
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => { if (!editing) setExpanded(false) }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       className="app-sidebar h-full bg-surface-950 border-r flex flex-col flex-shrink-0 overflow-hidden z-20"
     >
       <div className="h-14 px-3 flex items-center border-b border-white/5">
@@ -201,12 +213,24 @@ export default function Sidebar({
         </div>
         <AnimatePresence>
           {isExpanded && (
-            <motion.div initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="ml-2.5 min-w-0">
+            <motion.div initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="ml-2.5 min-w-0 flex-1">
               <p className="text-xs font-bold text-white whitespace-nowrap">웅천고등학교</p>
               <p className="text-[10px] text-slate-500 truncate">{config.teacherName || '교직원 업무지원'}</p>
             </motion.div>
           )}
         </AnimatePresence>
+        {isExpanded && <button
+          type="button"
+          onClick={toggleExpandedPinned}
+          title={expandedPinned ? '메뉴 자동 접힘으로 전환' : '메뉴 펼침 고정'}
+          aria-label={expandedPinned ? '메뉴 펼침 고정 해제' : '메뉴 펼침 고정'}
+          aria-pressed={expandedPinned}
+          className={clsx('ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg border transition-colors', expandedPinned
+            ? 'border-amber-400/40 bg-amber-400/15 text-amber-300 hover:bg-amber-400/25'
+            : 'border-white/10 text-slate-500 hover:bg-white/10 hover:text-slate-200')}
+        >
+          {expandedPinned ? <Pin size={15} /> : <PinOff size={15} />}
+        </button>}
       </div>
 
       {isExpanded && (

@@ -54,6 +54,13 @@ import {
   classifySharedWorkDeadline, isNewSharedWork, isSharedWorkComplete,
   loadSharedWorkLastViewedAt, subscribeSharedWorkViewed,
 } from '../services/sharedWorkNotifications'
+import {
+  DASHBOARD_TASK_STATUS_VISIBILITY_KEY,
+  DEFAULT_DASHBOARD_TASK_STATUS_VISIBILITY,
+  isDashboardTaskVisible,
+  normalizeDashboardTaskStatusVisibility,
+  type DashboardTaskStatusVisibility,
+} from '../services/dashboardTaskVisibility'
 import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
 import {
   getSpecialTimetableDay, getTimetableDayIndex, getTimetableSourceDate,
@@ -303,6 +310,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const [currentTime, setCurrentTime] = useState(new Date())
   const showNeis = config.showNeisSchedule === true
   const [scheduleSourceVisibility, setScheduleSourceVisibility] = useState<DashboardSourceVisibility>(DEFAULT_DASHBOARD_SOURCE_VISIBILITY)
+  const [taskStatusVisibility, setTaskStatusVisibility] = useState<DashboardTaskStatusVisibility>(DEFAULT_DASHBOARD_TASK_STATUS_VISIBILITY)
 
   useEffect(() => {
     window.electron?.configGet('dashboard.scheduleSources.v1').then(saved => {
@@ -312,6 +320,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
         ...(saved as Partial<DashboardSourceVisibility>),
       })
     }).catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    window.electron?.configGet(DASHBOARD_TASK_STATUS_VISIBILITY_KEY)
+      .then(saved => setTaskStatusVisibility(normalizeDashboardTaskStatusVisibility(saved)))
+      .catch(() => setTaskStatusVisibility({ ...DEFAULT_DASHBOARD_TASK_STATUS_VISIBILITY }))
   }, [])
 
   useEffect(() => {
@@ -327,6 +341,14 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     setScheduleSourceVisibility(current => {
       const next = { ...current, [source]: visible }
       void window.electron?.configSet('dashboard.scheduleSources.v1', next)
+      return next
+    })
+  }, [])
+
+  const toggleTaskStatus = useCallback((status: keyof DashboardTaskStatusVisibility, visible: boolean) => {
+    setTaskStatusVisibility(current => {
+      const next = { ...current, [status]: visible }
+      void window.electron?.configSet(DASHBOARD_TASK_STATUS_VISIBILITY_KEY, next)
       return next
     })
   }, [])
@@ -687,9 +709,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       eventName: task.title,
       department: task.departmentNames.length ? task.departmentNames.join('·') : '공유 업무',
       source: 'sharedWork' as const,
-      completed: task.status === 'completed' || task.closed || task.items.every(item =>
-        task.responses.find(response => response.teacherName === config.teacherName?.trim())?.checkedItemIds.includes(item.id),
-      ),
+      completed: isSharedWorkComplete(task, config.teacherName?.trim() ?? ''),
       taskId: task.id,
     })),
     ...personalTasks.filter(task => task.showOnCalendar !== false).map(task => ({
@@ -713,9 +733,10 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       source: 'pulledLesson' as const,
     })),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.eventName.localeCompare(b.eventName))
-  const combinedSchedule = allCombinedSchedule.filter(event => event.source === 'neis'
+  const combinedSchedule = allCombinedSchedule.filter(event => (event.source === 'neis'
     ? showNeis
     : scheduleSourceVisibility[event.source])
+    && isDashboardTaskVisible(event.source, event.completed, taskStatusVisibility))
   const upcomingCommitteeEvents = committeeEvents
     .filter(item => item.date >= todayStr() && item.date <= format(addDays(new Date(), 7), 'yyyy-MM-dd'))
     .sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`))
@@ -891,6 +912,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                     onToggleNeis={value => void saveConfig({ showNeisSchedule: value })}
                     sourceVisibility={scheduleSourceVisibility}
                     onToggleSource={toggleScheduleSource}
+                    taskStatusVisibility={taskStatusVisibility}
+                    onToggleTaskStatus={toggleTaskStatus}
                     creativeScheduleError={creativeScheduleError}
                   />
                 )}
@@ -1117,6 +1140,8 @@ function TwoWeekScheduleCalendar({
   onToggleNeis,
   sourceVisibility,
   onToggleSource,
+  taskStatusVisibility,
+  onToggleTaskStatus,
   creativeScheduleError,
 }: {
   selectedDate: string
@@ -1134,6 +1159,8 @@ function TwoWeekScheduleCalendar({
   onToggleNeis: (value: boolean) => void
   sourceVisibility: DashboardSourceVisibility
   onToggleSource: (source: keyof DashboardSourceVisibility, visible: boolean) => void
+  taskStatusVisibility: DashboardTaskStatusVisibility
+  onToggleTaskStatus: (status: keyof DashboardTaskStatusVisibility, visible: boolean) => void
   creativeScheduleError: string
 }) {
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 })
@@ -1202,6 +1229,8 @@ function TwoWeekScheduleCalendar({
           <ScheduleSourceToggle label="내 위원회" checked={sourceVisibility.committee} dot="bg-amber-400" tone="text-amber-300" onChange={value => onToggleSource('committee', value)} />
           <ScheduleSourceToggle label="공유 업무" checked={sourceVisibility.sharedWork} dot="bg-fuchsia-400" tone="text-fuchsia-300" onChange={value => onToggleSource('sharedWork', value)} />
           <ScheduleSourceToggle label="개인 업무" checked={sourceVisibility.personal} dot="bg-emerald-400" tone="text-emerald-300" onChange={value => onToggleSource('personal', value)} />
+          <ScheduleSourceToggle label="미완료 업무" checked={taskStatusVisibility.incomplete} dot="bg-amber-400" tone="text-amber-300" onChange={value => onToggleTaskStatus('incomplete', value)} />
+          <ScheduleSourceToggle label="완료 업무" checked={taskStatusVisibility.completed} dot="bg-slate-400" tone="text-slate-300" onChange={value => onToggleTaskStatus('completed', value)} />
           <ScheduleSourceToggle label="등교지도" checked={sourceVisibility.gateDuty} dot="bg-cyan-500" onChange={value => onToggleSource('gateDuty', value)} />
           <ScheduleSourceToggle label="급식지도" checked={sourceVisibility.mealDuty} dot="bg-orange-500" onChange={value => onToggleSource('mealDuty', value)} />
           <ScheduleSourceToggle label="수업변경" checked={sourceVisibility.timetableChange} dot="bg-fuchsia-400" tone="text-fuchsia-300" onChange={value => onToggleSource('timetableChange', value)} />

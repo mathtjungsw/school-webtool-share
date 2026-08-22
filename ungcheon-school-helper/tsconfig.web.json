@@ -76,6 +76,8 @@
     "src/services/schoolInfo.ts",
     "src/services/schoolInfoCandidates.ts",
     "src/services/sharedWorkNotifications.ts",
+    "src/services/dashboardTaskVisibility.ts",
+    "src/services/sidebarPreferences.ts",
     "src/services/schoolTimetable.ts",
     "src/services/timetablePlan.ts",
     "src/services/timetablePlanDocument.ts",
