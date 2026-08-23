@@ -13,6 +13,7 @@ import {
 import { ko } from 'date-fns/locale'
 import { useAdminStore } from '../stores/adminStore'
 import { useAppStore } from '../stores/appStore'
+import { VirtualizedTable, type VirtualizedTableColumn } from '../components/virtualization'
 import {
   addStaffChecklist,
   deleteStaffChecklist,
@@ -543,9 +544,52 @@ function RosterTab({
       const list = rosterListRef.current
       if (!list) return
       list.scrollTop = list.scrollHeight
-      list.querySelector<HTMLInputElement>(`[data-member-id="${id}"] input[data-field="name"]`)?.focus()
+      list.querySelector<HTMLInputElement>(`[data-row-key="${id}"] input[data-field="name"]`)?.focus()
     }))
   }
+
+  const rosterColumns: VirtualizedTableColumn<StaffMember>[] = [
+    {
+      key: 'order', header: '순번', width: 70, align: 'center', sticky: true,
+      render: (_member, index) => <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{index + 1}</span>,
+    },
+    {
+      key: 'position', header: '직책', width: 120,
+      render: member => isAdmin
+        ? <input className="input-field w-full py-1.5 text-xs" value={member.position} onChange={event => update(member.id, { position: event.target.value })} />
+        : <span className="truncate text-xs text-slate-700 dark:text-slate-300">{member.position}</span>,
+    },
+    {
+      key: 'name', header: '성명', width: 140,
+      render: member => isAdmin
+        ? <input data-field="name" className="input-field w-full py-1.5 text-xs" value={member.name} onChange={event => update(member.id, { name: event.target.value })} />
+        : <span className="truncate text-sm font-black text-slate-950 dark:text-white">{member.name}</span>,
+    },
+    {
+      key: 'department', header: '부서', width: 200,
+      render: member => isAdmin
+        ? <input className="input-field w-full py-1.5 text-xs" placeholder="부서(업무 배부에 사용)" value={member.department ?? ''} onChange={event => update(member.id, { department: event.target.value })} />
+        : <span className="truncate text-xs text-slate-700 dark:text-slate-300">{member.department || '-'}</span>,
+    },
+    {
+      key: 'subject', header: '교과', width: 170,
+      render: member => isAdmin
+        ? <input className="input-field w-full py-1.5 text-xs" placeholder="담당 교과" value={member.subject ?? ''} onChange={event => update(member.id, { subject: event.target.value })} />
+        : <span className="truncate text-xs text-slate-700 dark:text-slate-300">{member.subject || '-'}</span>,
+    },
+    {
+      key: 'homeroom', header: '담임', width: 140,
+      render: member => isAdmin
+        ? <input className="input-field w-full py-1.5 text-xs" placeholder="예: 1-1" value={member.homeroom ?? ''} onChange={event => update(member.id, { homeroom: event.target.value })} />
+        : <span className="truncate text-xs text-slate-700 dark:text-slate-300">{member.homeroom || '-'}</span>,
+    },
+    {
+      key: 'actions', header: '', width: 56, align: 'center',
+      render: member => isAdmin
+        ? <button aria-label={`${member.name || '교직원'} 삭제`} onClick={() => setDraft(current => current.filter(item => item.id !== member.id))} className="btn-ghost p-2 text-rose-600 dark:text-rose-300"><Trash2 size={13} /></button>
+        : null,
+    },
+  ]
 
   return (
     <div className="space-y-4">
@@ -569,43 +613,22 @@ function RosterTab({
         </div>
       )}
 
-      <div className="card overflow-x-auto p-0">
-        <div className="min-w-[980px]">
-        <div className="grid grid-cols-[54px_100px_120px_180px_150px_120px_42px] gap-2 px-4 py-2.5 bg-white/5 text-[10px] font-semibold text-slate-500">
-          <span>순번</span><span>직책</span><span>성명</span><span>부서</span><span>교과</span><span>담임</span><span></span>
-        </div>
-        <div ref={rosterListRef} className="max-h-[620px] overflow-y-auto">
-          {draft.map((member, index) => (
-            <div key={member.id} data-member-id={member.id} className="grid grid-cols-[54px_100px_120px_180px_150px_120px_42px] gap-2 items-center px-4 py-2 border-t border-white/5">
-              <span className="text-xs text-slate-600">{index + 1}</span>
-              {isAdmin
-                ? <input className="input-field py-1.5 text-xs" value={member.position} onChange={event => update(member.id, { position: event.target.value })} />
-                : <span className="text-xs text-slate-400">{member.position}</span>}
-              {isAdmin
-                ? <input data-field="name" className="input-field py-1.5 text-xs" value={member.name} onChange={event => update(member.id, { name: event.target.value })} />
-                : <span className="text-sm font-semibold text-slate-200">{member.name}</span>}
-              {isAdmin
-                ? <input className="input-field py-1.5 text-xs" placeholder="부서(업무 배부에 사용)" value={member.department ?? ''} onChange={event => update(member.id, { department: event.target.value })} />
-                : <span className="text-xs text-slate-500">{member.department || '-'}</span>}
-              {isAdmin
-                ? <input className="input-field py-1.5 text-xs" placeholder="담당 교과" value={member.subject ?? ''} onChange={event => update(member.id, { subject: event.target.value })} />
-                : <span className="text-xs text-slate-500">{member.subject || '-'}</span>}
-              {isAdmin
-                ? <input className="input-field py-1.5 text-xs" placeholder="예: 1-1" value={member.homeroom ?? ''} onChange={event => update(member.id, { homeroom: event.target.value })} />
-                : <span className="text-xs text-slate-500">{member.homeroom || '-'}</span>}
-              {isAdmin
-                ? <button onClick={() => setDraft(current => current.filter(item => item.id !== member.id))} className="btn-ghost p-2 text-rose-400"><Trash2 size={13} /></button>
-                : <span />}
-            </div>
-          ))}
-          {!draft.length && <p className="py-14 text-center text-sm text-slate-500">등록된 교직원이 없습니다.</p>}
-        </div>
+      <div className="card overflow-hidden p-0">
+        <VirtualizedTable
+          items={draft}
+          columns={rosterColumns}
+          getRowKey={member => member.id}
+          height={620}
+          rowHeight={54}
+          scrollRef={rosterListRef}
+          ariaLabel="공유 교직원 명렬"
+          emptyContent={<p className="text-sm font-bold text-slate-600 dark:text-slate-300">등록된 교직원이 없습니다.</p>}
+        />
         {isAdmin && (
-          <div className="border-t border-white/5 p-3">
+          <div className="border-t border-slate-200 p-3 dark:border-slate-800">
             <button onClick={addMember} className="btn-ghost flex items-center gap-1.5"><Plus size={13} />교직원 명렬 추가</button>
           </div>
         )}
-        </div>
       </div>
     </div>
   )

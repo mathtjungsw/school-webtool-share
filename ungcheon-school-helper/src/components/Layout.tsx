@@ -45,6 +45,8 @@ const StudentIdentityAuditPage = lazy(() => import('../pages/StudentIdentityAudi
 const SubjectRemarksPrintPage = lazy(() => import('../pages/SubjectRemarksPrintPage'))
 const AdminCenterPage = lazy(() => import('../pages/AdminCenterPage'))
 const VolunteerWorkPage = lazy(() => import('../pages/VolunteerWorkPage'))
+// 시험 기능은 번들에 포함해 검증하되 사이드바·검색 메뉴에는 노출하지 않습니다.
+const FutureOperationsPage = lazy(() => import('../features/futureOperations/FutureOperationsPage'))
 
 const PAGES: Record<string, React.ComponentType> = {
   neis: NeisPage,
@@ -82,6 +84,7 @@ const PAGES: Record<string, React.ComponentType> = {
   subject_remarks_print: SubjectRemarksPrintPage,
   admin_center: AdminCenterPage,
   volunteer_work: VolunteerWorkPage,
+  future_operations: FutureOperationsPage,
 }
 
 const MAX_HISTORY = 40

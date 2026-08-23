@@ -1,13 +1,13 @@
 {
   "name": "ungcheon-school-helper",
-  "version": "1.1.16",
+  "version": "1.1.17-preview.1",
   "description": "웅천고등학교 교직원을 위한 통합 업무 지원 프로그램",
   "main": "out/main/index.js",
   "author": "웅천고등학교",
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",
-    "typecheck": "node scripts/check-work-assistant-coverage.cjs && node scripts/check-timetable-change-actions.cjs && tsc -p tsconfig.node.json --noEmit --pretty false && tsc -p tsconfig.web.json --noEmit --pretty false",
+    "typecheck": "node scripts/check-work-assistant-coverage.cjs && node scripts/check-hidden-future-features.cjs && node scripts/check-theme-contrast.cjs && node scripts/check-timetable-change-actions.cjs && tsc -p tsconfig.node.json --noEmit --pretty false && tsc -p tsconfig.web.json --noEmit --pretty false",
     "build": "electron-vite build",
     "deploy:apps-script": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-apps-script.ps1",
     "package": "npm run build && electron-builder --win --dir && node scripts/package-windows.cjs && electron-builder --win nsis --prepackaged release/win-unpacked",

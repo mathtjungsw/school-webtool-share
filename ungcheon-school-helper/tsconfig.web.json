@@ -19,6 +19,8 @@
     "src/types/**/*",
     "src/stores/**/*",
     "src/components/**/*",
+    "src/config/**/*",
+    "src/features/**/*",
     "src/utils/**/*",
     "src/data/weatherCoords.ts",
     "src/data/recommendedSubjects.ts",
@@ -103,6 +105,7 @@
     "src/services/insa/**/*",
     "src/services/workReducer/**/*",
     "src/services/photoLedger.ts",
+    "src/services/printing/**/*",
     "src/services/fileParser/**/*"
   ]
 }

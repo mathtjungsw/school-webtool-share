@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import CoordinatorVolunteerModal from '../components/CoordinatorVolunteerModal'
+import { VirtualizedTable, type VirtualizedTableColumn } from '../components/virtualization'
 import { useAppStore } from '../stores/appStore'
 import { getSharedStudentRoster } from '../services/schoolHub'
 import type { SharedStudentRoster } from '../services/rosterAttendance'
@@ -780,6 +781,45 @@ function VerificationTab() {
     if (selectedClass === 'unclassified') return comparison.unclassified
     return comparison.rows.filter(row => selectedClass === 'all' || `${row.grade}-${row.className}` === selectedClass)
   }, [comparison, selectedClass])
+  const comparisonColumns: VirtualizedTableColumn<VolunteerRosterComparisonRow>[] = [
+    {
+      key: 'status', header: '상태', width: 92, sticky: true,
+      render: row => <ComparisonStatusCell row={row} manualDecision={manualDecisions[manualDecisionKey(row)]} />,
+    },
+    {
+      key: 'studentId', header: '학번', width: 72, align: 'center', sticky: true,
+      render: row => <span className="font-black">{row.studentId || '-'}</span>,
+    },
+    {
+      key: 'name', header: '이름', width: 82, align: 'center', sticky: true,
+      render: row => <span className="truncate font-bold" title={row.displayName}>{row.displayName}</span>,
+    },
+    { key: 'neisContent', header: '나이스 활동 내용', width: 180, render: row => <ActivitySideValue side={row.neis} field="content" /> },
+    { key: 'neisDate', header: '기간', width: 126, align: 'center', render: row => <ActivitySideValue side={row.neis} field="date" /> },
+    { key: 'neisHours', header: '시간', width: 64, align: 'center', render: row => <ActivitySideValue side={row.neis} field="hours" /> },
+    { key: 'hwpContent', header: '확인서 활동 내용', width: 180, render: row => <ActivitySideValue side={row.hwp} field="content" /> },
+    { key: 'hwpDate', header: '기간', width: 126, align: 'center', render: row => <ActivitySideValue side={row.hwp} field="date" /> },
+    { key: 'hwpHours', header: '시간', width: 64, align: 'center', render: row => <ActivitySideValue side={row.hwp} field="hours" /> },
+    {
+      key: 'decision', header: '판정·수정', width: 330,
+      render: row => {
+        const suggestedName = rosterById.get(row.studentId)?.name || ''
+        const sameName = rosterByName.get(row.displayName.replace(/\s+/g, '')) || []
+        const suggestedId = sameName.length === 1 ? volunteerStudentId(sameName[0].studentId) : ''
+        const decisionKey = manualDecisionKey(row)
+        return <ComparisonDecisionCell
+          row={row}
+          manualDecision={manualDecisions[decisionKey]}
+          onManualDecision={decision => setManualDecisions(current => decision
+            ? { ...current, [decisionKey]: decision }
+            : Object.fromEntries(Object.entries(current).filter(([id]) => id !== decisionKey)))}
+          suggestedName={suggestedName}
+          suggestedId={suggestedId}
+          onCorrect={(studentId, name, correction) => void correctUnclassified(row, studentId, name, correction)}
+        />
+      },
+    },
+  ]
 
   return (
     <div className="space-y-5">
@@ -826,14 +866,18 @@ function VerificationTab() {
         <div className="mt-5 flex flex-wrap gap-2"><button onClick={() => setSelectedClass('all')} className={classFilterClass(selectedClass === 'all')}>전체 {comparison.rows.length}행</button>{classOptions.map(className => <button key={className} onClick={() => setSelectedClass(className)} className={classFilterClass(selectedClass === className)}>{className}반 {comparison.rows.filter(row => `${row.grade}-${row.className}` === className).length}행</button>)}<button onClick={() => setSelectedClass('unclassified')} className={classFilterClass(selectedClass === 'unclassified', true)}>미분류 {comparison.unclassified.length}행</button></div>
         {selectedClass === 'unclassified' && <div className="mt-4 rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-bold text-rose-950 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-100">미분류에는 확인서에 사람이 잘못 입력한 것으로 보이는 학번·이름이 모입니다. 나이스 자료는 신뢰하고 별도의 명렬 검사를 하지 않습니다.</div>}
         <p className="mt-3 text-xs font-semibold text-slate-600 dark:text-slate-300">활동 내용·기간·시간 칸에 마우스를 올리면 원본 파일명과 Excel 행 또는 HWP 내 확인서 위치를 볼 수 있습니다.</p>
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700"><table className="w-full min-w-[1180px] table-fixed text-xs"><colgroup><col className="w-[78px]" /><col className="w-[62px]" /><col className="w-[72px]" /><col className="w-[170px]" /><col className="w-[120px]" /><col className="w-[58px]" /><col className="w-[170px]" /><col className="w-[120px]" /><col className="w-[58px]" /><col className="w-[272px]" /></colgroup><thead className="bg-slate-100 dark:bg-slate-800"><tr><th className="p-1.5">상태</th><th className="p-1.5">학번</th><th className="p-1.5">이름</th><th className="p-1.5 text-left">나이스 활동 내용</th><th className="p-1.5">기간</th><th className="p-1.5">시간</th><th className="p-1.5 text-left">확인서 활동 내용</th><th className="p-1.5">기간</th><th className="p-1.5">시간</th><th className="p-1.5 text-left">판정·수정</th></tr></thead><tbody>{visibleRows.map(row => {
-          const suggestedName = rosterById.get(row.studentId)?.name || ''
-          const sameName = rosterByName.get(row.displayName.replace(/\s+/g, '')) || []
-          const suggestedId = sameName.length === 1 ? volunteerStudentId(sameName[0].studentId) : ''
-          const decisionKey = manualDecisionKey(row)
-          return <RosterComparisonRow key={row.id} row={row} manualDecision={manualDecisions[decisionKey]} onManualDecision={decision => setManualDecisions(current => decision ? { ...current, [decisionKey]: decision } : Object.fromEntries(Object.entries(current).filter(([id]) => id !== decisionKey)))} suggestedName={suggestedName} suggestedId={suggestedId} onCorrect={(studentId, name, correction) => void correctUnclassified(row, studentId, name, correction)} />
-        })}</tbody></table></div>
-        {!visibleRows.length && <p className="py-6 text-center text-sm font-bold text-slate-600 dark:text-slate-300">선택한 반의 자료가 없습니다.</p>}
+        <VirtualizedTable
+          items={visibleRows}
+          columns={comparisonColumns}
+          getRowKey={row => row.id}
+          height={620}
+          rowHeight={94}
+          stickyFirstColumn={false}
+          rowClassName={row => comparisonRowTone(row, manualDecisions[manualDecisionKey(row)])}
+          className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700"
+          ariaLabel="봉사활동 나이스·확인서 검증 결과"
+          emptyContent={<p className="text-sm font-bold text-slate-600 dark:text-slate-300">선택한 반의 자료가 없습니다.</p>}
+        />
         {comparison.duplicates.length > 0 && <div className="mt-5"><h3 className="font-black text-rose-800 dark:text-rose-200">중복 자료 상세</h3><div className="mt-2 overflow-x-auto rounded-xl border border-rose-200 dark:border-rose-800"><table className="w-full min-w-[850px] text-sm"><thead className="bg-rose-50 dark:bg-rose-950/40"><tr><th className="p-3">자료</th><th className="p-3">학번</th><th className="p-3">이름</th><th className="p-3">중복 횟수</th><th className="p-3 text-left">활동</th></tr></thead><tbody>{comparison.duplicates.map((duplicate, index) => <tr key={`${duplicate.source}-${duplicate.studentId}-${index}`} className="border-t border-rose-200 dark:border-rose-800"><td className="p-3 font-black">{duplicate.source === 'neis' ? '나이스' : '확인서'}</td><td className="p-3 font-bold">{duplicate.studentId}</td><td className="p-3 font-bold">{duplicate.name}</td><td className="p-3 text-center font-black text-rose-700 dark:text-rose-300">{duplicate.count}회</td><td className="cursor-help p-3" title={`원본 파일: ${duplicate.sourceNames.join(', ')}`}><b>{duplicate.activity || '활동명 없음'}</b><small className="ml-2 text-slate-500 dark:text-slate-400">(파일 정보는 마우스를 올려 확인)</small></td></tr>)}</tbody></table></div></div>}
       </Panel>}
       <CoordinatorVolunteerModal source={coordinatorSource} open={coordinatorGeneratorOpen} onClose={() => { setCoordinatorGeneratorOpen(false); setCoordinatorSource(null) }} onApplied={async () => { await refresh(); setComparison(null) }} />
@@ -841,7 +885,39 @@ function VerificationTab() {
   )
 }
 
-function RosterComparisonRow({ row, manualDecision, onManualDecision, suggestedName, suggestedId, onCorrect }: {
+function comparisonStatus(row: VolunteerRosterComparisonRow, manualDecision?: ManualDecision) {
+  const baseStatus = {
+    matched: { label: '일치', icon: CheckCircle2, style: 'text-emerald-800 dark:text-emerald-200' },
+    'neis-only': { label: '나이스에만', icon: AlertTriangle, style: 'text-amber-800 dark:text-amber-200' },
+    'hwp-only': { label: '확인서에만', icon: AlertTriangle, style: 'text-amber-800 dark:text-amber-200' },
+    unclassified: { label: '미분류', icon: XCircle, style: 'text-rose-800 dark:text-rose-200' },
+  }[row.status]
+  return manualDecision === 'confirmed'
+    ? { label: '수기 확인', icon: CheckCircle2, style: 'text-emerald-800 dark:text-emerald-200' }
+    : manualDecision === 'deleted'
+      ? { label: '수기 삭제', icon: Trash2, style: 'text-slate-700 dark:text-slate-200' }
+      : baseStatus
+}
+
+function comparisonRowTone(row: VolunteerRosterComparisonRow, manualDecision?: ManualDecision) {
+  return manualDecision === 'confirmed'
+    ? 'bg-emerald-100/80 dark:bg-emerald-950/35'
+    : manualDecision === 'deleted'
+      ? 'bg-slate-200/90 text-slate-600 dark:bg-slate-800/80 dark:text-slate-300'
+      : row.status === 'matched'
+        ? 'bg-emerald-50/40 dark:bg-emerald-950/10'
+        : row.status === 'unclassified'
+          ? 'bg-rose-50/50 dark:bg-rose-950/20'
+          : 'bg-amber-50/30 dark:bg-amber-950/10'
+}
+
+function ComparisonStatusCell({ row, manualDecision }: { row: VolunteerRosterComparisonRow; manualDecision?: ManualDecision }) {
+  const status = comparisonStatus(row, manualDecision)
+  const Icon = status.icon
+  return <span className={clsx('whitespace-nowrap text-xs font-black', status.style)}><Icon size={13} className="mr-1 inline" />{status.label}</span>
+}
+
+function ComparisonDecisionCell({ row, manualDecision, onManualDecision, suggestedName, suggestedId, onCorrect }: {
   row: VolunteerRosterComparisonRow
   manualDecision?: ManualDecision
   onManualDecision?: (decision?: ManualDecision) => void
@@ -852,35 +928,16 @@ function RosterComparisonRow({ row, manualDecision, onManualDecision, suggestedN
   const [manual, setManual] = useState(false)
   const [manualId, setManualId] = useState(row.studentId)
   const [manualName, setManualName] = useState(row.displayName === '(이름 없음)' ? '' : row.displayName)
-  const baseStatus = {
-    matched: { label: '일치', icon: CheckCircle2, style: 'text-emerald-800 dark:text-emerald-200' },
-    'neis-only': { label: '나이스에만', icon: AlertTriangle, style: 'text-amber-800 dark:text-amber-200' },
-    'hwp-only': { label: '확인서에만', icon: AlertTriangle, style: 'text-amber-800 dark:text-amber-200' },
-    unclassified: { label: '미분류', icon: XCircle, style: 'text-rose-800 dark:text-rose-200' },
-  }[row.status]
-  const status = manualDecision === 'confirmed'
-    ? { label: '수기 확인', icon: CheckCircle2, style: 'text-emerald-800 dark:text-emerald-200' }
-    : manualDecision === 'deleted'
-      ? { label: '수기 삭제', icon: Trash2, style: 'text-slate-700 dark:text-slate-200' }
-      : baseStatus
-  const Icon = status.icon
-  const rowTone = manualDecision === 'confirmed'
-    ? 'bg-emerald-100/80 dark:bg-emerald-950/35'
-    : manualDecision === 'deleted'
-      ? 'bg-slate-200/90 text-slate-600 dark:bg-slate-800/80 dark:text-slate-300'
-      : row.status === 'matched'
-        ? 'bg-emerald-50/40 dark:bg-emerald-950/10'
-        : row.status === 'unclassified'
-          ? 'bg-rose-50/50 dark:bg-rose-950/20'
-          : 'bg-amber-50/30 dark:bg-amber-950/10'
-  return <tr className={clsx('border-t border-slate-200 align-middle dark:border-slate-700', rowTone)}><td className={clsx('whitespace-nowrap p-1.5 font-black', status.style)}><Icon size={13} className="mr-1 inline" />{status.label}</td><td className="p-1.5 text-center font-black">{row.studentId || '-'}</td><td className="truncate p-1.5 text-center font-bold" title={row.displayName}>{row.displayName}</td><ActivitySideCells side={row.neis} /><ActivitySideCells side={row.hwp} /><td className="p-1.5 font-semibold"><p className="line-clamp-2 leading-4" title={row.message}>{manualDecision === 'confirmed' ? '나이스 기록을 수기로 확인했습니다. 원본 자료는 변경하지 않았습니다.' : manualDecision === 'deleted' ? '확인서 기록을 검증 목록에서 수기 삭제 처리했습니다. 원본 자료는 변경하지 않았습니다.' : row.message}</p>{!manualDecision && row.status === 'neis-only' && <button type="button" onClick={() => onManualDecision?.('confirmed')} className="mt-1.5 rounded border border-emerald-500 bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">수기 확인</button>}{!manualDecision && row.status === 'hwp-only' && <button type="button" onClick={() => onManualDecision?.('deleted')} className="mt-1.5 rounded border border-slate-500 bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-900 dark:bg-slate-800 dark:text-slate-100">수기 삭제</button>}{manualDecision && <button type="button" onClick={() => onManualDecision?.()} className="mt-1.5 rounded border border-blue-400 bg-white px-2 py-1 text-[10px] font-black text-blue-900 no-underline dark:bg-slate-900 dark:text-blue-100">되돌리기</button>}{row.status === 'unclassified' && onCorrect && <div className="mt-1.5 flex flex-wrap gap-1">{suggestedId && <button type="button" onClick={() => onCorrect(suggestedId, row.displayName, '학번 맞춤')} className="rounded border border-sky-400 px-1.5 py-1 text-[10px] font-black text-sky-800 dark:text-sky-200">학번맞추기</button>}{suggestedName && <button type="button" onClick={() => onCorrect(row.studentId, suggestedName, '이름 맞춤')} className="rounded border border-emerald-400 px-1.5 py-1 text-[10px] font-black text-emerald-800 dark:text-emerald-200">이름맞추기</button>}<button type="button" onClick={() => setManual(value => !value)} className="rounded border border-amber-400 px-1.5 py-1 text-[10px] font-black text-amber-800 dark:text-amber-200">수기수정</button></div>}{manual && <div className="mt-1.5 grid grid-cols-[72px_1fr_auto] gap-1"><input inputMode="numeric" maxLength={5} value={manualId} onChange={event => setManualId(event.target.value.replace(/\D/g, '').slice(0, 5))} placeholder="학번" className="px-1 py-1 text-[10px]" /><input value={manualName} onChange={event => setManualName(event.target.value)} placeholder="이름" className="px-1 py-1 text-[10px]" /><button type="button" onClick={() => onCorrect?.(manualId, manualName, '직접 입력')} className="rounded bg-amber-500 px-1.5 py-1 text-[10px] font-black text-slate-950">적용</button></div>}</td></tr>
+  return <div className="w-full text-xs font-semibold"><p className="line-clamp-2 leading-4" title={row.message}>{manualDecision === 'confirmed' ? '나이스 기록을 수기로 확인했습니다. 원본 자료는 변경하지 않았습니다.' : manualDecision === 'deleted' ? '확인서 기록을 검증 목록에서 수기 삭제 처리했습니다. 원본 자료는 변경하지 않았습니다.' : row.message}</p>{!manualDecision && row.status === 'neis-only' && <button type="button" onClick={() => onManualDecision?.('confirmed')} className="mt-1.5 rounded border border-emerald-500 bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">수기 확인</button>}{!manualDecision && row.status === 'hwp-only' && <button type="button" onClick={() => onManualDecision?.('deleted')} className="mt-1.5 rounded border border-slate-500 bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-900 dark:bg-slate-800 dark:text-slate-100">수기 삭제</button>}{manualDecision && <button type="button" onClick={() => onManualDecision?.()} className="mt-1.5 rounded border border-blue-400 bg-white px-2 py-1 text-[10px] font-black text-blue-900 no-underline dark:bg-slate-900 dark:text-blue-100">되돌리기</button>}{row.status === 'unclassified' && onCorrect && <div className="mt-1.5 flex flex-wrap gap-1">{suggestedId && <button type="button" onClick={() => onCorrect(suggestedId, row.displayName, '학번 맞춤')} className="rounded border border-sky-400 px-1.5 py-1 text-[10px] font-black text-sky-800 dark:text-sky-200">학번맞추기</button>}{suggestedName && <button type="button" onClick={() => onCorrect(row.studentId, suggestedName, '이름 맞춤')} className="rounded border border-emerald-400 px-1.5 py-1 text-[10px] font-black text-emerald-800 dark:text-emerald-200">이름맞추기</button>}<button type="button" onClick={() => setManual(value => !value)} className="rounded border border-amber-400 px-1.5 py-1 text-[10px] font-black text-amber-800 dark:text-amber-200">수기수정</button></div>}{manual && <div className="mt-1.5 grid grid-cols-[72px_1fr_auto] gap-1"><input inputMode="numeric" maxLength={5} value={manualId} onChange={event => setManualId(event.target.value.replace(/\D/g, '').slice(0, 5))} placeholder="학번" className="min-w-0 px-1 py-1 text-[10px]" /><input value={manualName} onChange={event => setManualName(event.target.value)} placeholder="이름" className="min-w-0 px-1 py-1 text-[10px]" /><button type="button" onClick={() => onCorrect?.(manualId, manualName, '직접 입력')} className="rounded bg-amber-500 px-1.5 py-1 text-[10px] font-black text-slate-950">적용</button></div>}</div>
 }
 
-function ActivitySideCells({ side }: { side: VolunteerRosterComparisonRow['neis'] }) {
-  if (!side) return <><td className="p-1.5 font-bold text-slate-500 dark:text-slate-400">기록 없음</td><td className="p-1.5 text-center text-slate-500 dark:text-slate-400">-</td><td className="p-1.5 text-center text-slate-500 dark:text-slate-400">-</td></>
+function ActivitySideValue({ side, field }: { side: VolunteerRosterComparisonRow['neis']; field: 'content' | 'date' | 'hours' }) {
+  if (!side) return <span className="font-bold text-slate-500 dark:text-slate-400">{field === 'content' ? '기록 없음' : '-'}</span>
   const date = [side.startDate, side.endDate].filter(Boolean).join(' ~ ')
   const sourceTooltip = [`원본 파일: ${side.sourceName}`, side.sourceLocation && `원본 위치: ${side.sourceLocation}`].filter(Boolean).join('\n')
-  return <><td className="cursor-help p-1.5" title={sourceTooltip}><div className="flex min-w-0 items-center gap-1"><p className="truncate font-black">{side.content || '활동 내용 없음'}</p>{side.duplicateCount > 1 && <span className="shrink-0 rounded-full bg-rose-100 px-1 py-0.5 text-[9px] font-black text-rose-800 dark:bg-rose-900/50 dark:text-rose-100">{side.duplicateCount}회</span>}</div></td><td className="cursor-help truncate p-1.5 text-center font-semibold" title={`${date || '기간 미입력'}\n${sourceTooltip}`}>{date || '-'}</td><td className="cursor-help whitespace-nowrap p-1.5 text-center font-black text-blue-900 dark:text-blue-200" title={sourceTooltip}>{side.hours == null ? '미입력' : `${side.hours}시간`}</td></>
+  if (field === 'date') return <span className="cursor-help truncate font-semibold" title={`${date || '기간 미입력'}\n${sourceTooltip}`}>{date || '-'}</span>
+  if (field === 'hours') return <span className="cursor-help whitespace-nowrap font-black text-blue-900 dark:text-blue-200" title={sourceTooltip}>{side.hours == null ? '미입력' : `${side.hours}시간`}</span>
+  return <span className="flex min-w-0 cursor-help items-center gap-1" title={sourceTooltip}><span className="truncate font-black">{side.content || '활동 내용 없음'}</span>{side.duplicateCount > 1 && <span className="shrink-0 rounded-full bg-rose-100 px-1 py-0.5 text-[9px] font-black text-rose-800 dark:bg-rose-900/50 dark:text-rose-100">{side.duplicateCount}회</span>}</span>
 }
 
 function loadNeisDatasets(): StoredVolunteerNeisDataset[] {

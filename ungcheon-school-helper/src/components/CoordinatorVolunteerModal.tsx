@@ -13,6 +13,7 @@ import {
   type StoredVolunteerHwp,
 } from '../services/volunteerWork'
 import { useAppStore } from '../stores/appStore'
+import { VirtualizedTable, type VirtualizedTableColumn } from './virtualization'
 
 interface Props {
   open: boolean
@@ -143,6 +144,31 @@ export default function CoordinatorVolunteerModal({ open, onClose, onApplied, so
     } finally { setBusy(false) }
   }
 
+  const studentColumns: VirtualizedTableColumn<StudentRosterEntry>[] = [
+    {
+      key: 'className', header: '반', width: 80, align: 'center', sticky: true,
+      render: student => <span className="font-black">{student.className}반</span>,
+    },
+    {
+      key: 'number', header: '번호', width: 90, align: 'center',
+      render: student => <span className="font-bold">{Number(student.number)}번</span>,
+    },
+    {
+      key: 'studentId', header: '학번', width: 110, align: 'center',
+      render: student => <span className="font-black">{volunteerStudentId(student.studentId)}</span>,
+    },
+    {
+      key: 'name', header: '이름', width: 260,
+      render: student => <span className="truncate font-black">{student.name}</span>,
+    },
+    {
+      key: 'action', header: '처리', width: 120, align: 'center',
+      render: student => showExcluded
+        ? <button type="button" onClick={() => restore(student)} className="rounded-lg border border-emerald-400 px-3 py-1.5 text-xs font-black text-emerald-800 dark:text-emerald-200">복원</button>
+        : <button type="button" onClick={() => exclude(student)} className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-black text-rose-800 dark:text-rose-200">제외</button>,
+    },
+  ]
+
   if (!open) return null
   return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="봉사활동 확인서 생성 담당자용">
     <div className="flex max-h-[94vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-3xl border border-slate-300 bg-slate-50 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
@@ -194,10 +220,16 @@ export default function CoordinatorVolunteerModal({ open, onClose, onApplied, so
             <button type="button" onClick={clearAll} disabled={!selectedStudents.length} className="rounded-xl border border-rose-300 px-3 py-2.5 text-sm font-black text-rose-800 disabled:opacity-50 dark:border-rose-700 dark:text-rose-200"><Trash2 size={15} className="mr-1 inline" />현재 명단 비우기</button>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">{classCounts.map(item => <span key={item.className} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black dark:bg-slate-800">{item.className}반 {item.included}/{item.total}명</span>)}</div>
-          <div className="mt-3 max-h-[360px] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700">
-            <table className="w-full min-w-[620px] text-sm"><thead className="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800"><tr><th className="w-20 p-2">반</th><th className="w-24 p-2">번호</th><th className="w-28 p-2">학번</th><th className="p-2 text-left">이름</th><th className="w-28 p-2">처리</th></tr></thead><tbody>{displayedStudents.map(student => <tr key={volunteerStudentId(student.studentId)} className="border-t border-slate-200 dark:border-slate-700"><td className="p-2 text-center font-bold">{student.className}반</td><td className="p-2 text-center font-bold">{Number(student.number)}번</td><td className="p-2 text-center font-black">{volunteerStudentId(student.studentId)}</td><td className="p-2 font-black">{student.name}</td><td className="p-2 text-center">{showExcluded ? <button type="button" onClick={() => restore(student)} className="rounded-lg border border-emerald-400 px-3 py-1.5 text-xs font-black text-emerald-800 dark:text-emerald-200">복원</button> : <button type="button" onClick={() => exclude(student)} className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-black text-rose-800 dark:text-rose-200">제외</button>}</td></tr>)}</tbody></table>
-            {!displayedStudents.length && <p className="p-8 text-center text-sm font-bold text-slate-600 dark:text-slate-300">{draft.grade ? '현재 조건에 표시할 학생이 없습니다.' : '학년을 선택하면 전체 명렬이 표시됩니다.'}</p>}
-          </div>
+          <VirtualizedTable
+            items={displayedStudents}
+            columns={studentColumns}
+            getRowKey={student => volunteerStudentId(student.studentId)}
+            height={360}
+            rowHeight={48}
+            className="mt-3 rounded-xl border border-slate-200 dark:border-slate-700"
+            ariaLabel={`${draft.grade || ''}학년 봉사활동 확인서 생성 명단`}
+            emptyContent={<p className="px-4 text-center text-sm font-bold text-slate-600 dark:text-slate-300">{draft.grade ? '현재 조건에 표시할 학생이 없습니다.' : '학년을 선택하면 전체 명렬이 표시됩니다.'}</p>}
+          />
         </section>
         </div>
 

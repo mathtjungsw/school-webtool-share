@@ -1,3 +1,5 @@
+import { NAVIGATION_BY_ID, NAVIGATION_ITEMS } from '../config/navigationRegistry'
+
 export interface WorkAssistantEntry {
   id: string
   title: string
@@ -38,7 +40,7 @@ export const WORK_ASSISTANT_SUGGESTIONS = [
   '학교 공유 서비스 저장 통신을 진단하고 싶어',
 ]
 
-export const WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
+const DETAILED_WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
   {
     id: 'admin-center', title: '관리자 센터·즉시 NEIS 동기화', page: 'admin_center', category: '관리자',
     summary: '관리자 전용 화면에서 공용 NEIS 자료를 즉시 갱신하고, 학교 공유 서비스의 조회(GET)·저장 통신 경로(POST)를 실제 자료 변경 없이 진단합니다.',
@@ -313,6 +315,39 @@ export const WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
     steps: ['봉사활동 업무 메뉴를 열어 반별 발급·부서별 발급·확인서 검증 탭을 선택합니다.', '반별 발급은 학급을 선택해 공유 학생 명렬 전체를 번호순으로 불러옵니다. 인적 사항의 학년·반·총원·참가 인원은 자동 작성됩니다.', '봉사 날짜, 교시, 영역, 장소, 활동 내용을 입력합니다. 기본값은 학교 내 사제동행 교내 환경정화이며 수정할 수 있고, 확인자는 환경설정의 사용자 이름이 자동 입력됩니다.', '인정시간을 입력하고 전체 학생에게 입력 버튼을 누릅니다. 결석·결과·지각·조퇴 학생은 각 행의 인정시간 칸을 해당 문구로 바꾸면 시수 대신 문구가 출력됩니다.', 'HWPX 다운로드는 웅천고 원본 양식의 표·테두리·글꼴·배치를 유지하고 입력 셀만 교체합니다. 같은 내용으로 PDF 다운로드 또는 바로 인쇄도 할 수 있습니다.', '부서별 발급은 명단 Excel 양식에 4자리 학번·이름·학생별 실제 시수를 작성해 불러온 뒤 HWP로 저장합니다. 기존 5자리 학번은 불러올 때 4자리로 자동 변환됩니다.', '검증 탭에서 반별 나이스 XLS data 파일과 확인서 HWP·PDF를 계속 추가합니다. 텍스트 PDF는 직접 읽고 이미지형 스캔 PDF만 프로그램에 포함된 한국어 오프라인 OCR로 처리합니다.', '스캔 확인서를 OCR로 읽기 어렵다면 확인서 보관함 오른쪽의 봉사활동 확인서 생성(담당자용)을 누릅니다. 확인서 제목·활동 내용·기간·학년·인정 시간을 입력하면 해당 학년 전체 명렬이 표시됩니다.', '담당자용 생성 화면에서 스캔 원본에 없는 학생을 제외합니다. 학생 검색과 반 필터, 제외 학생 보기·복원, 전체 복원을 이용해 긴 학년 명렬을 빠르게 정리할 수 있습니다.', '화면의 확인서 미리보기에서 학급별 명단을 확인하고 검증 자료로 바로 반영을 누릅니다. PDF를 만들거나 다시 올리지 않아도 수기 생성한 확인서라는 표시와 입력한 제목으로 로컬 검증 보관함에 즉시 들어갑니다.', 'PDF의 OCR 결과 확인·수정에서 학번·이름·시간을 확인하거나 학번 기준 명렬 이름 맞춤을 사용한 뒤 로컬 결과를 저장합니다.', '누적 자료 전체 검증을 누르면 학생별 활동이 여러 행으로 펼쳐집니다. 내용과 시간이 모두 맞는 자료는 같은 행에서 일치로 표시되고 한쪽에만 있는 활동은 별도 행으로 표시됩니다.', '미분류 판정에서 학번맞추기·이름맞추기·수기수정으로 OCR 오타를 고칩니다. 수정 후에도 미분류 탭에 머물러 다음 항목을 계속 고칠 수 있고 수기 수정 이력이 남습니다.', '학생 명단과 문서는 학교 공유 서버·구글시트·외부 서버에 올라가지 않으며 OCR을 포함한 모든 문서 처리는 이 PC에서만 수행됩니다.'],
     keywords: ['봉사활동 업무', '봉사활동 확인서', '반별 봉사활동', '부서별 봉사활동', '담당자용 확인서', '수기 생성한 확인서', '확인서 제목', '검증 자료로 바로 반영', '봉사활동 확인서 생성 담당자용', '학년 전체 봉사 명렬', '제외 학생 복원', '스캔 확인서 수기 작성', '반 명렬 봉사', '결석 결과 봉사', '봉사 확인서 발급', 'HWPX 봉사', 'HWPX 다운로드', '봉사 PDF 다운로드', '봉사 바로 인쇄', '인정시간 일괄 입력', '봉사활동 검증', '봉사활동 나이스 비교', '봉사 시수', '도우미 봉사활동', '확인서 한글', 'HWP 봉사', 'PDF 봉사', '스캔 PDF', '오프라인 OCR', 'OCR 결과 수정', '학번맞추기', '이름맞추기', '수기수정', '봉사 명단', '봉사 명단 양식', 'Excel 양식', '봉사 누락', '봉사 중복', '누적 검증', '반별 검증', '활동 일치', '내용 시간 비교', '미분류', '학번 이름 오입력', '로컬 저장'],
   },
+]
+
+const detailedPages = new Set(DETAILED_WORK_ASSISTANT_ENTRIES.map(entry => entry.page))
+
+/**
+ * 사이드바 메뉴 레지스트리를 검색 카탈로그의 기준으로 사용합니다.
+ * - 기존 전문 안내는 내용을 그대로 보존하고 메뉴명·별칭을 자동 키워드로 보강합니다.
+ * - 새 메뉴에 아직 전문 안내가 없어도 기본 안내가 자동 생성됩니다.
+ */
+export const WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
+  ...DETAILED_WORK_ASSISTANT_ENTRIES.map(entry => {
+    const navigation = NAVIGATION_BY_ID.get(entry.page)
+    if (!navigation) return entry
+    return {
+      ...entry,
+      keywords: [...new Set([
+        navigation.label,
+        ...(navigation.searchAliases ?? []),
+        ...entry.keywords,
+      ])],
+    }
+  }),
+  ...NAVIGATION_ITEMS
+    .filter(item => !detailedPages.has(item.id))
+    .map(item => ({
+      id: `menu-${item.id}`,
+      title: item.label,
+      page: item.id,
+      category: item.assistantCategory,
+      summary: `${item.label} 메뉴에서 관련 업무를 확인하고 처리합니다.`,
+      steps: [`왼쪽 메뉴에서 ‘${item.label}’을 엽니다.`, '화면의 안내에 따라 필요한 항목을 확인하거나 입력합니다.'],
+      keywords: [item.label, ...(item.searchAliases ?? [])],
+    })),
 ]
 
 const STOP_WORDS = new Set(['하고', '싶어', '싶어요', '해줘', '해주세요', '어떻게', '하려면', '방법', '보여줘', '찾아줘', '기능', '메뉴'])

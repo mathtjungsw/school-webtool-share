@@ -7,7 +7,7 @@ import { testConnection } from '../services/llm'
 import type { SchoolInfo } from '../types'
 import clsx from 'clsx'
 import { HelpContent } from './HelpPage'
-import { SIDEBAR_MENU_OPTIONS } from '../components/Sidebar'
+import { SIDEBAR_MENU_OPTIONS } from '../config/navigationRegistry'
 
 const BREAK_MINUTES = 10
 

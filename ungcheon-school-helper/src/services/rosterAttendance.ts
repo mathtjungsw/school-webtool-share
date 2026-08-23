@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import { escapeHtml, printHtml } from '../utils/printHtml'
+import { escapePrintHtml as escapeHtml, printDocument } from './printing'
 import { xlsxWorkbookBytes } from '../utils/binaryBytes'
 import { canonicalStudentId, studentIdParts } from './studentId'
 
@@ -302,8 +302,10 @@ export function printTrainingRoster(
     ? new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric' })
       .format(new Date(`${date}T00:00:00`))
     : ''
-  printHtml(
-    `<section class="training-sheet" style="--training-row-height:${rowHeight.toFixed(2)}mm">
+  printDocument({
+    title: title || '연수등록부',
+    pageMode: 'single-page',
+    bodyHtml: `<section class="training-sheet" style="--training-row-height:${rowHeight.toFixed(2)}mm">
       <h1>${escapeHtml(title || '연수')}</h1>
       <p class="training-date">${escapeHtml(formattedDate)}</p>
       <table>
@@ -314,7 +316,7 @@ export function printTrainingRoster(
         <tbody>${rows}</tbody>
       </table>
     </section>`,
-    `
+    styles: `
       .sheet{padding:0}
       .training-sheet{
         width:210mm;height:297mm;padding:8mm 8mm 6mm;overflow:hidden;
@@ -331,7 +333,7 @@ export function printTrainingRoster(
       th:nth-child(4),th:nth-child(8),td:nth-child(4),td:nth-child(8){width:13%;}
       .training-sheet:last-child{break-after:auto;page-break-after:auto;}
     `,
-  )
+  })
 }
 
 export function printAttendanceRoster(options: {
@@ -372,9 +374,11 @@ export function printAttendanceRosters(groups: AttendanceRosterPrintGroup[]): vo
         <p class="count">재적 ${students.length}명</p>
       </section>`
   }).join('')
-  printHtml(
-    sheets,
-    `
+  printDocument({
+    title: groups.length === 1 ? groups[0]?.title || '출석부' : `출석부 ${groups.length}부`,
+    pageMode: 'multi-page',
+    bodyHtml: sheets,
+    styles: `
       .sheet{padding:0}
       .attendance-sheet{
         width:210mm;height:297mm;padding:9mm 11mm 6mm;overflow:hidden;
@@ -390,7 +394,7 @@ export function printAttendanceRosters(groups: AttendanceRosterPrintGroup[]): vo
       th:nth-child(4){width:9%}th:nth-child(5){width:25%}th:nth-child(6){width:26%}
       .count{text-align:right;font-size:9pt;line-height:1.2;margin-top:1mm;}
     `,
-  )
+  })
 }
 
 export function buildAttendanceRosterWorkbookBytes(

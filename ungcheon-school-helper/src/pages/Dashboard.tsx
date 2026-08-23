@@ -11,7 +11,7 @@ import {
   FileSpreadsheet, HelpCircle, Waves, SquareStack, CircleDot, Star,
   FileScan, FileCode2, MapPinned, ScanSearch,
   Clapperboard, SquarePen, MessagesSquare, BarChart3, Mic, CalendarRange, UsersRound,
-  ArrowUpRight, BellRing, Check, ListTodo, StickyNote, Eye, EyeOff,
+  ArrowUpRight, BellRing, Eye, EyeOff,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -33,6 +33,9 @@ import { useAppStore } from '../stores/appStore'
 import { WeatherTodayView, WeatherForecastView } from '../components/WeatherBar'
 import { QuickOrganizerModal } from '../components/QuickOrganizerModal'
 import { QuickOrganizerTrigger, type QuickOrganizerHint } from '../components/QuickOrganizerTrigger'
+import { TodayBriefingWidget, type TodayBriefingItem } from '../components/dashboard/TodayBriefingWidget'
+import { PersonalMemoWidget, PersonalTasksWidget, SharedTasksWidget } from '../components/dashboard/OrganizerWidgets'
+import { DashboardOrganizerTabs } from '../components/dashboard/DashboardOrganizerTabs'
 import { useWeather } from '../components/useWeather'
 import { getSharedNeisSnapshot } from '../services/sharedNeis'
 import {
@@ -50,10 +53,7 @@ import {
   loadPersonalMemo, loadPersonalTasks, savePersonalMemo, savePersonalTasks,
   subscribePersonalOrganizer, type PersonalTask,
 } from '../services/personalOrganizer'
-import {
-  classifySharedWorkDeadline, isNewSharedWork, isSharedWorkComplete,
-  loadSharedWorkLastViewedAt, subscribeSharedWorkViewed,
-} from '../services/sharedWorkNotifications'
+import { isSharedWorkComplete } from '../services/sharedWorkNotifications'
 import {
   DASHBOARD_TASK_STATUS_VISIBILITY_KEY,
   DEFAULT_DASHBOARD_TASK_STATUS_VISIBILITY,
@@ -199,6 +199,16 @@ function getClassStatus(
       return { type: 'break', fromPeriod, toPeriod, endTime: minsToTime(nextStart), remaining: nextStart - mins, isLunch: fromPeriod === '4' && toPeriod === '5' }
   }
   return { type: 'after' }
+}
+
+function classStatusSummary(status: ClassStatus) {
+  if (status.type === 'weekend') return '주말입니다. 오늘 등록된 일정과 업무를 확인하세요.'
+  if (status.type === 'before') return `첫 수업은 ${status.startTime}에 시작합니다.`
+  if (status.type === 'after') return '오늘 정규 수업이 끝났습니다.'
+  if (status.type === 'break') return status.isLunch
+    ? `점심시간 · ${status.toPeriod}교시까지 ${status.remaining}분 남았습니다.`
+    : `${status.fromPeriod}교시 후 쉬는 시간 · 다음 수업까지 ${status.remaining}분 남았습니다.`
+  return `${status.period}교시${status.subject ? ` · ${status.subject}` : ''} · ${status.remaining}분 남음`
 }
 
 const TC_COLORS = [
@@ -737,9 +747,6 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     ? showNeis
     : scheduleSourceVisibility[event.source])
     && isDashboardTaskVisible(event.source, event.completed, taskStatusVisibility))
-  const upcomingCommitteeEvents = committeeEvents
-    .filter(item => item.date >= todayStr() && item.date <= format(addDays(new Date(), 7), 'yyyy-MM-dd'))
-    .sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`))
   const incompleteAssignedTasks = sharedTasks
     .filter(task => task.targetNames.includes(config.teacherName?.trim() ?? '') && !isSharedWorkComplete(task, config.teacherName?.trim() ?? ''))
     .sort((a, b) => (a.deadline || '9999-99-99').localeCompare(b.deadline || '9999-99-99'))
@@ -779,6 +786,68 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   }
   const classStatus = getClassStatus(periodRanges, currentTime, todaySubjects)
   const specialTimetableDay = getSpecialTimetableDay(timetableDate)
+  const briefingToday = todayStr()
+  const briefingTodayYmd = toYmd(briefingToday)
+  const briefingSourcePage: Partial<Record<DashboardScheduleSource, string>> = {
+    committee: 'committees',
+    sharedWork: 'staff_tasks',
+    personal: 'calendar',
+    timetableChange: 'timetable_swap',
+    weekly: 'calendar',
+    creative: 'calendar',
+    schoolEvent: 'calendar',
+    gateDuty: 'calendar',
+    mealDuty: 'calendar',
+    pulledLesson: 'calendar',
+    neis: 'calendar',
+  }
+  const todayBriefingItems: TodayBriefingItem[] = [
+    ...combinedSchedule
+      .filter(item => item.date === briefingTodayYmd && item.source !== 'sharedWork' && item.source !== 'personal')
+      .slice(0, 8)
+      .map((item, index) => ({
+        id: `schedule-${item.source}-${index}-${item.eventName}`,
+        kind: 'schedule' as const,
+        title: item.eventName,
+        detail: item.department,
+        page: briefingSourcePage[item.source],
+      })),
+    ...incompleteAssignedTasks
+      .filter(task => !task.deadline || task.deadline <= briefingToday)
+      .slice(0, 5)
+      .map(task => ({
+        id: `shared-task-${task.id}`,
+        kind: 'task' as const,
+        title: task.title,
+        detail: task.deadline ? `${task.deadline}${task.deadline < briefingToday ? ' · 기한 초과' : ' · 오늘 마감'}` : '기한 미지정',
+        page: 'staff_tasks',
+        urgent: Boolean(task.deadline && task.deadline <= briefingToday),
+      })),
+    ...personalTasks
+      .filter(task => !task.completed && task.date <= briefingToday)
+      .slice(0, 4)
+      .map(task => ({
+        id: `personal-task-${task.id}`,
+        kind: 'task' as const,
+        title: task.title,
+        detail: `${task.date}${task.time ? ` · ${task.time}` : ''}${task.date < briefingToday ? ' · 기한 초과' : ''}`,
+        page: 'calendar',
+        urgent: task.date <= briefingToday,
+      })),
+    ...[
+      error,
+      weeklyPlanError,
+      dutyScheduleError,
+      creativeScheduleError,
+    ].filter(Boolean).map((message, index) => ({
+      id: `system-${index}`,
+      kind: 'system' as const,
+      title: message,
+      detail: '자료 동기화 상태를 확인해 주세요.',
+      page: 'admin_center',
+      urgent: true,
+    })),
+  ]
 
   return (
     <div className="p-5">
@@ -831,40 +900,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
         </div>
       )}
 
-      {((hasSchool && upcomingCommitteeEvents.length > 0) || incompleteAssignedTasks.length > 0) && (
-        <div className={`mb-2 grid gap-2 ${(hasSchool && upcomingCommitteeEvents.length > 0) && incompleteAssignedTasks.length > 0 ? 'lg:grid-cols-2' : ''}`}>
-          {hasSchool && upcomingCommitteeEvents.length > 0 && (() => {
-            const event = upcomingCommitteeEvents[0]
-            return (
-              <button
-                type="button"
-                onClick={() => onNavigate('committees')}
-                title={[event.committeeName, `${event.date} ${event.startTime}~${event.endTime}`, event.location].filter(Boolean).join(' · ')}
-                className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-left hover:border-amber-500/70"
-              >
-                <Landmark size={15} className="shrink-0 text-amber-700 dark:text-amber-300" />
-                <span className="shrink-0 text-xs font-black text-slate-950 dark:text-white">내 위원회 일정</span>
-                <span className="min-w-0 flex-1 truncate rounded-md bg-white/65 px-2 py-1 text-[11px] font-bold text-slate-950 dark:bg-surface-800/70 dark:text-white">
-                  {event.committeeName}
-                  <span className="ml-1.5 font-semibold text-amber-800 dark:text-amber-300">{event.date.slice(5)} {event.startTime}~{event.endTime}</span>
-                </span>
-                {upcomingCommitteeEvents.length > 1 && <span className="shrink-0 text-[10px] font-black text-amber-800 dark:text-amber-200">+{upcomingCommitteeEvents.length - 1}건</span>}
-                <span className="shrink-0 text-[10px] font-bold text-amber-900 dark:text-amber-100">일정 보기 →</span>
-              </button>
-            )
-          })()}
-
-          {incompleteAssignedTasks.length > 0 && (
-            <button type="button" onClick={() => onNavigate('staff_tasks')} className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-rose-400/40 bg-rose-500/10 px-3 py-1.5 text-left hover:border-rose-500/70">
-              <ClipboardCheck size={15} className="shrink-0 text-rose-700 dark:text-rose-300" />
-              <span className="shrink-0 text-xs font-black text-slate-950 dark:text-white">미완료 업무 {incompleteAssignedTasks.length}건</span>
-              <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-700 dark:text-slate-200">
-                {incompleteAssignedTasks.slice(0, 2).map(task => `${task.title}${task.deadline ? ` · ${task.deadline}` : ''}`).join(' / ')}
-              </span>
-              <span className="shrink-0 text-[10px] font-bold text-rose-800 dark:text-rose-200">업무센터 →</span>
-            </button>
-          )}
-        </div>
+      {hasSchool && (
+        <TodayBriefingWidget
+          classSummary={classStatusSummary(classStatus)}
+          items={todayBriefingItems}
+          onNavigate={onNavigate}
+        />
       )}
 
       {/* ── No school ── */}
@@ -999,9 +1040,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
         </>
       )}
 
-      {/* ── 공유 업무 · 개인 업무 · 개인 메모 ── */}
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <SharedTasksWidget
+      {/* ── 공유 업무 · 개인 업무 · 개인 메모: 탭으로 분리 ── */}
+      <DashboardOrganizerTabs
+        shared={<SharedTasksWidget
           tasks={sharedTasks}
           teacherName={config.teacherName?.trim() ?? ''}
           onOpen={() => onNavigate('staff_tasks')}
@@ -1013,8 +1054,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
             await submitStaffChecklist(task.id, teacherName, task.items.map(item => item.id), own?.memo ?? '')
             setSharedTasks(await listStaffChecklists(teacherName, '', true))
           }}
-        />
-        <PersonalTasksWidget
+        />}
+        personal={<PersonalTasksWidget
           tasks={personalTasks}
           onOpenCalendar={() => onNavigate('calendar')}
           onToggle={async task => {
@@ -1023,9 +1064,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
               : item)
             setPersonalTasks(await savePersonalTasks(updated))
           }}
-        />
-        <PersonalMemoWidget value={personalMemo} onChange={setPersonalMemo} loaded={memoLoaded} />
-      </div>
+        />}
+        memo={<PersonalMemoWidget value={personalMemo} onChange={setPersonalMemo} loaded={memoLoaded} />}
+      />
 
       {/* ── 즐겨찾기 섹션 ── */}
       {favorites.length > 0 && (
@@ -1319,106 +1360,6 @@ function ScheduleSourceToggle({ label, checked, dot, tone = '', disabled = false
     <input type="checkbox" className="h-3 w-3 accent-violet-500" checked={checked} disabled={disabled} onChange={event => onChange(event.target.checked)} />
     <span className={clsx('h-2 w-2 rounded-full', dot)} />{label}
   </label>
-}
-
-function SharedTasksWidget({
-  tasks,
-  teacherName,
-  onOpen,
-  onSettings,
-  onComplete,
-}: {
-  tasks: StaffChecklist[]
-  teacherName: string
-  onOpen: () => void
-  onSettings: () => void
-  onComplete: (task: StaffChecklist) => Promise<void>
-}) {
-  const [lastViewedAt, setLastViewedAt] = useState<string | null>(null)
-  useEffect(() => {
-    if (!teacherName) { setLastViewedAt(''); return }
-    void loadSharedWorkLastViewedAt(teacherName).then(setLastViewedAt)
-    return subscribeSharedWorkViewed((name, viewedAt) => {
-      if (name === teacherName) setLastViewedAt(viewedAt)
-    })
-  }, [teacherName])
-
-  const incomplete = tasks.filter(task => !isSharedWorkComplete(task, teacherName))
-  const newCount = lastViewedAt === null ? 0 : incomplete.filter(task => isNewSharedWork(task, lastViewedAt)).length
-  const todayCount = incomplete.filter(task => classifySharedWorkDeadline(task, teacherName) === 'today').length
-  const dueSoonCount = incomplete.filter(task => classifySharedWorkDeadline(task, teacherName) === 'dueSoon').length
-  const overdueCount = incomplete.filter(task => classifySharedWorkDeadline(task, teacherName) === 'overdue').length
-  const rank = { overdue: 0, today: 1, dueSoon: 2, later: 3, complete: 4 }
-  const visible = [...incomplete].sort((a, b) => {
-    const newDiff = Number(!(lastViewedAt !== null && isNewSharedWork(a, lastViewedAt))) - Number(!(lastViewedAt !== null && isNewSharedWork(b, lastViewedAt)))
-    return newDiff || rank[classifySharedWorkDeadline(a, teacherName)] - rank[classifySharedWorkDeadline(b, teacherName)] || (a.deadline || '9999').localeCompare(b.deadline || '9999')
-  }).slice(0, 6)
-
-  const alertLabel = (task: StaffChecklist) => {
-    if (lastViewedAt !== null && isNewSharedWork(task, lastViewedAt)) return { label: '새 업무', className: 'bg-violet-500/15 text-violet-300' }
-    const category = classifySharedWorkDeadline(task, teacherName)
-    if (category === 'overdue') return { label: '기한 초과', className: 'bg-rose-500/15 text-rose-300' }
-    if (category === 'today') return { label: '오늘 마감', className: 'bg-amber-500/15 text-amber-300' }
-    if (category === 'dueSoon') return { label: '마감 임박', className: 'bg-sky-500/15 text-sky-300' }
-    return null
-  }
-
-  return (
-    <section className="card p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2"><div className="grid h-7 w-7 place-items-center rounded-lg bg-violet-500/15"><BellRing size={14} className="text-violet-400" /></div><div><p className="text-sm font-bold text-white">업무 알림</p><p className="text-[10px] text-slate-500">새 업무와 마감 상태 자동 분류</p></div></div>
-        <button onClick={onOpen} className="btn-ghost flex items-center gap-1.5 text-[10px]">업무센터<ArrowUpRight size={11} /></button>
-      </div>
-      {!teacherName ? <button onClick={onSettings} className="w-full rounded-xl border border-dashed border-violet-400/20 py-6 text-center text-[11px] text-violet-300">환경설정에서 이름을 등록하면 배부된 업무를 볼 수 있습니다.</button>
-        : visible.length ? <div className="space-y-2">
-          <div className="flex flex-wrap gap-1.5 text-[9px] font-bold"><span className="rounded-full bg-violet-500/12 px-2 py-1 text-violet-300">새 업무 {newCount}</span><span className="rounded-full bg-amber-500/12 px-2 py-1 text-amber-300">오늘 {todayCount}</span><span className="rounded-full bg-sky-500/12 px-2 py-1 text-sky-300">임박 {dueSoonCount}</span><span className="rounded-full bg-rose-500/12 px-2 py-1 text-rose-300">초과 {overdueCount}</span></div>
-          {visible.map(task => { const alert = alertLabel(task); return <div key={task.id} className="flex items-start gap-2 rounded-xl border border-white/5 bg-white/[0.025] p-2.5"><button onClick={() => void onComplete(task)} className="group mt-0.5 grid h-4 w-4 flex-shrink-0 place-items-center rounded border border-slate-600 text-violet-300 hover:border-violet-400" aria-label="업무 전체 완료"><Check size={11} className="opacity-0 transition-opacity group-hover:opacity-100" /></button><button onClick={onOpen} className="min-w-0 flex-1 text-left"><div className="flex min-w-0 items-center gap-1.5"><p className="truncate text-[11px] font-semibold text-slate-200">{task.title}</p>{alert && <span className={clsx('flex-shrink-0 rounded-full px-1.5 py-0.5 text-[8px] font-bold', alert.className)}>{alert.label}</span>}</div><p className="mt-0.5 text-[9px] text-slate-500">{task.deadline || '기한 없음'}{task.departmentNames.length ? ` · ${task.departmentNames.join('·')}` : ''}{task.priority === 'high' ? ' · 중요' : ''}</p></button></div>})}
-        </div> : <button onClick={onOpen} className="w-full rounded-xl border border-dashed border-white/10 py-6 text-center text-[11px] text-slate-500 hover:border-violet-400/30 hover:text-violet-300">현재 확인할 공유 업무가 없습니다.</button>}
-    </section>
-  )
-}
-
-function PersonalTasksWidget({
-  tasks,
-  onOpenCalendar,
-  onToggle,
-}: {
-  tasks: PersonalTask[]
-  onOpenCalendar: () => void
-  onToggle: (task: PersonalTask) => Promise<void>
-}) {
-  const today = todayStr()
-  const end = format(addDays(new Date(), 13), 'yyyy-MM-dd')
-  const visible = tasks.filter(task => !task.completed && task.date <= end).slice(0, 7)
-  const overdue = tasks.filter(task => !task.completed && task.date < today).length
-
-  return (
-    <section className="card p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2"><div className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-500/15"><ListTodo size={14} className="text-emerald-400" /></div><div><p className="text-sm font-bold text-white">개인 업무</p><p className="text-[10px] text-slate-500">오늘부터 2주 안에 확인할 업무</p></div></div>
-        <button onClick={onOpenCalendar} className="btn-ghost flex items-center gap-1.5 text-[10px]"><CalendarDays size={12} />등록·관리<ArrowUpRight size={11} /></button>
-      </div>
-      {overdue > 0 && <p className="mb-2 rounded-lg bg-rose-500/10 px-2.5 py-1.5 text-[10px] font-semibold text-rose-300">기한이 지난 업무가 {overdue}개 있습니다.</p>}
-      {visible.length ? <div className="grid gap-2 md:grid-cols-2">
-        {visible.map(task => (
-          <div key={task.id} className="flex items-start gap-2 rounded-xl border border-white/5 bg-white/[0.025] p-2.5">
-            <button onClick={() => void onToggle(task)} className="group mt-0.5 grid h-4 w-4 flex-shrink-0 place-items-center rounded border border-slate-600 text-emerald-300 hover:border-emerald-400" aria-label="업무 완료"><Check size={11} className="opacity-0 transition-opacity group-hover:opacity-100" /></button>
-            <button onClick={onOpenCalendar} className="min-w-0 flex-1 text-left"><p className="truncate text-[11px] font-semibold text-slate-200">{task.title}</p><p className={clsx('mt-0.5 text-[9px]', task.date < today ? 'text-rose-400' : task.date === today ? 'text-amber-300' : 'text-slate-500')}>{task.date}{task.time ? ` · ${task.time}` : ''}{task.priority === 'high' ? ' · 중요' : ''}</p></button>
-          </div>
-        ))}
-      </div> : <button onClick={onOpenCalendar} className="w-full rounded-xl border border-dashed border-white/10 py-6 text-center text-[11px] text-slate-500 hover:border-emerald-400/30 hover:text-emerald-300">등록된 개인 업무가 없습니다. 캘린더에서 첫 업무를 등록해보세요.</button>}
-    </section>
-  )
-}
-
-function PersonalMemoWidget({ value, onChange, loaded }: { value: string; onChange: (value: string) => void; loaded: boolean }) {
-  return (
-    <section className="card p-4">
-      <div className="mb-3 flex items-center gap-2"><div className="grid h-7 w-7 place-items-center rounded-lg bg-amber-500/15"><StickyNote size={14} className="text-amber-400" /></div><div><p className="text-sm font-bold text-white">개인 메모</p><p className="text-[10px] text-emerald-400">이 PC에만 자동 저장</p></div></div>
-      <textarea value={value} onChange={event => onChange(event.target.value)} onBlur={() => { void savePersonalMemo(value) }} rows={7} disabled={!loaded} placeholder="잠깐 기억해둘 내용을 적으세요. 학교 공유 서버에는 전송되지 않습니다." className="w-full resize-none text-[11px] leading-relaxed" />
-      <p className="mt-2 text-right text-[9px] text-slate-600">{loaded ? '입력 후 자동 저장됩니다.' : '메모 불러오는 중...'}</p>
-    </section>
-  )
 }
 
 // ─── 이전 월간 달력 구현(대시보드에서는 2주 보기로 대체) ─────────

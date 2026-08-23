@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import {
-  ArrowLeftRight, Bell, BookOpen, Calculator, CalendarDays, CalendarRange,
-  Check, ClipboardCheck, FileCode2, FileDown, FileScan, FilePenLine, FileText,
-  GripVertical, HelpCircle, Landmark, LayoutDashboard, Link2, ListRestart, Pin, PinOff, EyeOff,
-  Building2, HeartHandshake, MapPinned, MessageSquareText, ScanSearch, ScrollText, SearchCheck, Settings, ShieldCheck, Table2, UsersRound, Wrench,
-  type LucideIcon,
-} from 'lucide-react'
+import { Check, EyeOff, GripVertical, ListRestart, Pin, PinOff, ScrollText } from 'lucide-react'
 import {
   DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent,
 } from '@dnd-kit/core'
@@ -19,48 +13,13 @@ import { useAppStore } from '../stores/appStore'
 import { useAdminStore } from '../stores/adminStore'
 import schoolLogo from '../assets/ungcheon-logo.png'
 import { isSidebarExpanded, normalizeSidebarExpandedPinned, SIDEBAR_EXPANDED_PINNED_KEY } from '../services/sidebarPreferences'
+import {
+  NAVIGATION_BY_ID,
+  NAVIGATION_ITEMS,
+  type NavigationItem,
+} from '../config/navigationRegistry'
 
-interface NavItem {
-  id: string
-  label: string
-  icon: LucideIcon
-}
-
-const NAV: NavItem[] = [
-  { id: 'help', label: '사용 매뉴얼', icon: HelpCircle },
-  { id: 'notifier', label: '업무알리미', icon: Bell },
-  { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
-  { id: 'calendar', label: '캘린더', icon: CalendarDays },
-  { id: 'settings', label: '환경설정', icon: Settings },
-  { id: 'admin_center', label: '관리자 센터', icon: ShieldCheck },
-  { id: 'staff_tasks', label: '업무센터', icon: ClipboardCheck },
-  { id: 'school_hub', label: '학교 공유 링크', icon: Link2 },
-  { id: 'timetable_swap', label: '교환·대강 계획', icon: ArrowLeftRight },
-  { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange },
-  { id: 'attendance_print', label: '출석부 출력', icon: UsersRound },
-  { id: 'volunteer_work', label: '봉사활동 업무', icon: HeartHandshake },
-  { id: 'student_locator', label: '학생 위치 찾기', icon: SearchCheck },
-  { id: 'schoolinfo_evaluation', label: '타학교 평가계획', icon: Building2 },
-  { id: 'student_identity_audit', label: '학생 학번·이름 교정기', icon: ScanSearch },
-  { id: 'subject_remarks_print', label: '교과세특 개별 인쇄기', icon: ScrollText },
-  { id: 'staff_roster', label: '교직원 명렬', icon: UsersRound },
-  { id: 'committees', label: '각종 위원회 현황', icon: Landmark },
-  { id: 'feature_requests', label: '기능개선 요청', icon: MessageSquareText },
-  { id: 'transfer_score', label: '전보내신점수 계산기', icon: MapPinned },
-  { id: 'grade_preview', label: '성적 산출 미리보기', icon: Calculator },
-  { id: 'estimated_split_score', label: '추정분할점수 도우미', icon: Table2 },
-  { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText },
-  { id: 'form_center', label: '서식센터', icon: FilePenLine },
-  { id: 'teacher_tools', label: '교사용 도구', icon: Wrench },
-  { id: 'excel_processor', label: 'Excel 전처리', icon: Table2 },
-  { id: 'recommended_subjects', label: '대학 권장과목', icon: BookOpen },
-  { id: 'payroll', label: '호봉획정 계산기', icon: Calculator },
-  { id: 'insa_analysis', label: 'NEIS 인사기록 분석', icon: FileScan },
-  { id: 'pdf_extractor', label: 'PDF 텍스트 추출', icon: FileDown },
-  { id: 'file_parser', label: '만능 파일 파서', icon: FileCode2 },
-]
-
-const DEFAULT_ORDER = NAV.map(item => item.id)
+const DEFAULT_ORDER = NAVIGATION_ITEMS.map(item => item.id)
 const LEGACY_DEFAULT_ORDER = [
   'dashboard', 'calendar', 'school_hub', 'feature_requests', 'settings', 'help',
   'timetable_swap', 'student_timetable', 'student_locator', 'student_identity_audit',
@@ -69,8 +28,7 @@ const LEGACY_DEFAULT_ORDER = [
   'excel_processor', 'recommended_subjects', 'payroll', 'transfer_score',
   'insa_analysis', 'pdf_extractor', 'file_parser', 'notifier',
 ]
-const NAV_BY_ID = new Map(NAV.map(item => [item.id, item]))
-export const SIDEBAR_MENU_OPTIONS = NAV.map(({ id, label }) => ({ id, label }))
+const NAV_BY_ID = NAVIGATION_BY_ID
 const SIDEBAR_PINNED_KEY = 'sidebar.pinnedMenus.v1'
 const SIDEBAR_HIDDEN_KEY = 'sidebar.hiddenMenus.v1'
 
@@ -155,7 +113,7 @@ export default function Sidebar({
     const orderedIds = [...pinned, ...menuOrder.filter(id => !pinned.includes(id))]
     return orderedIds
       .map(id => NAV_BY_ID.get(id))
-      .filter((item): item is NavItem => Boolean(item))
+      .filter((item): item is NavigationItem => Boolean(item))
       .filter(item => !hiddenMenus.includes(item.id))
       .filter(item => item.id !== 'admin_center' || isAdmin)
   }, [hiddenMenus, isAdmin, menuOrder, pinnedMenus])
@@ -282,7 +240,7 @@ export default function Sidebar({
 function NavButton({
   item, expanded, editing, active, pinned, onClick, onTogglePinned, onHide,
 }: {
-  item: NavItem
+  item: NavigationItem
   expanded: boolean
   editing: boolean
   active: boolean
