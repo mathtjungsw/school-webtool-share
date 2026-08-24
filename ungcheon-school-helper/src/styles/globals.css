@@ -366,6 +366,34 @@
 [data-theme="light"] textarea { color: #1e293b !important; }
 [data-theme="light"] option { background: #ffffff; color: #1e293b; }
 
+/* 교직원 명렬 가상 표는 Windows 색상 설정이 아니라 앱에서 선택한 테마만 따른다. */
+[data-theme="light"] .staff-roster-virtual-table > [role="rowgroup"]:first-child {
+  background: #f1f5f9 !important;
+}
+[data-theme="light"] .staff-roster-virtual-table > [role="rowgroup"]:nth-child(2) > [role="row"] {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+[data-theme="light"] .staff-roster-virtual-table [role="columnheader"] {
+  color: #172033 !important;
+  border-color: #cbd5e1 !important;
+}
+[data-theme="light"] .staff-roster-virtual-table [role="cell"] {
+  color: #172033 !important;
+  border-color: #e2e8f0 !important;
+}
+[data-theme="dark"] .staff-roster-virtual-table > [role="rowgroup"]:first-child {
+  background: #1e293b !important;
+}
+[data-theme="dark"] .staff-roster-virtual-table > [role="rowgroup"]:nth-child(2) > [role="row"] {
+  background: #020617 !important;
+  border-color: #1e293b !important;
+}
+[data-theme="dark"] .staff-roster-virtual-table [role="columnheader"],
+[data-theme="dark"] .staff-roster-virtual-table [role="cell"] {
+  color: #f8fafc !important;
+}
+
 /* 라이트 모드 활성 탭 — violet-300은 흰 배경에서 대비 부족 */
 [data-theme="light"] .text-violet-300  { color: #6d28d9 !important; }
 [data-theme="light"] .text-violet-400  { color: #7c3aed !important; }

@@ -620,6 +620,7 @@ function RosterTab({
           getRowKey={member => member.id}
           height={620}
           rowHeight={54}
+          className="staff-roster-virtual-table"
           scrollRef={rosterListRef}
           ariaLabel="공유 교직원 명렬"
           emptyContent={<p className="text-sm font-bold text-slate-600 dark:text-slate-300">등록된 교직원이 없습니다.</p>}
