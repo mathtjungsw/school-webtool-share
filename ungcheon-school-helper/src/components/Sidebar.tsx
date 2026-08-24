@@ -34,14 +34,14 @@ const SIDEBAR_HIDDEN_KEY = 'sidebar.hiddenMenus.v1'
 const SIDEBAR_COLLAPSED_GROUPS_KEY = 'sidebar.collapsedGroups.v1'
 
 const MENU_GROUPS = [
-  { id: 'start', label: '시작·설정', items: ['help', 'notifier', 'dashboard', 'calendar', 'settings', 'admin_center'] },
+  { id: 'start', label: '시작·설정', items: ['help', 'notifier', 'calendar', 'settings', 'admin_center'] },
   { id: 'school', label: '업무·학교운영', items: ['staff_tasks', 'school_hub', 'timetable_swap', 'staff_roster', 'committees', 'feature_requests', 'form_center'] },
   { id: 'student', label: '학생·학사', items: ['student_timetable', 'attendance_print', 'volunteer_work', 'student_locator', 'student_identity_audit', 'subject_remarks_print', 'record_privacy_blind'] },
   { id: 'curriculum', label: '평가·교육과정·진로', items: ['schoolinfo_evaluation', 'grade_preview', 'estimated_split_score', 'curriculum', 'recommended_subjects'] },
   { id: 'tools', label: '인사·교사용 도구', items: ['transfer_score', 'teacher_tools', 'excel_processor', 'payroll', 'insa_analysis', 'pdf_extractor', 'file_parser'] },
 ] as const
 
-const DEFAULT_COLLAPSED_GROUPS = MENU_GROUPS.filter(group => group.id !== 'start').map(group => group.id)
+const DEFAULT_COLLAPSED_GROUPS: string[] = []
 const GROUP_BY_MENU: ReadonlyMap<string, string> = new Map<string, string>(MENU_GROUPS.flatMap(group => group.items.map(id => [id, group.id])))
 
 function normalizeOrder(value: unknown) {
@@ -116,8 +116,8 @@ export default function Sidebar({
       window.electron?.configGet(SIDEBAR_COLLAPSED_GROUPS_KEY),
     ]).then(([order, pinned, hidden, expandedPin, collapsed]) => {
       setMenuOrder(normalizeOrder(order))
-      setPinnedMenus(Array.isArray(pinned) ? pinned.map(String).filter(id => NAV_BY_ID.has(id)) : [])
-      setHiddenMenus(Array.isArray(hidden) ? hidden.map(String).filter(id => NAV_BY_ID.has(id) && id !== 'settings') : [])
+      setPinnedMenus(Array.isArray(pinned) ? pinned.map(String).filter(id => NAV_BY_ID.has(id) && id !== 'dashboard') : [])
+      setHiddenMenus(Array.isArray(hidden) ? hidden.map(String).filter(id => NAV_BY_ID.has(id) && id !== 'settings' && id !== 'dashboard') : [])
       setExpandedPinned(normalizeSidebarExpandedPinned(expandedPin))
       setCollapsedGroups(Array.isArray(collapsed)
         ? collapsed.map(String).filter(id => MENU_GROUPS.some(group => group.id === id))
@@ -137,16 +137,18 @@ export default function Sidebar({
     return orderedIds
       .map(id => NAV_BY_ID.get(id))
       .filter((item): item is NavigationItem => Boolean(item))
-      .filter(item => !hiddenMenus.includes(item.id))
+      .filter(item => item.id === 'dashboard' || !hiddenMenus.includes(item.id))
       .filter(item => item.id !== 'admin_center' || isAdmin)
   }, [hiddenMenus, isAdmin, menuOrder, pinnedMenus])
 
-  const pinnedItems = useMemo(() => orderedItems.filter(item => pinnedMenus.includes(item.id)), [orderedItems, pinnedMenus])
+  const dashboardItem = useMemo(() => orderedItems.find(item => item.id === 'dashboard'), [orderedItems])
+  const menuItems = useMemo(() => orderedItems.filter(item => item.id !== 'dashboard'), [orderedItems])
+  const pinnedItems = useMemo(() => menuItems.filter(item => pinnedMenus.includes(item.id)), [menuItems, pinnedMenus])
   const groupedItems = useMemo(() => MENU_GROUPS.map(group => ({
     ...group,
-    entries: orderedItems.filter(item => !pinnedMenus.includes(item.id) && (group.items as readonly string[]).includes(item.id)),
-  })).filter(group => group.entries.length), [orderedItems, pinnedMenus])
-  const ungroupedItems = useMemo(() => orderedItems.filter(item => !pinnedMenus.includes(item.id) && !GROUP_BY_MENU.has(item.id)), [orderedItems, pinnedMenus])
+    entries: menuItems.filter(item => !pinnedMenus.includes(item.id) && (group.items as readonly string[]).includes(item.id)),
+  })).filter(group => group.entries.length), [menuItems, pinnedMenus])
+  const ungroupedItems = useMemo(() => menuItems.filter(item => !pinnedMenus.includes(item.id) && !GROUP_BY_MENU.has(item.id)), [menuItems, pinnedMenus])
 
   useEffect(() => {
     const activeGroup = GROUP_BY_MENU.get(currentPage)
@@ -168,6 +170,7 @@ export default function Sidebar({
   }
 
   const togglePinned = (id: string) => {
+    if (id === 'dashboard') return
     setPinnedMenus(current => {
       const next = current.includes(id) ? current.filter(item => item !== id) : [...current, id]
       void window.electron?.configSet(SIDEBAR_PINNED_KEY, next)
@@ -176,7 +179,7 @@ export default function Sidebar({
   }
 
   const hideMenu = (id: string) => {
-    if (id === 'settings') return
+    if (id === 'settings' || id === 'dashboard') return
     setHiddenMenus(current => {
       const next = [...new Set([...current, id])]
       void window.electron?.configSet(SIDEBAR_HIDDEN_KEY, next)
@@ -254,8 +257,11 @@ export default function Sidebar({
 
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-none">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={menuOrder} strategy={verticalListSortingStrategy}>
-            {editing || !isExpanded ? orderedItems.map(item => (
+          <SortableContext items={menuOrder.filter(id => id !== 'dashboard')} strategy={verticalListSortingStrategy}>
+            {dashboardItem && (
+              <NavButton key={dashboardItem.id} item={dashboardItem} expanded={isExpanded} editing={false} active={currentPage === dashboardItem.id} pinned={false} locked onClick={() => onNavigate(dashboardItem.id)} onTogglePinned={() => undefined} onHide={() => undefined} />
+            )}
+            {editing || !isExpanded ? menuItems.map(item => (
               <NavButton key={item.id} item={item} expanded={isExpanded} editing={editing} active={currentPage === item.id} pinned={pinnedMenus.includes(item.id)} onClick={() => onNavigate(item.id)} onTogglePinned={() => togglePinned(item.id)} onHide={() => hideMenu(item.id)} />
             )) : <>
               {pinnedItems.length > 0 && <MenuGroupHeader label="고정 메뉴" count={pinnedItems.length} pinned />}
@@ -308,13 +314,14 @@ function MenuGroupHeader({
 }
 
 function NavButton({
-  item, expanded, editing, active, pinned, onClick, onTogglePinned, onHide,
+  item, expanded, editing, active, pinned, locked = false, onClick, onTogglePinned, onHide,
 }: {
   item: NavigationItem
   expanded: boolean
   editing: boolean
   active: boolean
   pinned: boolean
+  locked?: boolean
   onClick: () => void
   onTogglePinned: () => void
   onHide: () => void
@@ -322,7 +329,7 @@ function NavButton({
   const Icon = item.icon
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
-    disabled: !editing,
+    disabled: !editing || locked,
   })
 
   return (
@@ -345,7 +352,7 @@ function NavButton({
         <Icon size={16} className={clsx('flex-shrink-0', active && 'text-amber-400')} />
         {expanded && <span className="ml-2.5 truncate text-sm whitespace-nowrap">{item.label}</span>}
       </button>
-      {expanded && editing && (
+      {expanded && editing && !locked && (
         <button
           type="button"
           {...attributes}
@@ -357,7 +364,7 @@ function NavButton({
           <GripVertical size={14} />
         </button>
       )}
-      {expanded && !editing && (
+      {expanded && !editing && !locked && (
         <div className="pointer-events-none absolute right-1 top-1 flex opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
           <button
             type="button"
