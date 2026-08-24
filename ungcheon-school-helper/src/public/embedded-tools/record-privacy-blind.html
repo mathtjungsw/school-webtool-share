@@ -4,12 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>생기부 개인정보 블라인드</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="./pdf.min.js"></script>
+<script src="./pdf-lib.min.js"></script>
+<script src="./jszip.min.js"></script>
 <style>
   :root{
     --ink:#15171c; --ink-2:#22252c; --paper:#f3f1ea; --paper-edge:#e7e3d6;
@@ -259,14 +256,7 @@
 (function(){
   "use strict";
   const pdfjsLib = window['pdfjsLib'];
-  (async function setupWorker(){
-    const url="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-    try{
-      const res=await fetch(url); const txt=await res.text();
-      const blob=new Blob([txt],{type:"application/javascript"});
-      pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(blob);
-    }catch(e){ pdfjsLib.GlobalWorkerOptions.workerSrc=url; }
-  })();
+  pdfjsLib.GlobalWorkerOptions.workerSrc="./pdf.worker.min.js";
 
   // ---------- state ----------
   // docs: [{ name, pdfDoc, pageMeta:[{items,images,noText}], boxes:[], strSchool, strName }]

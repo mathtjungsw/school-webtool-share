@@ -1,5 +1,6 @@
 import { ExternalLink, FileLock2, ShieldCheck } from 'lucide-react'
-import recordPrivacyBlindUrl from '../assets/embedded-tools/record-privacy-blind.html?url'
+
+const recordPrivacyBlindUrl = './embedded-tools/record-privacy-blind.html'
 
 export default function RecordPrivacyBlindPage() {
   return (

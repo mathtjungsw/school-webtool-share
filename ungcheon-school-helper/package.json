@@ -47,6 +47,8 @@
     "electron": "31.7.7",
     "electron-builder": "24.13.3",
     "electron-vite": "2.3.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist-v3": "npm:pdfjs-dist@^3.11.174",
     "png-to-ico": "^2.1.8",
     "postcss": "8.4.40",
     "rcedit": "^4.0.1",
