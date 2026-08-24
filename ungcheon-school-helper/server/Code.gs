@@ -355,6 +355,19 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.19',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.19',
+    body: [
+      '· 전보내신점수 계산기에 2027 인사관리기준 별표 3·4의 세부 인정 조건과 증빙 안내를 반영했습니다.',
+      '· 전보내신 경력연도는 3월 1일부터 다음 해 2월 말까지 계산하고, 표창·상장·자격증·인증서는 제21조 제3항에 따라 12월 31일까지 취득한 자료만 현재 내신에 반영합니다.',
+      '· 장기근속 누진점이 중복 합산되지 않도록 바로잡고, 자격증·영어시험·TEE·우대조건의 취득일과 요건을 확인할 수 있게 했습니다.',
+      '· 업무센터는 교직원 명렬과 업무 목록을 독립적으로 불러오며, 서버 응답이 늦을 때 마지막 동기화 자료와 작성 중인 로컬 임시 초안을 유지합니다.',
+      '· 업무 저장 재시도 시 같은 업무가 중복 등록되지 않도록 요청 식별값을 적용하고, 관리자 진단에서 시트별 읽기 시간을 확인할 수 있게 했습니다.',
+      '· 학교 공유 서비스의 반복적인 전체 시트 점검과 동기화 상태 전체 검색을 줄여 업무 조회·저장 지연을 개선했습니다.'
+    ].join('\n'),
+    date: '2026-08-24'
+  },
+  {
     key: 'v1.1.17',
     title: '[업데이트] 웅천고 업무도우미 v1.1.17',
     body: [
@@ -541,7 +554,7 @@ const GET_READ_ACTIONS = [
 function doGet(e) {
   try {
     const action = String(e && e.parameter && e.parameter.action || '');
-    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 32 } });
+    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 33 } });
     if (GET_READ_ACTIONS.indexOf(action) < 0) throw new Error('GET으로 허용되지 않는 요청입니다.');
 
     const rawPayload = String(e && e.parameter && e.parameter.payload || '{}');
@@ -566,7 +579,7 @@ function doPost(e) {
       ensureSheets_();
     }
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 32 } });
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 33 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
