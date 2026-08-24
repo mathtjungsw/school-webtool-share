@@ -17,6 +17,7 @@ import { VirtualizedTable, type VirtualizedTableColumn } from '../components/vir
 import {
   addStaffChecklist,
   deleteStaffChecklist,
+  getSchoolHubCacheStatus,
   getSharedStaffRoster,
   listStaffChecklists,
   replaceSharedStaffRoster,
@@ -68,20 +69,27 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [lastCacheAt, setLastCacheAt] = useState<number | null>(null)
 
   const load = useCallback(async (force = false) => {
     if (!config.schoolHubUrl) return
     setLoading(true)
     setError('')
     try {
-      const [nextRoster, nextChecklists] = await Promise.all([
+      const [rosterResult, checklistResult] = await Promise.allSettled([
         getSharedStaffRoster(force),
         mode === 'checklists' && teacherName
           ? listStaffChecklists(teacherName, isAdmin ? adminPassword : '', force)
           : Promise.resolve([]),
       ])
-      setRoster(nextRoster)
-      setChecklists(nextChecklists)
+      const failures: string[] = []
+      if (rosterResult.status === 'fulfilled') setRoster(rosterResult.value)
+      else failures.push(`교직원 명렬: ${rosterResult.reason instanceof Error ? rosterResult.reason.message : String(rosterResult.reason)}`)
+      if (checklistResult.status === 'fulfilled') setChecklists(checklistResult.value)
+      else failures.push(`업무 목록: ${checklistResult.reason instanceof Error ? checklistResult.reason.message : String(checklistResult.reason)}`)
+      const cacheStatus = getSchoolHubCacheStatus()
+      setLastCacheAt(cacheStatus.newestAt)
+      if (failures.length) setError(`일부 자료를 새로 받지 못했습니다. ${failures.join(' / ')}`)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : String(loadError))
     } finally {
@@ -166,6 +174,7 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
 
       {error && <Notice tone="error" text={error} />}
       {success && <Notice tone="success" text={success} />}
+      {lastCacheAt && <div className="rounded-xl border border-sky-500/20 bg-sky-500/8 px-4 py-2.5 text-[11px] font-semibold text-sky-800 dark:text-sky-200">마지막 동기화 자료 · {new Date(lastCacheAt).toLocaleString('ko-KR')}{error ? ' · 서버 응답 지연으로 로컬 복사본을 계속 표시합니다.' : ''}</div>}
 
       {mode === 'checklists' && (
         <ChecklistTab
@@ -201,6 +210,7 @@ type AssignedFilter = 'all' | 'new' | 'today' | 'dueSoon' | 'overdue'
 
 interface SharedTaskDraft {
   id?: string
+  requestId?: string
   title: string
   description: string
   startDate: string
@@ -226,6 +236,7 @@ const PRIORITY_LABEL: Record<StaffTaskPriority, string> = { low: '낮음', norma
 
 function emptySharedTask(): SharedTaskDraft {
   return {
+    requestId: crypto.randomUUID(),
     title: '', description: '', startDate: today(), deadline: today(), priority: 'normal',
     status: 'in_progress', linkUrl: '', itemsText: '', targetNames: [], departmentNames: [],
   }
@@ -253,6 +264,7 @@ function ChecklistTab(props: {
   const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()))
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<SharedTaskDraft>(emptySharedTask)
+  const [draftRecovered, setDraftRecovered] = useState(false)
   const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>([])
   const [lastViewedAt, setLastViewedAt] = useState<string | null>(null)
   const notificationInitializedFor = useRef('')
@@ -262,6 +274,26 @@ function ChecklistTab(props: {
   )
 
   useEffect(() => { void loadPersonalTasks().then(setPersonalTasks) }, [])
+  useEffect(() => {
+    if (!teacherName) return
+    try {
+      const saved = JSON.parse(localStorage.getItem(`ungcheon.staff-task-draft.v1:${teacherName}`) ?? 'null') as SharedTaskDraft | null
+      if (saved?.title || saved?.description || saved?.itemsText) {
+        setForm({ ...emptySharedTask(), ...saved, requestId: saved.requestId || crypto.randomUUID() })
+        setDraftRecovered(true)
+        setView('create')
+      }
+    } catch { /* 잘못된 임시 초안은 무시한다. */ }
+  }, [teacherName])
+  useEffect(() => {
+    if (!teacherName) return
+    const key = `ungcheon.staff-task-draft.v1:${teacherName}`
+    const timer = window.setTimeout(() => {
+      if (form.title || form.description || form.itemsText || form.targetNames.length) localStorage.setItem(key, JSON.stringify(form))
+      else localStorage.removeItem(key)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [form, teacherName])
   useEffect(() => subscribePersonalOrganizer(change => {
     if (change.kind === 'tasks') setPersonalTasks(change.value)
   }), [])
@@ -305,7 +337,11 @@ function ChecklistTab(props: {
     })
   }, [assigned, assignedFilter, checklists, created, newTaskIds, teacherName, view])
 
-  const resetForm = () => setForm(emptySharedTask())
+  const resetForm = () => {
+    if (teacherName) localStorage.removeItem(`ungcheon.staff-task-draft.v1:${teacherName}`)
+    setDraftRecovered(false)
+    setForm(emptySharedTask())
+  }
   const selectDepartment = (department: string) => {
     const names = members.filter(member => member.department === department).map(member => member.name)
     setForm(current => ({
@@ -316,7 +352,7 @@ function ChecklistTab(props: {
   }
   const editTask = (task: StaffChecklist) => {
     setForm({
-      id: task.id, title: task.title, description: task.description, startDate: task.startDate || today(),
+      id: task.id, requestId: crypto.randomUUID(), title: task.title, description: task.description, startDate: task.startDate || today(),
       deadline: task.deadline || today(), priority: task.priority, status: task.status,
       linkUrl: task.linkUrl, itemsText: task.items.map(item => item.label).join('\n'),
       targetNames: task.targetNames, departmentNames: task.departmentNames,
@@ -348,6 +384,7 @@ function ChecklistTab(props: {
         onSuccess('공유 업무를 수정했습니다.')
       } else {
         await addStaffChecklist({
+          requestId: form.requestId || crypto.randomUUID(),
           title: form.title, description: form.description, startDate: form.startDate,
           deadline: form.deadline, priority: form.priority, status: form.status,
           linkUrl: form.linkUrl, creatorName: teacherName, items,
@@ -358,7 +395,8 @@ function ChecklistTab(props: {
       resetForm()
       await onChanged()
     } catch (submitError) {
-      onError(submitError instanceof Error ? submitError.message : String(submitError))
+      setDraftRecovered(true)
+      onError(`업무 저장을 완료하지 못했습니다. 입력 내용은 이 PC에 임시 보관했습니다. 다시 저장해 주세요. (${submitError instanceof Error ? submitError.message : String(submitError)})`)
     } finally {
       setSaving(false)
     }
@@ -395,6 +433,7 @@ function ChecklistTab(props: {
         <div className={view === 'create' ? 'mx-auto w-full max-w-3xl' : ''}>
           {view === 'create' && <form onSubmit={submit} className="card space-y-3">
             <div className="flex items-start justify-between gap-2"><div><h2 className="font-bold text-white">{form.id ? '공유 업무 수정' : '새 공유 업무'}</h2><p className="mt-1 text-[11px] text-slate-500">전체·부서·개별 교원에게 배부할 수 있습니다.</p></div>{form.id && <button type="button" onClick={resetForm} className="text-[10px] text-slate-500 hover:text-white">새 업무</button>}</div>
+            {draftRecovered && <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-800 dark:text-amber-200">이 PC에 보관된 업무 초안입니다. 내용을 확인한 뒤 다시 저장하세요.</div>}
             <input required maxLength={100} className="input-field" placeholder="업무 제목" value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} />
             <textarea maxLength={1000} className="input-field min-h-20 resize-y" placeholder="업무 설명·안내" value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} />
             <textarea required maxLength={2000} className="input-field min-h-24 resize-y" placeholder={'세부 확인 항목 1\n세부 확인 항목 2'} value={form.itemsText} onChange={event => setForm({ ...form, itemsText: event.target.value })} />

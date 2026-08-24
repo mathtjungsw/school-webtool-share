@@ -69,6 +69,8 @@ declare global {
         checkedAt: string
         get: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
         post: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
+        roster: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
+        tasks: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
       }>
       schoolHubCacheGetAll: () => Promise<Array<{
         cacheKey: string

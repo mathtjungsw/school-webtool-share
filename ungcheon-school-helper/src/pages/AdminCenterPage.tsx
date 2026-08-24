@@ -33,6 +33,8 @@ interface HubDiagnosticResult {
   checkedAt: string
   get: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
   post: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
+  roster: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
+  tasks: { ok: boolean; status: number; elapsedMs: number; version: number | null; error: string }
 }
 
 export default function AdminCenterPage() {
@@ -188,16 +190,20 @@ export default function AdminCenterPage() {
           {!config.schoolHubUrl?.trim() && <Notice tone="warn">환경설정에 학교 공유 서비스 URL을 먼저 입력해 주세요.</Notice>}
           {diagnostic && (
             <>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <Status label="조회 통신(GET)" value={diagnostic.get.ok ? `정상 · ${diagnostic.get.elapsedMs}ms` : `실패 · ${diagnostic.get.error}`} good={diagnostic.get.ok} />
                 <Status label="저장 통신 경로(POST)" value={diagnostic.post.ok ? `정상 · ${diagnostic.post.elapsedMs}ms` : `실패 · ${diagnostic.post.error}`} good={diagnostic.post.ok} />
+                <Status label="교직원 명렬 시트 읽기" value={diagnostic.roster.ok ? `정상 · ${diagnostic.roster.elapsedMs}ms` : `실패 · ${diagnostic.roster.error}`} good={diagnostic.roster.ok} />
+                <Status label="업무센터 목록 읽기" value={diagnostic.tasks.ok ? `정상 · ${diagnostic.tasks.elapsedMs}ms` : `실패 · ${diagnostic.tasks.error}`} good={diagnostic.tasks.ok} />
                 <Status label="공유 서비스 버전" value={`버전 ${diagnostic.post.version ?? diagnostic.get.version ?? '-'}`} good={diagnostic.get.ok || diagnostic.post.ok} />
                 <Status label="마지막 진단" value={formatDateTime(diagnostic.checkedAt)} />
               </div>
-              {diagnostic.get.ok && diagnostic.post.ok
-                ? <Notice tone="success">조회와 저장 통신 경로가 모두 정상입니다. 이 진단은 실제 업무나 자료를 추가·수정하지 않았습니다.</Notice>
+              {diagnostic.get.ok && diagnostic.post.ok && diagnostic.roster.ok && diagnostic.tasks.ok
+                ? <Notice tone="success">조회·저장 통신과 실제 시트 읽기가 모두 정상입니다. 이 진단은 실제 업무나 자료를 추가·수정하지 않았습니다.</Notice>
                 : diagnostic.get.ok && !diagnostic.post.ok
                   ? <Notice tone="error">조회는 정상이지만 POST 통신이 실패했습니다. 학교 유선망이 외부 저장 요청을 차단할 가능성이 있습니다.</Notice>
+                  : diagnostic.get.ok && diagnostic.post.ok && (!diagnostic.roster.ok || !diagnostic.tasks.ok)
+                    ? <Notice tone="error">통신 경로는 정상이지만 Google 시트 읽기가 지연되고 있습니다. 업무센터는 마지막 동기화 자료를 표시합니다.</Notice>
                   : <Notice tone="error">학교 공유 서비스 연결에 실패했습니다. 네트워크와 공유 서비스 URL을 확인해 주세요.</Notice>}
             </>
           )}

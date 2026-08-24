@@ -32,25 +32,27 @@ export interface EducationActivityDefinition {
   annualPoint: number
   cap?: number
   condition: string
+  details?: string[]
 }
 
 export const EDUCATION_ACTIVITY_DEFINITIONS: EducationActivityDefinition[] = [
-  { id: 'homeroom', label: '담임교사', annualPoint: 0.3, condition: '2010.3.1. 이후 경력' },
+  { id: 'homeroom', label: '담임교사', annualPoint: 0.3, condition: '2010.3.1. 이후 경력', details: ['휴직 기간 제외', '2010.2.28. 이전은 연 0.20점'] },
   { id: 'school_violence', label: '학교폭력책임교사', annualPoint: 0.3, condition: '2027.3.1. 이후, 학교별 1명 한정' },
   { id: 'dual_subject', label: '2과목 이상 지도교사', annualPoint: 0.2, condition: '복수·부전공 자격, 2과목 이상 지도' },
-  { id: 'athlete_coach', label: '선수육성 지도교사', annualPoint: 0.25, condition: '2011.3.1. 이후 인정 경력' },
+  { id: 'athlete_coach', label: '선수육성 지도교사', annualPoint: 0.25, condition: '2011.3.1. 이후 인정 경력', details: ['전국소년체육대회(중)·전국체육대회(고) 출전 학생 지도', '동일 경력의 담임교사 경력·별표4 상장·표창과 중복 불가'] },
   { id: 'department_head', label: '부장교사', annualPoint: 0.4, condition: '2021.3.1. 이후 경력' },
-  { id: 'joint_curriculum', label: '공동교육과정 수업교사', annualPoint: 0.2, condition: '2022.3.1. 이후, 일과시간 내 수업' },
+  { id: 'joint_curriculum', label: '공동교육과정 수업교사', annualPoint: 0.2, condition: '2022.3.1. 이후, 일과시간 내 수업', details: ['방과후·주말간 공동교육과정 수업 제외', '공동교육과정 수업 월수는 겸임 월수로 중복 불가'] },
   { id: 'concurrent_one', label: '1개 학교 겸임', annualPoint: 0.5, condition: '통합운영학교 겸임 포함' },
   { id: 'concurrent_two', label: '2개 학교 겸임', annualPoint: 0.7, condition: '2010.3.1. 이후' },
   { id: 'broadcast_adjunct', label: '방송통신중·고 겸직', annualPoint: 0.2, cap: 0.6, condition: '2004.3.1. 이후, 상한 0.60점' },
   { id: 'research_school', label: '연구·시범학교', annualPoint: 0.5, condition: '전보 가산점 인정 교사' },
-  { id: 'training_cooperation', label: '연수협력학교', annualPoint: 0.3, condition: '2012.3.1. 이후, 교당 매년 2명 이내' },
+  { id: 'training_cooperation', label: '연수협력학교', annualPoint: 0.3, condition: '2012.3.1. 이후, 교당 매년 2명 이내', details: ['해당 학년도 인원 제한 확인 필요'] },
   { id: 'common_practice', label: '공동 실습소', annualPoint: 0.25, condition: '농업계·공업계 전문교과 교사' },
-  { id: 'dormitory_supervisor', label: '기숙사 사감', annualPoint: 0.2, cap: 0.6, condition: '인정 대상자, 상한 0.60점' },
-  { id: 'special_school_nurse', label: '특수학교 보건교사', annualPoint: 0.3, condition: '2027.3.1. 이후 경력' },
+  { id: 'dormitory_supervisor', label: '기숙사 사감', annualPoint: 0.2, cap: 0.6, condition: '인정 대상자, 상한 0.60점', details: ['2012.3.1. 이후 도교육청 지원 기숙사: 교당 매년 7명 이내', '2018.3.1. 이후 교육공무원 가산점 인정 인원 제외', '2023.3.1. 이후 도교육청 운영 기숙사 기준 확인'] },
+  { id: 'special_school_nurse_old', label: '특수학교 보건교사(2014.3.1.~2026.2.28.)', annualPoint: 0.2, condition: '해당 기간 연 0.20점' },
+  { id: 'special_school_nurse', label: '특수학교 보건교사(2027.3.1. 이후)', annualPoint: 0.3, condition: '해당 기간 연 0.30점' },
   { id: 'specialized_school', label: '각종학교', annualPoint: 0.2, condition: '별표3 지정 학교 경력' },
-  { id: 'happiness_school', label: '행복(나눔)학교', annualPoint: 0.2, cap: 0.6, condition: '점수 인정 경력만 입력, 최대 0.60점' },
+  { id: 'happiness_school', label: '행복(나눔)학교', annualPoint: 0.2, cap: 0.6, condition: '점수 인정 경력만 입력, 최대 0.60점', details: ['지정 이후 근무 3년차부터 최대 3년', '2021.3.1. 이후 통산 2년 초과 경력에 연 0.20점'] },
 ]
 
 export interface SelectOption {
@@ -65,11 +67,15 @@ export const COMMENDATION_OPTIONS: SelectOption[] = [
   { id: 'general_education', label: '교육일반 표창', score: 1 },
   { id: 'university_president', label: '대학교총장 표창(2010.3.1. 이후)', score: 0.7 },
   { id: 'direct_agency', label: '직속기관장 표창', score: 0.7 },
+  { id: 'superintendent_before_2010', label: '교육장 표창(2010.2.28. 이전)', score: 0.7 },
 ]
 
 export const QUALIFICATION_OPTIONS: SelectOption[] = [
   { id: '', label: '해당 없음', score: 0 },
-  { id: 'technical', label: '교과지도에 직접 필요한 기술자격증', score: 0.5 },
+  { id: 'engineer', label: '기술사·기능장·기사·산업기사·해기사 1~6급', score: 0.5 },
+  { id: 'craft_service', label: '기능사·서비스계 1~3급·1단 이상', score: 0.5 },
+  { id: 'information', label: '정보처리·전자계산기조직응용·컴활·워드', score: 0.5 },
+  { id: 'teacher_information', label: '교원정보활용능력인증', score: 0.5 },
 ]
 
 export const ENGLISH_OPTIONS: SelectOption[] = [
@@ -109,6 +115,20 @@ export interface AdditionalScoreInput {
   tee: string
   preference: string
   integrityContribution: boolean
+  commendationDate?: string
+  commendationPerformanceKey?: string
+  nationalAthleteYears?: string
+  ministerAwardYears?: string
+  studyGuidanceYears?: string
+  competitionGuidanceYears?: string
+  qualificationDate?: string
+  qualificationSubjectRequired?: boolean
+  englishTest?: 'TSE-P' | 'TOEFL_IBT' | 'TOEIC' | 'TEPS_OLD' | 'TEPS_NEW' | ''
+  englishScore?: number
+  englishDate?: string
+  teeDate?: string
+  teeEnglishTeacher?: boolean
+  preferenceEvidenceConfirmed?: boolean
 }
 
 export interface TransferScoreInput {
@@ -158,15 +178,17 @@ function addUtcDays(date: Date, days: number): Date {
   return new Date(date.getTime() + days * DAY_MS)
 }
 
-function subtractUtcYears(date: Date, years: number): Date {
-  const year = date.getUTCFullYear() - years
-  const month = date.getUTCMonth()
-  const day = Math.min(date.getUTCDate(), new Date(Date.UTC(year, month + 1, 0)).getUTCDate())
-  return new Date(Date.UTC(year, month, day))
+export function transferYearLabel(dateValue: string): number | null {
+  const date = parseDate(dateValue)
+  if (!date) return null
+  return date.getUTCMonth() >= 2 ? date.getUTCFullYear() : date.getUTCFullYear() - 1
 }
 
 function periodWindowStart(evaluationDate: Date, years: number): Date {
-  return subtractUtcYears(addUtcDays(evaluationDate, 1), years)
+  const transferYear = evaluationDate.getUTCMonth() >= 2
+    ? evaluationDate.getUTCFullYear()
+    : evaluationDate.getUTCFullYear() - 1
+  return new Date(Date.UTC(transferYear - years + 1, 2, 1))
 }
 
 export function roundScore(value: number): number {
@@ -239,14 +261,46 @@ function bandScore(totalMonths: number, startExclusive: number, endInclusive: nu
 
 export function calculateLongServiceBonus(totalMonths: number) {
   const months = Math.max(0, Math.min(60, Math.floor(totalMonths)))
-  const base = roundScore(
+  const total = roundScore(
     bandScore(months, 12, 24, 1)
     + bandScore(months, 24, 36, 2)
     + bandScore(months, 36, 48, 3)
     + bandScore(months, 48, 60, 3),
   )
-  const extra = roundScore(bandScore(months, 36, 48, 2) + bandScore(months, 48, 60, 2))
-  return { base, extra, total: roundScore(base + extra) }
+  // 별표3의 누적표(2년 1점, 3년 3점, 4년 6점, 5년 9점)를 그대로 적용한다.
+  // '최근 3년 초과' 문구를 별도 가산점으로 다시 더하지 않는다.
+  const longServicePortion = roundScore(bandScore(months, 36, 48, 2) + bandScore(months, 48, 60, 2))
+  return { base: total, extra: longServicePortion, total }
+}
+
+function parseYearTokens(value = ''): number[] {
+  return value.split(/[^0-9]+/).map(Number).filter(year => year >= 2000 && year <= 2100)
+}
+
+function englishScoreFromInput(input: AdditionalScoreInput): number {
+  const score = Number(input.englishScore) || 0
+  switch (input.englishTest) {
+    case 'TSE-P': return score >= 50 ? 1 : score >= 45 ? 0.5 : 0
+    case 'TOEFL_IBT': return score >= 92 ? 1 : score >= 80 ? 0.5 : 0
+    case 'TOEIC': return score >= 800 ? 1 : score >= 700 ? 0.5 : 0
+    case 'TEPS_OLD': return score >= 712 ? 1 : score >= 602 ? 0.5 : 0
+    case 'TEPS_NEW': return score >= 393 ? 1 : score >= 328 ? 0.5 : 0
+    default: return 0
+  }
+}
+
+function evidenceCutoff(evaluationDate: Date): Date {
+  const transferYear = evaluationDate.getUTCMonth() >= 2
+    ? evaluationDate.getUTCFullYear()
+    : evaluationDate.getUTCFullYear() - 1
+  return new Date(Date.UTC(transferYear, 11, 31))
+}
+
+function evidenceDateEligible(dateValue: string | undefined, cutoff: Date): boolean | null {
+  if (!dateValue) return null
+  const date = parseDate(dateValue)
+  if (!date) return null
+  return date <= cutoff
 }
 
 function findOption(options: SelectOption[], id: string): SelectOption {
@@ -319,10 +373,7 @@ export function calculateTransferScore(input: TransferScoreInput): TransferScore
   const longService = calculateLongServiceBonus(evaluationCareerMonths)
   const educationItems: ScoreBreakdownItem[] = []
   if (longService.base > 0) {
-    educationItems.push({ id: 'long_base', label: '근무경력부가점(기본 누진)', detail: `${evaluationCareerMonths}개월 · 2~5년차 연 1·2·3·3점`, score: longService.base })
-  }
-  if (longService.extra > 0) {
-    educationItems.push({ id: 'long_extra', label: '근무경력부가점(장기 추가)', detail: `${evaluationCareerMonths}개월 · 최근 3년 초과~5년 연 2점`, score: longService.extra })
+    educationItems.push({ id: 'long_base', label: '근무경력부가점', detail: `${evaluationCareerMonths}개월 · 별표3 누적표(2년 1점·3년 3점·4년 6점·5년 9점)`, score: longService.total })
   }
 
   for (const definition of EDUCATION_ACTIVITY_DEFINITIONS) {
@@ -335,10 +386,19 @@ export function calculateTransferScore(input: TransferScoreInput): TransferScore
   const educationActivityScore = roundScore(educationItems.reduce((sum, item) => sum + item.score, 0))
 
   const additionalItems: ScoreBreakdownItem[] = []
+  const acquisitionCutoff = evidenceCutoff(evaluationDate)
+  const acquisitionCutoffText = formatDate(acquisitionCutoff)
   const pushOption = (group: string, option: SelectOption) => {
     if (option.score > 0) additionalItems.push({ id: `${group}:${option.id}`, label: option.label, detail: '별표4 선택 항목', score: option.score })
   }
-  pushOption('commendation', findOption(COMMENDATION_OPTIONS, input.additional.commendation))
+  const commendationEligible = evidenceDateEligible(input.additional.commendationDate, acquisitionCutoff)
+  if (commendationEligible !== false) pushOption('commendation', findOption(COMMENDATION_OPTIONS, input.additional.commendation))
+  if (input.additional.commendation && !input.additional.commendationDate) {
+    warnings.push('표창 취득일을 입력해 평정기간 포함 여부를 확인해주세요.')
+  }
+  if (input.additional.commendation && commendationEligible === false) {
+    warnings.push(`표창 취득일이 ${acquisitionCutoffText} 이후입니다. 제21조 제3항에 따라 현재 내신에서 제외하고 전보된 학교의 차기 내신에서 평정합니다.`)
+  }
 
   const counted = [
     ['national_athlete', '전국소년체육대회·전국체육대회 학생 지도', input.additional.nationalAthleteAwards, 0.75, 5],
@@ -364,10 +424,54 @@ export function calculateTransferScore(input: TransferScoreInput): TransferScore
     warnings.push('표창·상장·대회지도는 동일 실적을 중복 적용할 수 없고, 상장·대회지도는 같은 학년도에 하나만 인정됩니다.')
   }
 
-  pushOption('qualification', findOption(QUALIFICATION_OPTIONS, input.additional.qualification))
-  pushOption('english', findOption(ENGLISH_OPTIONS, input.additional.english))
-  pushOption('tee', findOption(TEE_OPTIONS, input.additional.tee))
+  const recognitionYears = [
+    ['전국체전 상장', parseYearTokens(input.additional.nationalAthleteYears)],
+    ['교육감·장관 이상 상장', parseYearTokens(input.additional.ministerAwardYears)],
+    ['학습지도 연구대회', parseYearTokens(input.additional.studyGuidanceYears)],
+    ['대회 학생 지도', parseYearTokens(input.additional.competitionGuidanceYears)],
+  ] as const
+  const usedByYear = new Map<number, string[]>()
+  recognitionYears.forEach(([label, years]) => years.forEach(year => usedByYear.set(year, [...(usedByYear.get(year) ?? []), label])))
+  for (const [year, labels] of usedByYear) {
+    if (labels.length > 1) warnings.push(`${year} 내신연도에 ${labels.join('·')} 실적이 겹칩니다. 동일 학년도 택일·동일 실적 중복 불가 여부를 확인해주세요.`)
+  }
+  if (input.additional.commendationPerformanceKey?.trim() && recognitionGroupsUsed > 1) {
+    warnings.push(`표창 동일 실적 식별값 "${input.additional.commendationPerformanceKey.trim()}"과 상장·대회지도 실적의 중복 여부를 확인해주세요.`)
+  }
+
+  const qualificationEligible = evidenceDateEligible(input.additional.qualificationDate, acquisitionCutoff)
+  if (qualificationEligible !== false) pushOption('qualification', findOption(QUALIFICATION_OPTIONS, input.additional.qualification))
+  if (input.additional.qualification) {
+    if (!input.additional.qualificationSubjectRequired) warnings.push('기술자격증은 교과지도에 직접 필요한 자격인지 확인해야 합니다.')
+    if (!input.additional.qualificationDate) warnings.push('기술자격증 취득일을 입력해 평정기간 포함 여부를 확인해주세요.')
+    if (qualificationEligible === false) warnings.push(`기술자격증은 ${acquisitionCutoffText} 이후 취득하여 현재 내신 점수에서 제외했습니다.`)
+  }
+  const calculatedEnglishScore = englishScoreFromInput(input.additional)
+  const englishEligible = evidenceDateEligible(input.additional.englishDate, acquisitionCutoff)
+  if (input.additional.englishTest) {
+    if (calculatedEnglishScore > 0 && englishEligible !== false) additionalItems.push({
+      id: `english:${input.additional.englishTest}`,
+      label: `영어능력시험 ${input.additional.englishTest.replace('_', ' ')}`,
+      detail: `${Number(input.additional.englishScore) || 0}점 · 취득일 ${input.additional.englishDate || '미입력'}`,
+      score: calculatedEnglishScore,
+    })
+    else warnings.push('영어능력시험 점수가 별표4 최저 인정 기준에 미달합니다.')
+    if (!input.additional.englishDate) warnings.push('영어능력시험 취득일을 입력해 평정기간·유효기간을 확인해주세요.')
+    if (englishEligible === false) warnings.push(`영어능력시험은 ${acquisitionCutoffText} 이후 취득하여 현재 내신 점수에서 제외했습니다.`)
+  } else {
+    pushOption('english', findOption(ENGLISH_OPTIONS, input.additional.english))
+  }
+  const teeEligible = evidenceDateEligible(input.additional.teeDate, acquisitionCutoff)
+  if (teeEligible !== false) pushOption('tee', findOption(TEE_OPTIONS, input.additional.tee))
+  if (input.additional.tee) {
+    if (!input.additional.teeEnglishTeacher) warnings.push('TEE 인증서는 영어과 교사인지 확인해야 합니다.')
+    if (!input.additional.teeDate) warnings.push('TEE 인증서 취득일(2012.3.1. 이후·평정기간 내)을 확인해주세요.')
+    if (teeEligible === false) warnings.push(`TEE 인증서는 ${acquisitionCutoffText} 이후 취득하여 현재 내신 점수에서 제외했습니다.`)
+  }
   pushOption('preference', findOption(PREFERENCE_OPTIONS, input.additional.preference))
+  if (input.additional.preference && !input.additional.preferenceEvidenceConfirmed) {
+    warnings.push('우대조건은 택일 항목의 가족관계·주민등록·나이·부양 요건 증빙을 확인해주세요.')
+  }
   if (input.additional.integrityContribution) {
     additionalItems.push({ id: 'integrity', label: '청렴도 향상 기여', detail: '현임교 1회', score: 0.5 })
   }

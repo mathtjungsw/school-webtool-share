@@ -907,6 +907,13 @@ const HUB_READ_ACTIONS = new Set([
 ])
 
 const HUB_LARGE_DATA_ACTIONS = new Set([
+  'getSyncManifest',
+  'getStaffRoster',
+  'listStaffChecklists',
+  'addStaffChecklist',
+  'updateStaffChecklist',
+  'submitStaffChecklist',
+  'deleteStaffChecklist',
   'replaceStudentTimetable',
   'replaceStudentRoster',
   'replaceStaffRoster',
@@ -1029,7 +1036,9 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
 
   return {
     ok: false,
-    error: `학교 공유 서비스에 연결할 수 없습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.${lastError ? ` (${lastError})` : ''}`,
+    error: /abort|timeout/i.test(lastError)
+      ? `학교 공유 서비스 응답이 지연되어 ${action || '요청'} 처리를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.${lastError ? ` (${lastError})` : ''}`
+      : `학교 공유 서비스에 연결할 수 없습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.${lastError ? ` (${lastError})` : ''}`,
   }
 }
 
@@ -1098,6 +1107,18 @@ async function diagnoseSchoolHubAttempt(endpoint: string, method: 'GET' | 'POST'
   }
 }
 
+async function diagnoseSchoolHubRead(endpoint: string, action: string, payload: Record<string, unknown> = {}): Promise<HubDiagnosticAttempt> {
+  const startedAt = Date.now()
+  try {
+    const result = await fetchSchoolHub(endpoint, { action, ...payload }, action, 30_000)
+    const body = await result.json() as { ok?: boolean; error?: unknown }
+    const ok = result.ok && body.ok === true
+    return { ok, status: result.status, elapsedMs: Date.now() - startedAt, version: null, error: ok ? '' : String(body.error ?? `HTTP ${result.status}`) }
+  } catch (error) {
+    return { ok: false, status: 0, elapsedMs: Date.now() - startedAt, version: null, error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
 ipcMain.handle('schoolHub:diagnose', async () => {
   const endpoint = resolveSchoolHubEndpoint(store.get('config.schoolHubUrl', ''))
   let parsed: URL
@@ -1108,7 +1129,12 @@ ipcMain.handle('schoolHub:diagnose', async () => {
 
   const get = await diagnoseSchoolHubAttempt(endpoint, 'GET')
   const post = await diagnoseSchoolHubAttempt(endpoint, 'POST')
-  return { checkedAt: new Date().toISOString(), get, post }
+  const teacherName = String(store.get('config.teacherName', '') || '').trim()
+  const roster = await diagnoseSchoolHubRead(endpoint, 'getStaffRoster')
+  const tasks = teacherName
+    ? await diagnoseSchoolHubRead(endpoint, 'listStaffChecklists', { viewerName: teacherName })
+    : { ok: false, status: 0, elapsedMs: 0, version: null, error: '환경설정 이름 미입력' }
+  return { checkedAt: new Date().toISOString(), get, post, roster, tasks }
 })
 
 ipcMain.handle('notices:fetch', async () => {

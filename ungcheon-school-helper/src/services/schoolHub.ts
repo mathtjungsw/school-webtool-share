@@ -548,6 +548,7 @@ const notifyStaffChecklistUpdated = <T>(result: T) => {
 }
 
 export const addStaffChecklist = (input: {
+  requestId: string
   title: string
   description: string
   startDate: string

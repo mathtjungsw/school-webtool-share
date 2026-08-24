@@ -555,9 +555,16 @@ function doGet(e) {
 
 function doPost(e) {
   try {
-    ensureSheets_();
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
+
+    // 일반 조회에서 전체 시트 생성·보정을 매번 실행하지 않는다.
+    // 쓰기 요청은 버전 변경에 필요한 스키마만 보정한다.
+    if (['addStaffChecklist', 'updateStaffChecklist', 'submitStaffChecklist', 'deleteStaffChecklist'].indexOf(action) >= 0) {
+      ensureStaffChecklistSheets_();
+    } else if (GET_READ_ACTIONS.indexOf(action) < 0 && action !== 'health') {
+      ensureSheets_();
+    }
 
     if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 32 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
@@ -673,7 +680,10 @@ function getSyncManifest_() {
     const rows = readObjects_(sheetName);
     return 'v:' + String(rows.length ? Number(rows[0].version) || 0 : 0);
   }
-  function activityOf_(sheetNames) {
+  function activityOf_(resource, sheetNames) {
+    const stored = PropertiesService.getScriptProperties().getProperty('UNG_SYNC_RESOURCE_' + resource);
+    if (stored) return stored;
+    // 기존 배포 자료의 최초 1회만 기초 버전을 만든다.
     let count = 0;
     let latest = '';
     sheetNames.forEach(function(sheetName) {
@@ -683,7 +693,9 @@ function getSyncManifest_() {
         if (changed > latest) latest = changed;
       });
     });
-    return 'a:' + String(count) + ':' + latest;
+    const version = 'a:' + String(count) + ':' + latest;
+    PropertiesService.getScriptProperties().setProperty('UNG_SYNC_RESOURCE_' + resource, version);
+    return version;
   }
   return {
     generatedAt: new Date().toISOString(),
@@ -693,8 +705,8 @@ function getSyncManifest_() {
       staffRoster: versionOf_(STAFF_ROSTER_META_SHEET),
       studentRoster: versionOf_(STUDENT_ROSTER_META_SHEET),
       sharedNeis: versionOf_(NEIS_SYNC_META_SHEET),
-      staffChecklists: activityOf_([STAFF_CHECKLISTS_SHEET, STAFF_CHECKLIST_RESPONSES_SHEET])
-      ,timetableChanges: activityOf_([TIMETABLE_CHANGES_SHEET])
+      staffChecklists: activityOf_('staffChecklists', [STAFF_CHECKLISTS_SHEET, STAFF_CHECKLIST_RESPONSES_SHEET])
+      ,timetableChanges: activityOf_('timetableChanges', [TIMETABLE_CHANGES_SHEET])
     }
   };
 }
@@ -809,7 +821,7 @@ function ensureSheets_() {
   ensureDataSheet_(book, STAFF_CHECKLISTS_SHEET, [
     'id', 'title', 'description', 'deadline', 'creatorName', 'createdAt',
     'closed', 'itemsJson', 'targetNamesJson', 'startDate', 'priority', 'status',
-    'linkUrl', 'departmentNamesJson', 'updatedAt'
+    'linkUrl', 'departmentNamesJson', 'updatedAt', 'requestId'
   ]);
   ensureDataSheet_(book, STAFF_CHECKLIST_RESPONSES_SHEET, [
     'checklistId', 'teacherName', 'checkedItemIdsJson', 'memo', 'updatedAt'
@@ -844,6 +856,28 @@ function ensureSheets_() {
   ]);
   repairCommitteeTimeCells_(book);
   ensureReleaseNotices_();
+}
+
+function ensureStaffChecklistSheets_() {
+  const book = SpreadsheetApp.getActiveSpreadsheet();
+  if (!book) throw new Error('이 스크립트를 Google 스프레드시트에 연결하세요.');
+  ensureDataSheet_(book, STAFF_CHECKLISTS_SHEET, [
+    'id', 'title', 'description', 'deadline', 'creatorName', 'createdAt',
+    'closed', 'itemsJson', 'targetNamesJson', 'startDate', 'priority', 'status',
+    'linkUrl', 'departmentNamesJson', 'updatedAt', 'requestId'
+  ]);
+  ensureDataSheet_(book, STAFF_CHECKLIST_RESPONSES_SHEET, [
+    'checklistId', 'teacherName', 'checkedItemIdsJson', 'memo', 'updatedAt'
+  ]);
+}
+
+function touchSyncResource_(resource) {
+  const properties = PropertiesService.getScriptProperties();
+  const key = 'UNG_SYNC_RESOURCE_' + resource;
+  const previous = String(properties.getProperty(key) || 'v:0');
+  const match = previous.match(/^v:(\d+)/);
+  const next = (match ? Number(match[1]) : 0) + 1;
+  properties.setProperty(key, 'v:' + next + ':' + new Date().toISOString());
 }
 
 function ensureDataSheet_(book, name, headers) {
@@ -1583,6 +1617,13 @@ function listStaffChecklists_(body) {
   if (!viewerName) throw new Error('환경설정에서 본인 이름을 입력하세요.');
   const admin = isAdminPassword_(body.adminPassword);
   const responses = readObjects_(STAFF_CHECKLIST_RESPONSES_SHEET);
+  const responsesByChecklist = {};
+  responses.forEach(function(response) {
+    const checklistId = String(response.checklistId || '');
+    if (!checklistId) return;
+    if (!responsesByChecklist[checklistId]) responsesByChecklist[checklistId] = [];
+    responsesByChecklist[checklistId].push(response);
+  });
   return readObjects_(STAFF_CHECKLISTS_SHEET)
     .map(function(row) {
       const items = parseJsonArray_(row.itemsJson);
@@ -1590,11 +1631,8 @@ function listStaffChecklists_(body) {
       const canManage = admin || String(row.creatorName || '') === viewerName;
       const visible = canManage || targetNames.indexOf(viewerName) >= 0;
       if (!visible) return null;
-      const checklistResponses = responses
-        .filter(function(response) {
-          return String(response.checklistId || '') === String(row.id || '') &&
-            (canManage || String(response.teacherName || '') === viewerName);
-        })
+      const checklistResponses = (responsesByChecklist[String(row.id || '')] || [])
+        .filter(function(response) { return canManage || String(response.teacherName || '') === viewerName; })
         .map(function(response) {
           return {
             teacherName: String(response.teacherName || ''),
@@ -1630,6 +1668,7 @@ function listStaffChecklists_(body) {
 }
 
 function addStaffChecklist_(body) {
+  const requestId = clean_(body.requestId, 100);
   const creatorName = clean_(body.creatorName, 30);
   const title = clean_(body.title, 100);
   const description = clean_(body.description, 1000);
@@ -1665,14 +1704,25 @@ function addStaffChecklist_(body) {
   const items = itemLabels.map(function(label) {
     return { id: Utilities.getUuid(), label: label };
   });
-  const id = Utilities.getUuid();
-  const createdAt = new Date().toISOString();
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_CHECKLISTS_SHEET).appendRow([
-    id, title, description, deadline, creatorName, createdAt, status === 'completed',
-    JSON.stringify(items), JSON.stringify(targetNames), startDate, priority, status,
-    linkUrl, JSON.stringify(departmentNames), createdAt
-  ]);
-  return { id: id };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (requestId) {
+      const existingRequest = findObjectByValue_(STAFF_CHECKLISTS_SHEET, 'requestId', requestId);
+      if (existingRequest && existingRequest.id) return { id: String(existingRequest.id), duplicatePrevented: true };
+    }
+    const id = Utilities.getUuid();
+    const createdAt = new Date().toISOString();
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_CHECKLISTS_SHEET).appendRow([
+      id, title, description, deadline, creatorName, createdAt, status === 'completed',
+      JSON.stringify(items), JSON.stringify(targetNames), startDate, priority, status,
+      linkUrl, JSON.stringify(departmentNames), createdAt, requestId
+    ]);
+    touchSyncResource_('staffChecklists');
+    return { id: id };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function updateStaffChecklist_(body) {
@@ -1727,6 +1777,7 @@ function updateStaffChecklist_(body) {
       status === 'completed', JSON.stringify(items), JSON.stringify(targetNames),
       startDate, priority, status, linkUrl, JSON.stringify(departmentNames), updatedAt
     ]]);
+    touchSyncResource_('staffChecklists');
     return { updatedAt: updatedAt };
   }
   throw new Error('수정할 업무 행을 찾지 못했습니다.');
@@ -1763,10 +1814,12 @@ function submitStaffChecklist_(body) {
         sheet.getRange(row + 1, 3, 1, 3).setValues([[
           JSON.stringify(checkedItemIds), memo, updatedAt
         ]]);
+        touchSyncResource_('staffChecklists');
         return { updatedAt: updatedAt };
       }
     }
     sheet.appendRow([checklistId, teacherName, JSON.stringify(checkedItemIds), memo, updatedAt]);
+    touchSyncResource_('staffChecklists');
   } finally {
     lock.releaseLock();
   }
@@ -1786,6 +1839,7 @@ function deleteStaffChecklist_(body) {
   try {
     deleteRowsByValue_(STAFF_CHECKLIST_RESPONSES_SHEET, 'checklistId', checklistId);
     deleteRowsByValue_(STAFF_CHECKLISTS_SHEET, 'id', checklistId);
+    touchSyncResource_('staffChecklists');
   } finally {
     lock.releaseLock();
   }
@@ -2271,6 +2325,7 @@ function createTimetableChange_(body) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_CHANGES_SHEET);
   sheet.getRange('L:M').setNumberFormat('@');
   sheet.appendRow(row);
+  touchSyncResource_('timetableChanges');
   return timetableChangeObject_({
     id: row[0], kind: row[1], status: row[2], requesterName: row[3], targetTeacherName: row[4],
     originalSlotIndex: row[5], replacementSlotIndex: row[6], originalDate: row[7], replacementDate: row[8],
@@ -2320,6 +2375,7 @@ function respondTimetableChange_(body) {
     sheet.getRange(index + 1, respondedColumn + 1).setValue(now);
     sheet.getRange(index + 1, responderColumn + 1).setValue(responder);
     sheet.getRange(index + 1, updatedColumn + 1).setValue(now);
+    touchSyncResource_('timetableChanges');
     const changed = {};
     headers.forEach(function(header, column) { changed[header] = values[index][column]; });
     changed.status = decision; changed.respondedAt = now; changed.responderName = responder;
@@ -2352,6 +2408,7 @@ function applyTimetableChangeForRequester_(body) {
     const now = new Date().toISOString();
     sheet.getRange(index + 1, requesterAppliedColumn + 1).setValue(now);
     sheet.getRange(index + 1, updatedColumn + 1).setValue(now);
+    touchSyncResource_('timetableChanges');
     const changed = {};
     headers.forEach(function(header, column) { changed[header] = values[index][column]; });
     changed.requesterAppliedAt = now;
@@ -2374,6 +2431,7 @@ function cancelTimetableChange_(body) {
     const now = new Date().toISOString();
     sheet.getRange(index + 1, headers.indexOf('status') + 1).setValue('cancelled');
     sheet.getRange(index + 1, headers.indexOf('updatedAt') + 1).setValue(now);
+    touchSyncResource_('timetableChanges');
     return;
   }
   throw new Error('취소할 요청을 찾을 수 없습니다.');

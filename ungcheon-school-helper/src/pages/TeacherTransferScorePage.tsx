@@ -8,7 +8,6 @@ import { escapeHtml, printHtml } from '../utils/printHtml'
 import {
   COMMENDATION_OPTIONS,
   EDUCATION_ACTIVITY_DEFINITIONS,
-  ENGLISH_OPTIONS,
   PREFERENCE_OPTIONS,
   QUALIFICATION_OPTIONS,
   TEE_OPTIONS,
@@ -45,6 +44,20 @@ const EMPTY_ADDITIONAL: AdditionalScoreInput = {
   tee: '',
   preference: '',
   integrityContribution: false,
+  commendationDate: '',
+  commendationPerformanceKey: '',
+  nationalAthleteYears: '',
+  ministerAwardYears: '',
+  studyGuidanceYears: '',
+  competitionGuidanceYears: '',
+  qualificationDate: '',
+  qualificationSubjectRequired: false,
+  englishTest: '',
+  englishScore: 0,
+  englishDate: '',
+  teeDate: '',
+  teeEnglishTeacher: false,
+  preferenceEvidenceConfirmed: false,
 }
 
 function newCareerPeriod(): CareerPeriodInput {
@@ -199,7 +212,7 @@ export default function TeacherTransferScorePage() {
 
     printHtml(`<div class="sheet transfer-sheet">
       <h1>일반교사 전보내신점수 계산 결과</h1>
-      <p class="standard">2027. 경상남도교육청 중등 교육공무원 인사관리기준</p>
+      <p class="standard">2027. 경상남도교육청 중등 교육공무원 인사관리기준 · 내신연도 3.1.~다음 해 2.28.(29.)</p>
       <table class="meta"><tr><th>소속</th><td>웅천고등학교</td><th>성명</th><td>${escapeHtml(draft.applicantName || '-')}</td><th>평정기준일</th><td>${draft.evaluationDate}</td></tr></table>
       <h2>1. 근무경력점</h2>
       <table><thead><tr><th>학교</th><th>급지</th><th>입력 기간</th><th>최근 3년 반영</th><th>점수</th></tr></thead><tbody>${careerRows || '<tr><td colspan="5">입력 없음</td></tr>'}</tbody><tfoot><tr><th colspan="4">근무경력점 소계</th><th>${formatScore(result.workCareerScore)}</th></tr></tfoot></table>
@@ -287,7 +300,8 @@ export default function TeacherTransferScorePage() {
         <Info size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
         <div className="text-xs text-amber-100/80 leading-relaxed">
           <p className="font-semibold text-amber-200">웅천고등학교는 별표 2-1의 라급지로 연 5.5점입니다.</p>
-          <p className="mt-1">휴직·정직·직위해제·평정 제외 파견 기간은 빼고 실제 근무 구간만 나누어 입력하세요. 급지가 바뀐 이력은 해당 시점의 급지별로 별도 입력해야 합니다.</p>
+          <p className="mt-1">내신연도는 매년 3월 1일부터 다음 해 2월 28일(윤년 29일)까지입니다. 휴직·정직·직위해제·평정 제외 파견 기간은 빼고 실제 근무 구간만 나누어 입력하세요.</p>
+          <p className="mt-1">다만 표창·상장·자격증·인증서는 인사관리기준 제21조 제3항에 따라 12월 31일까지 취득한 것만 현재 내신에 평정하고, 다음 해 1월 1일 이후 취득분은 전보된 학교의 차기 내신에서 평정합니다.</p>
         </div>
       </section>
 
@@ -328,7 +342,7 @@ export default function TeacherTransferScorePage() {
             <div className="grid sm:grid-cols-3 gap-3">
               <ResultMini label="최근 5년 근무경력" value={formatMonths(result.evaluationCareerMonths)} />
               <ResultMini label="2~5년차 누진점" value={`${formatScore(result.longServiceBaseScore)}점`} />
-              <ResultMini label="3년 초과 장기 추가점" value={`${formatScore(result.longServiceExtraScore)}점`} />
+              <ResultMini label="누진점 중 3년 초과분" value={`${formatScore(result.longServiceExtraScore)}점 · 별도 합산 안 함`} />
             </div>
             <div className="grid md:grid-cols-2 gap-2.5">
               {EDUCATION_ACTIVITY_DEFINITIONS.map(definition => {
@@ -338,6 +352,7 @@ export default function TeacherTransferScorePage() {
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-slate-200">{definition.label} <span className="text-emerald-400">연 {definition.annualPoint.toFixed(2)}점</span></span>
                       <span className="block text-[11px] text-slate-500 mt-0.5 leading-relaxed">{definition.condition}</span>
+                      <details className="mt-1"><summary className="cursor-pointer text-[10px] font-semibold text-sky-400">인정 기준 보기</summary><ul className="mt-1 space-y-0.5"><li className="text-[10px] text-slate-500">• {definition.condition}</li>{definition.details?.map(detail => <li key={detail} className="text-[10px] text-slate-500">• {detail}</li>)}</ul></details>
                     </span>
                     <span className="w-24 flex items-center gap-1"><input type="number" min={0} max={60} className="input-field text-right" value={months || ''} placeholder="0" onChange={event => setDraft(current => ({ ...current, educationActivityMonths: { ...current.educationActivityMonths, [definition.id]: Math.max(0, Number(event.target.value) || 0) } }))} /><span className="text-xs text-slate-500">개월</span></span>
                   </label>
@@ -351,7 +366,6 @@ export default function TeacherTransferScorePage() {
             <div className="grid md:grid-cols-2 gap-3">
               <SelectField label="표창(택일)" value={draft.additional.commendation} options={COMMENDATION_OPTIONS} onChange={value => updateAdditional('commendation', value)} />
               <SelectField label="기술자격증(택일)" value={draft.additional.qualification} options={QUALIFICATION_OPTIONS} onChange={value => updateAdditional('qualification', value)} />
-              <SelectField label="영어능력시험(택일)" value={draft.additional.english} options={ENGLISH_OPTIONS} onChange={value => updateAdditional('english', value)} />
               <SelectField label="TEE 인증서" value={draft.additional.tee} options={TEE_OPTIONS} onChange={value => updateAdditional('tee', value)} />
               <SelectField label="우대조건(택일)" value={draft.additional.preference} options={PREFERENCE_OPTIONS} onChange={value => updateAdditional('preference', value)} />
               <label className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 flex items-center gap-3 cursor-pointer">
@@ -360,11 +374,45 @@ export default function TeacherTransferScorePage() {
               </label>
             </div>
 
+            <div className="grid lg:grid-cols-2 gap-3">
+              <details className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3" open={Boolean(draft.additional.commendation)}>
+                <summary className="cursor-pointer text-xs font-bold text-slate-200">표창 인정 기준·증빙</summary>
+                <div className="mt-3 grid sm:grid-cols-2 gap-2">
+                  <label className="field-label">취득일<input type="date" className="input-field mt-1" value={draft.additional.commendationDate ?? ''} onChange={event => updateAdditional('commendationDate', event.target.value)} /></label>
+                  <label className="field-label">동일 실적 식별<input className="input-field mt-1" placeholder="예: 2026 학교폭력 예방" value={draft.additional.commendationPerformanceKey ?? ''} onChange={event => updateAdditional('commendationPerformanceKey', event.target.value)} /></label>
+                </div>
+                <p className="mt-2 text-[10px] leading-relaxed text-amber-300">동일 실적으로 표창·상장을 받았거나 대회지도 실적과 겹치면 중복 인정되지 않습니다.</p>
+              </details>
+
+              <details className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3" open={Boolean(draft.additional.qualification)}>
+                <summary className="cursor-pointer text-xs font-bold text-slate-200">기술자격증 인정 기준·증빙</summary>
+                <label className="field-label mt-3 block">취득일<input type="date" className="input-field mt-1" value={draft.additional.qualificationDate ?? ''} onChange={event => updateAdditional('qualificationDate', event.target.value)} /></label>
+                <label className="mt-2 flex items-start gap-2 text-[11px] text-slate-300"><input type="checkbox" className="mt-0.5" checked={Boolean(draft.additional.qualificationSubjectRequired)} onChange={event => updateAdditional('qualificationSubjectRequired', event.target.checked)} /><span>내 교과지도에 직접 필요한 자격이고 평정기간 내 취득했음을 확인했습니다.</span></label>
+              </details>
+
+              <details className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3" open>
+                <summary className="cursor-pointer text-xs font-bold text-slate-200">영어능력시험 점수 자동 판정</summary>
+                <div className="mt-3 grid grid-cols-[1.2fr_0.8fr] gap-2">
+                  <label className="field-label">시험 종류<select className="input-field mt-1" value={draft.additional.englishTest ?? ''} onChange={event => updateAdditional('englishTest', event.target.value as AdditionalScoreInput['englishTest'])}><option value="">해당 없음</option><option value="TSE-P">TSE-P</option><option value="TOEFL_IBT">TOEFL(IBT)</option><option value="TOEIC">TOEIC</option><option value="TEPS_OLD">TEPS 구 990점</option><option value="TEPS_NEW">TEPS 신 600점</option></select></label>
+                  <label className="field-label">성적<input type="number" min={0} className="input-field mt-1" value={draft.additional.englishScore || ''} onChange={event => updateAdditional('englishScore', Math.max(0, Number(event.target.value) || 0))} /></label>
+                </div>
+                <label className="field-label mt-2 block">취득일<input type="date" className="input-field mt-1" value={draft.additional.englishDate ?? ''} onChange={event => updateAdditional('englishDate', event.target.value)} /></label>
+                <p className="mt-2 text-[10px] text-slate-500">TSE-P 45/50, TOEFL 80/92, TOEIC 700/800, 구 TEPS 602/712, 신 TEPS 328/393 기준을 자동 판정합니다.</p>
+              </details>
+
+              <details className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3" open={Boolean(draft.additional.tee || draft.additional.preference)}>
+                <summary className="cursor-pointer text-xs font-bold text-slate-200">TEE·우대조건 증빙 확인</summary>
+                <label className="field-label mt-3 block">TEE 취득일<input type="date" className="input-field mt-1" value={draft.additional.teeDate ?? ''} onChange={event => updateAdditional('teeDate', event.target.value)} /></label>
+                <label className="mt-2 flex items-start gap-2 text-[11px] text-slate-300"><input type="checkbox" className="mt-0.5" checked={Boolean(draft.additional.teeEnglishTeacher)} onChange={event => updateAdditional('teeEnglishTeacher', event.target.checked)} /><span>영어과 교사이며 2012.3.1. 이후·평정기간 내 인증입니다.</span></label>
+                <label className="mt-2 flex items-start gap-2 text-[11px] text-slate-300"><input type="checkbox" className="mt-0.5" checked={Boolean(draft.additional.preferenceEvidenceConfirmed)} onChange={event => updateAdditional('preferenceEvidenceConfirmed', event.target.checked)} /><span>우대조건의 가족관계·주민등록·나이·부양 증빙을 확인했습니다.</span></label>
+              </details>
+            </div>
+
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <CountField label="전국체전 학생 지도 상장" point={0.75} max={5} value={draft.additional.nationalAthleteAwards} onChange={value => updateAdditional('nationalAthleteAwards', value)} />
-              <CountField label="교육감·장관 이상 상장" point={0.5} max={5} value={draft.additional.ministerAwards} onChange={value => updateAdditional('ministerAwards', value)} />
-              <CountField label="학습지도 연구대회" point={0.75} max={99} value={draft.additional.studyGuidanceAwards} onChange={value => updateAdditional('studyGuidanceAwards', value)} />
-              <CountField label="인정 대회 학생 지도" point={0.5} max={5} value={draft.additional.competitionGuidanceAwards} onChange={value => updateAdditional('competitionGuidanceAwards', value)} />
+              <CountField label="전국체전 학생 지도 상장" point={0.75} max={5} value={draft.additional.nationalAthleteAwards} years={draft.additional.nationalAthleteYears ?? ''} onYearsChange={value => updateAdditional('nationalAthleteYears', value)} onChange={value => updateAdditional('nationalAthleteAwards', value)} />
+              <CountField label="교육감·장관 이상 상장" point={0.5} max={5} value={draft.additional.ministerAwards} years={draft.additional.ministerAwardYears ?? ''} onYearsChange={value => updateAdditional('ministerAwardYears', value)} onChange={value => updateAdditional('ministerAwards', value)} />
+              <CountField label="학습지도 연구대회" point={0.75} max={99} value={draft.additional.studyGuidanceAwards} years={draft.additional.studyGuidanceYears ?? ''} onYearsChange={value => updateAdditional('studyGuidanceYears', value)} onChange={value => updateAdditional('studyGuidanceAwards', value)} />
+              <CountField label="인정 대회 학생 지도" point={0.5} max={5} value={draft.additional.competitionGuidanceAwards} years={draft.additional.competitionGuidanceYears ?? ''} onYearsChange={value => updateAdditional('competitionGuidanceYears', value)} onChange={value => updateAdditional('competitionGuidanceAwards', value)} />
             </div>
           </section>
 
@@ -427,6 +475,6 @@ function SelectField({ label, value, options, onChange }: { label: string; value
   return <label className="field-label">{label}<select className="input-field mt-1" value={value} onChange={event => onChange(event.target.value)}>{options.map(option => <option key={option.id || 'none'} value={option.id}>{option.label}{option.score ? ` · ${option.score}점` : ''}</option>)}</select></label>
 }
 
-function CountField({ label, point, max, value, onChange }: { label: string; point: number; max: number; value: number; onChange: (value: number) => void }) {
-  return <label className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"><span className="text-xs font-semibold text-slate-300">{label}</span><span className="block text-[10px] text-slate-600 mt-0.5">평정기간 내 누가 · 회당 {point}점{max === 5 ? ' · 동일 학년도 택일' : ''}</span><span className="flex items-center gap-2 mt-2"><input type="number" min={0} max={max} className="input-field" value={value || ''} placeholder="0" onChange={event => onChange(Math.max(0, Math.min(max, Math.floor(Number(event.target.value) || 0))))} /><span className="text-xs text-slate-500 whitespace-nowrap">회</span></span></label>
+function CountField({ label, point, max, value, years, onYearsChange, onChange }: { label: string; point: number; max: number; value: number; years: string; onYearsChange: (value: string) => void; onChange: (value: number) => void }) {
+  return <label className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3"><span className="text-xs font-semibold text-slate-300">{label}</span><span className="block text-[10px] text-slate-600 mt-0.5">평정기간 내 누가 · 회당 {point}점{max === 5 ? ' · 동일 학년도 택일' : ''}</span><span className="flex items-center gap-2 mt-2"><input type="number" min={0} max={max} className="input-field" value={value || ''} placeholder="0" onChange={event => onChange(Math.max(0, Math.min(max, Math.floor(Number(event.target.value) || 0))))} /><span className="text-xs text-slate-500 whitespace-nowrap">회</span></span><input className="input-field mt-2 text-[11px]" placeholder="실적 내신연도 예: 2024, 2025" value={years} onChange={event => onYearsChange(event.target.value)} /></label>
 }
