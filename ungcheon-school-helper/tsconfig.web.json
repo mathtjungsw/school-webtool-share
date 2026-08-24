@@ -67,6 +67,7 @@
     "src/pages/StudentLocatorPage.tsx",
     "src/pages/StudentIdentityAuditPage.tsx",
     "src/pages/SubjectRemarksPrintPage.tsx",
+    "src/pages/RecordPrivacyBlindPage.tsx",
     "src/pages/VolunteerWorkPage.tsx",
     "src/services/neis.ts",
     "src/services/sharedNeis.ts",

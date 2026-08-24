@@ -1,6 +1,6 @@
 import {
   ArrowLeftRight, Bell, BookOpen, Building2, Calculator, CalendarDays, CalendarRange,
-  ClipboardCheck, FileCode2, FileDown, FilePenLine, FileScan, FileText, HeartHandshake,
+  ClipboardCheck, FileCode2, FileDown, FileLock2, FilePenLine, FileScan, FileText, HeartHandshake,
   HelpCircle, Landmark, LayoutDashboard, Link2, MapPinned, MessageSquareText, ScanSearch,
   ScrollText, SearchCheck, Settings, ShieldCheck, Table2, UsersRound, Wrench,
   type LucideIcon,
@@ -36,6 +36,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   { id: 'schoolinfo_evaluation', label: '타학교 평가계획', icon: Building2, assistantCategory: '학사·평가', searchAliases: ['다른 학교 평가계획', '학교알리미'] },
   { id: 'student_identity_audit', label: '학생 학번·이름 교정기', icon: ScanSearch, assistantCategory: '학사·기록', searchAliases: ['학번 이름 오류', '명단 교정'] },
   { id: 'subject_remarks_print', label: '교과세특 개별 인쇄기', icon: ScrollText, assistantCategory: '학사·기록', searchAliases: ['세특 인쇄', '교과세특'] },
+  { id: 'record_privacy_blind', label: '생기부 개인정보 블라인드', icon: FileLock2, assistantCategory: '학생·학사', searchAliases: ['생기부 블라인드', '학생부 개인정보 가리기', '생기부 이름 가리기', 'PDF 개인정보 삭제'] },
   { id: 'staff_roster', label: '교직원 명렬', icon: UsersRound, assistantCategory: '학교운영', searchAliases: ['교원 명렬', '연수등록부'] },
   { id: 'committees', label: '각종 위원회 현황', icon: Landmark, assistantCategory: '학교운영', searchAliases: ['위원회 명단', '위원회 일정'] },
   { id: 'feature_requests', label: '기능개선 요청', icon: MessageSquareText, assistantCategory: '지원', searchAliases: ['개선 의견', '새 기능 요청'] },
@@ -55,4 +56,3 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
 
 export const NAVIGATION_BY_ID = new Map(NAVIGATION_ITEMS.map(item => [item.id, item]))
 export const SIDEBAR_MENU_OPTIONS = NAVIGATION_ITEMS.map(({ id, label }) => ({ id, label }))
-

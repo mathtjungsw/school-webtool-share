@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, EyeOff, GripVertical, ListRestart, Pin, PinOff, ScrollText } from 'lucide-react'
+import { Check, ChevronDown, EyeOff, GripVertical, ListRestart, Pin, PinOff, ScrollText } from 'lucide-react'
 import {
   DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent,
 } from '@dnd-kit/core'
@@ -31,6 +31,18 @@ const LEGACY_DEFAULT_ORDER = [
 const NAV_BY_ID = NAVIGATION_BY_ID
 const SIDEBAR_PINNED_KEY = 'sidebar.pinnedMenus.v1'
 const SIDEBAR_HIDDEN_KEY = 'sidebar.hiddenMenus.v1'
+const SIDEBAR_COLLAPSED_GROUPS_KEY = 'sidebar.collapsedGroups.v1'
+
+const MENU_GROUPS = [
+  { id: 'start', label: '시작·설정', items: ['help', 'notifier', 'dashboard', 'calendar', 'settings', 'admin_center'] },
+  { id: 'school', label: '업무·학교운영', items: ['staff_tasks', 'school_hub', 'timetable_swap', 'staff_roster', 'committees', 'feature_requests', 'form_center'] },
+  { id: 'student', label: '학생·학사', items: ['student_timetable', 'attendance_print', 'volunteer_work', 'student_locator', 'student_identity_audit', 'subject_remarks_print', 'record_privacy_blind'] },
+  { id: 'curriculum', label: '평가·교육과정·진로', items: ['schoolinfo_evaluation', 'grade_preview', 'estimated_split_score', 'curriculum', 'recommended_subjects'] },
+  { id: 'tools', label: '인사·교사용 도구', items: ['transfer_score', 'teacher_tools', 'excel_processor', 'payroll', 'insa_analysis', 'pdf_extractor', 'file_parser'] },
+] as const
+
+const DEFAULT_COLLAPSED_GROUPS = MENU_GROUPS.filter(group => group.id !== 'start').map(group => group.id)
+const GROUP_BY_MENU: ReadonlyMap<string, string> = new Map<string, string>(MENU_GROUPS.flatMap(group => group.items.map(id => [id, group.id])))
 
 function normalizeOrder(value: unknown) {
   const saved = Array.isArray(value) ? value.map(String) : []
@@ -63,6 +75,12 @@ function normalizeOrder(value: unknown) {
     const locatorIndex = next.indexOf('student_locator')
     next.splice(locatorIndex >= 0 ? locatorIndex + 1 : next.length, 0, 'schoolinfo_evaluation')
   }
+  if (!known.includes('record_privacy_blind')) {
+    const appendedIndex = next.indexOf('record_privacy_blind')
+    if (appendedIndex >= 0) next.splice(appendedIndex, 1)
+    const remarksIndex = next.indexOf('subject_remarks_print')
+    next.splice(remarksIndex >= 0 ? remarksIndex + 1 : next.length, 0, 'record_privacy_blind')
+  }
   return next
 }
 
@@ -83,6 +101,7 @@ export default function Sidebar({
   const [menuOrder, setMenuOrder] = useState(DEFAULT_ORDER)
   const [pinnedMenus, setPinnedMenus] = useState<string[]>([])
   const [hiddenMenus, setHiddenMenus] = useState<string[]>([])
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>(DEFAULT_COLLAPSED_GROUPS)
   const config = useAppStore(s => s.config)
   const isAdmin = useAdminStore(s => s.isAdmin)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -94,11 +113,15 @@ export default function Sidebar({
       window.electron?.configGet(SIDEBAR_PINNED_KEY),
       window.electron?.configGet(SIDEBAR_HIDDEN_KEY),
       window.electron?.configGet(SIDEBAR_EXPANDED_PINNED_KEY),
-    ]).then(([order, pinned, hidden, expandedPin]) => {
+      window.electron?.configGet(SIDEBAR_COLLAPSED_GROUPS_KEY),
+    ]).then(([order, pinned, hidden, expandedPin, collapsed]) => {
       setMenuOrder(normalizeOrder(order))
       setPinnedMenus(Array.isArray(pinned) ? pinned.map(String).filter(id => NAV_BY_ID.has(id)) : [])
       setHiddenMenus(Array.isArray(hidden) ? hidden.map(String).filter(id => NAV_BY_ID.has(id) && id !== 'settings') : [])
       setExpandedPinned(normalizeSidebarExpandedPinned(expandedPin))
+      setCollapsedGroups(Array.isArray(collapsed)
+        ? collapsed.map(String).filter(id => MENU_GROUPS.some(group => group.id === id))
+        : DEFAULT_COLLAPSED_GROUPS)
     })
   }, [])
 
@@ -117,6 +140,19 @@ export default function Sidebar({
       .filter(item => !hiddenMenus.includes(item.id))
       .filter(item => item.id !== 'admin_center' || isAdmin)
   }, [hiddenMenus, isAdmin, menuOrder, pinnedMenus])
+
+  const pinnedItems = useMemo(() => orderedItems.filter(item => pinnedMenus.includes(item.id)), [orderedItems, pinnedMenus])
+  const groupedItems = useMemo(() => MENU_GROUPS.map(group => ({
+    ...group,
+    entries: orderedItems.filter(item => !pinnedMenus.includes(item.id) && (group.items as readonly string[]).includes(item.id)),
+  })).filter(group => group.entries.length), [orderedItems, pinnedMenus])
+  const ungroupedItems = useMemo(() => orderedItems.filter(item => !pinnedMenus.includes(item.id) && !GROUP_BY_MENU.has(item.id)), [orderedItems, pinnedMenus])
+
+  useEffect(() => {
+    const activeGroup = GROUP_BY_MENU.get(currentPage)
+    if (!activeGroup) return
+    setCollapsedGroups(current => current.includes(activeGroup) ? current.filter(id => id !== activeGroup) : current)
+  }, [currentPage])
 
   const saveOrder = (next: string[]) => {
     setMenuOrder(next)
@@ -147,6 +183,14 @@ export default function Sidebar({
       return next
     })
     if (currentPage === id) onNavigate('dashboard')
+  }
+
+  const toggleGroup = (id: string) => {
+    setCollapsedGroups(current => {
+      const next = current.includes(id) ? current.filter(item => item !== id) : [...current, id]
+      void window.electron?.configSet(SIDEBAR_COLLAPSED_GROUPS_KEY, next)
+      return next
+    })
   }
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
@@ -211,19 +255,27 @@ export default function Sidebar({
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-none">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={menuOrder} strategy={verticalListSortingStrategy}>
-            {orderedItems.map(item => (
-              <NavButton
-                key={item.id}
-                item={item}
-                expanded={isExpanded}
-                editing={editing}
-                active={currentPage === item.id}
-                pinned={pinnedMenus.includes(item.id)}
-                onClick={() => onNavigate(item.id)}
-                onTogglePinned={() => togglePinned(item.id)}
-                onHide={() => hideMenu(item.id)}
-              />
-            ))}
+            {editing || !isExpanded ? orderedItems.map(item => (
+              <NavButton key={item.id} item={item} expanded={isExpanded} editing={editing} active={currentPage === item.id} pinned={pinnedMenus.includes(item.id)} onClick={() => onNavigate(item.id)} onTogglePinned={() => togglePinned(item.id)} onHide={() => hideMenu(item.id)} />
+            )) : <>
+              {pinnedItems.length > 0 && <MenuGroupHeader label="고정 메뉴" count={pinnedItems.length} pinned />}
+              {pinnedItems.map(item => (
+                <NavButton key={item.id} item={item} expanded editing={false} active={currentPage === item.id} pinned onClick={() => onNavigate(item.id)} onTogglePinned={() => togglePinned(item.id)} onHide={() => hideMenu(item.id)} />
+              ))}
+              {groupedItems.map(group => {
+                const collapsed = collapsedGroups.includes(group.id)
+                return <section key={group.id} className="mb-1">
+                  <MenuGroupHeader label={group.label} count={group.entries.length} collapsed={collapsed} onToggle={() => toggleGroup(group.id)} />
+                  {!collapsed && group.entries.map(item => (
+                    <NavButton key={item.id} item={item} expanded editing={false} active={currentPage === item.id} pinned={false} onClick={() => onNavigate(item.id)} onTogglePinned={() => togglePinned(item.id)} onHide={() => hideMenu(item.id)} />
+                  ))}
+                </section>
+              })}
+              {ungroupedItems.length > 0 && <section>
+                <MenuGroupHeader label="기타" count={ungroupedItems.length} />
+                {ungroupedItems.map(item => <NavButton key={item.id} item={item} expanded editing={false} active={currentPage === item.id} pinned={false} onClick={() => onNavigate(item.id)} onTogglePinned={() => togglePinned(item.id)} onHide={() => hideMenu(item.id)} />)}
+              </section>}
+            </>}
           </SortableContext>
         </DndContext>
       </nav>
@@ -235,6 +287,24 @@ export default function Sidebar({
       </button>
     </motion.aside>
   )
+}
+
+function MenuGroupHeader({
+  label, count, collapsed = false, pinned = false, onToggle,
+}: {
+  label: string
+  count: number
+  collapsed?: boolean
+  pinned?: boolean
+  onToggle?: () => void
+}) {
+  const content = <>
+    <span className="truncate">{label}</span>
+    <span className="ml-auto rounded-full bg-black/5 px-1.5 py-0.5 text-[9px] dark:bg-white/10">{count}</span>
+    {!pinned && <ChevronDown size={12} className={clsx('transition-transform', collapsed && '-rotate-90')} />}
+  </>
+  if (pinned) return <div className="mx-3 mt-1 flex h-7 items-center gap-1.5 text-[10px] font-black tracking-wide text-amber-700 dark:text-amber-300">{content}</div>
+  return <button type="button" onClick={onToggle} className="mx-2 flex h-8 w-[calc(100%-1rem)] items-center gap-1.5 rounded-lg px-2 text-left text-[10px] font-black tracking-wide text-slate-600 hover:bg-black/5 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100" aria-expanded={!collapsed}>{content}</button>
 }
 
 function NavButton({

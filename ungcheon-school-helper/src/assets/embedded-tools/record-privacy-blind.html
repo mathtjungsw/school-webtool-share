@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>생기부 개인정보 블라인드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --ink:#15171c; --ink-2:#22252c; --paper:#f3f1ea; --paper-edge:#e7e3d6;
+    --line:#33373f; --muted:#8b8f99; --muted-2:#5b5f68;
+    --redact:#111317; --redact-fill:#111317; --accent:#c8553d; --accent-soft:rgba(200,85,61,.16);
+    --ok:#3f8f6e; --focus:#e8a23d;
+    --sans:"Pretendard",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--ink);color:#dfe2e8;font-family:var(--sans);-webkit-font-smoothing:antialiased;
+    display:grid;grid-template-columns:340px 1fr;grid-template-rows:100vh;overflow:hidden}
+  /* sidebar */
+  aside{background:var(--ink-2);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+  .brand{padding:22px 22px 18px;border-bottom:1px solid var(--line)}
+  .brand h1{margin:0;font-size:17px;letter-spacing:-.01em;font-weight:700;color:#f4f5f7;display:flex;align-items:center;gap:10px}
+  .bar-mark{display:inline-block;width:34px;height:13px;background:var(--redact);border-radius:2px;position:relative;flex:none}
+  .bar-mark::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 6px,rgba(255,255,255,.06) 6px 7px)}
+  .brand p{margin:9px 0 0;font-size:12px;line-height:1.55;color:var(--muted)}
+  .brand .local{margin-top:11px;display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ok);background:rgba(63,143,110,.12);border:1px solid rgba(63,143,110,.3);padding:4px 9px;border-radius:999px}
+  .brand .local b{font-weight:600}
+
+  .panel{padding:18px 22px;border-bottom:1px solid var(--line)}
+  .scrollwrap{flex:1;min-height:0;overflow-y:auto}
+  .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:0 0 12px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  .eyebrow .badge{color:var(--accent);font-size:11px;letter-spacing:0;font-variant-numeric:tabular-nums}
+
+  .drop{border:1.5px dashed var(--line);border-radius:10px;padding:18px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;color:var(--muted)}
+  .drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft);color:#e7c4ba}
+  .drop strong{display:block;color:#e6e8ec;font-size:13px;margin-bottom:3px}
+  .drop span{font-size:11.5px}
+
+  /* file queue */
+  .filelist{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+  .filerow{display:flex;align-items:center;gap:9px;background:#1b1e24;border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;transition:border-color .15s,background .15s}
+  .filerow:hover{border-color:#4a4f59}
+  .filerow.active{border-color:var(--accent);background:#241b19}
+  .filerow .ic{flex:none;font-size:13px}
+  .filerow .meta{min-width:0;flex:1}
+  .filerow .nm{font-size:12px;color:#dfe2e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .filerow .sub2{font-size:10.5px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+  .filerow.active .sub2{color:#caa99c}
+  .filerow .rm2{flex:none;background:none;border:none;color:#6b7079;font-size:13px;cursor:pointer;padding:3px 5px;border-radius:5px;line-height:1}
+  .filerow .rm2:hover{color:#e08a78;background:#2a2024}
+  .clearall{margin-top:9px;width:100%;background:none;border:none;color:var(--muted-2);font-size:11px;cursor:pointer;text-align:left;padding:2px;display:none}
+  .clearall:hover{color:#cf6b56}
+
+  .rule{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid #2a2e36}
+  .rule:first-of-type{border-top:none}
+  .rule label{font-size:13px;color:#e2e4e9;font-weight:600;cursor:pointer;line-height:1.3}
+  .rule .desc{font-size:11.5px;color:var(--muted-2);margin-top:3px;line-height:1.5}
+  .rule .count{font-size:11px;color:var(--accent);font-variant-numeric:tabular-nums;margin-top:3px}
+  .sw{position:relative;flex:none;width:38px;height:22px;margin-top:1px}
+  .sw input{opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+  .sw .track{position:absolute;inset:0;background:#3a3e47;border-radius:999px;transition:background .15s;pointer-events:none}
+  .sw .knob{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#cfd2d8;border-radius:50%;transition:transform .15s,background .15s;pointer-events:none}
+  .sw input:checked + .track{background:var(--accent)}
+  .sw input:checked ~ .knob{transform:translateX(16px);background:#fff}
+  .sw input:focus-visible ~ .track{outline:2px solid var(--focus);outline-offset:2px}
+
+  .field input[type=text]{width:100%;background:#1b1e24;border:1px solid var(--line);color:#e6e8ec;border-radius:8px;padding:8px 10px;font-size:12.5px;font-family:var(--sans)}
+  .field input::placeholder{color:#666b75}
+  .addbtn{margin-top:8px;width:100%;background:#262a32;border:1px solid var(--line);color:#dfe2e8;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;font-weight:600}
+  .addbtn:hover{background:#2e333c}
+  .hint{font-size:11.5px;color:var(--muted-2);line-height:1.6;margin:10px 0 0}
+  .hint b{color:#b9bdc6;font-weight:600}
+
+  .actions{padding:16px 22px;border-top:1px solid var(--line);background:var(--ink-2)}
+  .colorsel{display:flex;align-items:center;gap:10px;margin-bottom:13px}
+  .colorsel .lbl{font-size:12.5px;color:#cfd2d8;font-weight:600}
+  .seg{display:inline-flex;background:#1b1e24;border:1px solid var(--line);border-radius:8px;padding:3px;gap:3px;margin-left:auto}
+  .segbtn{background:none;border:none;color:var(--muted);font-size:12px;font-weight:600;padding:5px 11px;border-radius:6px;cursor:pointer;font-family:var(--sans);display:inline-flex;align-items:center;gap:6px}
+  .segbtn:hover{color:#cfd2d8}
+  .segbtn.active{background:var(--accent);color:#fff}
+  .segbtn .dot{width:10px;height:10px;border-radius:2px;border:1px solid rgba(140,140,150,.5)}
+  .export{width:100%;background:var(--accent);color:#fff;border:none;border-radius:9px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:-.01em;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .15s,transform .05s}
+  .export:hover:not(:disabled){background:#b54a35}
+  .export:active:not(:disabled){transform:translateY(1px)}
+  .export:disabled{background:#3a3e47;color:#7b808a;cursor:not-allowed}
+  .actions .sub{margin-top:9px;font-size:11px;color:var(--muted-2);text-align:center;line-height:1.5}
+
+  .credit{padding:11px 22px 15px;background:var(--ink-2);text-align:left}
+  .maker{font-family:"Nanum Pen Script","Apple Chancery","Snell Roundhand","Segoe Script",cursive;font-size:23px;line-height:1;color:#a99277;letter-spacing:.4px;display:inline-flex;align-items:center;gap:8px;opacity:.92}
+  .maker::before{content:"";width:18px;height:1px;background:#5e5346;display:inline-block}
+
+  /* main */
+  main{position:relative;min-height:0;display:flex;flex-direction:column;background:#0f1115}
+  .topbar{display:flex;align-items:center;gap:16px;padding:13px 24px;border-bottom:1px solid var(--line);background:var(--ink);color:var(--muted);font-size:12.5px;flex:none}
+  .topbar .legend{display:inline-flex;align-items:center;gap:7px}
+  .topbar .swatch{width:14px;height:14px;border-radius:3px;flex:none}
+  .topbar .nowfile{color:#cfd2d8;font-weight:600;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topbar .sp{margin-left:auto}
+  .zoombtn{background:#23262d;border:1px solid var(--line);color:#cfd2d8;width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:15px;line-height:1}
+  .zoombtn:hover{background:#2c3038}
+  .zoomval{font-variant-numeric:tabular-nums;min-width:42px;text-align:center}
+
+  .stage{flex:1;overflow:auto;padding:28px 24px 60px;min-height:0}
+  .pages{display:flex;flex-direction:column;align-items:center;gap:26px}
+  .pagecard{position:relative;background:var(--paper);box-shadow:0 2px 4px rgba(0,0,0,.4),0 14px 40px rgba(0,0,0,.45);border-radius:3px;overflow:hidden;outline:1px solid var(--paper-edge)}
+  .pagecard canvas{display:block}
+  .overlay{position:absolute;inset:0;cursor:crosshair}
+  .pagenum{position:absolute;top:8px;left:-46px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;background:#1b1e24;border:1px solid var(--line);border-radius:6px;padding:3px 7px}
+  .notext{position:absolute;left:8px;bottom:8px;font-size:10.5px;color:#a86b3d;background:rgba(168,107,61,.14);border:1px solid rgba(168,107,61,.4);border-radius:6px;padding:3px 7px}
+  .rbox{position:absolute;background:var(--redact-fill);outline:1.5px solid var(--accent);outline-offset:-1px;border-radius:1px}
+  .rbox.manual{outline-style:dashed}
+  .rbox .rm{position:absolute;top:-9px;right:-9px;width:19px;height:19px;border-radius:50%;border:none;background:var(--accent);color:#fff;font-size:12px;line-height:1;cursor:pointer;display:none;align-items:center;justify-content:center;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+  .rbox:hover .rm{display:flex}
+  .rbox:hover{outline-color:var(--focus)}
+
+  .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;color:var(--muted);padding:40px}
+  .empty .big{font-size:15px;color:#c4c8d0;font-weight:600;margin-bottom:8px}
+  .empty .sm{font-size:12.5px;line-height:1.7;max-width:380px}
+  .empty .marks{display:flex;gap:6px;margin-bottom:22px}
+  .empty .marks i{display:block;height:14px;background:var(--redact);border-radius:2px}
+  .empty .marks i:nth-child(1){width:64px}.empty .marks i:nth-child(2){width:38px}.empty .marks i:nth-child(3){width:88px}
+
+  .overlaywrap{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(15,17,21,.78);z-index:20;flex-direction:column;gap:16px}
+  .overlaywrap.show{display:flex}
+  .spinner{width:34px;height:34px;border:3px solid #2c3038;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .overlaywrap .msg{font-size:13px;color:#cfd2d8}
+  .progress{width:240px;height:5px;background:#262a32;border-radius:999px;overflow:hidden}
+  .progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+
+  @media (max-width:820px){
+    body{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+    aside{max-height:50vh}
+    .pagenum{left:8px;top:8px}
+  }
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand">
+    <h1><span class="bar-mark"></span>생기부 블라인드</h1>
+    <p>여러 학교생활기록부 PDF의 개인정보를 한 번에 가려 안전하게 공유하세요.</p>
+    <span class="local">🔒 <b>완전 로컬 처리</b> · 파일은 업로드되지 않음</span>
+  </div>
+
+  <div class="scrollwrap">
+    <div class="panel">
+      <p class="eyebrow">1 · PDF 불러오기 <span class="badge" id="fileBadge"></span></p>
+      <div class="drop" id="drop">
+        <strong>여러 PDF를 한 번에 끌어다 놓기</strong>
+        <span>또는 클릭해서 여러 개 선택</span>
+        <input type="file" id="file" accept="application/pdf" multiple hidden />
+      </div>
+      <div class="filelist" id="filelist"></div>
+      <button class="clearall" id="clearAll">전체 목록 비우기</button>
+    </div>
+
+    <div class="panel">
+      <p class="eyebrow">2 · 가릴 항목 (모든 파일 공통)</p>
+      <div class="rule">
+        <span class="sw"><input type="checkbox" id="r_id" checked /><span class="track"></span><span class="knob"></span></span>
+        <div><label for="r_id">인적·학적사항 전체</label>
+          <div class="desc">1번 항목의 성명·주민번호·주소·학적 영역 (1페이지)</div><div class="count" id="c_id"></div></div>
+      </div>
+      <div class="rule">
+        <span class="sw"><input type="checkbox" id="r_school" checked /><span class="track"></span><span class="knob"></span></span>
+        <div><label for="r_school">하단 학교명</label>
+          <div class="desc">모든 페이지 하단 왼쪽 학교 이름</div><div class="count" id="c_school"></div></div>
+      </div>
+      <div class="rule">
+        <span class="sw"><input type="checkbox" id="r_name" checked /><span class="track"></span><span class="knob"></span></span>
+        <div><label for="r_name">하단 성명</label>
+          <div class="desc">모든 페이지 하단 오른쪽 성명</div><div class="count" id="c_name"></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="eyebrow">추가 옵션 (선택)</p>
+      <div class="rule">
+        <span class="sw"><input type="checkbox" id="r_teacher" /><span class="track"></span><span class="knob"></span></span>
+        <div><label for="r_teacher">담임 성명 (1페이지)</label>
+          <div class="desc">상단 표의 학년별 담임 교사 이름</div><div class="count" id="c_teacher"></div></div>
+      </div>
+      <div class="rule">
+        <span class="sw"><input type="checkbox" id="r_stamp" /><span class="track"></span><span class="knob"></span></span>
+        <div><label for="r_stamp">인쇄 정보 워터마크</label>
+          <div class="desc">출력일시·IP·교사명이 적힌 인쇄 스탬프 줄</div><div class="count" id="c_stamp"></div></div>
+      </div>
+      <div class="rule">
+        <span class="sw"><input type="checkbox" id="r_photo" /><span class="track"></span><span class="knob"></span></span>
+        <div><label for="r_photo">증명사진 (1페이지)</label>
+          <div class="desc">우상단 사진 영역을 실제 위치로 가림</div><div class="count" id="c_photo"></div></div>
+      </div>
+      <div class="rule">
+        <span class="sw"><input type="checkbox" id="r_everywhere" /><span class="track"></span><span class="knob"></span></span>
+        <div><label for="r_everywhere">본문 속 학교명·성명도 모두</label>
+          <div class="desc">수여기관·봉사장소 등 본문에 나오는 학교명/성명까지 전부 가림</div><div class="count" id="c_everywhere"></div></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="eyebrow">직접 가리기</p>
+      <div class="field">
+        <input type="text" id="customText" placeholder="가릴 단어 입력 (모든 파일에 적용)" />
+        <button class="addbtn" id="addText">이 단어가 나오는 곳 모두 가리기</button>
+      </div>
+      <p class="hint"><b>마우스로 직접:</b> 현재 보고 있는 파일의 페이지 위에서 드래그하면 박스를 그릴 수 있어요. 박스에 마우스를 올리면 나오는 <b>✕</b>로 삭제합니다.</p>
+    </div>
+  </div>
+
+  <div class="actions">
+    <div class="colorsel">
+      <span class="lbl">가림 색상</span>
+      <div class="seg" id="colorSeg">
+        <button class="segbtn active" data-color="black"><span class="dot" style="background:#111317"></span>검정</button>
+        <button class="segbtn" data-color="white"><span class="dot" style="background:#ffffff"></span>흰색</button>
+      </div>
+    </div>
+    <button class="export" id="export" disabled>PDF 내보내기</button>
+    <div class="sub">결과물은 텍스트가 제거된 이미지 PDF로 저장되어 가린 정보를 복구할 수 없습니다.</div>
+  </div>
+  <div class="credit"><span class="maker">원본 제작: 충렬여자고등학교 Bryan Park · 웅천고 업무도우미용으로 수정</span></div>
+</aside>
+
+<main>
+  <div class="topbar">
+    <span class="legend"><span class="swatch" style="background:var(--redact-fill);outline:1.5px solid var(--accent);outline-offset:-1px"></span>자동 탐지</span>
+    <span class="legend"><span class="swatch" style="background:var(--redact-fill);outline:1.5px dashed var(--accent);outline-offset:-1px"></span>직접 추가</span>
+    <span class="nowfile" id="nowFile"></span>
+    <span class="sp"></span>
+    <button class="zoombtn" id="zoomOut" title="축소">−</button>
+    <span class="zoomval" id="zoomVal">100%</span>
+    <button class="zoombtn" id="zoomIn" title="확대">+</button>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="empty" id="empty">
+      <div class="marks"><i></i><i></i><i></i></div>
+      <div class="big">아직 불러온 파일이 없어요</div>
+      <div class="sm">생기부 PDF 여러 개를 한 번에 불러오면 파일별로 가릴 영역이 자동 표시됩니다. 한 파일을 클릭해 미리 보고 조정한 뒤, 전체를 한꺼번에 안전한 PDF로 내보내세요.</div>
+    </div>
+    <div class="pages" id="pages"></div>
+  </div>
+
+  <div class="overlaywrap" id="loading">
+    <div class="spinner"></div>
+    <div class="msg" id="loadMsg">처리 중…</div>
+    <div class="progress"><i id="progBar"></i></div>
+  </div>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  const pdfjsLib = window['pdfjsLib'];
+  (async function setupWorker(){
+    const url="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    try{
+      const res=await fetch(url); const txt=await res.text();
+      const blob=new Blob([txt],{type:"application/javascript"});
+      pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(blob);
+    }catch(e){ pdfjsLib.GlobalWorkerOptions.workerSrc=url; }
+  })();
+
+  // ---------- state ----------
+  // docs: [{ name, pdfDoc, pageMeta:[{items,images,noText}], boxes:[], strSchool, strName }]
+  let docs=[], activeDoc=-1, zoom=1, baseScale=1.4, boxSeq=1, renderToken=0;
+  let redactColor="#111317";
+  const EXPORT_SCALE=2.4;
+
+  const $=s=>document.querySelector(s);
+  const fileInput=$("#file"), drop=$("#drop"), fileListEl=$("#filelist"), clearBtn=$("#clearAll"), fileBadge=$("#fileBadge");
+  const pagesEl=$("#pages"), emptyEl=$("#empty"), nowFile=$("#nowFile");
+  const loadingEl=$("#loading"), loadMsg=$("#loadMsg"), progBar=$("#progBar");
+  const exportBtn=$("#export");
+  const toggles={id:$("#r_id"),school:$("#r_school"),name:$("#r_name"),teacher:$("#r_teacher"),stamp:$("#r_stamp"),photo:$("#r_photo"),everywhere:$("#r_everywhere")};
+  const counts={id:$("#c_id"),school:$("#c_school"),name:$("#c_name"),teacher:$("#c_teacher"),stamp:$("#c_stamp"),photo:$("#c_photo"),everywhere:$("#c_everywhere")};
+
+  const norm=s=>(s||"").replace(/\s+/g,"");
+  const esc=s=>(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  function showLoading(m){loadMsg.textContent=m;progBar.style.width="0%";loadingEl.classList.add("show");}
+  function setProg(p){progBar.style.width=Math.round(p*100)+"%";}
+  function hideLoading(){loadingEl.classList.remove("show");}
+  function pad(b,px,py){return {x0:Math.max(0,b.x0-px),y0:Math.max(0,b.y0-py),x1:Math.min(1,b.x1+px),y1:Math.min(1,b.y1+py)};}
+
+  // ---------- file input ----------
+  drop.addEventListener("click",()=>fileInput.click());
+  drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over")});
+  drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+  drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("over");loadFiles(e.dataTransfer.files);});
+  fileInput.addEventListener("change",e=>{loadFiles(e.target.files);fileInput.value="";});
+
+  async function loadFiles(list){
+    const files=Array.from(list).filter(f=>f.type==="application/pdf"||f.name.toLowerCase().endsWith(".pdf"));
+    if(!files.length){alert("PDF 파일을 선택해 주세요.");return;}
+    showLoading("PDF 분석 중…");
+    const startCount=docs.length;
+    try{
+      for(let k=0;k<files.length;k++){
+        loadMsg.textContent=`PDF 분석 중 (${k+1} / ${files.length})  ·  ${files[k].name}`;
+        setProg(k/files.length);
+        try{
+          const doc=await analyzeDoc(files[k]);
+          docs.push(doc);
+          updateFileList();
+        }catch(err){
+          console.error("분석 실패:",files[k].name,err);
+          alert(`"${files[k].name}" 분석에 실패했습니다.\n${err&&err.message?err.message:""}`);
+        }
+      }
+      setProg(1);
+      regenerateAuto();
+      if(activeDoc<0 && docs.length){ setActive(startCount<docs.length?startCount:0); }
+      else { updateFileList(); }
+      exportBtn.disabled=docs.length===0;
+    }finally{ hideLoading(); }
+  }
+
+  async function analyzeDoc(file){
+    const buf=await file.arrayBuffer();
+    const pdfDoc=await pdfjsLib.getDocument({data:buf}).promise;
+    const pageMeta=[];
+    for(let i=0;i<pdfDoc.numPages;i++){
+      const page=await pdfDoc.getPage(i+1);
+      const vp=page.getViewport({scale:1});
+      const tc=await page.getTextContent();
+      const items=[];
+      for(const it of tc.items){
+        if(!it.str||!it.str.trim()) continue;
+        const tx=pdfjsLib.Util.transform(vp.transform,it.transform);
+        const fh=Math.hypot(tx[2],tx[3])||(it.height*vp.scale)||8;
+        const wpx=(it.width||0)*vp.scale;
+        const left=tx[4], top=tx[5]-fh;
+        items.push({str:it.str,x0:left/vp.width,y0:top/vp.height,x1:(left+wpx)/vp.width,y1:(top+fh)/vp.height});
+      }
+      let images=[];
+      if(i===0){ try{ images=await getImageRects(page,vp); }catch(_){ images=[]; } }
+      pageMeta.push({items,images,noText:items.length===0});
+    }
+    const doc={name:file.name,pdfDoc,pageMeta,boxes:[],strSchool:"",strName:""};
+    detectStringsForDoc(doc);
+    return doc;
+  }
+
+  // ---------- image locator ----------
+  async function getImageRects(page,vp){
+    const OPS=pdfjsLib.OPS;
+    const ops=await page.getOperatorList();
+    const imgOps=new Set([OPS.paintImageXObject,OPS.paintInlineImageXObject,OPS.paintImageMaskXObject].filter(v=>v!==undefined));
+    let ctm=[1,0,0,1,0,0]; const stack=[]; const rects=[];
+    for(let i=0;i<ops.fnArray.length;i++){
+      const fn=ops.fnArray[i],args=ops.argsArray[i];
+      if(fn===OPS.save){stack.push(ctm.slice());}
+      else if(fn===OPS.restore){ctm=stack.pop()||[1,0,0,1,0,0];}
+      else if(fn===OPS.transform){ctm=pdfjsLib.Util.transform(ctm,args);}
+      else if(fn===OPS.paintFormXObjectBegin){stack.push(ctm.slice());if(args&&args[0])ctm=pdfjsLib.Util.transform(ctm,args[0]);}
+      else if(fn===OPS.paintFormXObjectEnd){ctm=stack.pop()||ctm;}
+      else if(imgOps.has(fn)){
+        const m=pdfjsLib.Util.transform(vp.transform,ctm);
+        const c=[[0,0],[1,0],[0,1],[1,1]].map(([x,y])=>[m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]]);
+        const xs=c.map(p=>p[0]),ys=c.map(p=>p[1]);
+        rects.push({x0:Math.min(...xs)/vp.width,y0:Math.min(...ys)/vp.height,x1:Math.max(...xs)/vp.width,y1:Math.max(...ys)/vp.height});
+      }
+    }
+    return rects;
+  }
+
+  // ---------- footer locator ----------
+  function footerInfo(items){
+    if(!items||!items.length) return null;
+    let maxY0=0; items.forEach(it=>{if(it.y0>maxY0)maxY0=it.y0;});
+    const thr=Math.max(0.88,maxY0-0.06);
+    const band=items.filter(it=>it.y0>=thr);
+    const sm=band.find(it=>norm(it.str).includes("성명"));
+    if(!sm) return {band,sm:null,row:[]};
+    const midY=(sm.y0+sm.y1)/2;
+    const row=band.filter(it=>Math.abs((it.y0+it.y1)/2-midY)<0.014);
+    return {band,sm,row};
+  }
+  function footerSchool(row){let s=null;for(const it of row){if(!s||it.x0<s.x0)s=it;}return s;}
+  function footerNameItems(row,sm){return row.filter(it=>it.x0>sm.x1-0.004&&norm(it.str)!=="성명");}
+
+  function detectStringsForDoc(doc){
+    doc.strSchool="";doc.strName="";
+    for(let p=0;p<doc.pageMeta.length;p++){
+      const fi=footerInfo(doc.pageMeta[p].items);
+      if(!fi||!fi.sm) continue;
+      const school=footerSchool(fi.row);
+      if(school) doc.strSchool=school.str.trim();
+      const right=footerNameItems(fi.row,fi.sm).sort((a,b)=>a.x0-b.x0);
+      if(right.length) doc.strName=right[0].str.trim();
+      break;
+    }
+  }
+
+  // ---------- auto detection (all docs) ----------
+  function addBox(doc,page,b,type){
+    if(b.x1<=b.x0||b.y1<=b.y0) return;
+    doc.boxes.push({id:boxSeq++,page,x0:b.x0,y0:b.y0,x1:b.x1,y1:b.y1,type});
+  }
+
+  function regenerateAuto(){
+    const cnt={id:0,school:0,name:0,teacher:0,stamp:0,photo:0,everywhere:0};
+    docs.forEach(doc=>{
+      doc.boxes=doc.boxes.filter(b=>b.type==="manual");
+      for(let p=0;p<doc.pageMeta.length;p++){
+        const items=doc.pageMeta[p].items;
+        const fi=footerInfo(items);
+        const sm=fi?fi.sm:null, row=fi?fi.row:[];
+
+        if(toggles.id.checked&&p===0){
+          const h1=items.find(it=>norm(it.str).includes("인적"));
+          const h2=items.find(it=>norm(it.str).includes("출결"));
+          if(h1&&h2&&h2.y0>h1.y1){ addBox(doc,p,{x0:0.045,y0:h1.y1+0.004,x1:0.955,y1:h2.y0-0.006},"id"); cnt.id++; }
+        }
+        if(toggles.teacher.checked&&p===0){
+          const hdr=items.find(it=>norm(it.str).includes("담임성명"));
+          if(hdr){
+            const cx=(hdr.x0+hdr.x1)/2;
+            items.forEach(it=>{
+              const icx=(it.x0+it.x1)/2;
+              if(it.y0>hdr.y1+0.002&&it.y0<0.33&&Math.abs(icx-cx)<0.06){ addBox(doc,0,pad(it,0.008,0.005),"teacher"); cnt.teacher++; }
+            });
+          }
+        }
+        if(toggles.school.checked&&sm&&row.length){
+          const school=footerSchool(row);
+          if(school){ addBox(doc,p,pad(school,0.006,0.004),"school"); cnt.school++; }
+        }
+        if(toggles.name.checked&&sm){
+          const right=footerNameItems(row,sm);
+          if(right.length){
+            let x0=1,y0=1,x1=0,y1=0;
+            right.forEach(it=>{x0=Math.min(x0,it.x0);y0=Math.min(y0,it.y0);x1=Math.max(x1,it.x1);y1=Math.max(y1,it.y1);});
+            addBox(doc,p,pad({x0,y0,x1,y1},0.006,0.004),"name"); cnt.name++;
+          }
+        }
+        if(toggles.stamp.checked){
+          items.filter(it=>it.str.includes("***")).forEach(it=>{ addBox(doc,p,pad(it,0.004,0.004),"stamp"); cnt.stamp++; });
+        }
+        if(toggles.everywhere.checked){
+          const targets=[];
+          if(doc.strSchool&&doc.strSchool.length>=2) targets.push(norm(doc.strSchool));
+          if(doc.strName&&doc.strName.length>=2) targets.push(norm(doc.strName));
+          if(targets.length){
+            items.forEach(it=>{ const n=norm(it.str); if(targets.some(t=>n.includes(t))){ addBox(doc,p,pad(it,0.003,0.003),"everywhere"); cnt.everywhere++; } });
+          }
+        }
+      }
+      if(toggles.photo.checked&&doc.pageMeta.length){
+        const imgs=(doc.pageMeta[0].images||[]).filter(r=>(r.x1-r.x0)>0.04&&(r.y1-r.y0)>0.04);
+        if(imgs.length){ imgs.forEach(r=>{ addBox(doc,0,pad(r,0.01,0.01),"photo"); cnt.photo++; }); }
+        else { addBox(doc,0,{x0:0.77,y0:0.14,x1:0.95,y1:0.305},"photo"); cnt.photo++; }
+      }
+    });
+
+    const total=docs.length;
+    const label=(c)=> c? (total>1?`${c}곳 (전체)`:`${c}곳`):"";
+    counts.id.textContent=label(cnt.id);
+    counts.school.textContent=label(cnt.school);
+    counts.name.textContent=label(cnt.name);
+    counts.teacher.textContent=label(cnt.teacher);
+    counts.stamp.textContent=label(cnt.stamp);
+    counts.photo.textContent=label(cnt.photo);
+    counts.everywhere.textContent=label(cnt.everywhere);
+
+    updateFileList();
+    renderBoxes();
+  }
+
+  Object.values(toggles).forEach(t=>t.addEventListener("change",regenerateAuto));
+
+  // ---------- redaction color ----------
+  const colorSeg=$("#colorSeg");
+  colorSeg.addEventListener("click",e=>{
+    const btn=e.target.closest(".segbtn"); if(!btn) return;
+    colorSeg.querySelectorAll(".segbtn").forEach(b=>b.classList.toggle("active",b===btn));
+    redactColor = btn.dataset.color==="white" ? "#ffffff" : "#111317";
+    document.documentElement.style.setProperty("--redact-fill", redactColor);
+  });
+
+  // ---------- custom text (all docs) ----------
+  $("#addText").addEventListener("click",()=>{
+    const v=$("#customText").value.trim();
+    if(!v) return;
+    if(!docs.length){ alert("먼저 PDF를 불러와 주세요."); return; }
+    const target=norm(v); let added=0;
+    docs.forEach(doc=>{
+      for(let p=0;p<doc.pageMeta.length;p++){
+        doc.pageMeta[p].items.forEach(it=>{ if(norm(it.str).includes(target)){ addBox(doc,p,pad(it,0.003,0.003),"manual"); added++; } });
+      }
+    });
+    $("#customText").value="";
+    if(!added) alert(`"${v}" 을(를) 어떤 파일에서도 찾지 못했어요.`);
+    updateFileList(); renderBoxes();
+  });
+  $("#customText").addEventListener("keydown",e=>{if(e.key==="Enter")$("#addText").click();});
+
+  // ---------- file list ----------
+  function updateFileList(){
+    fileListEl.innerHTML="";
+    docs.forEach((doc,i)=>{
+      const row=document.createElement("div");
+      row.className="filerow"+(i===activeDoc?" active":"");
+      row.innerHTML=`<span class="ic">📄</span><div class="meta"><div class="nm">${esc(doc.name)}</div><div class="sub2">${doc.pdfDoc.numPages}p · 가림 ${doc.boxes.length}곳</div></div>`;
+      const rm=document.createElement("button");
+      rm.className="rm2"; rm.textContent="✕"; rm.title="목록에서 제거";
+      rm.addEventListener("click",e=>{e.stopPropagation();removeDoc(i);});
+      row.addEventListener("click",()=>{ if(i!==activeDoc) setActive(i); });
+      row.appendChild(rm);
+      fileListEl.appendChild(row);
+    });
+    fileBadge.textContent=docs.length?`${docs.length}개`:"";
+    clearBtn.style.display=docs.length?"block":"none";
+    updateExportBtn();
+  }
+  function updateExportBtn(){
+    if(!docs.length){ exportBtn.textContent="PDF 내보내기"; exportBtn.disabled=true; return; }
+    exportBtn.disabled=false;
+    exportBtn.textContent = docs.length>1 ? `전체 ${docs.length}개 일괄 내보내기 (ZIP)` : "가린 PDF 내보내기";
+  }
+
+  function removeDoc(i){
+    docs.splice(i,1);
+    if(docs.length===0){ activeDoc=-1; pagesEl.innerHTML=""; emptyEl.style.display="flex"; nowFile.textContent=""; regenerateAuto(); exportBtn.disabled=true; return; }
+    if(activeDoc===i){ activeDoc=Math.min(i,docs.length-1); setActive(activeDoc); }
+    else { if(activeDoc>i) activeDoc--; updateFileList(); }
+  }
+  clearBtn.addEventListener("click",()=>{
+    docs=[]; activeDoc=-1; pagesEl.innerHTML=""; emptyEl.style.display="flex"; nowFile.textContent="";
+    regenerateAuto(); exportBtn.disabled=true;
+  });
+
+  // ---------- active doc preview ----------
+  async function setActive(i){
+    activeDoc=i; updateFileList();
+    emptyEl.style.display="none";
+    nowFile.textContent=docs[i]?docs[i].name:"";
+    await renderActive();
+  }
+  async function renderActive(){
+    const tok=++renderToken;
+    pagesEl.innerHTML="";
+    const doc=docs[activeDoc];
+    if(!doc) return;
+    const N=doc.pdfDoc.numPages;
+    for(let i=0;i<N;i++){
+      if(tok!==renderToken) return;
+      await renderPageCanvas(doc,i);
+    }
+    if(tok!==renderToken) return;
+    renderBoxes();
+  }
+  async function renderPageCanvas(doc,idx){
+    const page=await doc.pdfDoc.getPage(idx+1);
+    const vp=page.getViewport({scale:baseScale*zoom});
+    const card=document.createElement("div");
+    card.className="pagecard"; card.dataset.page=idx;
+    card.style.width=vp.width+"px"; card.style.height=vp.height+"px";
+    const canvas=document.createElement("canvas");
+    canvas.width=vp.width; canvas.height=vp.height;
+    await page.render({canvasContext:canvas.getContext("2d"),viewport:vp}).promise;
+    card.appendChild(canvas);
+    const num=document.createElement("div"); num.className="pagenum"; num.textContent="p."+(idx+1); card.appendChild(num);
+    const overlay=document.createElement("div"); overlay.className="overlay"; card.appendChild(overlay);
+    attachDraw(overlay,idx);
+    if(doc.pageMeta[idx]&&doc.pageMeta[idx].noText){
+      const n=document.createElement("div"); n.className="notext"; n.textContent="텍스트 없음 (스캔본일 수 있어요)"; card.appendChild(n);
+    }
+    pagesEl.appendChild(card);
+  }
+
+  // ---------- boxes ----------
+  function renderBoxes(){
+    const doc=docs[activeDoc];
+    document.querySelectorAll(".overlay").forEach(ov=>{
+      const page=+ov.parentElement.dataset.page;
+      ov.querySelectorAll(".rbox").forEach(n=>n.remove());
+      if(!doc) return;
+      doc.boxes.filter(b=>b.page===page).forEach(b=>{
+        const el=document.createElement("div");
+        el.className="rbox"+(b.type==="manual"?" manual":"");
+        el.style.left=(b.x0*100)+"%"; el.style.top=(b.y0*100)+"%";
+        el.style.width=((b.x1-b.x0)*100)+"%"; el.style.height=((b.y1-b.y0)*100)+"%";
+        const rm=document.createElement("button"); rm.className="rm"; rm.textContent="✕"; rm.title="이 박스 삭제";
+        rm.addEventListener("click",ev=>{ ev.stopPropagation(); doc.boxes=doc.boxes.filter(x=>x.id!==b.id); updateFileList(); renderBoxes(); });
+        el.appendChild(rm); ov.appendChild(el);
+      });
+    });
+  }
+
+  function attachDraw(overlay,page){
+    let drawing=false,sx=0,sy=0,tmp=null;
+    overlay.addEventListener("mousedown",e=>{
+      if(e.target.closest(".rbox")) return;
+      const doc=docs[activeDoc]; if(!doc) return;
+      drawing=true;
+      const r=overlay.getBoundingClientRect();
+      sx=(e.clientX-r.left)/r.width; sy=(e.clientY-r.top)/r.height;
+      tmp=document.createElement("div"); tmp.className="rbox manual"; overlay.appendChild(tmp);
+      e.preventDefault();
+    });
+    window.addEventListener("mousemove",e=>{
+      if(!drawing||!tmp) return;
+      const r=overlay.getBoundingClientRect();
+      let cx=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)), cy=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));
+      const x0=Math.min(sx,cx),y0=Math.min(sy,cy),x1=Math.max(sx,cx),y1=Math.max(sy,cy);
+      tmp.style.left=(x0*100)+"%"; tmp.style.top=(y0*100)+"%"; tmp.style.width=((x1-x0)*100)+"%"; tmp.style.height=((y1-y0)*100)+"%";
+    });
+    window.addEventListener("mouseup",e=>{
+      if(!drawing||!tmp) return; drawing=false;
+      const doc=docs[activeDoc];
+      const r=overlay.getBoundingClientRect();
+      let cx=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)), cy=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));
+      const x0=Math.min(sx,cx),y0=Math.min(sy,cy),x1=Math.max(sx,cx),y1=Math.max(sy,cy);
+      tmp.remove(); tmp=null;
+      if(doc&&x1-x0>0.004&&y1-y0>0.004){ addBox(doc,page,{x0,y0,x1,y1},"manual"); updateFileList(); renderBoxes(); }
+    });
+  }
+
+  // ---------- zoom ----------
+  let zoomBusy=false;
+  async function applyZoom(z){
+    zoom=Math.max(0.5,Math.min(2,z)); $("#zoomVal").textContent=Math.round(zoom*100)+"%";
+    if(zoomBusy||activeDoc<0) return;
+    zoomBusy=true; showLoading("다시 그리는 중…");
+    await renderActive(); hideLoading(); zoomBusy=false;
+  }
+  $("#zoomIn").addEventListener("click",()=>applyZoom(zoom+0.15));
+  $("#zoomOut").addEventListener("click",()=>applyZoom(zoom-0.15));
+
+  // ---------- batch export ----------
+  exportBtn.addEventListener("click",async()=>{
+    if(!docs.length) return;
+    exportBtn.disabled=true; showLoading("안전한 PDF 만드는 중…");
+    try{
+      const totalPages=docs.reduce((s,d)=>s+d.pdfDoc.numPages,0);
+      let done=0;
+      const useZip=docs.length>1;
+      const zip=useZip?new JSZip():null;
+      const usedNames={};
+
+      for(let d=0;d<docs.length;d++){
+        const doc=docs[d];
+        const pdfBytes=await buildRedacted(doc,(pi,pn)=>{
+          done=Math.min(totalPages,done+1);
+          loadMsg.textContent=`처리 중 · 파일 ${d+1}/${docs.length} · 페이지 ${pi}/${pn}`;
+          setProg(done/totalPages);
+        });
+        let base=doc.name.replace(/\.pdf$/i,"");
+        let fname=base+"_블라인드.pdf";
+        if(usedNames[fname]){ usedNames[fname]++; fname=base+"_블라인드("+usedNames[fname]+").pdf"; } else usedNames[fname]=1;
+        if(useZip){ zip.file(fname,pdfBytes); }
+        else { downloadBytes(pdfBytes,fname,"application/pdf"); }
+      }
+      setProg(1);
+      if(useZip){
+        loadMsg.textContent="ZIP 압축 중…";
+        const blob=await zip.generateAsync({type:"blob"});
+        const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="생기부_블라인드_일괄.zip"; a.click();
+        setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+      }
+    }catch(err){
+      console.error(err); alert("내보내기 중 문제가 발생했습니다.\n"+(err&&err.message?err.message:""));
+    }finally{ hideLoading(); exportBtn.disabled=false; }
+  });
+
+  async function buildRedacted(doc,onPage){
+    const {PDFDocument}=window.PDFLib;
+    const out=await PDFDocument.create();
+    const N=doc.pdfDoc.numPages;
+    for(let i=0;i<N;i++){
+      const page=await doc.pdfDoc.getPage(i+1);
+      const vp=page.getViewport({scale:EXPORT_SCALE});
+      const c=document.createElement("canvas"); c.width=vp.width; c.height=vp.height;
+      const ctx=c.getContext("2d");
+      await page.render({canvasContext:ctx,viewport:vp}).promise;
+      ctx.fillStyle=redactColor;
+      doc.boxes.filter(b=>b.page===i).forEach(b=>{ ctx.fillRect(b.x0*c.width,b.y0*c.height,(b.x1-b.x0)*c.width,(b.y1-b.y0)*c.height); });
+      const jpg=c.toDataURL("image/jpeg",0.85);
+      const img=await out.embedJpg(dataURLToBytes(jpg));
+      const pt=page.getViewport({scale:1});
+      const pg=out.addPage([pt.width,pt.height]);
+      pg.drawImage(img,{x:0,y:0,width:pt.width,height:pt.height});
+      c.width=c.height=0;
+      if(onPage) onPage(i+1,N);
+    }
+    return await out.save();
+  }
+
+  function dataURLToBytes(dataURL){
+    const bin=atob(dataURL.split(",")[1]); const len=bin.length; const bytes=new Uint8Array(len);
+    for(let i=0;i<len;i++) bytes[i]=bin.charCodeAt(i); return bytes;
+  }
+  function downloadBytes(bytes,name,type){
+    const blob=new Blob([bytes],{type}); const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  }
+
+})();
+</script>
+</body>
+</html>
