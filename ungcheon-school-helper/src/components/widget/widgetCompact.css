@@ -1,0 +1,274 @@
+html,
+body,
+#root {
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.widget-shell {
+  height: auto !important;
+  min-height: 0;
+  border-radius: 17px;
+}
+
+.widget-header {
+  height: 43px;
+  min-height: 43px;
+  padding: 6px 8px;
+  gap: 5px;
+}
+
+.widget-grip {
+  width: 14px;
+  display: grid;
+  place-items: center;
+}
+
+.widget-identity {
+  min-width: 0;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.widget-identity b {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.widget-identity small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9px;
+  margin: 0;
+}
+
+.widget-identity i {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+}
+
+.widget-identity .online::before,
+.widget-identity .offline::before {
+  width: 7px;
+  height: 7px;
+  margin: 0;
+}
+
+.widget-header nav {
+  gap: 0;
+}
+
+.widget-header button {
+  padding: 5px;
+}
+
+.widget-shell main {
+  overflow: visible;
+  padding: 6px 7px 7px;
+  gap: 5px;
+}
+
+.widget-section {
+  border-radius: 10px;
+  padding: 6px 7px;
+}
+
+.section-title {
+  height: 17px;
+  margin-bottom: 3px;
+  font-size: 10px;
+}
+
+.section-title svg {
+  width: 13px;
+  height: 13px;
+}
+
+.section-title button {
+  padding: 1px 3px;
+  font-size: 8px;
+}
+
+.day-rule {
+  margin-bottom: 3px;
+  padding: 3px 5px;
+}
+
+.period-list {
+  gap: 2px;
+}
+
+.period-row {
+  min-height: 23px;
+  grid-template-columns: 19px 34px minmax(0, 1fr) auto auto;
+  gap: 3px;
+  padding: 2px 5px;
+}
+
+.period-row b {
+  font-size: 10px;
+}
+
+.period-number {
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  font-size: 9px;
+}
+
+.period-time,
+.period-row small {
+  font-size: 8px;
+}
+
+.period-row em {
+  font-size: 7px;
+}
+
+.events-section li {
+  min-height: 19px;
+  padding: 1px 0;
+  gap: 5px;
+}
+
+.events-section i {
+  width: 4px;
+  height: 17px;
+}
+
+.events-section li div {
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.events-section li b {
+  flex: 1;
+  font-size: 9px;
+}
+
+.events-section li small {
+  flex: 0 0 auto;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 8px;
+}
+
+.more-events {
+  min-height: 15px !important;
+  color: #6d28d9;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.empty {
+  margin: 0;
+  font-size: 9px;
+}
+
+.meal-section {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.meal-section .section-title {
+  margin: 0;
+}
+
+.meal-section p {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+}
+
+.fortune-section {
+  padding: 6px 8px;
+}
+
+.fortune-heading {
+  font-size: 10px;
+}
+
+.fortune-section p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  margin: 3px 0;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.fortune-section > div:last-child {
+  font-size: 8px;
+}
+
+.widget-actions {
+  gap: 4px;
+}
+
+.widget-actions button {
+  min-height: 32px;
+  padding: 5px 4px;
+  border-radius: 9px;
+  font-size: 8px;
+}
+
+.widget-actions button b {
+  font-size: 10px;
+}
+
+.widget-compact {
+  min-height: 46px;
+  padding: 6px 9px;
+  gap: 6px;
+}
+
+.widget-compact b {
+  font-size: 9px;
+}
+
+.compact-counts {
+  gap: 3px;
+}
+
+.compact-counts span {
+  padding: 4px;
+}
+
+.widget-settings {
+  padding: 7px 10px;
+  gap: 5px;
+  font-size: 9px;
+}
+
+.widget-settings input[type='range'] {
+  width: 140px;
+}
+
+.preset-minimal.is-expanded .widget-actions {
+  margin-top: 0;
+}
+
+@media (max-height: 560px) {
+  .widget-shell main {
+    gap: 4px;
+  }
+
+  .widget-section {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+}

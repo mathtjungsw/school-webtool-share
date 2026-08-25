@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   AlertCircle, Check, ChevronLeft, Link2, Megaphone, MessageSquareText,
-  LogOut, Minus, Search, ScrollText, Square, X,
+  LogOut, Minus, Search, ScrollText, Square, X, PanelsTopLeft,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useNoticeStore } from '../stores/noticeStore'
@@ -60,6 +60,9 @@ export default function TitleBar({
         <TopNav active={currentPage === 'feature_requests'} onClick={() => onNavigate('feature_requests')} icon={<MessageSquareText size={11} />}>기능개선</TopNav>
         <NoticeButton />
         <TimetableChangeNotifications />
+        <button type="button" onClick={() => window.electron?.showWidget()} className="no-drag flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] text-slate-400 hover:text-white hover:bg-white/5" title="바탕화면 미니 대시보드 열기">
+          <PanelsTopLeft size={12} />미니 위젯
+        </button>
         <TopNav active={currentPage === 'settings'} onClick={() => onNavigate('settings')}>환경설정</TopNav>
       </div>
 

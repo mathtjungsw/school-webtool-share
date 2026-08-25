@@ -141,6 +141,10 @@ export default function Layout() {
     return () => window.removeEventListener('app:navigate', handleNavigate)
   })
 
+  useEffect(() => window.electron?.onNavigateRequest(pageId => {
+    if (pageId) window.dispatchEvent(new CustomEvent('app:navigate', { detail: pageId }))
+  }), [])
+
   return (
     <div className="app-shell h-screen bg-surface-900 flex flex-col overflow-hidden">
       <TitleBar

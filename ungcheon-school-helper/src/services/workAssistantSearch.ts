@@ -40,9 +40,17 @@ export const WORK_ASSISTANT_SUGGESTIONS = [
   '학교 PC에서 주간계획이나 창체 일정이 안 보여',
   '학교 공유 서비스 저장 통신을 진단하고 싶어',
   '업무와 수업 변경 알림을 한곳에서 보고 싶어',
+  '바탕화면 미니 위젯을 열고 싶어',
 ]
 
 const DETAILED_WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
+  {
+    id: 'desktop-mini-widget', title: '바탕화면 미니 대시보드', page: 'settings', category: '설정·도움말',
+    summary: '오늘 시간표·일정·급식·미완료 업무·알림과 가벼운 오늘의 한마디를 작은 위젯으로 계속 확인합니다.',
+    steps: ['상단의 미니 위젯 버튼을 누릅니다.', '처음에는 펼친 상태로 열리며 현재 수업은 파란색, 다음 수업은 주황색으로 표시됩니다.', '위젯의 설정 버튼에서 디자인·투명도·Windows 자동 실행·오늘의 한마디를 조절합니다.', '접기 버튼을 누르면 현재·다음 수업과 건수만 남고, X 버튼은 완전 종료가 아니라 위젯만 숨깁니다.', '트레이의 웅천고 아이콘을 두 번 누르면 다시 열 수 있습니다.'],
+    keywords: ['미니 위젯', '바탕화면 위젯', '데스크톱 위젯', '오늘 시간표 위젯', '투명도', '위젯 접기', '위젯 디자인', '오늘의 운세', '오늘의 한마디', '행운의 색', '행운의 숫자', '위젯 자동실행'],
+    teacherContext: true,
+  },
   {
     id: 'operations-notifications', title: '통합 알림·변경센터', page: 'operations_notifications', category: '알림',
     summary: '내 업무, 위원회 일정, 수업 교환·대강 변경을 처리 필요·참고·완료로 나누어 한곳에서 확인합니다.',

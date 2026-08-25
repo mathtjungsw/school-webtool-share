@@ -1,7 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import WidgetApp from './components/widget/WidgetApp'
 import './styles/globals.css'
+import './components/widget/widget.css'
+import './components/widget/widgetCompact.css'
 import { logger } from './utils/logger'
 
 // 웹보기가 첫 화면을 그리기 전부터 밝은 모드로 고정한다.
@@ -34,6 +37,6 @@ window.addEventListener('error', e => {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    {new URLSearchParams(window.location.search).get('window') === 'widget' ? <WidgetApp /> : <App />}
   </React.StrictMode>
 )

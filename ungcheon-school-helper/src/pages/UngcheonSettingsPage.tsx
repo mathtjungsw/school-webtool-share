@@ -291,7 +291,7 @@ export default function UngcheonSettingsPage() {
           </Field>
           <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 cursor-pointer">
             <Power size={16} className="text-slate-400" />
-            <span className="text-sm text-slate-300 flex-1">Windows 시작 시 자동 실행</span>
+            <span className="text-sm text-slate-900 flex-1">Windows 시작 시 미니 위젯 자동 실행</span>
             <input
               type="checkbox"
               checked={autoLaunch}
@@ -302,6 +302,10 @@ export default function UngcheonSettingsPage() {
               className="w-4 h-4"
             />
           </label>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black/10 bg-white px-4 py-3">
+          <div><p className="text-sm font-black text-slate-950">바탕화면 미니 대시보드</p><p className="mt-1 text-xs font-semibold text-slate-600">처음에는 펼친 상태로 열리며, 위젯 안에서 디자인·투명도·고정을 조절할 수 있습니다.</p></div>
+          <button type="button" className="btn-primary text-xs" onClick={() => window.electron.showWidget()}>미니 위젯 열기</button>
         </div>
         <div className="mt-5 border-t border-black/10 pt-4 dark:border-white/10">
           <div className="flex flex-wrap items-center justify-between gap-3">

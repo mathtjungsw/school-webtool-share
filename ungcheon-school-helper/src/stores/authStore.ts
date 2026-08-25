@@ -77,6 +77,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         useAppStore.getState().saveConfig({ teacherName }),
       ])
       set({ authenticated: true, teacherName, expiresAt, error: '' })
+      window.electron?.notifyAuthChanged()
       void preloadSchoolHubCache(teacherName)
       return true
     } catch (error) {
@@ -94,6 +95,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       window.electron?.configDelete(SESSION_EXPIRES_KEY),
     ])
     set({ authenticated: false, teacherName: '', expiresAt: '', error: '' })
+    window.electron?.notifyAuthChanged()
   },
 }))
 

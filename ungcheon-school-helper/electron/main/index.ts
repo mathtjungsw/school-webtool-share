@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog, safeStorage, session, net } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog, safeStorage, session, net, Tray, Menu, screen } from 'electron'
 import { join, resolve as pathResolve, basename, extname } from 'path'
 import { pathToFileURL } from 'url'
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync, readdirSync, copyFileSync } from 'fs'
@@ -58,12 +58,46 @@ import {
 const execFileAsync = promisify(execFile)
 
 const store = new Store()
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) app.quit()
 
 // 웅천고 전용 공유 주소는 프로그램에 내장한다. 과거 PC에 다른 주소가 저장되어
 // 있어도 시작할 때 고정 주소로 덮어써 사용자가 수정할 필요가 없게 한다.
 store.set('config.schoolHubUrl', UNGCHEON_SCHOOL_HUB_URL)
 
 let mainWindow: BrowserWindow | null = null
+let widgetWindow: BrowserWindow | null = null
+let tray: Tray | null = null
+let isQuitting = false
+
+type WidgetPreset = 'glass-light' | 'solid-light' | 'dark-glass' | 'school-yellow' | 'minimal'
+interface WidgetSettings {
+  expanded: boolean
+  pinned: boolean
+  opacity: number
+  preset: WidgetPreset
+  showFortune: boolean
+  showMeal: boolean
+  dense: boolean
+  x?: number
+  y?: number
+}
+const WIDGET_SETTINGS_KEY = 'widget.settings.v1'
+const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
+  expanded: true, pinned: true, opacity: 0.96, preset: 'glass-light', showFortune: true, showMeal: true, dense: true,
+}
+function widgetSettings(): WidgetSettings {
+  const saved = store.get(WIDGET_SETTINGS_KEY) as Partial<WidgetSettings> | undefined
+  return { ...DEFAULT_WIDGET_SETTINGS, ...(saved ?? {}), expanded: saved?.expanded !== false }
+}
+function widgetSize(expanded: boolean, preset: WidgetPreset) {
+  if (preset === 'minimal') return expanded ? { width: 360, height: 480 } : { width: 360, height: 96 }
+  return expanded ? { width: 390, height: 600 } : { width: 390, height: 110 }
+}
+function loadRenderer(window: BrowserWindow, widget = false) {
+  if (process.env['ELECTRON_RENDERER_URL']) window.loadURL(`${process.env['ELECTRON_RENDERER_URL']}${widget ? '?window=widget' : ''}`)
+  else window.loadFile(join(__dirname, '../renderer/index.html'), widget ? { query: { window: 'widget' } } : undefined)
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -91,7 +125,7 @@ function createWindow() {
   mainWindow.maximize()
   mainWindow.once('ready-to-show', () => mainWindow?.show())
 
-  nativeTheme.themeSource = 'dark'
+  nativeTheme.themeSource = 'light'
 
   // User-Agent에서 Electron 제거 — 구글 캘린더 등 Electron 차단 서비스 우회
   const chromeUA = mainWindow.webContents.getUserAgent()
@@ -99,11 +133,7 @@ function createWindow() {
     .replace(/ electron\/[\d.]+/i, '')
   mainWindow.webContents.setUserAgent(chromeUA)
 
-  if (process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  loadRenderer(mainWindow)
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -127,7 +157,14 @@ app.whenReady().then(() => {
     callback({ responseHeaders: headers })
   })
 
-  createWindow()
+  nativeTheme.themeSource = 'light'
+  if (!process.argv.includes('--widget')) createWindow()
+  createWidgetWindow()
+  createTray()
+  if (store.get('widget.autoLaunchInitialized') !== true) {
+    store.set('widget.autoLaunchInitialized', true)
+    setWidgetAutoLaunch(true)
+  }
 
   // 프로덕션 빌드에서만 자동 업데이트 확인 + 자동 실행 기본값 적용
   if (!process.env['ELECTRON_RENDERER_URL'] && !app.getVersion().includes('-preview.')) {
@@ -141,12 +178,18 @@ app.whenReady().then(() => {
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    showMainWindow()
   })
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  if (process.platform === 'darwin' && isQuitting) app.quit()
+})
+
+app.on('before-quit', () => { isQuitting = true })
+app.on('second-instance', (_, argv) => {
+  if (argv.includes('--widget')) createWidgetWindow()
+  else showMainWindow()
 })
 
 // Window controls IPC
@@ -156,6 +199,31 @@ ipcMain.on('window:maximize', () => {
   else mainWindow?.maximize()
 })
 ipcMain.on('window:close', () => mainWindow?.close())
+ipcMain.handle('widget:show', () => { createWidgetWindow(); return true })
+ipcMain.handle('widget:hide', () => { widgetWindow?.hide(); return true })
+ipcMain.handle('widget:getSettings', () => widgetSettings())
+ipcMain.handle('widget:updateSettings', (_, patch: Partial<WidgetSettings>) => {
+  const next = { ...widgetSettings(), ...patch }
+  next.opacity = Math.max(0.65, Math.min(1, Number(next.opacity) || DEFAULT_WIDGET_SETTINGS.opacity))
+  store.set(WIDGET_SETTINGS_KEY, next)
+  if (widgetWindow) {
+    widgetWindow.setAlwaysOnTop(next.pinned)
+    widgetWindow.setOpacity(next.opacity)
+    const size = widgetSize(next.expanded, next.preset)
+    widgetWindow.setSize(size.width, size.height, true)
+    widgetWindow.webContents.send('widget:settingsChanged', next)
+  }
+  return next
+})
+ipcMain.handle('widget:fitHeight', (_, requestedHeight: number) => {
+  if (!widgetWindow || widgetWindow.isDestroyed()) return false
+  const height = Math.max(84, Math.min(760, Math.ceil(Number(requestedHeight) || 0)))
+  const [width, currentHeight] = widgetWindow.getSize()
+  if (Math.abs(currentHeight - height) > 1) widgetWindow.setSize(width, height, false)
+  return true
+})
+ipcMain.handle('widget:openMain', (_, page = '') => { showMainWindow(String(page)); return true })
+ipcMain.on('auth:changed', () => BrowserWindow.getAllWindows().forEach(window => window.webContents.send('auth:changed')))
 
 // Config IPC
 // C-1: 허용 키 접두어 화이트리스트 — 렌더러가 임의 키를 주입하는 것을 방지
@@ -167,6 +235,7 @@ const ALLOWED_CONFIG_KEY_PREFIXES = [
   'personal.', 'sidebar.', 'pilotLogin.', 'neisSync.', 'notifier.',
   'staffTasks.',
   'recommendedSubjects.',
+  'widget.',
 ]
 function isAllowedConfigKey(key: string): boolean {
   return ALLOWED_CONFIG_KEY_PREFIXES.some(p => key.startsWith(p))
@@ -429,8 +498,7 @@ ipcMain.handle('app:getAutoLaunch', () => {
   return app.getLoginItemSettings().openAtLogin
 })
 ipcMain.handle('app:setAutoLaunch', (_, enable: boolean) => {
-  if (process.env['ELECTRON_RENDERER_URL']) return  // dev 환경에서는 잘못된 경로 등록 방지
-  app.setLoginItemSettings({ openAtLogin: enable })
+  setWidgetAutoLaunch(enable)
 })
 
 // Notifier IPC
@@ -1040,6 +1108,71 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
       ? `학교 공유 서비스 응답이 지연되어 ${action || '요청'} 처리를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.${lastError ? ` (${lastError})` : ''}`
       : `학교 공유 서비스에 연결할 수 없습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.${lastError ? ` (${lastError})` : ''}`,
   }
+}
+
+function createWidgetWindow() {
+  if (widgetWindow && !widgetWindow.isDestroyed()) {
+    widgetWindow.show()
+    widgetWindow.focus()
+    return widgetWindow
+  }
+  const settings = widgetSettings()
+  const size = widgetSize(settings.expanded, settings.preset)
+  const workArea = screen.getPrimaryDisplay().workArea
+  const desiredX = Number.isFinite(settings.x) ? Number(settings.x) : workArea.x + workArea.width - size.width - 18
+  const desiredY = Number.isFinite(settings.y) ? Number(settings.y) : workArea.y + 18
+  const x = Math.max(workArea.x, Math.min(desiredX, workArea.x + workArea.width - size.width))
+  const y = Math.max(workArea.y, Math.min(desiredY, workArea.y + workArea.height - Math.min(size.height, workArea.height)))
+  widgetWindow = new BrowserWindow({
+    ...size,
+    x, y,
+    minWidth: 350, minHeight: 84,
+    frame: false, transparent: true, backgroundColor: '#00000000', resizable: false,
+    alwaysOnTop: settings.pinned, skipTaskbar: true, show: false, hasShadow: true,
+    icon: process.env['ELECTRON_RENDERER_URL'] ? join(__dirname, '../../resources/icon.png') : join(process.resourcesPath, 'icon.png'),
+    webPreferences: { preload: join(__dirname, '../preload/index.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
+  })
+  widgetWindow.setOpacity(Math.max(0.65, Math.min(1, settings.opacity)))
+  widgetWindow.once('ready-to-show', () => widgetWindow?.show())
+  widgetWindow.on('moved', () => {
+    if (!widgetWindow) return
+    const [x, y] = widgetWindow.getPosition()
+    store.set(WIDGET_SETTINGS_KEY, { ...widgetSettings(), x, y })
+  })
+  widgetWindow.on('close', event => {
+    if (!isQuitting) { event.preventDefault(); widgetWindow?.hide() }
+  })
+  widgetWindow.on('closed', () => { widgetWindow = null })
+  loadRenderer(widgetWindow, true)
+  return widgetWindow
+}
+
+function showMainWindow(page = '') {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow()
+  mainWindow?.show()
+  mainWindow?.focus()
+  if (page) mainWindow?.webContents.send('app:navigate', page)
+}
+
+function setWidgetAutoLaunch(enable: boolean) {
+  if (process.env['ELECTRON_RENDERER_URL']) return
+  app.setLoginItemSettings({ openAtLogin: enable, args: enable ? ['--widget'] : [] })
+}
+
+function createTray() {
+  if (tray) return
+  tray = new Tray(process.env['ELECTRON_RENDERER_URL'] ? join(__dirname, '../../resources/icon.png') : join(process.resourcesPath, 'icon.png'))
+  tray.setToolTip('웅천고 업무도우미')
+  const refresh = () => tray?.setContextMenu(Menu.buildFromTemplate([
+    { label: '미니 위젯 열기', click: () => createWidgetWindow() },
+    { label: '업무도우미 열기', click: () => showMainWindow() },
+    { type: 'separator' },
+    { label: 'Windows 시작 시 위젯 자동 실행', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin, click: item => { setWidgetAutoLaunch(item.checked); refresh() } },
+    { type: 'separator' },
+    { label: '완전 종료', click: () => { isQuitting = true; app.quit() } },
+  ]))
+  refresh()
+  tray.on('double-click', () => createWidgetWindow())
 }
 
 ipcMain.handle('schoolHub:request', (_, payload: Record<string, unknown>) => requestSchoolHub(payload))

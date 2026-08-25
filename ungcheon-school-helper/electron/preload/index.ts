@@ -139,6 +139,29 @@ contextBridge.exposeInMainWorld('electron', {
   getAutoLaunch: (): Promise<boolean> => ipcRenderer.invoke('app:getAutoLaunch'),
   setAutoLaunch: (enable: boolean) => ipcRenderer.invoke('app:setAutoLaunch', enable),
 
+  // Desktop mini dashboard widget
+  showWidget: (): Promise<boolean> => ipcRenderer.invoke('widget:show'),
+  hideWidget: (): Promise<boolean> => ipcRenderer.invoke('widget:hide'),
+  widgetGetSettings: () => ipcRenderer.invoke('widget:getSettings'),
+  widgetUpdateSettings: (patch: Record<string, unknown>) => ipcRenderer.invoke('widget:updateSettings', patch),
+  widgetFitHeight: (height: number): Promise<boolean> => ipcRenderer.invoke('widget:fitHeight', height),
+  widgetOpenMain: (page = ''): Promise<boolean> => ipcRenderer.invoke('widget:openMain', page),
+  onWidgetSettingsChanged: (cb: (settings: unknown) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, settings: unknown) => cb(settings)
+    ipcRenderer.on('widget:settingsChanged', handler)
+    return () => ipcRenderer.removeListener('widget:settingsChanged', handler)
+  },
+  notifyAuthChanged: () => ipcRenderer.send('auth:changed'),
+  onAuthChanged: (cb: () => void) => {
+    ipcRenderer.on('auth:changed', cb)
+    return () => ipcRenderer.removeListener('auth:changed', cb)
+  },
+  onNavigateRequest: (cb: (page: string) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, page: string) => cb(page)
+    ipcRenderer.on('app:navigate', handler)
+    return () => ipcRenderer.removeListener('app:navigate', handler)
+  },
+
   // Resources path (for bundled static HTML tools)
   getResourcesPath: (): Promise<string> => ipcRenderer.invoke('app:resourcesPath'),
 

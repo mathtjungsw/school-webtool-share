@@ -98,6 +98,16 @@ declare global {
       }>
       getAutoLaunch: () => Promise<boolean>
       setAutoLaunch: (enable: boolean) => Promise<void>
+      showWidget: () => Promise<boolean>
+      hideWidget: () => Promise<boolean>
+      widgetGetSettings: () => Promise<import('./components/widget/WidgetApp').WidgetSettings>
+      widgetUpdateSettings: (patch: Partial<import('./components/widget/WidgetApp').WidgetSettings>) => Promise<import('./components/widget/WidgetApp').WidgetSettings>
+      widgetFitHeight: (height: number) => Promise<boolean>
+      widgetOpenMain: (page?: string) => Promise<boolean>
+      onWidgetSettingsChanged: (cb: (settings: import('./components/widget/WidgetApp').WidgetSettings) => void) => () => void
+      notifyAuthChanged: () => void
+      onAuthChanged: (cb: () => void) => () => void
+      onNavigateRequest: (cb: (page: string) => void) => () => void
       getResourcesPath: () => Promise<string>
       weeklyPlanGetMonth: (
         year: number,
