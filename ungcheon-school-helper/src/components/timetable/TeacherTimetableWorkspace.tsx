@@ -35,8 +35,6 @@ const MONTH_LABELS: Record<string, string> = {
 }
 
 export default function TeacherTimetableWorkspace({ mode, timetable, currentTeacherName, configured, staffRoster }: Props) {
-  const initialTeacher = Math.max(0, timetable.teachers.findIndex(item => normalizeName(item.name) === normalizeName(currentTeacherName)))
-  const [teacherIndex, setTeacherIndex] = useState(initialTeacher)
   const [teacherView, setTeacherView] = useState<TeacherView>('month')
   const [monthKey, setMonthKey] = useState('2026-08')
   const [selectedDate, setSelectedDate] = useState('2026-08-25')
@@ -59,16 +57,14 @@ export default function TeacherTimetableWorkspace({ mode, timetable, currentTeac
   }, [configured, currentTeacherName])
 
   useEffect(() => { void loadChanges() }, [loadChanges])
-  useEffect(() => {
-    const next = timetable.teachers.findIndex(item => normalizeName(item.name) === normalizeName(currentTeacherName))
-    if (next >= 0) setTeacherIndex(next)
-  }, [currentTeacherName, timetable.teachers])
-
   if (mode === 'manager') {
     return <ManagerSchedule timetable={timetable} staffRoster={staffRoster} changes={changes} weekKey={weekKey} onWeekChange={setWeekKey} loading={loading} onRefresh={() => void loadChanges(true)} />
   }
 
-  const teacher = timetable.teachers[teacherIndex]
+  const teacher = timetable.teachers.find(item => normalizeName(item.name) === normalizeName(currentTeacherName))
+  if (!teacher) {
+    return <section className="card p-6 text-center"><CalendarDays size={30} className="mx-auto text-amber-500" /><h2 className="mt-3 text-base font-black text-slate-950 dark:text-white">로그인한 교사의 시간표를 찾지 못했습니다</h2><p className="mt-2 text-sm font-semibold text-slate-600 dark:text-slate-300">현재 로그인 이름 “{currentTeacherName || '미설정'}”이 관리자가 올린 시간표의 교사명과 일치하는지 확인해 주세요. 다른 교사의 시간표는 시간표 업무 담당자 탭에서만 확인할 수 있습니다.</p></section>
+  }
   const monthDates = monthCalendarDates(monthKey)
   const days = monthDates.map(date => buildCompositeTeacherDay(timetable, teacher.name, date, changes, PULLED_LESSONS_2026))
   const selectedDay = buildCompositeTeacherDay(timetable, teacher.name, selectedDate, changes, PULLED_LESSONS_2026)
@@ -81,14 +77,9 @@ export default function TeacherTimetableWorkspace({ mode, timetable, currentTeac
       <section className="card p-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-64 flex-1">
-            <h2 className="flex items-center gap-2 text-base font-black text-white"><CalendarDays size={18} className="text-violet-400" /> 교사 시간표</h2>
-            <p className="mt-1 text-xs font-semibold text-slate-400">2026학년도 2학기 학사일정과 승인된 수업 변경을 합성한 예상 시간표입니다.</p>
+            <h2 className="flex items-center gap-2 text-base font-black text-slate-950 dark:text-white"><CalendarDays size={18} className="text-violet-500" /> {teacher.name} 선생님 시간표</h2>
+            <p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-300">로그인한 본인의 2026학년도 2학기 학사일정과 승인된 수업 변경을 합성한 예상 시간표입니다.</p>
           </div>
-          <label className="min-w-56 text-xs font-bold text-slate-400">교사 선택
-            <select className="input-field mt-1 w-full" value={teacherIndex} onChange={event => setTeacherIndex(Number(event.target.value))}>
-              {timetable.teachers.map((item, index) => <option key={`${item.name}-${index}`} value={index}>{item.label}</option>)}
-            </select>
-          </label>
           <button className="btn-ghost inline-flex items-center gap-2" onClick={() => void loadChanges(true)} disabled={loading}><RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> 변경자료 새로고침</button>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold text-slate-400">
@@ -133,24 +124,25 @@ export default function TeacherTimetableWorkspace({ mode, timetable, currentTeac
 }
 
 function MonthSchedule({ monthKey, days, selectedDate, onSelect }: { monthKey: string; days: CompositeTeacherDay[]; selectedDate: string; onSelect: (date: string) => void }) {
-  return <section className="card overflow-hidden print:overflow-visible">
-    <div className="grid grid-cols-7 border-b border-white/10 bg-white/5 text-center text-xs font-black text-slate-300">
+  return <section className="card overflow-x-auto print:overflow-visible"><div className="min-w-[1050px]">
+    <div className="grid grid-cols-7 border-b border-black/10 bg-black/[0.03] text-center text-xs font-black text-slate-800 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
       {['일', '월', '화', '수', '목', '금', '토'].map(day => <div key={day} className="px-2 py-2">{day}</div>)}
     </div>
     <div className="grid grid-cols-7">
       {days.map(day => {
         const outsideMonth = !day.date.startsWith(monthKey)
         const changed = day.lessons.some(item => item.source !== 'base')
-        return <button key={day.date} type="button" onClick={() => onSelect(day.date)} className={clsx('min-h-44 border-b border-r border-white/10 p-2 text-left align-top transition-colors', outsideMonth && 'opacity-35', selectedDate === day.date ? 'bg-violet-500/15 ring-2 ring-inset ring-violet-400/50' : 'hover:bg-white/[0.035]')}>
-          <div className="flex items-center justify-between gap-1"><strong className="text-xs text-slate-200">{Number(day.date.slice(-2))}</strong>{changed && <span className="rounded bg-violet-500/20 px-1.5 py-0.5 text-[8px] font-black text-violet-300">변경</span>}</div>
+        return <button key={day.date} type="button" onClick={() => onSelect(day.date)} className={clsx('min-h-60 border-b border-r border-black/10 p-2 text-left align-top transition-colors dark:border-white/10', outsideMonth && 'opacity-35', selectedDate === day.date ? 'bg-violet-500/15 ring-2 ring-inset ring-violet-500/60' : 'hover:bg-black/[0.025] dark:hover:bg-white/[0.035]')}>
+          <div className="flex items-center justify-between gap-1"><strong className="text-xs text-slate-950 dark:text-slate-100">{Number(day.date.slice(-2))}</strong>{changed && <span className="rounded bg-violet-500/20 px-1.5 py-0.5 text-[8px] font-black text-violet-700 dark:text-violet-200">변경</span>}</div>
           {day.rule.specialWeekdayLabel && <p className="mt-1 rounded bg-amber-500/15 px-1.5 py-1 text-[8px] font-black text-amber-300">{day.rule.specialWeekdayLabel}</p>}
-          {day.rule.kind !== 'instruction' ? <p className="mt-2 text-[10px] font-black text-rose-300">{day.rule.label}</p> : <div className="mt-1 space-y-0.5">{day.lessons.filter(item => item.value || item.badge).map(item => <LessonLine key={item.period} lesson={item} />)}</div>}
+          {day.rule.kind !== 'instruction' && <p className="mt-1 truncate rounded bg-rose-500/10 px-1.5 py-1 text-[9px] font-black text-rose-700 dark:text-rose-300">{day.rule.label}</p>}
+          <div className={clsx('mt-1 divide-y divide-black/10 rounded border border-black/10 dark:divide-white/10 dark:border-white/10', day.rule.kind !== 'instruction' && 'opacity-35')}>{day.lessons.map(item => <div key={item.period} className={clsx('h-6 px-1 py-0.5', item.source === 'pulled' ? 'bg-emerald-500/15' : item.source !== 'base' ? 'bg-violet-500/15' : '')}><LessonLine lesson={day.rule.kind === 'instruction' ? item : { ...item, value: '', badge: '' }} /></div>)}</div>
           {day.rule.eventBadges.map(event => <p key={event} className="mt-1 truncate rounded bg-cyan-500/10 px-1.5 py-1 text-[8px] font-bold text-cyan-300" title={event}>{event}</p>)}
           {day.outOfRangeLessons.map(item => <p key={`${item.period}-${item.value}`} className="mt-1 text-[8px] font-black text-amber-300">⚠ {item.period}교시 운영범위 밖</p>)}
         </button>
       })}
     </div>
-  </section>
+  </div></section>
 }
 
 function WeekSchedule({ days, selectedDate, onSelect }: { days: CompositeTeacherDay[]; selectedDate: string; onSelect: (date: string) => void }) {
@@ -228,12 +220,12 @@ function ManagerSchedule({ timetable, staffRoster, changes, weekKey, onWeekChang
     <section className="card p-4"><div className="flex flex-wrap items-end gap-3"><div className="min-w-64 flex-1"><h2 className="flex items-center gap-2 text-base font-black text-white"><UserCog size={18} className="text-cyan-400" /> 시간표 업무 담당자</h2><p className="mt-1 text-xs font-semibold text-slate-400">기본 시간표와 학사일정·승인된 변경·당김수업을 합친 모든 교사의 주간 예상표입니다.</p></div><label className="text-xs font-bold text-slate-400">기준 주<input type="date" className="input-field mt-1" value={weekKey} min="2026-08-11" max="2027-02-05" onChange={event => onWeekChange(event.target.value)} /></label><button className="btn-ghost inline-flex items-center gap-2" onClick={onRefresh} disabled={loading}><RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> 새로고침</button><button className="btn-primary inline-flex items-center gap-2" onClick={() => void exportExcel()}><Download size={14} /> Excel 출력</button></div><p className="mt-3 text-[11px] font-bold text-slate-500">기준 주 {dates[0]} ~ {dates[4]} · 생성 시각 {new Date().toLocaleString('ko-KR')} · 출력 파일은 이 PC에만 저장됩니다.</p></section>
     <section className="card p-3"><div className="grid gap-2 md:grid-cols-6"><label className="relative md:col-span-2"><Search size={14} className="absolute left-3 top-3 text-slate-500" /><input className="input-field w-full !pl-9" placeholder="교사명·교과 검색" value={query} onChange={event => setQuery(event.target.value)} /></label><select className="input-field" value={subjectFilter} onChange={event => setSubjectFilter(event.target.value)}><option value="all">전체 교과</option>{subjects.map(subject => <option key={subject} value={subject}>{subject}</option>)}</select><select className="input-field" value={dayFilter} onChange={event => setDayFilter(event.target.value)}><option value="all">전체 요일</option>{TIMETABLE_DAYS.map((day, index) => <option key={day} value={index}>{day}요일</option>)}</select><select className="input-field" value={periodFilter} onChange={event => setPeriodFilter(event.target.value)}><option value="all">전체 교시</option>{Array.from({ length: 7 }, (_, index) => <option key={index} value={index + 1}>{index + 1}교시</option>)}</select><select className="input-field" value={lessonFilter} onChange={event => setLessonFilter(event.target.value)}><option value="all">수업 여부 전체</option><option value="class">수업 있음</option><option value="free">공강 있음</option></select></div><label className="mt-3 inline-flex items-center gap-2 text-xs font-bold text-slate-400"><input type="checkbox" checked={includeDetails} onChange={event => setIncludeDetails(event.target.checked)} /> Excel에 선택 결과 교사별 상세 시트 추가</label></section>
     {warnings.length > 0 && <section className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3"><strong className="text-xs text-amber-300">점검 경고 {warnings.length}건</strong><p className="mt-1 line-clamp-2 text-[10px] font-semibold text-amber-200">{warnings.slice(0, 8).join(' · ')}</p></section>}
-    <section className="card overflow-auto"><table className="min-w-[2100px] w-full border-collapse text-[9px]"><thead className="sticky top-0 z-20 bg-slate-900"><tr><th className="sticky left-0 z-30 w-36 border border-white/10 bg-slate-900 px-2 py-2 text-left text-slate-200">교사</th>{dates.flatMap((date, dayIndex) => Array.from({ length: 7 }, (_, periodIndex) => <th key={`${date}-${periodIndex}`} className="w-14 border border-white/10 px-1 py-2 text-slate-300">{TIMETABLE_DAYS[dayIndex]} {periodIndex + 1}</th>))}</tr></thead><tbody>{filtered.map(row => <ManagerRow key={row.teacher.name} row={row} expanded={expandedTeacher === row.teacher.name} onToggle={() => setExpandedTeacher(expandedTeacher === row.teacher.name ? '' : row.teacher.name)} />)}</tbody></table>{!filtered.length && <p className="p-8 text-center text-xs font-bold text-slate-500">조건에 맞는 교사가 없습니다.</p>}</section>
+    <section className="card overflow-auto"><table className="min-w-[2100px] w-full border-collapse text-[9px]"><thead className="sticky top-0 z-20 bg-slate-100 dark:bg-slate-900"><tr><th className="sticky left-0 z-30 w-36 border border-slate-300 bg-slate-100 px-2 py-2 text-left text-slate-950 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100">교사</th>{dates.flatMap((date, dayIndex) => Array.from({ length: 7 }, (_, periodIndex) => <th key={`${date}-${periodIndex}`} className={clsx('w-14 border border-slate-300 px-1 py-2 text-slate-900 dark:border-white/10 dark:text-slate-200', periodIndex === 0 && 'border-l-2 border-l-slate-500 dark:border-l-slate-400')}>{TIMETABLE_DAYS[dayIndex]} {periodIndex + 1}</th>))}</tr></thead><tbody>{filtered.map(row => <ManagerRow key={row.teacher.name} row={row} expanded={expandedTeacher === row.teacher.name} onToggle={() => setExpandedTeacher(expandedTeacher === row.teacher.name ? '' : row.teacher.name)} />)}</tbody></table>{!filtered.length && <p className="p-8 text-center text-xs font-bold text-slate-500">조건에 맞는 교사가 없습니다.</p>}</section>
   </div>
 }
 
 function ManagerRow({ row, expanded, onToggle }: { row: { teacher: SchoolTimetable['teachers'][number]; subject: string; days: CompositeTeacherDay[] }; expanded: boolean; onToggle: () => void }) {
-  return <><tr className="hover:bg-white/[0.025]"><td className="sticky left-0 z-10 border border-white/10 bg-slate-950 px-2 py-2"><button type="button" onClick={onToggle} className="flex w-full items-center gap-1 text-left font-black text-slate-100">{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}{row.teacher.name}</button><span className="ml-4 text-[8px] text-slate-500">{row.subject || '교과 미등록'}</span></td>{row.days.flatMap(day => day.lessons.map(item => <td key={`${day.date}-${item.period}`} className={clsx('border border-white/10 px-1 py-1 align-top font-bold text-slate-300', item.source === 'pulled' ? 'bg-emerald-500/15' : item.source !== 'base' ? 'bg-violet-500/15' : '', item.warning && 'ring-2 ring-inset ring-rose-400')} title={`${item.badge}${item.originalValue ? `\n변경 전: ${oneLine(item.originalValue)}` : ''}`}>{oneLine(item.value)}</td>))}</tr>{expanded && <tr><td colSpan={36} className="border border-white/10 bg-white/[0.02] p-3"><div className="grid gap-2 lg:grid-cols-5">{row.days.map(day => <div key={day.date} className="rounded-lg border border-white/10 p-2"><strong className="text-[10px] text-slate-200">{day.date}</strong><div className="mt-1 space-y-1">{day.lessons.map(item => <LessonLine key={item.period} lesson={item} />)}</div></div>)}</div></td></tr>}</>
+  return <><tr className="hover:bg-slate-50 dark:hover:bg-white/[0.025]"><td className="sticky left-0 z-10 border border-slate-300 bg-white px-2 py-2 dark:border-white/10 dark:bg-slate-950"><button type="button" onClick={onToggle} className="flex w-full items-center gap-1 text-left font-black text-slate-950 dark:text-slate-100">{expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}{row.teacher.name}</button><span className="ml-4 text-[8px] text-slate-600 dark:text-slate-400">{row.subject || '교과 미등록'}</span></td>{row.days.flatMap(day => day.lessons.map(item => <td key={`${day.date}-${item.period}`} className={clsx('border border-slate-300 bg-white px-1 py-1 align-top font-bold text-slate-950 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200', item.period === 1 && 'border-l-2 border-l-slate-500 dark:border-l-slate-400', item.source === 'pulled' ? '!bg-emerald-100 dark:!bg-emerald-500/20' : item.source !== 'base' ? '!bg-violet-100 dark:!bg-violet-500/20' : '', item.warning && 'ring-2 ring-inset ring-rose-500')} title={`${item.badge}${item.originalValue ? `\n변경 전: ${oneLine(item.originalValue)}` : ''}`}>{oneLine(item.value)}</td>))}</tr>{expanded && <tr><td colSpan={36} className="border border-slate-300 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.02]"><div className="grid gap-2 lg:grid-cols-5">{row.days.map(day => <div key={day.date} className="rounded-lg border border-slate-300 bg-white p-2 dark:border-white/10 dark:bg-slate-950"><strong className="text-[10px] text-slate-950 dark:text-slate-100">{day.date}</strong><div className="mt-1 space-y-1">{day.lessons.map(item => <LessonLine key={item.period} lesson={item} />)}</div></div>)}</div></td></tr>}</>
 }
 
 function LessonLine({ lesson, expanded = false }: { lesson: CompositeTeacherDay['lessons'][number]; expanded?: boolean }) {
@@ -249,11 +241,10 @@ function staffSubject(teacherName: string, roster?: SharedStaffRoster | null) { 
 function safeSheetName(value: string, used: string[]) { const base = value.replace(/[\\/?*\[\]:]/g, '').slice(0, 25) || '교사'; let name = base; let index = 2; while (used.includes(name)) name = `${base.slice(0, 22)}_${index++}`; return name }
 function printTeacherMonth(teacherLabel: string, monthKey: string, days: CompositeTeacherDay[]) {
   const cells = days.map(day => {
-    const lessons = day.rule.kind === 'instruction'
-      ? day.lessons.filter(item => item.value || item.badge).map(item => `<li class="${item.source}"><b>${item.period}교시</b> ${escapeHtml(oneLine(item.value) || item.badge)}${item.badge ? `<small>${escapeHtml(item.badge)}</small>` : ''}</li>`).join('')
-      : `<p class="closed">${escapeHtml(day.rule.label)}</p>`
+    const fixedRows = day.lessons.map(item => `<li class="${day.rule.kind === 'instruction' ? item.source : 'closed-row'}"><b>${item.period}교시</b> ${day.rule.kind === 'instruction' && (item.value || item.badge) ? escapeHtml(oneLine(item.value) || item.badge) : '&nbsp;'}${day.rule.kind === 'instruction' && item.badge ? `<small>${escapeHtml(item.badge)}</small>` : ''}</li>`).join('')
+    const lessons = `${day.rule.kind !== 'instruction' ? `<p class="closed">${escapeHtml(day.rule.label)}</p>` : ''}${fixedRows}`
     return `<td class="${day.date.startsWith(monthKey) ? '' : 'outside'}"><strong>${Number(day.date.slice(-2))}</strong>${day.rule.specialWeekdayLabel ? `<em>${escapeHtml(day.rule.specialWeekdayLabel)}</em>` : ''}<ul>${lessons}</ul>${day.rule.eventBadges.map(event => `<i>${escapeHtml(event)}</i>`).join('')}</td>`
   })
   const rows = Array.from({ length: Math.ceil(cells.length / 7) }, (_, index) => `<tr>${cells.slice(index * 7, index * 7 + 7).join('')}</tr>`).join('')
-  printHtml(`<div class="teacher-month"><h1>${escapeHtml(teacherLabel)} · ${escapeHtml(MONTH_LABELS[monthKey] ?? monthKey)} 시간표</h1><p class="meta">2026학년도 2학기 · 학사일정과 승인된 교환·대강·당김수업 반영 · 생성 ${escapeHtml(new Date().toLocaleString('ko-KR'))}</p><table><thead><tr>${['일', '월', '화', '수', '목', '금', '토'].map(day => `<th>${day}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table><p class="note">※ 본 시간표는 NEIS와 별개로 업무 편의를 위해 제공되는 예상 자료입니다. 고사기간은 실제 시간표 확정 전까지 비워 표시합니다.</p></div>`, `.teacher-month{font-size:7pt}.teacher-month h1{text-align:center;font-size:17pt;margin-bottom:2mm}.meta{text-align:center;color:#444;margin-bottom:4mm}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #444}th{padding:2mm;background:#eef2f7;font-size:8pt}td{height:31mm;padding:1.5mm;vertical-align:top}td>strong{font-size:8pt}.outside{color:#aaa;background:#fafafa}ul{list-style:none;margin:1mm 0 0;padding:0}li{margin:.5mm 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}li small,em,i{display:block;font-style:normal;font-size:6pt;margin-top:.5mm}.exchange,.substitution{color:#5b21b6}.pulled{color:#047857}.closed{color:#be123c;font-weight:700;margin-top:3mm}.note{margin-top:3mm;color:#555;font-size:7pt}@page{size:A4 landscape;margin:8mm}`)
+  printHtml(`<div class="teacher-month"><h1>${escapeHtml(teacherLabel)} · ${escapeHtml(MONTH_LABELS[monthKey] ?? monthKey)} 시간표</h1><p class="meta">2026학년도 2학기 · 학사일정과 승인된 교환·대강·당김수업 반영 · 생성 ${escapeHtml(new Date().toLocaleString('ko-KR'))}</p><table><thead><tr>${['일', '월', '화', '수', '목', '금', '토'].map(day => `<th>${day}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table><p class="note">※ 본 시간표는 NEIS와 별개로 업무 편의를 위해 제공되는 예상 자료입니다. 고사기간은 실제 시간표 확정 전까지 비워 표시합니다.</p></div>`, `.teacher-month{font-size:6.5pt}.teacher-month h1{text-align:center;font-size:17pt;margin-bottom:2mm}.meta{text-align:center;color:#444;margin-bottom:4mm}table{width:100%;border-collapse:collapse;table-layout:fixed}th,td{border:1px solid #444}th{padding:2mm;background:#eef2f7;font-size:8pt}td{height:38mm;padding:1.2mm;vertical-align:top}td>strong{font-size:8pt}.outside{color:#aaa;background:#fafafa}ul{list-style:none;margin:1mm 0 0;padding:0;border:1px solid #bbb}li{height:3.6mm;line-height:3.6mm;padding:0 .7mm;border-top:1px solid #ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}li:first-child{border-top:0}li b{display:inline-block;width:7mm;font-size:5.5pt}li small,em,i{font-style:normal;font-size:5.5pt;margin-left:.5mm}.exchange,.substitution{color:#5b21b6;background:#f3e8ff}.pulled{color:#047857;background:#d1fae5}.closed{color:#be123c;font-weight:700;margin:1mm 0}.closed-row{color:#aaa}.note{margin-top:3mm;color:#555;font-size:7pt}@page{size:A4 landscape;margin:8mm}`)
 }

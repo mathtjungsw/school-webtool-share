@@ -4,10 +4,12 @@ import {
   UserRound, Clock3, Power, AlertCircle, ExternalLink, LockKeyhole,
   Database, Trash2,
   MonitorCheck, RefreshCw, Loader2,
+  Eye, RotateCcw,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useAuthStore } from '../stores/authStore'
 import { useAdminStore } from '../stores/adminStore'
+import { SIDEBAR_MENU_OPTIONS } from '../config/navigationRegistry'
 import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 import {
   clearSchoolHubPersistentCache,
@@ -43,10 +45,16 @@ export default function UngcheonSettingsPage() {
   const [neisSyncMessage, setNeisSyncMessage] = useState('')
   const [neisSyncWarning, setNeisSyncWarning] = useState('')
   const [neisSyncError, setNeisSyncError] = useState('')
+  const [hiddenMenus, setHiddenMenus] = useState<string[]>([])
 
   useEffect(() => setDraft(config), [config])
   useEffect(() => {
     window.electron?.getAutoLaunch().then(setAutoLaunch).catch(() => undefined)
+  }, [])
+  useEffect(() => {
+    window.electron?.configGet('sidebar.hiddenMenus.v1').then(value => {
+      setHiddenMenus(Array.isArray(value) ? value.map(String) : [])
+    }).catch(() => setHiddenMenus([]))
   }, [])
   useEffect(() => {
     if (!config.schoolHubUrl) return
@@ -124,6 +132,15 @@ export default function UngcheonSettingsPage() {
       setNeisSyncError(error instanceof Error ? error.message : String(error))
     } finally { setNeisSyncBusy(false) }
   }
+
+  const saveHiddenMenus = async (next: string[]) => {
+    setHiddenMenus(next)
+    await window.electron?.configSet('sidebar.hiddenMenus.v1', next)
+    window.dispatchEvent(new CustomEvent('sidebar:preferences-updated'))
+  }
+
+  const restoreMenu = (id: string) => void saveHiddenMenus(hiddenMenus.filter(item => item !== id))
+  const restoreAllMenus = () => void saveHiddenMenus([])
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-5">
@@ -288,6 +305,17 @@ export default function UngcheonSettingsPage() {
               className="w-4 h-4"
             />
           </label>
+        </div>
+        <div className="mt-5 border-t border-black/10 pt-4 dark:border-white/10">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><h3 className="flex items-center gap-2 text-sm font-black text-slate-950 dark:text-white"><Eye size={15} className="text-violet-500" /> 숨긴 메뉴 관리</h3><p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400">사이드바에서 숨긴 메뉴를 다시 표시합니다. 대시보드와 환경설정은 숨길 수 없습니다.</p></div>
+            <button type="button" onClick={restoreAllMenus} disabled={!hiddenMenus.length} className="btn-ghost inline-flex items-center gap-1.5 text-xs disabled:opacity-40"><RotateCcw size={13} />전체 복원</button>
+          </div>
+          {hiddenMenus.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{hiddenMenus.map(id => {
+            const menu = SIDEBAR_MENU_OPTIONS.find(item => item.id === id)
+            if (!menu) return null
+            return <div key={id} className="flex items-center justify-between rounded-xl border border-black/10 bg-black/[0.025] px-3 py-2 dark:border-white/10 dark:bg-white/[0.025]"><span className="text-sm font-bold text-slate-900 dark:text-slate-100">{menu.label}</span><button type="button" onClick={() => restoreMenu(id)} className="btn-ghost !px-2 !py-1 text-xs">다시 표시</button></div>
+          })}</div> : <p className="mt-3 rounded-xl border border-dashed border-black/15 px-4 py-5 text-center text-xs font-semibold text-slate-500 dark:border-white/15 dark:text-slate-400">현재 숨긴 메뉴가 없습니다.</p>}
         </div>
       </Section>
 

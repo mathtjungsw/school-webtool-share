@@ -34,7 +34,7 @@ const SIDEBAR_HIDDEN_KEY = 'sidebar.hiddenMenus.v1'
 const SIDEBAR_COLLAPSED_GROUPS_KEY = 'sidebar.collapsedGroups.v1'
 
 const MENU_GROUPS = [
-  { id: 'start', label: '시작·설정', items: ['help', 'notifier', 'calendar', 'settings', 'admin_center'] },
+  { id: 'start', label: '시작·설정', items: ['help', 'notifier', 'operations_notifications', 'calendar', 'settings', 'admin_center'] },
   { id: 'school', label: '업무·학교운영', items: ['staff_tasks', 'school_hub', 'timetable_swap', 'staff_roster', 'committees', 'feature_requests', 'form_center'] },
   { id: 'student', label: '학생·학사', items: ['student_timetable', 'attendance_print', 'volunteer_work', 'student_locator', 'student_identity_audit', 'subject_remarks_print', 'record_privacy_blind'] },
   { id: 'curriculum', label: '평가·교육과정·진로', items: ['schoolinfo_evaluation', 'grade_preview', 'estimated_split_score', 'curriculum', 'recommended_subjects'] },

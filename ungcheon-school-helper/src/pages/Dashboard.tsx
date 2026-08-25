@@ -115,7 +115,7 @@ const DEFAULT_DASHBOARD_SOURCE_VISIBILITY: DashboardSourceVisibility = {
 
 const PORTFOLIO_GROUPS: PortfolioGroup[] = [
   { group: '학사·기록', color: 'amber', items: [
-    { id: 'timetable_swap', label: '교환·대강 계획', icon: Shuffle, desc: '후보 시간표·연강 확인과 계획서 출력' },
+    { id: 'timetable_swap', label: '교사 시간표', icon: Shuffle, desc: '내 시간표·교환·대강·공동 공강과 계획서' },
     { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange, desc: '과목선택 자료를 반영한 개인 시간표 조회·인쇄' },
     { id: 'student_locator', label: '학생 위치 찾기', icon: FileSearch, desc: '학번·이름으로 현재 수업과 교실 확인' },
     { id: 'student_identity_audit', label: '학생 학번·이름 교정기', icon: ScanSearch, desc: '파일·붙여넣기의 잘못 연결된 학번과 이름 확인' },

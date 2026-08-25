@@ -29,6 +29,7 @@ const SchoolCommitteesPage = lazy(() => import('../pages/SchoolCommitteesPage'))
 const PdfExtractorPage = lazy(() => import('../pages/PdfExtractorPage'))
 const FileParserPage = lazy(() => import('../pages/FileParserPage'))
 const NotifierPage = lazy(() => import('../pages/NotifierPage'))
+const OperationsNotificationsPage = lazy(() => import('../features/futureOperations/OperationsNotificationsPage'))
 const StaffTasksPage = lazy(() => import('../pages/StaffTasksPage'))
 const StaffRosterPage = lazy(() =>
   import('../pages/StaffTasksPage').then(module => ({ default: module.StaffRosterPage })),
@@ -71,6 +72,7 @@ const PAGES: Record<string, React.ComponentType> = {
   pdf_extractor: PdfExtractorPage,
   file_parser: FileParserPage,
   notifier: NotifierPage,
+  operations_notifications: OperationsNotificationsPage,
   staff_tasks: StaffTasksPage,
   staff_roster: StaffRosterPage,
   attendance_print: AttendancePrintPage,

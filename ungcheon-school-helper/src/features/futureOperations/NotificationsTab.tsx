@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Bell, Check, Clock3, RefreshCw } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { loadHubNotifications } from './hubNotifications'
@@ -41,6 +41,8 @@ export default function NotificationsTab({ state, saving, update }: FutureTabPro
       setMessage(`공유자료를 불러오지 못했습니다. 로컬 알림은 계속 사용할 수 있습니다. (${error instanceof Error ? error.message : String(error)})`)
     } finally { setRefreshing(false) }
   }
+
+  useEffect(() => { void refresh() }, [])
 
   const patchNotification = async (item: OperationsNotification, patch: Partial<OperationsNotification>) => {
     await update(current => {

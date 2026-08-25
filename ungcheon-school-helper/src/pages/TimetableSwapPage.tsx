@@ -6,6 +6,7 @@ import {
 import clsx from 'clsx'
 import { useAdminStore } from '../stores/adminStore'
 import { useAppStore } from '../stores/appStore'
+import { useAuthStore } from '../stores/authStore'
 import TeacherSchedulePreview from '../components/timetable/TeacherSchedulePreview'
 import TeacherTimetableWorkspace from '../components/timetable/TeacherTimetableWorkspace'
 import TimetablePlanEditor from '../components/timetable/TimetablePlanEditor'
@@ -47,6 +48,7 @@ type PreviewSelection = {
 
 export default function TimetableSwapPage() {
   const config = useAppStore(state => state.config)
+  const loggedInTeacherName = useAuthStore(state => state.teacherName)
   const isAdmin = useAdminStore(state => state.isAdmin)
   const adminPassword = useAdminStore(state => state.adminPassword)
   const [timetable, setTimetable] = useState<SchoolTimetable | null>(null)
@@ -287,8 +289,8 @@ export default function TimetableSwapPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-5 min-w-0">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="page-title flex items-center gap-2"><ArrowLeftRight size={22} className="text-violet-400" /> 교환·대강 계획</h1>
-          <p className="text-sm text-slate-400 mt-1">교환·대강 후보의 예상 시간표와 연강을 확인하고 계획서를 작성합니다.</p>
+          <h1 className="page-title flex items-center gap-2"><ArrowLeftRight size={22} className="text-violet-500" /> 교사 시간표</h1>
+          <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-1">내 주간·월별 시간표를 확인하고 교환·대강 후보, 공동 공강과 계획서를 함께 관리합니다.</p>
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
@@ -385,9 +387,9 @@ export default function TimetableSwapPage() {
         />
         <ChangeRequestHistory items={changeRequests} teacherName={config.teacherName?.trim() ?? ''} onChanged={loadChangeRequests} />
       </>) : viewMode === 'teacher_schedule' ? (
-        <TeacherTimetableWorkspace mode="teacher" timetable={timetable} currentTeacherName={config.teacherName?.trim() ?? ''} configured={configured} staffRoster={staffRoster} />
+        <TeacherTimetableWorkspace mode="teacher" timetable={timetable} currentTeacherName={loggedInTeacherName.trim()} configured={configured} staffRoster={staffRoster} />
       ) : viewMode === 'manager_schedule' ? (
-        <TeacherTimetableWorkspace mode="manager" timetable={timetable} currentTeacherName={config.teacherName?.trim() ?? ''} configured={configured} staffRoster={staffRoster} />
+        <TeacherTimetableWorkspace mode="manager" timetable={timetable} currentTeacherName={loggedInTeacherName.trim()} configured={configured} staffRoster={staffRoster} />
       ) : viewMode === 'common_free' ? (
         <CommonFreeTimePanel
           timetable={timetable}

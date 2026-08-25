@@ -11,7 +11,7 @@ import { describeNeisSyncReport, getNeisSyncStatus, runNeisSync, type NeisSyncSt
 
 const SHORTCUTS: Array<{ page: string; title: string; detail: string; icon: LucideIcon }> = [
   { page: 'school_hub', title: '공지·학교 공유 링크', detail: '학교 공지와 교직원 공용 링크를 관리합니다.', icon: Link2 },
-  { page: 'timetable_swap', title: '교환·대강 시간표', detail: '새 학교 시간표를 업로드하고 교환·대강 계획을 확인합니다.', icon: ArrowLeftRight },
+  { page: 'timetable_swap', title: '교사 시간표', detail: '새 학교 시간표를 업로드하고 교환·대강 계획을 확인합니다.', icon: ArrowLeftRight },
   { page: 'staff_roster', title: '교직원 명렬', detail: '교직원 명렬과 연수등록부 출력 명단을 관리합니다.', icon: UsersRound },
   { page: 'attendance_print', title: '학생 명렬·출석부', detail: '학생 명렬을 갱신하고 학급·수업 출석부를 확인합니다.', icon: FileSpreadsheet },
   { page: 'committees', title: '각종 위원회', detail: '위원 명단과 위원회 일정을 관리합니다.', icon: Landmark },

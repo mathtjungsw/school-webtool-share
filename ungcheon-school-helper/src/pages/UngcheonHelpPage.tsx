@@ -88,7 +88,7 @@ const SECTIONS = [
     ],
   },
   {
-    title: '교환·대강 계획',
+    title: '교사 시간표',
     icon: ArrowLeftRight,
     items: [
       '교사와 수업을 선택하면 같은 학급 수업을 맡으면서 서로 공강인 교환 후보를 찾아줍니다.',
