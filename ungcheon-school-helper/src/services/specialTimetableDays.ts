@@ -14,6 +14,27 @@ export const SPECIAL_TIMETABLE_DAYS: SpecialTimetableDay[] = [
     title: '월요일 시간표 운영',
     message: '8월 11일(화)은 월요일 시간표로 운영합니다.',
   },
+  {
+    date: '2026-10-13',
+    sourceWeekday: '금',
+    sourceDayIndex: 4,
+    title: '금요일 시간표 운영',
+    message: '10월 13일(화)은 금요일 시간표로 운영합니다.',
+  },
+  {
+    date: '2026-11-09',
+    sourceWeekday: '금',
+    sourceDayIndex: 4,
+    title: '금요일 시간표 운영',
+    message: '11월 9일(월)은 금요일 시간표로 운영합니다.',
+  },
+  {
+    date: '2026-11-17',
+    sourceWeekday: '금',
+    sourceDayIndex: 4,
+    title: '금요일 시간표 운영',
+    message: '11월 17일(화)은 금요일 시간표로 운영합니다.',
+  },
 ]
 
 function normalizeDate(value: string) {

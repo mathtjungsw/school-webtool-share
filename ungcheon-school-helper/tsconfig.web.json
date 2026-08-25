@@ -99,6 +99,7 @@
     "src/services/ungcheonSchedule.ts",
     "src/services/specialTimetableDays.ts",
     "src/services/pulledLessons.ts",
+    "src/services/teacherTimetableCalendar.ts",
     "src/services/hobong.ts",
     "src/services/hobongExcel.ts",
     "src/services/teacherTransferScore.ts",

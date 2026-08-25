@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle, ArrowLeftRight, CheckCircle2, FileSpreadsheet,
-  ClipboardList, LockKeyhole, RefreshCw, Search, ShieldCheck, Upload, UserRoundSearch, Users, X,
+  CalendarRange, ClipboardList, LockKeyhole, RefreshCw, Search, ShieldCheck, Upload, UserCog, UserRoundSearch, Users, X,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAdminStore } from '../stores/adminStore'
 import { useAppStore } from '../stores/appStore'
 import TeacherSchedulePreview from '../components/timetable/TeacherSchedulePreview'
+import TeacherTimetableWorkspace from '../components/timetable/TeacherTimetableWorkspace'
 import TimetablePlanEditor from '../components/timetable/TimetablePlanEditor'
 import { getSchoolTimetable, getSharedStaffRoster, replaceSchoolTimetable, subscribeHubResource } from '../services/schoolHub'
 import {
@@ -37,7 +38,7 @@ import { applyTimetableChangeForRequester, cancelTimetableChange, createTimetabl
 import type { TimetablePlanEntry } from '../services/timetablePlan'
 import type { SharedStaffRoster } from '../services/rosterAttendance'
 
-type ViewMode = 'exchange' | 'substitution' | 'common_free' | 'plan'
+type ViewMode = 'exchange' | 'substitution' | 'common_free' | 'teacher_schedule' | 'manager_schedule' | 'plan'
 type PreviewSelection = {
   mode: 'exchange' | 'substitution'
   teacherIndex: number
@@ -333,6 +334,18 @@ export default function TimetableSwapPage() {
           label="공동 공강 확인"
         />
         <ModeButton
+          active={viewMode === 'teacher_schedule'}
+          onClick={() => { setViewMode('teacher_schedule'); setSelectedSlot(null); setPreview(null) }}
+          icon={<CalendarRange size={14} />}
+          label="교사 시간표"
+        />
+        <ModeButton
+          active={viewMode === 'manager_schedule'}
+          onClick={() => { setViewMode('manager_schedule'); setSelectedSlot(null); setPreview(null) }}
+          icon={<UserCog size={14} />}
+          label="시간표 업무 담당자"
+        />
+        <ModeButton
           active={viewMode === 'plan'}
           onClick={() => { setViewMode('plan'); setPreview(null) }}
           icon={<ClipboardList size={14} />}
@@ -371,7 +384,11 @@ export default function TimetableSwapPage() {
           onApply={requestApplication}
         />
         <ChangeRequestHistory items={changeRequests} teacherName={config.teacherName?.trim() ?? ''} onChanged={loadChangeRequests} />
-      </>) : viewMode === 'common_free' ? (
+      </>) : viewMode === 'teacher_schedule' ? (
+        <TeacherTimetableWorkspace mode="teacher" timetable={timetable} currentTeacherName={config.teacherName?.trim() ?? ''} configured={configured} staffRoster={staffRoster} />
+      ) : viewMode === 'manager_schedule' ? (
+        <TeacherTimetableWorkspace mode="manager" timetable={timetable} currentTeacherName={config.teacherName?.trim() ?? ''} configured={configured} staffRoster={staffRoster} />
+      ) : viewMode === 'common_free' ? (
         <CommonFreeTimePanel
           timetable={timetable}
           selectedTeacherIndexes={commonFreeTeacherIndexes}
