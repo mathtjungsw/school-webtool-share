@@ -285,12 +285,9 @@ export default function UngcheonSettingsPage() {
 
       <Section icon={<Palette size={17} />} title="화면 및 실행">
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="테마">
-            <select value={draft.theme ?? 'auto'} onChange={e => setDraft({ ...draft, theme: e.target.value as 'auto' | 'light' | 'dark' })}>
-              <option value="auto">시간에 따라 자동</option>
-              <option value="light">라이트</option>
-              <option value="dark">다크</option>
-            </select>
+          <Field label="화면 모드">
+            <div className="input-field flex min-h-10 items-center bg-white font-bold text-slate-950">밝은 모드 고정</div>
+            <p className="mt-1 text-[11px] font-semibold text-slate-600">글자 가독성을 위해 다크 모드와 시간별 자동 전환은 사용하지 않습니다.</p>
           </Field>
           <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-3 cursor-pointer">
             <Power size={16} className="text-slate-400" />

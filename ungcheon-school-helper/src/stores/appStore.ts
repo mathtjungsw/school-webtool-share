@@ -9,7 +9,7 @@ export const UNGCHEON_DEFAULT_CONFIG: AppConfig = {
   schoolType: '고등학교',
   schoolHubUrl: 'https://script.google.com/macros/s/AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w/exec',
   schoolAddress: '경상남도 창원시 진해구 웅천중로 71',
-  theme: 'auto',
+  theme: 'light',
   showNeisSchedule: false,
   grade: '1',
   classNm: '1',
@@ -95,6 +95,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newCfg = {
       ...get().config,
       ...patch,
+      // 1.1.21부터 화면은 밝은 모드로만 운영한다.
+      theme: 'light' as const,
       // 학교 공유 서비스 주소는 웅천고 전용 고정값이며 환경설정으로 변경하지 않는다.
       schoolHubUrl: UNGCHEON_DEFAULT_CONFIG.schoolHubUrl,
     }
@@ -144,6 +146,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       ...apiKeys,
       schoolHubUrl: UNGCHEON_DEFAULT_CONFIG.schoolHubUrl,
     } as AppConfig
+    // 이전 버전의 auto/dark 설정은 다른 환경설정을 건드리지 않고 light로만 이전한다.
+    cfg.theme = 'light'
     // 기존 기본값(true)이 저장된 PC도 이번 업데이트에서 한 번만 꺼짐으로 전환한다.
     // 이후 사용자가 켜거나 끈 선택은 그대로 유지된다.
     if (applyNeisDefaultOff) cfg.showNeisSchedule = false
@@ -159,6 +163,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
     if (nested.schoolHubUrl !== UNGCHEON_DEFAULT_CONFIG.schoolHubUrl) {
       patch['config.schoolHubUrl'] = UNGCHEON_DEFAULT_CONFIG.schoolHubUrl
+    }
+    if (nested.theme !== 'light') {
+      patch['config.theme'] = 'light'
     }
     if (applyNeisDefaultOff) {
       patch['config.showNeisSchedule'] = false

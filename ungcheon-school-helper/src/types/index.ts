@@ -113,7 +113,7 @@ export interface AppConfig {
   portalAutoMonitor?: boolean
   schoolAddress?: string
   secondLocationName?: string
-  theme?: 'auto' | 'light' | 'dark'
+  theme?: 'light'
   showNeisSchedule?: boolean
 }
 

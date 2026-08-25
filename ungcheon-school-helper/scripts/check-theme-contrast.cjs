@@ -47,9 +47,9 @@ function contrast(foreground, background) {
   return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05)
 }
 
-const darkTokens = variables(extractBlock(':root'))
-const lightVariableOffset = css.indexOf('[data-theme="dark"] .same-subject-candidate-badge')
-const lightTokens = { ...darkTokens, ...variables(extractBlock('[data-theme="light"]', lightVariableOffset)) }
+const baseTokens = variables(extractBlock(':root'))
+const lightVariableOffset = css.indexOf('[data-theme="light"] {')
+const lightTokens = { ...baseTokens, ...variables(extractBlock('[data-theme="light"]', lightVariableOffset)) }
 const failures = []
 const results = []
 
@@ -61,15 +61,13 @@ function assertContrast(label, foreground, background, minimum = MIN_RATIO) {
   }
 }
 
-for (const [theme, tokens] of [['dark', darkTokens], ['light', lightTokens]]) {
-  for (const surface of ['surface-800', 'surface-900', 'surface-950']) {
-    for (const text of ['text-primary', 'text-secondary', 'surface-50']) {
-      if (!tokens[text] || !tokens[surface]) throw new Error(`테마 토큰이 없습니다: ${theme} ${text}/${surface}`)
-      assertContrast(`${theme} ${text} on ${surface}`, tokens[text], tokens[surface])
-    }
+for (const surface of ['surface-800', 'surface-900', 'surface-950']) {
+  for (const text of ['text-primary', 'text-secondary', 'surface-50']) {
+    if (!lightTokens[text] || !lightTokens[surface]) throw new Error(`밝은 모드 토큰이 없습니다: ${text}/${surface}`)
+    assertContrast(`light ${text} on ${surface}`, lightTokens[text], lightTokens[surface])
   }
 }
-assertContrast('기본 버튼 --ink on --brand', darkTokens.ink, darkTokens.brand)
+assertContrast('기본 버튼 --ink on --brand', lightTokens.ink, lightTokens.brand)
 
 function ruleColor(fragment) {
   const start = css.indexOf(fragment)
@@ -91,13 +89,10 @@ const globalFamilies = [
   ['text-white', 'white/black'],
 ]
 
-for (const theme of ['light', 'dark']) {
-  const tokens = theme === 'light' ? lightTokens : darkTokens
-  for (const [classFragment, label] of globalFamilies) {
-    const foreground = ruleColor(`[data-theme="${theme}"] [class*="${classFragment}"]`)
-    for (const surface of ['surface-800', 'surface-900', 'surface-950']) {
-      assertContrast(`${theme} 전역 ${label} text on ${surface}`, foreground, tokens[surface])
-    }
+for (const [classFragment, label] of globalFamilies) {
+  const foreground = ruleColor(`[data-theme="light"] [class*="${classFragment}"]`)
+  for (const surface of ['surface-800', 'surface-900', 'surface-950']) {
+    assertContrast(`light 전역 ${label} text on ${surface}`, foreground, lightTokens[surface])
   }
 }
 
@@ -108,5 +103,5 @@ if (failures.length) {
 }
 
 const lowest = results.reduce((current, item) => item.ratio < current.ratio ? item : current)
-console.log(`PASS 밝은·다크 테마 WCAG AA 글자 대비 ${results.length}개 조합`)
+console.log(`PASS 밝은 모드 WCAG AA 글자 대비 ${results.length}개 조합`)
 console.log(`PASS 최저 대비 ${lowest.ratio.toFixed(2)}:1 (${lowest.label})`)

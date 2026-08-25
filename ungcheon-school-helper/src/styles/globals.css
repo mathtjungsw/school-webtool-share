@@ -382,6 +382,51 @@
   color: #172033 !important;
   border-color: #e2e8f0 !important;
 }
+
+/* 시간표 업무 담당자 주간표: 밝은 모드에서만 읽기 쉽게 고정한다. */
+[data-theme="light"] .teacher-manager-table {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+[data-theme="light"] .teacher-manager-table th {
+  border: 1px solid #94a3b8 !important;
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+[data-theme="light"] .teacher-manager-table td {
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+[data-theme="light"] .teacher-manager-row:hover td {
+  background: #f8fafc !important;
+}
+[data-theme="light"] .teacher-manager-table .teacher-manager-sticky {
+  background: #f8fafc !important;
+  box-shadow: 2px 0 0 #94a3b8;
+}
+[data-theme="light"] .teacher-manager-table .teacher-manager-day-start {
+  border-left: 2px solid #64748b !important;
+}
+[data-theme="light"] .teacher-manager-table td.teacher-manager-pulled {
+  background: #d1fae5 !important;
+  color: #064e3b !important;
+}
+[data-theme="light"] .teacher-manager-table td.teacher-manager-changed {
+  background: #ede9fe !important;
+  color: #4c1d95 !important;
+}
+[data-theme="light"] .teacher-manager-table td.teacher-manager-warning {
+  box-shadow: inset 0 0 0 2px #e11d48 !important;
+}
+[data-theme="light"] .teacher-manager-table .teacher-manager-detail {
+  background: #f1f5f9 !important;
+}
+[data-theme="light"] .teacher-manager-detail-card {
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
 [data-theme="dark"] .staff-roster-virtual-table > [role="rowgroup"]:first-child {
   background: #1e293b !important;
 }

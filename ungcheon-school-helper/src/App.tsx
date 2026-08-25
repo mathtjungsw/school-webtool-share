@@ -40,20 +40,12 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // 시간 기반 자동 테마: 오전 6시~오후 6시 라이트, 나머지(저녁·새벽) 다크
+  // 웅천고 업무도우미는 밝은 모드만 제공한다.
   useEffect(() => {
-    const apply = () => {
-      const pref = config.theme ?? 'auto'
-      const h = new Date().getHours()
-      const resolved = pref === 'auto'
-        ? (h >= 6 && h < 18 ? 'light' : 'dark')
-        : pref
-      document.documentElement.setAttribute('data-theme', resolved)
-    }
-    apply()
-    const t = setInterval(apply, 60_000)
-    return () => clearInterval(t)
-  }, [config.theme])
+    document.documentElement.setAttribute('data-theme', 'light')
+    document.documentElement.classList.remove('dark')
+    document.documentElement.style.colorScheme = 'light'
+  }, [])
 
   useEffect(() => {
     if (!authenticated) return

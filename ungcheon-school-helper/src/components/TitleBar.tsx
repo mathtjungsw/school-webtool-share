@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   AlertCircle, Check, ChevronLeft, Link2, Megaphone, MessageSquareText,
-  LogOut, Minus, Moon, Search, ScrollText, Square, Sun, SunMoon, X,
+  LogOut, Minus, Search, ScrollText, Square, X,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useNoticeStore } from '../stores/noticeStore'
@@ -29,20 +29,12 @@ export default function TitleBar({
 }) {
   const [version, setVersion] = useState('')
   const config = useAppStore(state => state.config)
-  const saveConfig = useAppStore(state => state.saveConfig)
   const updateNone = useAppStore(state => state.updateNone)
   const updateError = useAppStore(state => state.updateError)
   const clearUpdateError = useAppStore(state => state.clearUpdateError)
   const logout = useAuthStore(state => state.logout)
 
   useEffect(() => { window.electron?.getVersion().then(setVersion) }, [])
-
-  const theme = config.theme ?? 'auto'
-  const cycleTheme = () => {
-    const next = theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto'
-    saveConfig({ theme: next })
-  }
-  const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : SunMoon
 
   return (
     <div className="app-titlebar drag-region h-11 flex items-center px-3 bg-surface-950 border-b flex-shrink-0">
@@ -81,9 +73,6 @@ export default function TitleBar({
         <AdminModeButton />
         <button onClick={() => void logout()} title={`${config.teacherName ?? ''} 로그아웃·사용자 전환`} className="flex h-7 items-center gap-1 rounded px-2 text-[10px] text-slate-400 hover:bg-white/5 hover:text-white">
           <LogOut size={12} /><span className="max-w-16 truncate">{config.teacherName}</span>
-        </button>
-        <button onClick={cycleTheme} title={`테마: ${theme}`} className="w-7 h-7 grid place-items-center text-slate-500 hover:text-slate-200 rounded hover:bg-white/5">
-          <ThemeIcon size={13} />
         </button>
         <button onClick={onOpenLog} title="앱 로그" className="relative w-7 h-7 grid place-items-center text-slate-500 hover:text-slate-200 rounded hover:bg-white/5">
           <ScrollText size={13} />
