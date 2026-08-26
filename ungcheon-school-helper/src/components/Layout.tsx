@@ -47,6 +47,7 @@ const SubjectRemarksPrintPage = lazy(() => import('../pages/SubjectRemarksPrintP
 const AdminCenterPage = lazy(() => import('../pages/AdminCenterPage'))
 const VolunteerWorkPage = lazy(() => import('../pages/VolunteerWorkPage'))
 const RecordPrivacyBlindPage = lazy(() => import('../pages/RecordPrivacyBlindPage'))
+const AuditEvidenceCenterPage = lazy(() => import('../pages/AuditEvidenceCenterPage'))
 // 시험 기능은 번들에 포함해 검증하되 사이드바·검색 메뉴에는 노출하지 않습니다.
 const FutureOperationsPage = lazy(() => import('../features/futureOperations/FutureOperationsPage'))
 
@@ -88,6 +89,7 @@ const PAGES: Record<string, React.ComponentType> = {
   admin_center: AdminCenterPage,
   volunteer_work: VolunteerWorkPage,
   record_privacy_blind: RecordPrivacyBlindPage,
+  audit_evidence: AuditEvidenceCenterPage,
   future_operations: FutureOperationsPage,
 }
 

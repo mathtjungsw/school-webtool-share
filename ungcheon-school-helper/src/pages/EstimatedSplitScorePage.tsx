@@ -4,6 +4,8 @@ import {
   Copy, FileSpreadsheet, FolderOpen, Info, Plus, RotateCcw, Save, ShieldCheck, Trash2, Upload,
 } from 'lucide-react'
 import clsx from 'clsx'
+import ReferenceMetadataView from '../components/ReferenceMetadata'
+import { REFERENCE_CATALOG } from '../data/referenceCatalog'
 import {
   STORAGE_KEY as SPLIT_STORAGE_KEY, buildGradeCutSummary, calculateGradePreview, columnIndex,
   defaultComponents, defaultGradePreviewState, exportRestoreWorkbook, importRestoreWorkbook,
@@ -300,6 +302,7 @@ export default function EstimatedSplitScorePage() {
           </div>
         </div>
       </header>
+      <ReferenceMetadataView metadata={REFERENCE_CATALOG.estimatedSplitScore} />
 
       <StepCard number="01" title="시험 전 1차 추정분할점수 설계" description="희망 분할점수를 만들기 위한 난이도별 예상 정답률을 역산합니다.">
         <SplitPlannerPanel

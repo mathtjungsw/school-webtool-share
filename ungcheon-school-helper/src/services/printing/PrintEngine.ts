@@ -15,6 +15,16 @@ export interface PrintPreviewHandle {
   print: () => void
 }
 
+export interface PrintPreflightResult {
+  fitsSinglePage: boolean
+  horizontalOverflow: boolean
+  verticalOverflow: boolean
+  estimatedPages: number
+  scaleToFit: number
+  messages: string[]
+  suggestions: string[]
+}
+
 const BLOCKED_ELEMENTS = new Set([
   'script', 'iframe', 'frame', 'object', 'embed', 'form', 'input', 'button', 'textarea',
   'select', 'option', 'link', 'meta', 'base', 'audio', 'video', 'canvas', 'svg', 'math',
@@ -119,6 +129,71 @@ async function waitUntilReady(frame: HTMLIFrameElement): Promise<void> {
   ])
 }
 
+export function calculatePrintPreflight(
+  contentWidth: number,
+  contentHeight: number,
+  pageWidth: number,
+  pageHeight: number,
+): PrintPreflightResult {
+  const safePageWidth = Math.max(1, pageWidth)
+  const safePageHeight = Math.max(1, pageHeight)
+  const horizontalOverflow = contentWidth > safePageWidth + 2
+  const verticalOverflow = contentHeight > safePageHeight + 2
+  const estimatedPages = Math.max(1, Math.ceil(contentHeight / safePageHeight))
+  const scaleToFit = Math.max(0.55, Math.min(1, safePageWidth / Math.max(contentWidth, 1), safePageHeight / Math.max(contentHeight, 1)))
+  const messages: string[] = []
+  const suggestions: string[] = []
+  if (horizontalOverflow) {
+    messages.push('오른쪽 열이나 표가 A4 경계 밖으로 잘릴 수 있습니다.')
+    suggestions.push('가로 방향 전환 또는 표 너비 자동 맞춤')
+  }
+  if (verticalOverflow) {
+    messages.push(`내용이 약 ${estimatedPages}페이지 높이입니다.`)
+    suggestions.push('여백·행 높이·글자 크기 단계 조정')
+  }
+  return {
+    fitsSinglePage: !horizontalOverflow && !verticalOverflow,
+    horizontalOverflow, verticalOverflow, estimatedPages, scaleToFit,
+    messages, suggestions: [...new Set(suggestions)],
+  }
+}
+
+function inspectFrame(frame: HTMLIFrameElement): PrintPreflightResult {
+  const frameDocument = frame.contentDocument
+  const root = frameDocument?.querySelector<HTMLElement>('.print-engine-root')
+  if (!root) return calculatePrintPreflight(1, 1, 1, 1)
+  return calculatePrintPreflight(root.scrollWidth, root.scrollHeight, root.clientWidth, root.clientHeight)
+}
+
+function showPreflightDialog(
+  title: string,
+  result: PrintPreflightResult,
+  allowAutoFit: boolean,
+): Promise<'fit' | 'print' | 'cancel'> {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div')
+    overlay.setAttribute('role', 'dialog')
+    overlay.setAttribute('aria-modal', 'true')
+    overlay.setAttribute('aria-label', 'A4 한 장 출력 사전검사')
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:12000;display:grid;place-items:center;background:rgba(15,23,42,.68);padding:20px;'
+    const dialog = document.createElement('section')
+    dialog.style.cssText = 'width:min(520px,100%);border:1px solid #f59e0b;border-radius:18px;background:#fff;color:#0f172a;box-shadow:0 24px 70px rgba(15,23,42,.28);padding:22px;font-family:Malgun Gothic,sans-serif;'
+    const messages = result.messages.map(message => `<li style="margin-top:7px">${escapePrintHtml(message)}</li>`).join('')
+    const suggestions = result.suggestions.map(message => `<li style="margin-top:5px">${escapePrintHtml(message)}</li>`).join('')
+    dialog.innerHTML = `<div style="font-size:12px;font-weight:800;color:#92400e">A4 한 장 출력 사전검사</div><h2 style="margin:4px 0 0;font-size:19px">${escapePrintHtml(title)}</h2><p style="margin:12px 0 0;font-size:13px;font-weight:700;color:#475569">인쇄 전에 잘림 가능성을 발견했습니다.</p><ul style="margin:10px 0 0 18px;font-size:13px;font-weight:700;color:#9f1239">${messages}</ul>${suggestions ? `<div style="margin-top:14px;border-radius:11px;background:#fffbeb;padding:11px"><b style="font-size:12px">권장 보정</b><ul style="margin:5px 0 0 18px;font-size:12px;color:#475569">${suggestions}</ul></div>` : ''}<p style="margin-top:12px;font-size:11px;color:#64748b">자동 맞춤은 내용을 삭제하지 않고 전체 문서를 축소합니다. 축소 후 글자가 너무 작으면 취소하고 원본 화면에서 내용을 조정하세요.</p>`
+    const actions = document.createElement('div')
+    actions.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:18px;'
+    const finish = (choice: 'fit' | 'print' | 'cancel') => { overlay.remove(); resolve(choice) }
+    const cancel = document.createElement('button'); cancel.textContent = '취소'; cancel.style.cssText = 'border:1px solid #cbd5e1;border-radius:9px;background:#fff;padding:8px 12px;font-weight:800;cursor:pointer;'; cancel.onclick = () => finish('cancel')
+    const print = document.createElement('button'); print.textContent = '그대로 인쇄'; print.style.cssText = 'border:1px solid #cbd5e1;border-radius:9px;background:#f8fafc;padding:8px 12px;font-weight:800;cursor:pointer;'; print.onclick = () => finish('print')
+    actions.append(cancel, print)
+    if (allowAutoFit) {
+      const fit = document.createElement('button'); fit.textContent = '한 장 자동 맞춤'; fit.style.cssText = 'border:0;border-radius:9px;background:#d9ba00;color:#17212b;padding:8px 12px;font-weight:900;cursor:pointer;'; fit.onclick = () => finish('fit'); actions.append(fit)
+    }
+    dialog.append(actions); overlay.append(dialog); document.body.appendChild(overlay); cancel.focus()
+  })
+}
+
 function writeFrame(frame: HTMLIFrameElement, html: string): boolean {
   const frameDocument = frame.contentDocument
   if (!frameDocument) return false
@@ -148,7 +223,21 @@ export function printDocument(options: PrintDocumentOptions): void {
   }
   if (frame.contentWindow) frame.contentWindow.onafterprint = cleanup
 
-  void waitUntilReady(frame).then(() => {
+  void waitUntilReady(frame).then(async () => {
+    const result = inspectFrame(frame)
+    const singlePage = (options.pageMode ?? 'multi-page') === 'single-page'
+    if (result.horizontalOverflow || (singlePage && result.verticalOverflow)) {
+      const choice = await showPreflightDialog(options.title, result, singlePage)
+      if (choice === 'cancel') { cleanup(); return }
+      if (choice === 'fit') {
+        const fitted: PrintDocumentOptions = {
+          ...options,
+          styles: `${options.styles ?? ''}\n@media print{.print-engine-root{transform:scale(${result.scaleToFit.toFixed(4)});transform-origin:top left;}}`,
+        }
+        if (!writeFrame(frame, buildPrintDocument(fitted))) { cleanup(); return }
+        await waitUntilReady(frame)
+      }
+    }
     try {
       frame.contentWindow?.focus()
       frame.contentWindow?.print()
@@ -173,6 +262,12 @@ export function openPrintPreview(options: PrintDocumentOptions): PrintPreviewHan
   toolbar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:14px 14px 0 0;background:#fff;padding:10px 14px;color:#0f172a;font:700 14px Malgun Gothic,sans-serif;'
   const label = document.createElement('strong')
   label.textContent = options.title
+  const preflightBadge = document.createElement('span')
+  preflightBadge.textContent = 'A4 검사 중…'
+  preflightBadge.style.cssText = 'margin-left:10px;border-radius:999px;background:#f1f5f9;color:#475569;padding:4px 8px;font-size:11px;font-weight:800;'
+  const titleGroup = document.createElement('div')
+  titleGroup.style.cssText = 'display:flex;align-items:center;min-width:0;'
+  titleGroup.append(label, preflightBadge)
   const actions = document.createElement('div')
   actions.style.cssText = 'display:flex;gap:8px;'
   const printButton = document.createElement('button')
@@ -184,7 +279,7 @@ export function openPrintPreview(options: PrintDocumentOptions): PrintPreviewHan
   closeButton.textContent = '닫기'
   closeButton.style.cssText = 'border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#0f172a;padding:8px 12px;font-weight:800;cursor:pointer;'
   actions.append(printButton, closeButton)
-  toolbar.append(label, actions)
+  toolbar.append(titleGroup, actions)
 
   const frame = document.createElement('iframe')
   frame.title = `${options.title} 미리보기`
@@ -193,6 +288,15 @@ export function openPrintPreview(options: PrintDocumentOptions): PrintPreviewHan
   overlay.append(toolbar, frame)
   document.body.appendChild(overlay)
   writeFrame(frame, buildPrintDocument(options))
+  void waitUntilReady(frame).then(() => {
+    const result = inspectFrame(frame)
+    const singlePage = (options.pageMode ?? 'multi-page') === 'single-page'
+    const warning = result.horizontalOverflow || (singlePage && result.verticalOverflow)
+    preflightBadge.textContent = warning ? `A4 확인 필요 · 예상 ${result.estimatedPages}쪽` : singlePage ? 'A4 한 장 맞춤' : `A4 예상 ${result.estimatedPages}쪽`
+    preflightBadge.style.background = warning ? '#fff1f2' : '#ecfdf5'
+    preflightBadge.style.color = warning ? '#9f1239' : '#065f46'
+    if (warning) preflightBadge.title = [...result.messages, ...result.suggestions].join('\n')
+  })
 
   const close = () => {
     document.removeEventListener('keydown', onKeyDown)

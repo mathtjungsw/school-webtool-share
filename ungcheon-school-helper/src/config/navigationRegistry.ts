@@ -2,7 +2,7 @@ import {
   ArrowLeftRight, Bell, BookOpen, Building2, Calculator, CalendarDays, CalendarRange,
   ClipboardCheck, FileCode2, FileDown, FileLock2, FilePenLine, FileScan, FileText, HeartHandshake,
   HelpCircle, Landmark, LayoutDashboard, Link2, MapPinned, MessageSquareText, ScanSearch,
-  ScrollText, SearchCheck, Settings, ShieldCheck, Table2, UsersRound, Wrench,
+  ScrollText, SearchCheck, Settings, ShieldAlert, ShieldCheck, Table2, UsersRound, Wrench,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -28,6 +28,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   { id: 'settings', label: '환경설정', icon: Settings, assistantCategory: '설정·도움말', searchAliases: ['사용자 설정', '이름 설정', '테마 설정'] },
   { id: 'admin_center', label: '관리자 센터', icon: ShieldCheck, assistantCategory: '관리자', searchAliases: ['관리자 동기화', 'NEIS 동기화'] },
   { id: 'staff_tasks', label: '업무센터', icon: ClipboardCheck, assistantCategory: '학교운영', searchAliases: ['업무 등록', '배부 업무', '체크리스트'] },
+  { id: 'audit_evidence', label: '감사 증빙센터', icon: ShieldAlert, assistantCategory: '학교운영', searchAliases: ['감사 규정', '감사 사례', '자체점검표', '자율형 종합감사'] },
   { id: 'school_hub', label: '학교 공유 링크', icon: Link2, assistantCategory: '학교 공유', searchAliases: ['공유 링크', '부서 링크'] },
   { id: 'timetable_swap', label: '교사 시간표', icon: ArrowLeftRight, assistantCategory: '학사·기록', searchAliases: ['교환·대강 계획', '수업 교체', '대강', '공동 공강'] },
   { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange, assistantCategory: '학사·기록', searchAliases: ['개인 시간표', '학생 시간표'] },

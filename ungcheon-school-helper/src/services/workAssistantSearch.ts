@@ -9,6 +9,13 @@ export interface WorkAssistantEntry {
   steps: string[]
   keywords: string[]
   teacherContext?: boolean
+  system?: string
+  roleOrDepartment?: string
+  menuPath?: string
+  preparations?: string[]
+  afterChecks?: string[]
+  commonMistakes?: string[]
+  reference?: { standardDate: string; source: string; verifiedAt: string; sourceFile?: string }
 }
 
 export interface WorkAssistantResult extends WorkAssistantEntry {
@@ -41,14 +48,28 @@ export const WORK_ASSISTANT_SUGGESTIONS = [
   '학교 공유 서비스 저장 통신을 진단하고 싶어',
   '업무와 수업 변경 알림을 한곳에서 보고 싶어',
   '바탕화면 미니 위젯을 열고 싶어',
+  '감사 규정이나 자체점검표를 확인하고 싶어',
 ]
 
 const DETAILED_WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
   {
+    id: 'audit-evidence-center', title: '감사 규정·사례·자체점검표 확인', page: 'audit_evidence', category: '학교운영',
+    summary: '경상남도교육청 도움자료를 바탕으로 감사 관련 규정, 예방 사례와 분야별 자체점검표를 한곳에서 확인합니다.',
+    steps: ['감사 증빙센터 메뉴를 엽니다.', '규정 확인·감사 사례 검색·자체점검표 확인 중 필요한 탭을 선택합니다.', '업무명이나 핵심어를 검색하고 분야를 좁힙니다.', '자체점검표에서는 상태와 메모를 입력하고 현재 목록을 출력할 수 있습니다.', '최종 판단이 필요하면 표시된 출처 원문과 최신 기준을 다시 확인합니다.'],
+    keywords: ['감사 증빙센터', '감사 규정', '감사 사례', '감사사례집', '자체점검표', '자율점검', '자율형 종합감사', '규정 확인'],
+    system: '웅천고 업무도우미 · 경상남도교육청 학교업무 도움자료',
+    roleOrDepartment: '감사 업무 총괄 및 분야별 업무 담당자',
+    menuPath: '업무·학교운영 > 감사 증빙센터',
+    preparations: ['확인하려는 업무명 또는 핵심어', '필요한 경우 학교의 실제 증빙자료와 최신 공식 원문'],
+    afterChecks: ['기준일·출처·최종 확인일 확인', '보완 필요 항목의 담당자와 처리기한 확인'],
+    commonMistakes: ['앱의 참고자료를 공식 감사 판단으로 오해', '도교육청 예시 담당부서를 학교의 실제 업무분장으로 단정'],
+    reference: { standardDate: '2026학년도', source: '경상남도교육청 학교업무 도움자료', verifiedAt: '2026-08-26' },
+  },
+  {
     id: 'desktop-mini-widget', title: '바탕화면 미니 대시보드', page: 'settings', category: '설정·도움말',
-    summary: '오늘 시간표·일정·급식·미완료 업무·알림과 가벼운 오늘의 한마디를 작은 위젯으로 계속 확인합니다.',
-    steps: ['상단의 미니 위젯 버튼을 누릅니다.', '처음에는 펼친 상태로 열리며 현재 수업은 파란색, 다음 수업은 주황색으로 표시됩니다.', '위젯의 설정 버튼에서 디자인·투명도·Windows 자동 실행·오늘의 한마디를 조절합니다.', '접기 버튼을 누르면 현재·다음 수업과 건수만 남고, X 버튼은 완전 종료가 아니라 위젯만 숨깁니다.', '트레이의 웅천고 아이콘을 두 번 누르면 다시 열 수 있습니다.'],
-    keywords: ['미니 위젯', '바탕화면 위젯', '데스크톱 위젯', '오늘 시간표 위젯', '투명도', '위젯 접기', '위젯 디자인', '오늘의 운세', '오늘의 한마디', '행운의 색', '행운의 숫자', '위젯 자동실행'],
+    summary: '오늘 시간표·일정·급식·미완료 업무·알림·오늘의 운세와 무작위 행운카드를 작은 위젯으로 계속 확인합니다.',
+    steps: ['상단의 미니 위젯 버튼을 누릅니다.', '처음에는 펼친 상태로 열리며 현재 수업은 파란색, 다음 수업은 주황색으로 표시됩니다.', '오늘의 운세는 교사 이름과 날짜를 기준으로 하루 동안 고정됩니다.', '오늘의 행운카드는 궁금한 내용을 떠올린 뒤 누르며, 타로·화투 중 선택하고 누를 때마다 새 카드가 무작위로 나옵니다.', '위젯 설정에서 디자인·투명도·Windows 자동 실행·운세·행운카드 표시를 조절합니다.', '접기 버튼을 누르면 현재·다음 수업과 건수만 남고, X 버튼은 완전 종료가 아니라 위젯만 숨깁니다.', '트레이의 웅천고 아이콘을 두 번 누르면 다시 열 수 있습니다.'],
+    keywords: ['미니 위젯', '바탕화면 위젯', '데스크톱 위젯', '오늘 시간표 위젯', '투명도', '위젯 접기', '위젯 디자인', '오늘의 운세', '오늘의 행운카드', '타로', '화투', '행운의 색', '행운의 숫자', '위젯 자동실행'],
     teacherContext: true,
   },
   {

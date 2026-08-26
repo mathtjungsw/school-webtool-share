@@ -5,6 +5,8 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { escapeHtml, printHtml } from '../utils/printHtml'
+import ReferenceMetadataView from '../components/ReferenceMetadata'
+import { REFERENCE_CATALOG } from '../data/referenceCatalog'
 import {
   COMMENDATION_OPTIONS,
   EDUCATION_ACTIVITY_DEFINITIONS,
@@ -240,6 +242,7 @@ export default function TeacherTransferScorePage() {
           <button type="button" className="btn-primary flex items-center gap-1.5" onClick={printReport}><Printer size={14} />결과 인쇄·PDF</button>
         </div>
       </header>
+      <ReferenceMetadataView metadata={REFERENCE_CATALOG.transferScore} />
 
       <section className="rounded-2xl border border-sky-500/25 bg-gradient-to-br from-sky-500/10 to-emerald-500/[0.04] p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

@@ -77,14 +77,26 @@ interface WidgetSettings {
   opacity: number
   preset: WidgetPreset
   showFortune: boolean
+  showLuckyCard: boolean
+  luckyCardKind: 'tarot' | 'hwatu'
   showMeal: boolean
+  showPersonalSchedules: boolean
+  showPersonalTasksInEvents: boolean
+  showNeisSchedules: boolean
+  showCommitteeEvents: boolean
+  showWeeklyPlans: boolean
+  showGateDuty: boolean
+  showMealDuty: boolean
+  showCreativeActivities: boolean
   dense: boolean
   x?: number
   y?: number
 }
 const WIDGET_SETTINGS_KEY = 'widget.settings.v1'
 const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
-  expanded: true, pinned: true, opacity: 0.96, preset: 'glass-light', showFortune: true, showMeal: true, dense: true,
+  expanded: true, pinned: true, opacity: 0.96, preset: 'glass-light', showFortune: true, showLuckyCard: true, luckyCardKind: 'tarot', showMeal: true,
+  showPersonalSchedules: true, showPersonalTasksInEvents: true, showNeisSchedules: true, showCommitteeEvents: true,
+  showWeeklyPlans: true, showGateDuty: true, showMealDuty: true, showCreativeActivities: true, dense: true,
 }
 function widgetSettings(): WidgetSettings {
   const saved = store.get(WIDGET_SETTINGS_KEY) as Partial<WidgetSettings> | undefined
@@ -393,7 +405,10 @@ autoUpdater.on('update-not-available', () => {
 autoUpdater.on('error', (error: Error, message?: string) => {
   mainWindow?.webContents.send('update:error', error?.message ?? message ?? String(error))
 })
-ipcMain.on('update:install', () => autoUpdater.quitAndInstall())
+ipcMain.on('update:install', () => {
+  if (app.getVersion().includes('-preview.')) return
+  autoUpdater.quitAndInstall()
+})
 ipcMain.handle('update:check', async () => {
   if (process.env['ELECTRON_RENDERER_URL'] || app.getVersion().includes('-preview.')) {
     mainWindow?.webContents.send('update:none')

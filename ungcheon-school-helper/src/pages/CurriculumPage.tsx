@@ -7,6 +7,8 @@ import {
   Printer,
 } from 'lucide-react'
 import clsx from 'clsx'
+import ReferenceMetadataView from '../components/ReferenceMetadata'
+import { REFERENCE_CATALOG } from '../data/referenceCatalog'
 
 type PdfId = 'all' | 'grade1' | 'grade2' | 'grade3'
 type ChoiceId = 'choice1' | 'choice2'
@@ -109,6 +111,8 @@ export default function CurriculumPage() {
           </div>
         )}
       </div>
+
+      <ReferenceMetadataView metadata={REFERENCE_CATALOG.curriculum2026} />
 
       <div className="flex items-center gap-1 overflow-x-auto border-b border-white/10 mb-4 flex-shrink-0">
         {PDF_TABS.map(item => (

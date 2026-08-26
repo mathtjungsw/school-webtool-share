@@ -35,7 +35,7 @@ const SIDEBAR_COLLAPSED_GROUPS_KEY = 'sidebar.collapsedGroups.v1'
 
 const MENU_GROUPS = [
   { id: 'start', label: '시작·설정', items: ['help', 'notifier', 'operations_notifications', 'calendar', 'settings', 'admin_center'] },
-  { id: 'school', label: '업무·학교운영', items: ['staff_tasks', 'school_hub', 'timetable_swap', 'staff_roster', 'committees', 'feature_requests', 'form_center'] },
+  { id: 'school', label: '업무·학교운영', items: ['staff_tasks', 'audit_evidence', 'school_hub', 'timetable_swap', 'staff_roster', 'committees', 'feature_requests', 'form_center'] },
   { id: 'student', label: '학생·학사', items: ['student_timetable', 'attendance_print', 'volunteer_work', 'student_locator', 'student_identity_audit', 'subject_remarks_print', 'record_privacy_blind'] },
   { id: 'curriculum', label: '평가·교육과정·진로', items: ['schoolinfo_evaluation', 'grade_preview', 'estimated_split_score', 'curriculum', 'recommended_subjects'] },
   { id: 'tools', label: '인사·교사용 도구', items: ['transfer_score', 'teacher_tools', 'excel_processor', 'payroll', 'insa_analysis', 'pdf_extractor', 'file_parser'] },
@@ -80,6 +80,12 @@ function normalizeOrder(value: unknown) {
     if (appendedIndex >= 0) next.splice(appendedIndex, 1)
     const remarksIndex = next.indexOf('subject_remarks_print')
     next.splice(remarksIndex >= 0 ? remarksIndex + 1 : next.length, 0, 'record_privacy_blind')
+  }
+  if (!known.includes('audit_evidence')) {
+    const appendedIndex = next.indexOf('audit_evidence')
+    if (appendedIndex >= 0) next.splice(appendedIndex, 1)
+    const tasksIndex = next.indexOf('staff_tasks')
+    next.splice(tasksIndex >= 0 ? tasksIndex + 1 : next.length, 0, 'audit_evidence')
   }
   return next
 }
