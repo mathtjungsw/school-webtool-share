@@ -91,6 +91,7 @@
     "src/services/effectiveTimetable.ts",
     "src/services/helpClassSchedule.ts",
     "src/services/studentIdentityAudit.ts",
+    "src/services/studentSpecificLocator.ts",
     "src/services/subjectRemarksPrint.ts",
     "src/services/volunteerWork.ts",
     "src/services/studentId.ts",
