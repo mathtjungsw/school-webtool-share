@@ -268,6 +268,18 @@ function pointClock(point: WidgetHourlyWeatherPoint) {
   return clock ? Number(clock[1]) * 60 + Number(clock[2]) : Number.NaN
 }
 
+function koreaMinutes(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const hour = Number(parts.find(part => part.type === 'hour')?.value ?? 0)
+  const minute = Number(parts.find(part => part.type === 'minute')?.value ?? 0)
+  return hour * 60 + minute
+}
+
 function isPrecipitationCode(code: number | undefined) {
   return typeof code === 'number' && ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95)
 }
@@ -303,7 +315,7 @@ export function buildWeatherActions(
   ]
   const actions: WidgetWeatherAction[] = []
   const referenceNow = options.now ?? new Date()
-  const currentHourStart = referenceNow.getHours() * 60
+  const currentHourStart = Math.floor(koreaMinutes(referenceNow) / 60) * 60
   const relevant = points.filter(point => {
     const clock = pointClock(point)
     return Number.isFinite(clock) && clock >= currentHourStart
