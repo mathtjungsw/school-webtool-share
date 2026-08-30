@@ -3,11 +3,11 @@
   "files": {
     "pulledLessons2026.ts": {
       "source": "src/data/pulledLessons2026.ts",
-      "sha256": "acf1ca166a55c9460b3bf01c1f7c8e7d9ada09519b476ac0cc76f6a012c56dab"
+      "sha256": "4183a131a09ccc1f2df885652f714e675a9b10dfbb3fa47892bb2b4683ed7ddd"
     },
     "ungcheonSchedule.ts": {
       "source": "src/services/ungcheonSchedule.ts",
-      "sha256": "0b29084f7efd2a970e49118bb2951717854c8630923b4fd4fb017e1e5b9eac7c"
+      "sha256": "187533345cd49cfb14fb49a6d9ebf0af523ca68bb9402fba2836f79a17e441bb"
     }
   }
 }

@@ -11,7 +11,9 @@ const files = [
   ['src/data/pulledLessons2026.ts', 'pulledLessons2026.ts'],
   ['src/services/ungcheonSchedule.ts', 'ungcheonSchedule.ts'],
 ]
-const sha256 = content => crypto.createHash('sha256').update(content).digest('hex')
+// Git uses LF in its source repository while Windows checkouts may use CRLF.
+// Validate content, not checkout-specific newline bytes, on both build hosts.
+const sha256 = content => crypto.createHash('sha256').update(content.toString('utf8').replace(/\r\n/g, '\n')).digest('hex')
 const hasDesktop = fs.existsSync(path.join(desktop, 'package.json'))
 if (process.argv.includes('--write')) {
   if (!hasDesktop) throw new Error('최신 데스크톱 소스가 있는 통합 저장소에서만 동기화할 수 있습니다.')
