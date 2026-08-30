@@ -140,7 +140,11 @@ function Get-LocalContent {
     if ($file.Name.StartsWith('.')) { continue }
     $type = switch ($file.Extension.ToLowerInvariant()) { '.gs' { 'SERVER_JS' } '.js' { 'SERVER_JS' } '.html' { 'HTML' } '.json' { if ($file.Name -eq 'appsscript.json') { 'JSON' } } }
     if (-not $type) { continue }
-    $files += @{ name = $file.BaseName; type = $type; source = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 }
+    # Get-Content -Raw attaches PSPath/PSDrive/Provider ETS properties to strings
+    # in Windows PowerShell 5. Serializing those at depth 30 can recursively walk
+    # provider metadata for minutes. ReadAllText returns a plain System.String.
+    $plainSource = [System.IO.File]::ReadAllText($file.FullName, [System.Text.Encoding]::UTF8)
+    $files += @{ name = [string]$file.BaseName; type = [string]$type; source = $plainSource }
   }
   if (@($files | Where-Object { $_.name -eq 'appsscript' -and $_.type -eq 'JSON' }).Count -ne 1) { throw 'Apps Script manifest is missing.' }
   return @{ files = @($files) }

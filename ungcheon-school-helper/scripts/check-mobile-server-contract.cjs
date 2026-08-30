@@ -5,6 +5,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
+// Apps Script Date calendar methods use the manifest timezone. CI runners may
+// use UTC; changing only Utilities.formatDate would leave getDay/getDate/setDate
+// in the runner timezone and incorrectly drop Korea-midnight school events.
+const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../server/appsscript.json'), 'utf8'));
+assert.equal(manifest.timeZone, 'Asia/Seoul');
+process.env.TZ = manifest.timeZone;
+
 const sourcePath = path.resolve(__dirname, '../server/Code.gs');
 const source = fs.readFileSync(sourcePath, 'utf8');
 new vm.Script(source, { filename: 'server/Code.gs' });
@@ -129,6 +136,16 @@ function harness() {
     failCache: (read, write) => { failCacheRead = read; failCacheWrite = write; },
   };
 }
+
+test('Date calendar operations follow the Apps Script manifest timezone', () => {
+  const h = harness();
+  const midnight = vm.runInContext('new Date("2026-08-30T15:00:00Z")', h.context);
+  assert.equal(midnight.getDate(), 31);
+  assert.equal(midnight.getDay(), 1);
+  midnight.setDate(midnight.getDate() + 1);
+  assert.equal(midnight.toISOString(), '2026-08-31T15:00:00.000Z');
+  assert.equal(h.context.mobileNearestDate_(31, 1, '2026-08-30', '2026-09-12'), '2026-08-31');
+});
 
 test('service v39+ and desktop/mobile release notices are retained', () => {
   const h = harness();

@@ -133,6 +133,11 @@ pass('concurrency and immutable source guards', () => {
  assert.match(ps, /Get-OriginMainCommit\) -ne \$mainCommit/)
  assert.match(ps, /Get-ContentFingerprint -Content \$versionContent\) -ne \$localHash/)
 })
+pass('deployment source uses plain .NET strings, not Get-Content ETS values', () => {
+ assert.match(ps, /\$plainSource\s*=\s*\[System\.IO\.File\]::ReadAllText\(\$file\.FullName,\s*\[System\.Text\.Encoding\]::UTF8\)/)
+ assert.match(ps, /source\s*=\s*\$plainSource/)
+ assert.doesNotMatch(ps, /source\s*=\s*Get-Content/)
+})
 if (process.platform === 'win32') {
  pass('Windows PowerShell parser', () => {
   const command = `$errors=$null;$tokens=$null;$null=[System.Management.Automation.Language.Parser]::ParseFile('${psFile.replace(/'/g, "''")}',[ref]$tokens,[ref]$errors);if($errors.Count){throw 'PowerShell parse failed'};Write-Output 'PowerShell parse passed'`
@@ -159,6 +164,33 @@ if (process.platform === 'win32') {
    Write-Output 'Snapshot tests passed'`
   const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { encoding: 'utf8', timeout: 30000 })
   assert.match(output, /Snapshot tests passed/)
+ })
+ pass('PowerShell 5 upload JSON remains bounded plain strings', () => {
+  const serverDir = path.join(__dirname, '..', 'server')
+  const command = `
+   $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';Set-StrictMode -Version Latest;
+   $tokens=$null;$errors=$null;$ast=[System.Management.Automation.Language.Parser]::ParseFile('${psFile.replace(/'/g, "''")}',[ref]$tokens,[ref]$errors);
+   $serverDir='${serverDir.replace(/'/g, "''")}';
+   $fn=$ast.FindAll({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Get-LocalContent'},$false)[0];
+   . ([scriptblock]::Create($fn.Extent.Text));
+   $payload=Get-LocalContent;$sourceBytes=0;
+   foreach($entry in $payload.files){
+    if($entry.source -isnot [string]){throw 'Source is not a plain string'};
+    foreach($metadataName in @('PSPath','PSDrive','PSProvider','ReadCount')){if($entry.source.PSObject.Properties.Match($metadataName).Count -gt 0){throw 'Source has extended filesystem metadata'}};
+    $sourceBytes += [Text.Encoding]::UTF8.GetByteCount($entry.source);
+   };
+   $timer=[Diagnostics.Stopwatch]::StartNew();$json=$payload|ConvertTo-Json -Depth 30 -Compress;$timer.Stop();
+   $jsonBytes=[Text.Encoding]::UTF8.GetByteCount($json);
+   if($timer.ElapsedMilliseconds -gt 5000){throw 'Upload payload serialization is too slow'};
+   if($jsonBytes -gt ($sourceBytes*4+8192)){throw 'Upload payload expanded beyond source size'};
+   $decoded=$json|ConvertFrom-Json;
+   if(@($decoded.files|Where-Object{$_.source -isnot [string]}).Count -gt 0){throw 'Upload JSON source became an ETS object'};
+   [pscustomobject]@{files=$payload.files.Count;bytes=$jsonBytes;elapsedMs=$timer.ElapsedMilliseconds}|ConvertTo-Json -Compress`
+  const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { encoding: 'utf8', timeout: 15000 })
+  const summary = JSON.parse(output.trim())
+  assert.ok(summary.files >= 2)
+  assert.ok(summary.bytes > 0)
+  assert.ok(summary.elapsedMs <= 5000)
  })
 }
 const realSource = fs.readFileSync(path.join(__dirname, '..', 'server', 'Code.gs'), 'utf8')
