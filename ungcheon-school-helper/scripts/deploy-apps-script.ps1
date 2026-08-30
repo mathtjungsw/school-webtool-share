@@ -95,9 +95,21 @@ function Invoke-AppsScriptApi {
 
 function Get-ContentFingerprint {
   param([object]$Content)
-  $rows = @($Content.files | Sort-Object name, type | ForEach-Object {
-    [ordered]@{ name = [string]$_.name; type = [string]$_.type; source = ([string]$_.source).Replace("`r`n", "`n").TrimEnd() }
-  })
+  # PowerShell 5 sorts Hashtable properties differently from PSCustomObject
+  # properties. Local files are Hashtables; Google API files are PSCustomObjects.
+  # Build explicit values, then use ordinal keys so both hash the same file order.
+  $rowsByKey = [System.Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+  $keys = [System.Collections.Generic.List[string]]::new()
+  foreach ($file in $Content.files) {
+    $name = [string]$file.name
+    $type = [string]$file.type
+    $key = $name + [char]0 + $type
+    if ($rowsByKey.ContainsKey($key)) { throw 'Deployment blocked: duplicate Apps Script file identity.' }
+    $rowsByKey.Add($key, [ordered]@{ name = $name; type = $type; source = ([string]$file.source).Replace("`r`n", "`n").TrimEnd() })
+    $keys.Add($key)
+  }
+  $keys.Sort([StringComparer]::Ordinal)
+  $rows = @(foreach ($key in $keys) { $rowsByKey[$key] })
   $bytes = [System.Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject $rows -Depth 10 -Compress))
   $sha = [System.Security.Cryptography.SHA256]::Create()
   try { return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant() }

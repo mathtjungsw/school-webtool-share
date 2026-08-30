@@ -161,6 +161,15 @@ if (process.platform === 'win32') {
    $blocked=$false;try{Assert-RemoteFilesPreserved -Local $local -Remote @{files=@(@{name='Lost';type='SERVER_JS';source='function lost() {}'})}}catch{$blocked=$true};if(-not $blocked){throw 'Remote file removal was not blocked'};
    $crlf=@{files=@(@{name='Code';type='SERVER_JS';source=($file.source+[char]13+[char]10)})};
    if((Get-ContentFingerprint -Content $local) -ne (Get-ContentFingerprint -Content $crlf)){throw 'Line-ending normalization failed'};
+   $manifest=@{name='appsscript';type='JSON';source='{}'};
+   $localPair=@{files=@($manifest,$file)};
+   $remotePair=[pscustomobject]@{files=@([pscustomobject]$file,[pscustomobject]$manifest)};
+   if((Get-ContentFingerprint -Content $localPair) -ne (Get-ContentFingerprint -Content $remotePair)){throw 'Hashtable/PSCustomObject order changed the fingerprint'};
+   $reversedPair=@{files=@($file,$manifest)};
+   if((Get-ContentFingerprint -Content $localPair) -ne (Get-ContentFingerprint -Content $reversedPair)){throw 'Input file order changed the fingerprint'};
+   $changedPair=[pscustomobject]@{files=@([pscustomobject]@{name='Code';type='SERVER_JS';source='function changed() {}'},[pscustomobject]$manifest)};
+   if((Get-ContentFingerprint -Content $localPair) -eq (Get-ContentFingerprint -Content $changedPair)){throw 'Changed source was not detected'};
+   $blocked=$false;try{Get-ContentFingerprint -Content @{files=@($file,$file)}}catch{$blocked=$true};if(-not $blocked){throw 'Duplicate file identities were not blocked'};
    Write-Output 'Snapshot tests passed'`
   const output = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { encoding: 'utf8', timeout: 30000 })
   assert.match(output, /Snapshot tests passed/)
