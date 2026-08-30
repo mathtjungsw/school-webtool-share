@@ -7,6 +7,16 @@ export interface DailyForecast {
   weatherDesc: string
   maxTemp: number
   minTemp: number
+  precipitationProbability: number
+}
+
+export interface HourlyForecast {
+  time: string
+  temp: number
+  precipitationProbability: number
+  windSpeed: number
+  emoji: string
+  weatherDesc: string
 }
 
 export interface WeatherData {
@@ -20,6 +30,8 @@ export interface WeatherData {
   pm10: number
   pm2_5: number
   weekly: DailyForecast[]
+  hourly: HourlyForecast[]
+  updatedAt: string
 }
 
 // 날씨/대기질을 1회 fetch하는 공유 훅 (컴포넌트와 분리 → Fast Refresh 경계 보존)
@@ -52,7 +64,8 @@ export function useWeather(address?: string, locationName?: string) {
       `https://api.open-meteo.com/v1/forecast` +
       `?latitude=${lat}&longitude=${lon}` +
       `&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m` +
-      `&daily=weather_code,temperature_2m_max,temperature_2m_min` +
+      `&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m` +
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
       `&timezone=Asia/Seoul` +
       `&forecast_days=7`
 
@@ -67,19 +80,22 @@ export function useWeather(address?: string, locationName?: string) {
         ? window.electron.fetchWeather(url)
         : fetch(url).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
 
-    Promise.allSettled([doFetch(weatherUrl), doFetch(aqUrl)])
+    const refreshWeather = () => {
+      setLoading(true)
+      void Promise.allSettled([doFetch(weatherUrl), doFetch(aqUrl)])
       .then(([weatherResult, aqResult]) => {
         if (cancelled) return
-        if (weatherResult.status === 'rejected') { setData(null); return }
+        if (weatherResult.status === 'rejected') return
         const j = weatherResult.value as Record<string, unknown>
         const cur = j.current as Record<string, number> | undefined
-        if (!cur) { setData(null); return }
+        if (!cur) return
 
         const daily = j.daily as {
           time: string[]
           weather_code: number[]
           temperature_2m_max: number[]
           temperature_2m_min: number[]
+          precipitation_probability_max?: number[]
         } | undefined
 
         // M-1: non-null assertion 제거 — 옵셔널 체이닝으로 안전하게 접근
@@ -91,6 +107,26 @@ export function useWeather(address?: string, locationName?: string) {
             weatherDesc,
             maxTemp: Math.round(daily?.temperature_2m_max?.[i] ?? 0),
             minTemp: Math.round(daily?.temperature_2m_min?.[i] ?? 0),
+            precipitationProbability: Math.round(daily?.precipitation_probability_max?.[i] ?? 0),
+          }
+        })
+
+        const hourlySource = j.hourly as {
+          time?: string[]
+          temperature_2m?: number[]
+          precipitation_probability?: number[]
+          weather_code?: number[]
+          wind_speed_10m?: number[]
+        } | undefined
+        const hourly: HourlyForecast[] = (hourlySource?.time ?? []).map((time, i) => {
+          const weather = wmoToWeather(hourlySource?.weather_code?.[i] ?? 0)
+          return {
+            time,
+            temp: Math.round(hourlySource?.temperature_2m?.[i] ?? 0),
+            precipitationProbability: Math.round(hourlySource?.precipitation_probability?.[i] ?? 0),
+            windSpeed: Number((hourlySource?.wind_speed_10m?.[i] ?? 0).toFixed(1)),
+            emoji: weather.emoji,
+            weatherDesc: weather.label,
           }
         })
 
@@ -110,11 +146,18 @@ export function useWeather(address?: string, locationName?: string) {
           emoji,
           weatherDesc,
           weekly,
+          hourly,
+          updatedAt: new Date().toISOString(),
         })
       })
       .finally(() => { if (!cancelled) setLoading(false) })
 
-    return () => { cancelled = true }
+    }
+
+    refreshWeather()
+    const refreshTimer = window.setInterval(refreshWeather, 45 * 60_000)
+
+    return () => { cancelled = true; window.clearInterval(refreshTimer) }
   }, [address, locationName])
 
   return { data, loading, displayName }

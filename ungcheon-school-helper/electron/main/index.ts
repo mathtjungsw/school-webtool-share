@@ -54,6 +54,11 @@ import {
   searchSchoolInfoSchoolsByRegion,
   type SchoolInfoEvaluationRequest,
 } from './schoolinfo'
+import {
+  DEFAULT_WIDGET_PRODUCTIVITY_SETTINGS,
+  normalizeWidgetProductivitySettings,
+  type WidgetProductivitySettings,
+} from '../../src/services/widgetSettings'
 
 const execFileAsync = promisify(execFile)
 
@@ -71,7 +76,7 @@ let tray: Tray | null = null
 let isQuitting = false
 
 type WidgetPreset = 'glass-light' | 'solid-light' | 'dark-glass' | 'school-yellow' | 'minimal'
-interface WidgetSettings {
+interface WidgetSettings extends WidgetProductivitySettings {
   expanded: boolean
   pinned: boolean
   opacity: number
@@ -94,13 +99,19 @@ interface WidgetSettings {
 }
 const WIDGET_SETTINGS_KEY = 'widget.settings.v1'
 const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
+  ...DEFAULT_WIDGET_PRODUCTIVITY_SETTINGS,
   expanded: true, pinned: true, opacity: 0.96, preset: 'glass-light', showFortune: true, showLuckyCard: true, luckyCardKind: 'tarot', showMeal: true,
   showPersonalSchedules: true, showPersonalTasksInEvents: true, showNeisSchedules: true, showCommitteeEvents: true,
   showWeeklyPlans: true, showGateDuty: true, showMealDuty: true, showCreativeActivities: true, dense: true,
 }
 function widgetSettings(): WidgetSettings {
   const saved = store.get(WIDGET_SETTINGS_KEY) as Partial<WidgetSettings> | undefined
-  return { ...DEFAULT_WIDGET_SETTINGS, ...(saved ?? {}), expanded: saved?.expanded !== false }
+  return {
+    ...DEFAULT_WIDGET_SETTINGS,
+    ...(saved ?? {}),
+    ...normalizeWidgetProductivitySettings(saved),
+    expanded: saved?.expanded !== false,
+  }
 }
 function widgetSize(expanded: boolean, preset: WidgetPreset) {
   if (preset === 'minimal') return expanded ? { width: 360, height: 480 } : { width: 360, height: 96 }
@@ -215,7 +226,11 @@ ipcMain.handle('widget:show', () => { createWidgetWindow(); return true })
 ipcMain.handle('widget:hide', () => { widgetWindow?.hide(); return true })
 ipcMain.handle('widget:getSettings', () => widgetSettings())
 ipcMain.handle('widget:updateSettings', (_, patch: Partial<WidgetSettings>) => {
-  const next = { ...widgetSettings(), ...patch }
+  const merged = { ...widgetSettings(), ...patch }
+  const next: WidgetSettings = {
+    ...merged,
+    ...normalizeWidgetProductivitySettings(merged),
+  }
   next.opacity = Math.max(0.65, Math.min(1, Number(next.opacity) || DEFAULT_WIDGET_SETTINGS.opacity))
   store.set(WIDGET_SETTINGS_KEY, next)
   if (widgetWindow) {
@@ -229,7 +244,9 @@ ipcMain.handle('widget:updateSettings', (_, patch: Partial<WidgetSettings>) => {
 })
 ipcMain.handle('widget:fitHeight', (_, requestedHeight: number) => {
   if (!widgetWindow || widgetWindow.isDestroyed()) return false
-  const height = Math.max(84, Math.min(760, Math.ceil(Number(requestedHeight) || 0)))
+  const workArea = screen.getDisplayMatching(widgetWindow.getBounds()).workArea
+  const maxHeight = Math.max(320, workArea.height - 24)
+  const height = Math.max(84, Math.min(maxHeight, Math.ceil(Number(requestedHeight) || 0)))
   const [width, currentHeight] = widgetWindow.getSize()
   if (Math.abs(currentHeight - height) > 1) widgetWindow.setSize(width, height, false)
   return true
@@ -1164,9 +1181,18 @@ function createWidgetWindow() {
 
 function showMainWindow(page = '') {
   if (!mainWindow || mainWindow.isDestroyed()) createWindow()
+  const sendNavigation = () => {
+    if (page && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('app:navigate', page)
+    }
+  }
+  if (page && mainWindow?.webContents.isLoading()) {
+    mainWindow.webContents.once('did-finish-load', sendNavigation)
+  } else {
+    sendNavigation()
+  }
   mainWindow?.show()
   mainWindow?.focus()
-  if (page) mainWindow?.webContents.send('app:navigate', page)
 }
 
 function setWidgetAutoLaunch(enable: boolean) {

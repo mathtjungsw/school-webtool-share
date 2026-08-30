@@ -5,6 +5,7 @@ import WidgetApp from './components/widget/WidgetApp'
 import './styles/globals.css'
 import './components/widget/widget.css'
 import './components/widget/widgetCompact.css'
+import './components/widget/widgetProductivity.css'
 import { logger } from './utils/logger'
 
 // 웹보기가 첫 화면을 그리기 전부터 밝은 모드로 고정한다.
