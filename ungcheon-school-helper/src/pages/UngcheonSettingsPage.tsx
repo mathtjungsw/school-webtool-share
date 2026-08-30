@@ -4,7 +4,7 @@ import {
   UserRound, Clock3, Power, AlertCircle, ExternalLink, LockKeyhole,
   Database, Trash2,
   MonitorCheck, RefreshCw, Loader2,
-  Eye, RotateCcw,
+  Eye, RotateCcw, Smartphone,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useAuthStore } from '../stores/authStore'
@@ -26,6 +26,7 @@ import {
 } from '../services/sharedNeis'
 
 const NEIS_KEY_URL = 'https://open.neis.go.kr/portal/guide/actKeyPage.do'
+const MOBILE_SCHEDULE_URL = 'https://ungcheon-mobile-schedule.jsw890122.chatgpt.site'
 
 export default function UngcheonSettingsPage() {
   const logout = useAuthStore(state => state.logout)
@@ -246,6 +247,24 @@ export default function UngcheonSettingsPage() {
           {hubStatus === 'ok' && <p className="text-xs text-emerald-400 flex items-center gap-1 mt-2"><CheckCircle2 size={12} /> 연결되었습니다.</p>}
           {hubStatus === 'error' && <p className="text-xs text-rose-400 flex items-center gap-1 mt-2"><AlertCircle size={12} /> 연결하지 못했습니다. 배포 URL과 권한을 확인하세요.</p>}
         </Field>
+        <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-bold text-slate-950"><Smartphone size={16} className="text-sky-700" />모바일 일정 PWA</h3>
+              <p className="mt-1 text-xs leading-relaxed text-slate-700">스마트폰에서 오늘·이번 주·다음 주 일정과 교사 시간표, 급식을 읽기 전용으로 확인합니다.</p>
+            </div>
+            <button type="button" onClick={() => window.electron?.openExternal(MOBILE_SCHEDULE_URL)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-sky-300 bg-white px-4 py-2 text-sm font-bold text-sky-900 transition-colors hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600">
+              모바일 일정 열기 <ExternalLink size={14} />
+            </button>
+          </div>
+          <p className="mt-3 select-text break-all text-xs font-semibold text-sky-900">{MOBILE_SCHEDULE_URL}</p>
+          <ul className="mt-3 list-disc space-y-1.5 pl-4 text-xs leading-relaxed text-slate-700">
+            <li>본인 이름과 학교에서 안내받은 공통 비밀번호로 로그인하며, 로그인은 72시간 유지됩니다.</li>
+            <li>스마트폰 브라우저에서 위 주소를 연 뒤 ‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택하면 앱처럼 바로 열 수 있습니다.</li>
+            <li>학교 공유자료를 조회만 하며, 모바일에서는 일정을 수정하거나 NEIS API를 직접 호출하지 않습니다.</li>
+          </ul>
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950">개인 일정·개인 업무는 PC의 웅천고 업무도우미에서만 확인할 수 있습니다.</p>
+        </div>
       </Section>
 
       <Section icon={<Database size={17} />} title="공유자료 로컬 저장·자동 동기화">

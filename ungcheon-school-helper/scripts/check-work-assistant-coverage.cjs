@@ -40,3 +40,14 @@ if (unknownPages.length) {
 
 console.log(`PASS 사이드바·검색도우미 공통 메뉴 레지스트리 (${navigationIds.length}개 메뉴)`)
 console.log(`PASS 기존 전문 안내 ${detailedPages.length}개 유지 + 새 메뉴 자동 기본 안내`)
+
+const settingsSource = fs.readFileSync(path.join(projectRoot, 'src/pages/UngcheonSettingsPage.tsx'), 'utf8')
+const mobileUrl = 'https://ungcheon-mobile-schedule.jsw890122.chatgpt.site'
+if (!settingsSource.includes(`const MOBILE_SCHEDULE_URL = '${mobileUrl}'`) || !settingsSource.includes('openExternal(MOBILE_SCHEDULE_URL)')) {
+  throw new Error('환경설정의 모바일 일정 연결이 공식 고정 주소를 사용하지 않습니다.')
+}
+const mobileEntry = assistantSource.match(/id: 'mobile-schedule-pwa'[\s\S]*?\n  },/)?.[0] ?? ''
+for (const required of ["page: 'settings'", mobileUrl, '공통 비밀번호', '72시간', '읽기 전용', '홈 화면에 추가', '개인 일정·개인 업무']) {
+  if (!mobileEntry.includes(required)) throw new Error(`모바일 일정 검색 안내가 누락되었습니다: ${required}`)
+}
+console.log('PASS 모바일 일정 공식 주소·환경설정 검색 경로·로그인 및 설치 안내')

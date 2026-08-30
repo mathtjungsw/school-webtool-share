@@ -35,6 +35,15 @@ const NEIS_SYNC_TOKEN_HASH_PROPERTY = 'UNG_NEIS_SYNC_TOKEN_SHA256';
 const NEIS_SYNC_REGISTERED_AT_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_AT';
 const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
+// 모바일 PWA는 학생 자료를 읽지 않고 아래 공개 일정 시트만 읽기 전용으로 중계합니다.
+const MOBILE_SERVICE_VERSION = 39;
+const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
+const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
+const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
+const MOBILE_MEAL_DUTY_ID = '10cPw-KaYGNPSN-JYDCmNC7MqPhUVOwtoIzD7kS6qKRE';
+const MOBILE_SHARED_PASSWORD_HASH_PROPERTY = 'UNG_MOBILE_SHARED_PASSWORD_HASH';
+const MOBILE_SESSION_PROPERTY_PREFIX = 'UNG_MOBILE_SESSION_';
+const MOBILE_SESSION_HOURS = 72;
 // 2026학년도 업무분장 원문에서 담임·교과·부서만 선별한 자료입니다.
 // 업무, 세부업무, 부담임 등 나머지 원문 정보는 저장하지 않습니다.
 const STAFF_ASSIGNMENTS_2026 = [
@@ -355,6 +364,50 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.26',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.26 · 모바일 일정 정식 통합',
+    body: [
+      '· 최신 데스크톱 기능과 기존 업데이트 안내를 모두 유지하면서 모바일 일정 PWA의 이름·공통 비밀번호 로그인 및 72시간 세션을 정식 통합했습니다.',
+      '· 주간계획·창체·창체 학사일정·등교/급식지도·교사 시간표·위원회·승인 및 반영 수업 변경을 출처별 상태와 함께 제공합니다.',
+      '· 관리자 PC가 공유한 요청 기간 급식과 기존 오늘 급식 응답을 유지하며 모바일에서는 NEIS API를 직접 호출하거나 학생 자료를 받지 않습니다.',
+      '· 모바일 조회 제한을 35초로 늘리고 로그인 만료·네트워크 오류·로컬 캐시 저장 실패를 구분해 복귀와 자동 새로고침 연결을 안정화했습니다.',
+      '· 고정 Apps Script 주소와 모바일 공개 주소를 유지하고 배포 전 최신 main·실제 서버 계약·릴리스 안내 보존을 검사합니다.'
+    ].join('\n'),
+    date: '2026-08-30'
+  },
+  {
+    key: 'mobile-service-meal-range-2026-08-30',
+    title: '[모바일 일정 개선] 선택 날짜 급식 조회',
+    body: [
+      '· 모바일 일정에서 오늘뿐 아니라 공유 시트에 자료가 있는 선택 날짜의 급식도 확인할 수 있습니다.',
+      '· 급식은 요청한 일정 범위의 날짜·식사 구분·메뉴·열량만 읽고, 기존 오늘 급식 응답은 하위 호환을 위해 유지합니다.',
+      '· 모바일 앱이나 Apps Script에서 NEIS API를 직접 호출하지 않으며 NEIS 학사일정·학급시간표·학생 자료는 전송하지 않습니다.'
+    ].join('\n'),
+    date: '2026-08-30'
+  },
+  {
+    key: 'mobile-service-2026-08-30',
+    title: '[모바일 일정 개선] 자동 최신화와 자료별 상태 안내',
+    body: [
+      '· 모바일 일정 PWA가 앱 복귀·네트워크 복구·날짜 변경 때 오늘 자료를 자동으로 다시 확인합니다.',
+      '· 일정·교사 시간표·위원회·수업 변경·급식을 독립적으로 조회해 일부 자료가 실패해도 나머지 최신 자료를 표시합니다.',
+      '· 모바일 응답에 출처별 조회 상태를 추가해 최신 자료, 정상 빈 자료, 일시적 조회 실패를 구분합니다.',
+      '· 급식은 기존처럼 관리자 PC가 공유한 오늘 급식만 읽으며 NEIS 학사일정·학급시간표·학생 자료는 모바일로 보내지 않습니다.'
+    ].join('\n'),
+    date: '2026-08-30'
+  },
+  {
+    key: 'mobile-service-2026-08-26',
+    title: '[공유 서비스 안정화] 모바일 일정 급식 조회 복구',
+    body: [
+      '· 모바일 일정 PWA의 로그인·일정·오늘 급식 읽기 전용 연결을 최신 학교 공유 서비스에 다시 반영했습니다.',
+      '· 모바일 급식 캐시에 한국 날짜를 포함해 날짜가 바뀐 뒤 전날 급식이 남아 오늘 급식이 비어 보이는 문제를 방지했습니다.',
+      '· 모바일 앱은 관리자 PC가 학교 공유 시트에 저장한 오늘 급식만 읽으며, NEIS 학사일정·학생 자료는 모바일로 보내지 않습니다.',
+      '· 이후 학교 공유 서비스 배포 시 모바일 계약과 서비스 버전을 자동 확인하도록 배포 검사를 강화했습니다.'
+    ].join('\n'),
+    date: '2026-08-26'
+  },
+  {
     key: 'v1.1.25',
     title: '[업데이트] 웅천고 업무도우미 v1.1.25',
     body: [
@@ -608,7 +661,7 @@ const GET_READ_ACTIONS = [
 function doGet(e) {
   try {
     const action = String(e && e.parameter && e.parameter.action || '');
-    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 33 } });
+    if (!action) return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: MOBILE_SERVICE_VERSION } });
     if (GET_READ_ACTIONS.indexOf(action) < 0) throw new Error('GET으로 허용되지 않는 요청입니다.');
 
     const rawPayload = String(e && e.parameter && e.parameter.payload || '{}');
@@ -625,15 +678,23 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
+    // 읽기 전용 모바일 요청은 전체 시트 초기화 및 잠금을 거치지 않습니다.
+    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: MOBILE_SERVICE_VERSION } });
+    if (action === 'verifyMobileViewer') {
+      const mobileViewer = mobileAssertViewer_(body.viewerName);
+      if (sha256_(String(body.password || '')) !== mobileSharedPasswordHash_()) throw new Error('이름 또는 공통 비밀번호가 올바르지 않습니다.');
+      return json_({ ok: true, data: mobileCreateSession_(mobileViewer) });
+    }
+    if (action === 'getMobileScheduleBundle') return json_({ ok: true, data: getMobileScheduleBundle_(body) });
+
     // 일반 조회에서 전체 시트 생성·보정을 매번 실행하지 않는다.
     // 쓰기 요청은 버전 변경에 필요한 스키마만 보정한다.
     if (['addStaffChecklist', 'updateStaffChecklist', 'submitStaffChecklist', 'deleteStaffChecklist'].indexOf(action) >= 0) {
       ensureStaffChecklistSheets_();
-    } else if (GET_READ_ACTIONS.indexOf(action) < 0 && action !== 'health') {
+    } else if (GET_READ_ACTIONS.indexOf(action) < 0) {
       ensureSheets_();
     }
 
-    if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: 33 } });
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
@@ -738,7 +799,12 @@ function doPost(e) {
     if (action === 'replaceNeisSnapshot') return json_({ ok: true, data: replaceNeisSnapshot_(body) });
     throw new Error('허용되지 않는 요청입니다.');
   } catch (error) {
-    return json_({ ok: false, error: String(error && error.message ? error.message : error) });
+    const failure = { ok: false, error: String(error && error.message ? error.message : error) };
+    if (error && error.code === 'MOBILE_SESSION_EXPIRED') {
+      failure.code = 'MOBILE_SESSION_EXPIRED';
+      failure.errorCode = 'MOBILE_SESSION_EXPIRED';
+    }
+    return json_(failure);
   }
 }
 
@@ -2513,6 +2579,329 @@ function requireAdmin_(password) {
 function isAdminPassword_(password) {
   const stored = PropertiesService.getScriptProperties().getProperty(ADMIN_HASH_KEY);
   return Boolean(stored && password && sha256_(String(password)) === stored);
+}
+
+function mobileDate_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, 'Asia/Seoul', 'yyyy-MM-dd');
+  }
+  const text = String(value || '').trim();
+  const iso = text.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
+  if (iso) return iso[1] + '-' + String(Number(iso[2])).padStart(2, '0') + '-' + String(Number(iso[3])).padStart(2, '0');
+  return '';
+}
+
+function mobileAssertViewer_(viewerName) {
+  const name = clean_(viewerName, 30);
+  const roster = getStaffRoster_();
+  if (!name || !roster || !Array.isArray(roster.members) || !roster.members.some(function(member) { return String(member.name || '').trim() === name; })) {
+    throw new Error('교직원 명렬에 등록된 이름과 일치하지 않습니다.');
+  }
+  return name;
+}
+
+function mobileSharedPasswordHash_() {
+  const saved = PropertiesService.getScriptProperties().getProperty(MOBILE_SHARED_PASSWORD_HASH_PROPERTY);
+  if (!saved) throw new Error('모바일 공통 비밀번호가 서버에 설정되지 않았습니다.');
+  return saved;
+}
+
+function mobileCreateSession_(viewerName) {
+  const expiresAt = Date.now() + MOBILE_SESSION_HOURS * 60 * 60 * 1000;
+  const accessToken = Utilities.getUuid() + Utilities.getUuid();
+  const tokenKey = MOBILE_SESSION_PROPERTY_PREFIX + sha256_(accessToken).replace(/[^A-Za-z0-9]/g, '').slice(0, 40);
+  const properties = PropertiesService.getScriptProperties();
+  const all = properties.getProperties();
+  Object.keys(all).forEach(function(key) {
+    if (key.indexOf(MOBILE_SESSION_PROPERTY_PREFIX) !== 0) return;
+    try {
+      if (Number(JSON.parse(all[key]).expiresAt) <= Date.now()) properties.deleteProperty(key);
+    } catch (error) { properties.deleteProperty(key); }
+  });
+  properties.setProperty(tokenKey, JSON.stringify({ viewerName: viewerName, expiresAt: expiresAt }));
+  return { verified: true, accessToken: accessToken, expiresAt: new Date(expiresAt).toISOString() };
+}
+
+function mobileSessionExpired_() {
+  const error = new Error('로그인이 만료되었거나 올바르지 않습니다.');
+  error.code = 'MOBILE_SESSION_EXPIRED';
+  return error;
+}
+
+function mobileAssertAccess_(body) {
+  const viewerName = mobileAssertViewer_(body.viewerName);
+  const token = clean_(body.accessToken, 500);
+  if (!token) throw mobileSessionExpired_();
+  const tokenKey = MOBILE_SESSION_PROPERTY_PREFIX + sha256_(token).replace(/[^A-Za-z0-9]/g, '').slice(0, 40);
+  const saved = PropertiesService.getScriptProperties().getProperty(tokenKey);
+  let session;
+  try { session = JSON.parse(saved || '{}'); }
+  catch (error) { session = {}; }
+  if (session.viewerName !== viewerName || !Number.isFinite(Number(session.expiresAt)) || Number(session.expiresAt) <= Date.now()) throw mobileSessionExpired_();
+  return viewerName;
+}
+
+function mobileExpandedValues_(sheet) {
+  const range = sheet.getDataRange();
+  const values = range.getDisplayValues();
+  range.getMergedRanges().forEach(function(merged) {
+    const top = merged.getRow() - range.getRow();
+    const left = merged.getColumn() - range.getColumn();
+    const value = values[top] && values[top][left] || '';
+    for (let row = top; row < top + merged.getNumRows(); row++) {
+      for (let col = left; col < left + merged.getNumColumns(); col++) {
+        if (values[row]) values[row][col] = value;
+      }
+    }
+  });
+  return values;
+}
+
+function mobileNearestDate_(day, weekday, fromDate, toDate) {
+  const start = new Date(fromDate + 'T00:00:00+09:00');
+  const end = new Date(toDate + 'T23:59:59+09:00');
+  for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    if (cursor.getDate() === day && (!weekday || cursor.getDay() === weekday)) return Utilities.formatDate(cursor, 'Asia/Seoul', 'yyyy-MM-dd');
+  }
+  return '';
+}
+
+function mobileMonthDay_(month, day, fromDate, toDate) {
+  const fromYear = Number(fromDate.slice(0, 4));
+  for (let offset = -1; offset <= 1; offset++) {
+    const candidate = (fromYear + offset) + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    if (candidate >= fromDate && candidate <= toDate) return candidate;
+  }
+  return '';
+}
+
+function mobileWeeklySheetRelevant_(sheetName, fromDate, toDate) {
+  const numbers = (String(sheetName || '').replace(/,/g, '.').match(/\d+/g) || []).map(Number);
+  if (numbers.length < 3) return false;
+  const year = numbers[0] < 100 ? 2000 + numbers[0] : numbers[0];
+  const start = year + '-' + String(numbers[1]).padStart(2, '0') + '-' + String(numbers[2]).padStart(2, '0');
+  const startDate = new Date(start + 'T00:00:00+09:00');
+  if (isNaN(startDate.getTime())) return false;
+  const endDate = new Date(startDate.getTime() + 7 * 86400000);
+  const end = Utilities.formatDate(endDate, 'Asia/Seoul', 'yyyy-MM-dd');
+  return start <= toDate && end >= fromDate;
+}
+
+function mobileWeeklyEvents_(fromDate, toDate) {
+  const result = [];
+  SpreadsheetApp.openById(MOBILE_WEEKLY_PLAN_ID).getSheets()
+    .filter(function(sheet) { return mobileWeeklySheetRelevant_(sheet.getName(), fromDate, toDate); })
+    .slice(0, 4)
+    .forEach(function(sheet) {
+    const rows = mobileExpandedValues_(sheet);
+    const headerIndex = rows.findIndex(function(row) { return row.some(function(cell) { return /\d{1,2}\s*일?\s*\([월화수목금토일]\)/.test(cell); }); });
+    if (headerIndex < 0) return;
+    const header = rows[headerIndex];
+    const dates = {};
+    const weekdayMap = { '일': 0, '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6 };
+    header.forEach(function(cell, col) {
+      const match = String(cell || '').match(/(\d{1,2})\s*일?\s*\(([월화수목금토일])\)/);
+      if (match) dates[col] = mobileNearestDate_(Number(match[1]), weekdayMap[match[2]], fromDate, toDate);
+    });
+    rows.slice(headerIndex + 1).forEach(function(row) {
+      const department = clean_(row[0], 60);
+      if (!department) return;
+      Object.keys(dates).forEach(function(key) {
+        const col = Number(key);
+        const date = dates[col];
+        const title = clean_(row[col], 300);
+        if (date && title && !/^(기타|비고)$/.test(title)) result.push({ date: date, title: title, source: 'weekly', label: department || '주간계획' });
+      });
+    });
+  });
+  return result;
+}
+
+function mobileCreativeEvents_(fromDate, toDate) {
+  const book = SpreadsheetApp.openById(MOBILE_CREATIVE_SCHEDULE_ID);
+  const result = [];
+  const activitySheet = book.getSheetByName('창체입력');
+  if (activitySheet) activitySheet.getDataRange().getValues().slice(1).forEach(function(row) {
+    const date = mobileDate_(row[0]);
+    const activity = clean_(row[4], 200);
+    if (!date || date < fromDate || date > toDate || !activity) return;
+    const grades = [1, 2, 3].filter(function(grade) { return row[4 + grade] === true || String(row[4 + grade]).toUpperCase() === 'TRUE'; }).join('·');
+    const period = clean_(row[2], 30);
+    const guidance = clean_(row[9], 150);
+    const detail = [period && period + '교시', grades && grades + '학년', guidance].filter(Boolean).join(', ');
+    result.push({ date: date, title: detail ? activity + '(' + detail + ')' : activity, source: 'creative', label: clean_(row[8], 60) || '창체' });
+  });
+  const schoolSheet = book.getSheetByName('학사일정_2학기');
+  if (schoolSheet) schoolSheet.getDataRange().getDisplayValues().forEach(function(row) {
+    const month = Number(row[1]);
+    if (!month) return;
+    for (let offset = 0; offset < 5; offset++) {
+      const day = Number(row[8 + offset * 2]);
+      const title = clean_(row[9 + offset * 2], 250);
+      const date = mobileNearestDate_(day, offset + 1, fromDate, toDate);
+      if (date && title && Number(date.slice(5, 7)) === month) result.push({ date: date, title: title, source: 'schoolEvent', label: '창체 학사일정' });
+    }
+  });
+  return result;
+}
+
+function mobileDutyEventsFromSheet_(spreadsheetId, sheetName, viewerName, kind, title, time, location, fromDate, toDate) {
+  const book = SpreadsheetApp.openById(spreadsheetId);
+  const sheet = book.getSheetByName(sheetName) || book.getSheets()[0];
+  const rows = mobileExpandedValues_(sheet);
+  const result = [];
+  rows.forEach(function(row, rowIndex) {
+    row.forEach(function(cell, col) {
+      const match = String(cell || '').match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+      if (!match) return;
+      const candidate = mobileMonthDay_(Number(match[1]), Number(match[2]), fromDate, toDate);
+      if (!candidate) return;
+      let blockEnd = rowIndex + 1;
+      while (blockEnd < rows.length && !rows[blockEnd].some(function(value) { return /(\d{1,2})\s*월\s*(\d{1,2})\s*일/.test(value); })) blockEnd++;
+      for (let index = rowIndex + 1; index < blockEnd; index++) {
+        const names = String(rows[index][col] || '').split(/[,，·/\s]+/).filter(Boolean);
+        if (names.indexOf(viewerName) < 0) continue;
+        const place = kind === 'gate' ? (rows[index].find(function(value) { return value === '정문' || value === '후문'; }) || location) : location;
+        result.push({ date: candidate, title: kind === 'gate' ? title + ' · ' + place : title, source: kind === 'gate' ? 'gateDuty' : 'mealDuty', label: title, time: time });
+      }
+    });
+  });
+  return result;
+}
+
+// 모바일에서는 NEIS API를 호출하지 않고, 관리자 PC가 공유 시트에 저장한 요청 기간 급식만 최소 조회합니다.
+function mobileSharedMealsInRange_(fromDate, toDate) {
+  const fromKey = clean_(fromDate, 10).replace(/-/g, '');
+  const toKey = clean_(toDate, 10).replace(/-/g, '');
+  return readObjects_(NEIS_MEALS_SHEET).filter(function(row) {
+    const dateKey = clean_(row.date, 8);
+    return /^\d{8}$/.test(dateKey) && dateKey >= fromKey && dateKey <= toKey;
+  }).map(function(row) {
+    const dateKey = clean_(row.date, 8);
+    let dishNames = [];
+    try { dishNames = JSON.parse(String(row.dishNamesJson || '[]')); } catch (ignore) {}
+    return {
+      date: dateKey.slice(0, 4) + '-' + dateKey.slice(4, 6) + '-' + dateKey.slice(6, 8),
+      mealType: clean_(row.mealType, 30),
+      dishNames: (Array.isArray(dishNames) ? dishNames : []).map(function(name) { return clean_(name, 100); }).filter(Boolean).slice(0, 30),
+      calories: clean_(row.calories, 100)
+    };
+  }).filter(function(meal) { return meal.mealType || meal.dishNames.length; })
+    .sort(function(a, b) { return a.date.localeCompare(b.date) || a.mealType.localeCompare(b.mealType); });
+}
+
+function mobileSourceCount_(value) {
+  if (Array.isArray(value)) return value.length;
+  return value ? 1 : 0;
+}
+
+function mobileLoadSource_(sourceStatus, key, emptyValue, loader) {
+  const attemptedAt = new Date().toISOString();
+  try {
+    const value = loader();
+    const itemCount = mobileSourceCount_(value);
+    sourceStatus[key] = {
+      state: itemCount ? 'fresh' : 'empty',
+      mode: 'live',
+      lastAttemptAt: attemptedAt,
+      lastSuccessAt: attemptedAt,
+      itemCount: itemCount
+    };
+    return value;
+  } catch (error) {
+    sourceStatus[key] = {
+      state: 'unavailable',
+      mode: 'live',
+      lastAttemptAt: attemptedAt,
+      itemCount: 0,
+      errorCode: 'READ_FAILED'
+    };
+    return emptyValue;
+  }
+}
+
+function getMobileScheduleBundle_(body) {
+  const viewerName = mobileAssertAccess_(body);
+  const fromDate = clean_(body.fromDate, 10);
+  const toDate = clean_(body.toDate, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate)) throw new Error('조회 기간을 확인해 주세요.');
+  const days = Math.round((new Date(toDate + 'T00:00:00+09:00') - new Date(fromDate + 'T00:00:00+09:00')) / 86400000);
+  if (!Number.isFinite(days) || mobileDate_(new Date(fromDate + 'T00:00:00+09:00')) !== fromDate || mobileDate_(new Date(toDate + 'T00:00:00+09:00')) !== toDate || days < 0 || days > 21) throw new Error('모바일 일정은 올바른 날짜의 최대 22일 범위에서 조회할 수 있습니다.');
+  // 오늘 급식 하위 호환 필드가 날짜 변경 때 즉시 달라지도록 한국 날짜를 캐시 키에 포함합니다.
+  const todayKey = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd');
+  const cacheKey = 'mobile:v' + MOBILE_SERVICE_VERSION + ':' + sha256_(viewerName).slice(0, 12) + ':' + todayKey + ':' + fromDate + ':' + toDate;
+  let cached = null;
+  try { cached = CacheService.getScriptCache().get(cacheKey); } catch (ignore) {}
+  if (cached) {
+    try {
+      const cachedResult = JSON.parse(cached);
+      if (cachedResult && cachedResult.contractVersion === 3 && cachedResult.sourceStatus) {
+        Object.keys(cachedResult.sourceStatus).forEach(function(key) {
+          cachedResult.sourceStatus[key].mode = 'response-cache';
+        });
+        cachedResult.servedAt = new Date().toISOString();
+        return cachedResult;
+      }
+    } catch (ignore) {}
+  }
+  const sourceStatus = {};
+  const weeklyEvents = mobileLoadSource_(sourceStatus, 'weekly', [], function() {
+    return mobileWeeklyEvents_(fromDate, toDate);
+  });
+  const creativeEvents = mobileLoadSource_(sourceStatus, 'creative', [], function() {
+    return mobileCreativeEvents_(fromDate, toDate);
+  });
+  const gateDutyEvents = mobileLoadSource_(sourceStatus, 'gateDuty', [], function() {
+    return mobileDutyEventsFromSheet_(MOBILE_GATE_DUTY_ID, '교문지도(2학기)', viewerName, 'gate', '등교지도', '08:15~08:25', '교문', fromDate, toDate);
+  });
+  const mealDutyEvents = mobileLoadSource_(sourceStatus, 'mealDuty', [], function() {
+    return mobileDutyEventsFromSheet_(MOBILE_MEAL_DUTY_ID, '급식 지도(2학기)', viewerName, 'meal', '급식지도', '12:30~13:10', '급식실', fromDate, toDate);
+  });
+  const events = [].concat(weeklyEvents, creativeEvents, gateDutyEvents, mealDutyEvents);
+  const seen = {};
+  let timetableUpdatedAt = '';
+  const teacherTimetable = mobileLoadSource_(sourceStatus, 'timetable', null, function() {
+    const schoolTimetable = getTimetable_();
+    timetableUpdatedAt = schoolTimetable && iso_(schoolTimetable.uploadedAt) || '';
+    return schoolTimetable && schoolTimetable.teachers.find(function(teacher) { return String(teacher.name || '').trim() === viewerName; }) || null;
+  });
+  if (timetableUpdatedAt && sourceStatus.timetable.state !== 'unavailable') sourceStatus.timetable.dataUpdatedAt = timetableUpdatedAt;
+  const committeeEvents = mobileLoadSource_(sourceStatus, 'committee', [], function() {
+    return listCommitteeState_().events.filter(function(event) { return event.date >= fromDate && event.date <= toDate && event.memberNames.indexOf(viewerName) >= 0; });
+  });
+  const timetableChanges = mobileLoadSource_(sourceStatus, 'changes', [], function() {
+    return listTimetableChanges_({ viewerName: viewerName, fromDate: fromDate, toDate: toDate, includeSchool: false }).filter(function(change) {
+      if (change.status === 'cancelled' || change.status === 'rejected') return false;
+      return change.status === 'approved' || Boolean(change.requesterAppliedAt && change.requesterName === viewerName);
+    });
+  });
+  const todayIsoDate = todayKey.slice(0, 4) + '-' + todayKey.slice(4, 6) + '-' + todayKey.slice(6, 8);
+  const sharedMeals = mobileLoadSource_(sourceStatus, 'meals', [], function() {
+    // 요청 범위 밖의 날짜를 선택해도 구버전 todayMeals는 오늘 급식을 유지합니다.
+    return mobileSharedMealsInRange_(fromDate < todayIsoDate ? fromDate : todayIsoDate, toDate > todayIsoDate ? toDate : todayIsoDate)
+      .filter(function(meal) { return (meal.date >= fromDate && meal.date <= toDate) || meal.date === todayIsoDate; });
+  });
+  const meals = sharedMeals.filter(function(meal) { return meal.date >= fromDate && meal.date <= toDate; });
+  const todayMeals = sharedMeals.filter(function(meal) { return meal.date === todayIsoDate; });
+  const result = { events: events.filter(function(item) {
+    const key = [item.date, item.source, item.title, item.time || ''].join('|');
+    if (seen[key]) return false;
+    seen[key] = true;
+    return true;
+  }).sort(function(a, b) { return a.date.localeCompare(b.date) || String(a.time || '').localeCompare(String(b.time || '')); }),
+    teacherTimetable: teacherTimetable, committeeEvents: committeeEvents,
+    timetableChanges: timetableChanges,
+    meals: meals,
+    todayMeals: todayMeals,
+    contractVersion: 3,
+    sourceStatus: sourceStatus,
+    fetchedAt: new Date().toISOString(),
+    servedAt: new Date().toISOString() };
+  const allSourcesAvailable = Object.keys(sourceStatus).every(function(key) { return sourceStatus[key].state !== 'unavailable'; });
+  if (allSourcesAvailable) {
+    try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 60); } catch (ignore) {}
+  }
+  return result;
 }
 
 function readObjects_(sheetName) {

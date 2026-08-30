@@ -1,5 +1,19 @@
 # 웅천고 업무도우미 작업 규칙
 
+## 데스크톱·모바일 공동 배포 계약
+
+- `server/Code.gs`는 데스크톱과 `../ungcheon-mobile-pwa`의 공용 백엔드다. 항상 최신 `origin/main`에서 시작하고 실제 고정 Apps Script 배포 및 원격 HEAD의 변경도 확인한다. 과거 버전 detached 작업트리를 그대로 배포하지 않는다.
+- 데스크톱 기능과 모바일 기능을 합쳐 보존한다. `RELEASE_NOTES`는 한쪽 안내로 교체하지 않고 같은 버전의 본문도 합쳐 보존한다. 특히 v1.1.24·v1.1.25 안내를 삭제하지 않는다.
+- 모바일 통합 시에는 `doGet`·`doPost`, `mobile*`, `getMobileScheduleBundle_`, `MOBILE_*` 상수, `RELEASE_NOTES` 외 데스크톱 함수 본문·상수 값·선언 형태가 최신 main과 같아야 한다. 이름만 남긴 빈 함수나 다른 시트명으로 치환한 코드를 허용하지 않는다. 별도 데스크톱 변경은 main에서 검토·검증한 뒤 배포하고 원격과의 실제 코드 diff도 확인한다.
+- 모바일 이름·공통 비밀번호 로그인 `verifyMobileViewer`, 72시간 세션, `getMobileScheduleBundle`, `contractVersion: 3`, 출처별 `sourceStatus`를 유지한다. 코드가 바뀌면 `MOBILE_SERVICE_VERSION`을 올린다.
+- 모바일에서는 관리자 PC가 공유 `NEIS급식` 시트에 동기화한 요청 기간 `meals`와 오늘의 하위 호환 `todayMeals`만 재사용한다. NEIS API 직접 호출·NEIS 학사일정·NEIS 학급시간표·학생 명렬·학생 시간표를 모바일 응답이나 캐시에 추가하지 않는다.
+- 공통 비밀번호 ScriptProperty 이름과 활성 로그인 세션을 삭제·초기화하지 않는다. 배포 중 초기 설정 함수나 비밀번호 설정 함수를 실행하지 않는다.
+- Apps Script는 `npm run deploy:apps-script`로 기존 고정 배포를 갱신한다. `-ValidateOnly`는 오프라인 소스 검사, `-PreflightOnly`는 최신 main·실제 고정 배포·원격 HEAD의 읽기 전용 사전 검사다. 가드를 우회하거나 새 deploymentId를 만들지 않는다.
+- 모바일 공개 URL을 유지한다. 35초 조회 제한, 로그인 만료와 네트워크 오류 구분, 캐시 저장 실패 분리, 중복 갱신 억제, 서비스 워커의 Apps Script POST 미개입 원칙을 검증한다.
+- 비밀번호·토큰·인증된 응답 원문은 소스·로그·문서·테스트 픽스처에 기록하지 않는다. 자세한 계약 및 필수 검증은 `docs/MOBILE_PWA_SHARED_DATA.md`를 따른다.
+
+## 공통 작업 절차
+
 - 기능, 메뉴 이름, 이용 순서가 바뀔 때마다 `src/services/workAssistantSearch.ts`의 제목·설명·단계·검색어도 함께 검토하고 갱신한다.
 - 새 사이드바 메뉴에는 해당 `page`를 가리키는 검색 도우미 항목을 최소 하나 추가한다.
 - 배포 전 `npm run typecheck`를 실행한다. 이 명령에는 사이드바와 검색 도우미의 메뉴 누락 검사가 포함된다.
