@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { WidgetModuleHeader, WidgetModuleBody } from './WidgetModuleDisclosure'
 import {
   CalendarRange,
   Check,
@@ -90,6 +91,15 @@ export default function WidgetQuickTools({
   )
   const textStats = useMemo(() => countText(textInput), [textInput])
   const visibleQr = localQr || qrDataUrl || ''
+  const summary = active === 'qr'
+    ? `QR · ${visibleQr ? '생성됨' : qrValue.trim() ? `입력 중 ${qrValue.trim()}` : '입력 대기'}`
+    : active === 'snippets'
+      ? `문구 · ${snippetLabel.trim() || snippetText.trim() ? `작성 중 ${snippetLabel.trim() || snippetText.trim()}` : `${snippets.length}건 저장`}`
+      : active === 'students'
+        ? `학번 · ${studentOutput ? '정리 결과 있음' : studentInput.trim() ? '입력 중' : '입력 대기'}`
+        : active === 'periods'
+          ? `기간·시수 · ${startDate && endDate ? `${days}일 / ${days * periodsPerDay}시간` : periodExpression.trim() ? `표현 합계 ${calculatePeriodTotal(periodExpression)}시간` : '기간 입력 대기'}`
+          : `글자 수 · ${textStats.characters}자 / ${textStats.utf8Bytes}B`
 
   const flash = (value: string) => {
     setMessage(value)
@@ -132,10 +142,9 @@ export default function WidgetQuickTools({
 
   return (
     <section className="widget-productivity-section widget-quick-tools no-drag" aria-label="빠른 도구">
-      <header className="widget-productivity-section-heading">
-        <span><Sparkles size={13} /><strong>빠른 도구</strong></span>
-        {message && <small className="widget-tool-message"><Check size={10} />{message}</small>}
-      </header>
+      <WidgetModuleHeader title="빠른 도구" icon={<Sparkles size={13} />} summary={summary}
+        badge={message && <small className="widget-tool-message"><Check size={10} />{message}</small>} />
+      <WidgetModuleBody>
       <div className="widget-tool-tabs" role="tablist" aria-label="빠른 도구 선택">
         {TOOLS.map((tool) => {
           const Icon = tool.icon
@@ -263,6 +272,7 @@ export default function WidgetQuickTools({
           </div>
         )}
       </div>
+      </WidgetModuleBody>
     </section>
   )
 }

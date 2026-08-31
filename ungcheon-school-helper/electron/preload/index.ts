@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { WidgetSettingsPatch } from '../../src/services/widgetSettings'
 
 contextBridge.exposeInMainWorld('electron', {
   // Window controls
@@ -143,7 +144,7 @@ contextBridge.exposeInMainWorld('electron', {
   showWidget: (): Promise<boolean> => ipcRenderer.invoke('widget:show'),
   hideWidget: (): Promise<boolean> => ipcRenderer.invoke('widget:hide'),
   widgetGetSettings: () => ipcRenderer.invoke('widget:getSettings'),
-  widgetUpdateSettings: (patch: Record<string, unknown>) => ipcRenderer.invoke('widget:updateSettings', patch),
+  widgetUpdateSettings: (patch: WidgetSettingsPatch & Record<string, unknown>) => ipcRenderer.invoke('widget:updateSettings', patch),
   widgetFitHeight: (height: number): Promise<boolean> => ipcRenderer.invoke('widget:fitHeight', height),
   widgetOpenMain: (page = ''): Promise<boolean> => ipcRenderer.invoke('widget:openMain', page),
   onWidgetSettingsChanged: (cb: (settings: unknown) => void) => {

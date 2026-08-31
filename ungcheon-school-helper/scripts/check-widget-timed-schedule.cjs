@@ -16,7 +16,8 @@ function bundle(relativePath, reactOverride) {
   return module.exports
 }
 const { buildWidgetTimedSchedule: build, parseWidgetClock } = bundle('src/services/widgetTimedSchedule.ts')
-const WidgetTimetable = bundle('src/components/widget/WidgetTimetable.tsx').default
+const timetableExports = bundle('src/components/widget/WidgetTimetable.tsx')
+const WidgetTimetable = timetableExports.default
 const date = '2026-08-31'
 const lessons = Array.from({ length: 7 }, (_, i) => ({ period: i + 1, value: i === 1 ? '' : `교실${i + 1}\n합성과목`, badge: i === 5 ? '당김수업' : '' }))
 const event = (id, startTime, endTime, extra = {}) => ({ id, date, title: id, kind: 'committee', startTime, endTime, ...extra })
@@ -116,7 +117,7 @@ test('render offers overlap expansion instead of horizontal overflow or unreadab
   const html = render([event('a', '13:30', '14:10'), event('b', '13:40', '14:00'), event('c', '13:45', '13:55')])
   assert.ok(html.includes('wts-overlap'))
   assert.ok(html.includes('3개 일정 상세 보기'))
-  assert.ok(html.includes('펼쳐 보기'))
+  assert.ok(html.includes('보기'))
 })
 test('unavailable and holiday render retain timed events without fake free lesson rows', () => {
   for (const overrides of [{ timetableUnavailable: true }, { rule: { kind: 'weekend', label: '주말' } }]) {
@@ -156,6 +157,50 @@ test('event clicks and overlap expansion show read-only details locally and clos
   elements(Interactive(crowded), node => node.type === 'button' && node.props.className === 'wts-overlap')[0].props.onClick()
   assert.equal(detail.keys.length, 3)
   assert.equal(elements(Interactive(crowded), node => node.type === 'article').length, 3)
+  const longLesson = '304 · 매우 긴 합성 교과명과 강의실 정보 전체 보기'
+  const lessonProps = { ...props, lessons: lessons.map(lesson => lesson.period === 4 ? { ...lesson, value: longLesson, badge: '교환 반영' } : lesson) }
+  const lessonButton = elements(Interactive(lessonProps), node => node.type === 'button' && node.props.className === 'wts-lesson' && node.props['aria-label'].startsWith('4교시'))[0]
+  lessonButton.props.onClick()
+  assert.equal(detail.period, 4)
+  const lessonHtml = renderToStaticMarkup(Interactive(lessonProps))
+  assert.ok(lessonHtml.includes('4교시 · 수업 상세'))
+  assert.ok(lessonHtml.includes(longLesson))
+  assert.ok(lessonHtml.includes('교환 반영'))
+  assert.ok(lessonHtml.includes('11:40~12:30'))
+})
+test('compact 26px rows clamp all tag positions without negative tops or adjacent-row overflow', () => {
+  assert.equal(timetableExports.WIDGET_TIMETABLE_ROW_HEIGHT, 26)
+  assert.equal(timetableExports.WIDGET_TIMETABLE_TAG_HEIGHT, 22)
+  for (const percentage of [-20, 0, 10, 40, 80, 100, 140]) {
+    const top = timetableExports.widgetTimedTagTop(percentage)
+    assert.ok(top >= 0 && top + timetableExports.WIDGET_TIMETABLE_TAG_HEIGHT <= 26)
+  }
+  const html = render([event('late-point', '13:29'), event('short-range', '15:19', '15:20')])
+  assert.ok(html.includes('min-height:26px'))
+  assert.ok(!html.includes('min-height:42px') && !html.includes('min-height:32px'))
+  assert.ok(!html.includes('top:-'))
+})
+test('module header summarizes current and next actual lesson while body remains mounted', () => {
+  const Interactive = bundle('src/components/widget/WidgetTimetable.tsx', { ...React, useMemo: create => create(), useEffect: () => {}, useRef: () => ({ current: null }), useState: () => [null, () => {}] }).default
+  const props = { date, lessons, events: [], now: new Date(2026, 7, 31, 12, 16), rule: { kind: 'instruction' }, timer: { currentPeriod: 4, nextPeriod: 5, countdown: '14분 남음' } }
+  const tree = Interactive(props)
+  const children = React.Children.toArray(tree.props.children)
+  const header = children.find(child => child.type?.name === 'WidgetModuleHeader')
+  const body = children.find(child => child.type?.name === 'WidgetModuleBody')
+  assert.ok(header && body)
+  assert.equal(header.props.title, '오늘 시간표')
+  assert.ok(header.props.summary.includes('현재 4교시'))
+  assert.ok(header.props.summary.includes('다음 5교시 74분 후'))
+  assert.ok(!header.props.summary.includes('14분 후'))
+  assert.ok(body.props.children, 'Disclosure must wrap, not conditionally unmount, timetable content')
+  const withFree = Interactive({ ...props, lessons: lessons.map(lesson => lesson.period === 5 ? { ...lesson, value: '' } : lesson) })
+  const nextHeader = React.Children.toArray(withFree.props.children).find(child => child.type?.name === 'WidgetModuleHeader')
+  assert.ok(nextHeader.props.summary.includes('다음 6교시 134분 후'))
+  for (const events of [[], [event('lunch-event', '12:50', '13:10')]]) {
+    const lunch = Interactive({ ...props, events, now: new Date(2026, 7, 31, 13, 0), lessons: lessons.map(lesson => lesson.period === 5 ? { ...lesson, value: '' } : lesson) })
+    const lunchHeader = React.Children.toArray(lunch.props.children).find(child => child.type?.name === 'WidgetModuleHeader')
+    assert.equal(lunchHeader.props.summary, '점심 · 다음 6교시 90분 후')
+  }
 })
 test('detail scrolling occurs only on a new open selection and only outside widget-body bounds', () => {
   let detail = null, previousDependency, scrollCount = 0, bounds = { top: 450, bottom: 600 }, regionPresent = true

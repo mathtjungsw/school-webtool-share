@@ -330,7 +330,7 @@ footer button {
   margin: 7px 0;
   color: #422006;
 }
-.fortune-section > div:last-child {
+.fortune-section .fortune-luck {
   font-size: 9px;
   display: flex;
   align-items: center;

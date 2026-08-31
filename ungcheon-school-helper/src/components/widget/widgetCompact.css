@@ -246,7 +246,7 @@ html[data-widget-window="true"] #root {
   line-height: 1.35;
 }
 
-.fortune-section > div:last-child {
+.fortune-section .fortune-luck {
   font-size: 8px;
 }
 

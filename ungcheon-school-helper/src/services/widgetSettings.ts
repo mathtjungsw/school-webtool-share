@@ -56,10 +56,11 @@ export interface WidgetEndOfDaySettings {
 }
 
 export interface WidgetProductivitySettings {
-  version: 3
+  version: 4
   showTimedEvents: boolean
   moduleOrder: WidgetModuleId[]
   moduleVisibility: Record<WidgetModuleId, boolean>
+  moduleCollapsed: Record<WidgetModuleId, boolean>
   density: WidgetDensity
   shortcutIds: string[]
   tomorrowStartTime: string
@@ -68,6 +69,10 @@ export interface WidgetProductivitySettings {
   weatherAlerts: WidgetWeatherAlertSettings
   endOfDay: WidgetEndOfDaySettings
 }
+
+/** Collapse updates are deltas so concurrent clicks cannot replace sibling state. */
+export type WidgetSettingsPatch<T extends WidgetProductivitySettings = WidgetProductivitySettings> =
+  Omit<Partial<T>, 'moduleCollapsed'> & { moduleCollapsed?: Partial<Record<WidgetModuleId, boolean>> }
 
 const DEFAULT_MODULE_VISIBILITY: Record<WidgetModuleId, boolean> = {
   timetable: true,
@@ -85,10 +90,11 @@ const DEFAULT_MODULE_VISIBILITY: Record<WidgetModuleId, boolean> = {
 }
 
 export const DEFAULT_WIDGET_PRODUCTIVITY_SETTINGS: WidgetProductivitySettings = {
-  version: 3,
+  version: 4,
   showTimedEvents: true,
   moduleOrder: [...WIDGET_MODULE_IDS],
   moduleVisibility: { ...DEFAULT_MODULE_VISIBILITY },
+  moduleCollapsed: Object.fromEntries(WIDGET_MODULE_IDS.map(id => [id, false])) as Record<WidgetModuleId, boolean>,
   density: 'default',
   shortcutIds: ['student_locator', 'timetable_swap', 'staff_tasks'],
   tomorrowStartTime: '16:00',
@@ -169,6 +175,13 @@ function normalizeModuleVisibility(input: Record<string, unknown>) {
   return visibility
 }
 
+function normalizeModuleCollapsed(value: unknown): Record<WidgetModuleId, boolean> {
+  const saved = isRecord(value) ? value : {}
+  return Object.fromEntries(WIDGET_MODULE_IDS.map(id => [
+    id, Object.hasOwn(saved, id) && typeof saved[id] === 'boolean' ? saved[id] : false,
+  ])) as Record<WidgetModuleId, boolean>
+}
+
 /**
  * Reads current settings and every legacy shape used by the desktop widget.
  * Unknown or duplicate module ids are discarded and newly introduced modules
@@ -200,10 +213,11 @@ export function normalizeWidgetProductivitySettings(value: unknown): WidgetProdu
       : 'default'
 
   return {
-    version: 3,
+    version: 4,
     showTimedEvents,
     moduleOrder: normalizeModuleOrder(input.moduleOrder),
     moduleVisibility,
+    moduleCollapsed: normalizeModuleCollapsed(input.moduleCollapsed),
     density,
     shortcutIds: normalizeShortcutIds(input.shortcutIds),
     tomorrowStartTime: validTime(input.tomorrowStartTime, DEFAULT_WIDGET_PRODUCTIVITY_SETTINGS.tomorrowStartTime),
@@ -257,6 +271,17 @@ export function setWidgetModuleVisibility(
   return normalizeWidgetProductivitySettings({
     ...settings,
     moduleVisibility: { ...settings.moduleVisibility, [id]: visible },
+  })
+}
+
+export function setWidgetModuleCollapsed(
+  settings: WidgetProductivitySettings,
+  id: WidgetModuleId,
+  collapsed: boolean,
+): WidgetProductivitySettings {
+  return normalizeWidgetProductivitySettings({
+    ...settings,
+    moduleCollapsed: { ...settings.moduleCollapsed, [id]: collapsed },
   })
 }
 

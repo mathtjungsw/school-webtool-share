@@ -59,6 +59,7 @@ import {
   DEFAULT_WIDGET_PRODUCTIVITY_SETTINGS,
   normalizeWidgetProductivitySettings,
   type WidgetProductivitySettings,
+  type WidgetSettingsPatch,
 } from '../../src/services/widgetSettings'
 
 const execFileAsync = promisify(execFile)
@@ -235,8 +236,13 @@ ipcMain.on('window:close', () => mainWindow?.close())
 ipcMain.handle('widget:show', () => { createWidgetWindow(); return true })
 ipcMain.handle('widget:hide', () => { widgetWindow?.hide(); return true })
 ipcMain.handle('widget:getSettings', () => widgetSettings())
-ipcMain.handle('widget:updateSettings', (_, patch: Partial<WidgetSettings>) => {
-  const merged = { ...widgetSettings(), ...patch }
+ipcMain.handle('widget:updateSettings', (_, patch: WidgetSettingsPatch<WidgetSettings>) => {
+  const current = widgetSettings()
+  const merged = {
+    ...current,
+    ...patch,
+    moduleCollapsed: { ...current.moduleCollapsed, ...patch.moduleCollapsed },
+  }
   const next: WidgetSettings = {
     ...merged,
     ...normalizeWidgetProductivitySettings(merged),

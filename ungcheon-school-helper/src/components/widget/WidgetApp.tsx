@@ -62,6 +62,7 @@ import {
 import { isSharedWorkComplete } from "../../services/sharedWorkNotifications";
 import { UNGCHEON_PERIOD_PLAN } from "../../services/ungcheonSchedule";
 import WidgetTimetable from "./WidgetTimetable";
+import { WidgetModuleDisclosure, WidgetModuleHeader, WidgetModuleBody } from "./WidgetModuleDisclosure";
 import { buildWidgetBaseEvents, buildWidgetSupplementEvents, normalizeWidgetEventDate, type WidgetEvent } from "../../services/widgetEventSources";
 import { normalizeWidgetTimedEvents } from "../../services/widgetTimedSchedule";
 import { getLocalDailyFortune } from "../../services/localFortune";
@@ -77,6 +78,7 @@ import {
   normalizeWidgetProductivitySettings,
   type WidgetModuleId,
   type WidgetProductivitySettings,
+  type WidgetSettingsPatch,
 } from "../../services/widgetSettings";
 import {
   addDaysYmd,
@@ -460,7 +462,7 @@ export default function WidgetApp() {
     };
   }, [auth.teacherName]);
 
-  const applySettings = useCallback(async (patch: Partial<WidgetSettings>) => {
+  const applySettings = useCallback(async (patch: WidgetSettingsPatch<WidgetSettings>) => {
     const next = await window.electron.widgetUpdateSettings(patch);
     setSettings(normalizeWidgetSettings(next));
   }, []);
@@ -1049,31 +1051,34 @@ export default function WidgetApp() {
 
   const mealModule = (
     <section className="widget-section meal-section" title={meal.join(" · ")}>
-      <div className="section-title"><span><Utensils size={15} /> 오늘 급식</span></div>
-      <p>{meal.length ? meal.join(" · ") : "급식 정보를 준비하고 있습니다."}</p>
+      <WidgetModuleHeader title="오늘 급식" icon={<Utensils size={13} />}
+        summary={meal.length ? meal.join(" · ") : "표시할 급식 정보가 없습니다."} />
+      <WidgetModuleBody><p>{meal.length ? meal.join(" · ") : "표시할 급식 정보가 없습니다."}</p></WidgetModuleBody>
     </section>
   );
 
   const fortuneModule = (
     <section className="widget-section fortune-section">
-      <div className="fortune-heading">오늘의 운세</div>
+      <WidgetModuleHeader title="오늘의 운세" summary={fortune.phrase} />
+      <WidgetModuleBody>
       <p>{fortune.phrase}</p>
-      <div>
+      <div className="fortune-luck">
         <span className="color-dot" style={{ background: fortune.colorHex }} /> 행운의 색 <b>{fortune.colorName}</b>
         <span className="fortune-number">행운의 숫자 <b>{fortune.luckyNumber}</b></span>
       </div>
+      </WidgetModuleBody>
     </section>
   );
 
   const luckyCardModule = (
     <section className="widget-section lucky-card-section">
-      <div className="section-title">
-        <span><Sparkles size={14} /> 오늘의 행운카드</span>
-        <span className="lucky-kind-switch" aria-label="행운카드 종류">
+      <WidgetModuleHeader title="오늘의 행운카드" icon={<Sparkles size={13} />}
+        summary={`${settings.luckyCardKind === "tarot" ? "타로" : "화투"} · ${luckyCard?.name || "뽑기 전"}`}
+        actions={<span className="lucky-kind-switch" aria-label="행운카드 종류">
           <button className={settings.luckyCardKind === "tarot" ? "active" : ""} onClick={() => changeLuckyKind("tarot")}>타로</button>
           <button className={settings.luckyCardKind === "hwatu" ? "active" : ""} onClick={() => changeLuckyKind("hwatu")}>화투</button>
-        </span>
-      </div>
+        </span>} />
+      <WidgetModuleBody>
       {!luckyCard ? (
         <div className="lucky-card-prompt">
           <p>궁금한 내용을 머릿속으로 떠올리며 클릭해주세요</p>
@@ -1108,6 +1113,7 @@ export default function WidgetApp() {
         </div>
       )}
       <small className="lucky-card-note">외부 전송 없이 이 PC에서 무작위로 뽑는 긍정 메시지입니다.</small>
+      </WidgetModuleBody>
     </section>
   );
 
@@ -1318,7 +1324,13 @@ export default function WidgetApp() {
           <div ref={contentRef} className="widget-content">
           {settings.moduleOrder
             .filter(id => WIDGET_MODULE_IDS.includes(id) && isWidgetModuleVisible(settings, id))
-            .map(id => <div key={id} className={`widget-module-slot widget-module-${id}`}>{moduleNodes[id]}</div>)}
+            .map(id => <div key={id} className={`widget-module-slot widget-module-${id}`}
+              data-module-collapsed={settings.moduleCollapsed[id]}>
+              <WidgetModuleDisclosure collapsed={settings.moduleCollapsed[id]}
+                onToggle={() => void applySettings({ moduleCollapsed: { [id]: !settings.moduleCollapsed[id] } })}>
+                {moduleNodes[id]}
+              </WidgetModuleDisclosure>
+            </div>)}
 
           {openPanel && (
             <section ref={popoverRef} className="widget-popover no-drag" aria-label={openPanel === "tasks" ? "미완료 업무 요약" : "새 알림 요약"}>

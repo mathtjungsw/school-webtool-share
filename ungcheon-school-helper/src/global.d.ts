@@ -101,7 +101,7 @@ declare global {
       showWidget: () => Promise<boolean>
       hideWidget: () => Promise<boolean>
       widgetGetSettings: () => Promise<import('./components/widget/WidgetApp').WidgetSettings>
-      widgetUpdateSettings: (patch: Partial<import('./components/widget/WidgetApp').WidgetSettings>) => Promise<import('./components/widget/WidgetApp').WidgetSettings>
+      widgetUpdateSettings: (patch: import('./services/widgetSettings').WidgetSettingsPatch<import('./components/widget/WidgetApp').WidgetSettings>) => Promise<import('./components/widget/WidgetApp').WidgetSettings>
       widgetFitHeight: (height: number) => Promise<boolean>
       widgetOpenMain: (page?: string) => Promise<boolean>
       onWidgetSettingsChanged: (cb: (settings: import('./components/widget/WidgetApp').WidgetSettings) => void) => () => void

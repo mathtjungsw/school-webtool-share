@@ -1,12 +1,11 @@
-import { useState, type ReactNode } from 'react'
+import { type ReactNode } from 'react'
+import { WidgetModuleHeader, WidgetModuleBody } from './WidgetModuleDisclosure'
 import {
   AlarmClock,
   ArrowUpRight,
   BriefcaseBusiness,
   CalendarClock,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   CloudSun,
   Coffee,
   ExternalLink,
@@ -25,44 +24,27 @@ export type WidgetModuleTone = 'blue' | 'green' | 'amber' | 'rose' | 'slate'
 
 export interface WidgetProductivitySectionProps {
   title: string
+  summary: string
   icon?: ReactNode
   badge?: ReactNode
   children: ReactNode
   className?: string
-  collapsible?: boolean
-  defaultCollapsed?: boolean
   empty?: boolean
 }
 
 export function WidgetProductivitySection({
   title,
+  summary,
   icon,
   badge,
   children,
   className = '',
-  collapsible = false,
-  defaultCollapsed = false,
   empty = false,
 }: WidgetProductivitySectionProps) {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed)
   return (
     <section className={`widget-productivity-section ${className} ${empty ? 'is-empty' : ''} no-drag`}>
-      <header className="widget-productivity-section-heading">
-        <span>{icon}<strong>{title}</strong>{badge}</span>
-        {collapsible && (
-          <button
-            type="button"
-            className="widget-productivity-icon-button"
-            title={collapsed ? `${title} 펼치기` : `${title} 접기`}
-            aria-label={collapsed ? `${title} 펼치기` : `${title} 접기`}
-            aria-expanded={!collapsed}
-            onClick={() => setCollapsed((value) => !value)}
-          >
-            {collapsed ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
-          </button>
-        )}
-      </header>
-      {!collapsed && <div className="widget-productivity-section-body">{children}</div>}
+      <WidgetModuleHeader title={title} summary={summary} icon={icon} badge={badge} />
+      <WidgetModuleBody className="widget-productivity-section-body">{children}</WidgetModuleBody>
     </section>
   )
 }
@@ -86,6 +68,7 @@ export function WidgetPeriodTimerModule({ value }: { value: WidgetPeriodTimerVie
   return (
     <WidgetProductivitySection
       title="교시 타이머"
+      summary={[value.headline || value.label, countdown].filter(Boolean).join(' · ')}
       icon={<AlarmClock size={13} aria-hidden="true" />}
       badge={countdown && <b className={`widget-status-pill tone-${tone}`}>{countdown}</b>}
       className={`widget-period-timer tone-${tone}`}
@@ -139,10 +122,10 @@ export function WidgetTomorrowModule({ value }: { value: WidgetTomorrowPreviewVi
   return (
     <WidgetProductivitySection
       title="내일 미리보기"
+      summary={[value.dateLabel, value.dayLabel === '다음 수업일' ? value.dayLabel : '', value.firstLesson ? `첫 수업 ${value.firstLesson.title}` : value.firstEvent ? `첫 일정 ${value.firstEvent.title}` : value.duties?.length ? `지도 ${value.duties[0].title}` : value.ruleLabel || '예정된 수업·일정 없음'].filter(Boolean).join(' · ')}
       icon={<CalendarClock size={13} aria-hidden="true" />}
       badge={<small className="widget-heading-meta">{value.dateLabel}{value.dayLabel ? ` · ${value.dayLabel}` : ''}</small>}
       className="widget-tomorrow-module"
-      collapsible
       empty={!hasItems}
     >
       {value.ruleLabel && <p className="widget-day-rule-note">{value.ruleLabel}</p>}
@@ -171,6 +154,7 @@ export function WidgetWeatherModule({ location, temperature, updatedAt, actions,
   return (
     <WidgetProductivitySection
       title="날씨 행동 알림"
+      summary={loading ? '날씨 불러오는 중' : !temperature && !actions.length ? '날씨 자료 없음' : [temperature, actions[0]?.label || '추가 날씨 알림 없음'].filter(Boolean).join(' · ')}
       icon={<CloudSun size={13} aria-hidden="true" />}
       badge={<small className="widget-heading-meta">{[location, temperature].filter(Boolean).join(' · ')}</small>}
       className="widget-weather-module"
@@ -220,14 +204,15 @@ function taskBucketTone(bucket: WidgetTaskBucketView): WidgetModuleTone {
 
 export function WidgetTaskTimelineModule({ buckets, onOpenTasks }: WidgetTaskTimelineProps) {
   const total = buckets.reduce((sum, bucket) => sum + bucket.items.length, 0)
+  const incomplete = buckets.reduce((sum, bucket) => sum + bucket.items.filter(item => !item.completed).length, 0)
   const priority = buckets.flatMap((bucket) => bucket.items.map((item) => ({ ...item, bucket }))).slice(0, 3)
   return (
     <WidgetProductivitySection
       title="업무 마감 타임라인"
+      summary={`미완료 ${incomplete}건${total > incomplete ? ` · 완료 ${total - incomplete}건` : ''}`}
       icon={<BriefcaseBusiness size={13} aria-hidden="true" />}
       badge={<b className="widget-productivity-count">{total}</b>}
       className="widget-task-timeline"
-      collapsible
       empty={total === 0}
     >
       {total ? (
@@ -274,6 +259,7 @@ export function WidgetShortcutsModule({
   return (
     <WidgetProductivitySection
       title="자주 쓰는 메뉴"
+      summary={shortcuts.length ? `${shortcuts.length}개 · ${shortcuts[0].label}` : '선택한 메뉴 없음'}
       icon={<ExternalLink size={13} aria-hidden="true" />}
       className="widget-shortcuts-module"
       empty={shortcuts.length === 0}
@@ -324,10 +310,10 @@ export function WidgetEndOfDayModule({
   return (
     <WidgetProductivitySection
       title="퇴근 전 브리핑"
+      summary={items.slice(0, 2).join(' · ')}
       icon={<SunMedium size={13} aria-hidden="true" />}
       badge={<span className="widget-status-pill tone-amber"><Coffee size={10} /> 하루 마무리</span>}
       className="widget-end-of-day"
-      collapsible
     >
       <ul>
         {items.map((item) => <li key={item}><CheckCircle2 size={11} />{item}</li>)}

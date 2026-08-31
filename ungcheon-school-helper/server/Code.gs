@@ -36,7 +36,7 @@ const NEIS_SYNC_REGISTERED_AT_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_AT';
 const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 학생 자료를 읽지 않고 아래 공개 일정 시트만 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 41;
+const MOBILE_SERVICE_VERSION = 42;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -363,6 +363,18 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'v1.1.29',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.29 · 위젯 기능별 접기와 한 줄 시간표',
+    body: [
+      '· 위젯 각 기능의 제목 오른쪽 버튼으로 개별 접기·펼치기를 제공합니다. 접으면 제목과 핵심 요약만 한 줄로 표시하며, 기능별 상태는 이 PC에 저장됩니다.',
+      '· 기능 접기는 설정의 표시·숨김 및 위젯 전체 접기와 별개입니다. 입력 중인 메모·도구 값과 뽑은 카드는 기능을 다시 펼쳐도 유지됩니다.',
+      '· 오늘 시간표의 교시·시각·수업 정보를 한 줄로 압축했습니다. 현재·다음 수업과 남은 시간, 변경 표시, 오른쪽 시간 지정 일정은 유지하며 긴 수업명이나 겹친 일정은 눌러서 자세히 확인할 수 있습니다.',
+      '· 접은 기능만큼 위젯 높이가 줄어들고 화면을 넘으면 본문만 스크롤합니다. 고정 하단의 미완료 업무·새 알림·프로그램 열기는 계속 사용할 수 있습니다.',
+      '· 기존 시간 지정 일정 선택과 개인 설정, 교환·대강, 모바일 일정 PWA 연결 및 기존 릴리스 안내를 모두 보존했습니다.'
+    ].join('\n'),
+    date: '2026-08-31'
+  },
   {
     key: 'v1.1.28',
     title: '[업데이트] 웅천고 업무도우미 v1.1.28 · 위젯 시간표와 일정 통합',

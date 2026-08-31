@@ -56,7 +56,7 @@ async function main() {
     moduleOrder: ['tasks', 'tasks', 'unknown', 'timer'],
     shortcutIds: ['student_locator', 'student_locator', 'staff_tasks', 'calendar', 'dashboard', 'settings'],
   })
-  assert.equal(migrated.version, 3)
+  assert.equal(migrated.version, 4)
   assert.equal(migrated.density, 'compact')
   assert.deepEqual(migrated.moduleOrder.slice(0, 2), ['tasks', 'timer'])
   assert.equal(migrated.moduleOrder.length, 12)

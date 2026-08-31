@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { WidgetModuleHeader, WidgetModuleBody } from './WidgetModuleDisclosure'
 import { BriefcaseBusiness, Check, CheckCircle2, Circle, Pencil, Plus, StickyNote, Trash2, X } from 'lucide-react'
 import type { QuickMemo, QuickMemoRetention } from '../../services/widgetLocalData'
 
@@ -45,21 +46,21 @@ export default function WidgetQuickMemo({
 
   return (
     <section className="widget-productivity-section widget-quick-memo no-drag" aria-label="빠른 메모">
-      <header className="widget-productivity-section-heading">
-        <span>
-          <StickyNote size={13} aria-hidden="true" />
-          <strong>빠른 메모</strong>
-          {memos.length > 0 && <b className="widget-productivity-count">{memos.length}</b>}
-        </span>
-        <button
+      <WidgetModuleHeader
+        title="빠른 메모"
+        icon={<StickyNote size={13} aria-hidden="true" />}
+        summary={editingId ? `수정 중 · ${editingText.trim() || '내용 없음'}` : trimmed ? `작성 중 · ${trimmed}` : `메모 ${memos.length}건 · 미완료 ${memos.filter(memo => !memo.completed).length}건`}
+        badge={memos.length > 0 && <b className="widget-productivity-count">{memos.length}</b>}
+        actions={<button
           type="button"
           className="widget-productivity-text-button"
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
         >
-          {expanded ? '접기' : '쓰기'}
-        </button>
-      </header>
+          {expanded ? '입력 닫기' : '쓰기'}
+        </button>}
+      />
+      <WidgetModuleBody>
 
       {expanded && (
         <div className="widget-memo-editor">
@@ -189,6 +190,7 @@ export default function WidgetQuickMemo({
       ) : (
         !expanded && <p className="widget-productivity-empty">저장된 빠른 메모가 없습니다.</p>
       )}
+      </WidgetModuleBody>
     </section>
   )
 }

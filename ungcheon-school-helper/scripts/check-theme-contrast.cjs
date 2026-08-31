@@ -106,6 +106,14 @@ for (const tone of ['violet', 'teal', 'amber', 'blue']) {
   assertContrast(`widget ${tone} point label`, foreground, '#fffdf5')
 }
 
+const disclosureCss = fs.readFileSync(path.join(projectRoot, 'src/components/widget/widgetModuleDisclosure.css'), 'utf8')
+for (const selector of ['.widget-shell .widget-module-heading', '.widget-module-summary', '.widget-shell .widget-module-toggle']) {
+  const block = disclosureCss.slice(disclosureCss.indexOf(selector)).match(/\{([^}]+)\}/)?.[1]
+  const foreground = block?.match(/(?:^|;)\s*color:\s*(#[0-9a-fA-F]{6})/)?.[1]
+  if (!foreground) throw new Error(`위젯 접기 글자색이 없습니다: ${selector}`)
+  for (const background of ['#ffffff', '#fff1cd', '#dbeafe']) assertContrast(`widget disclosure ${selector}`, foreground, background)
+}
+
 if (failures.length) {
   console.error(`FAIL 테마 글자 대비 ${failures.length}건`)
   for (const failure of failures) console.error(`- ${failure}`)

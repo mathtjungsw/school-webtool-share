@@ -33,9 +33,9 @@ function test(label, run) { run(); count++; console.log(`PASS ${label}`) }
 const settings = loadTs('src/services/widgetSettings.ts')
 const normalize = settings.normalizeWidgetProductivitySettings
 
-test('schema v3 removes the separate events module and enables the integrated lane by default', () => {
+test('schema v4 retains the integrated events lane by default', () => {
   const current = normalize(undefined)
-  assert.equal(current.version, 3)
+  assert.equal(current.version, 4)
   assert.equal(current.showTimedEvents, true)
   assert.equal(settings.WIDGET_MODULE_IDS.length, 12)
   assert.ok(!settings.WIDGET_MODULE_IDS.includes('events'))
