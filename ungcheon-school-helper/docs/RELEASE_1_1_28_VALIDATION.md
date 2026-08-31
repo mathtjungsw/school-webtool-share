@@ -5,6 +5,7 @@
 ## 반영 범위
 
 - 최신 origin/main `b9f2edcb1d3bd24fc2c87bcc0e27fcc0c51bc4c3` (v1.1.27)에서 시작했다.
+- 배포 소스 커밋: `b84bb0b35b8e55d7cdf9fcfecf58ea9e86aec9cf`.
 - 사용자의 정식 업데이트 요청에 따라 별도 시험판 없이 구현했다.
 - 오늘 시간표 왼쪽은 기존 수업, 오른쪽은 시간 지정 일정으로 구성했다. 시작·종료 시간이 있는 항목은 기간, 시각 하나만 있는 항목은 단일 시각 태그로 표시한다.
 - 점심·쉬는시간·수업 전후 일정과 다중 겹침 상세 보기를 지원한다. 일정 상세는 위젯 안에서 읽기 전용으로 확인한다.
@@ -35,7 +36,18 @@
 - -ValidateOnly 통과. -PreflightOnly에서 최신 main과 실제 고정 배포 @69, 원격 HEAD 비교 통과.
 - 이번 PC 표시 변경에서는 실제 이름·비밀번호 로그인 및 인증 일정 조회를 다시 실행하지 않았다. 해당 동작은 합성 계약 검사와 서버 함수 무변경 비교로 회귀 확인했다.
 - 모바일 PWA 코드와 공개 주소는 변경하지 않는다. 공통 비밀번호 ScriptProperty와 활성 세션을 초기화하지 않는다.
+- 기존 고정 배포를 프로젝트 버전 @70으로 업데이트했다. 배포 직후 GET health가 이전 버전40을 응답해 스크립트의 마지막 확인은 실패했으나, 재배포 없이 읽기 전용 재검사에서 고정 배포 @70과 GET·POST health의 버전41을 확인했다.
+- 인증 없는 getMobileScheduleBundle 요청은 올바르게 거부되고 알 수 없는 액션으로 처리되지 않았다. 비밀번호나 인증 토큰을 기록하지 않았다.
+- 기존 모바일 공개 주소 HTTP200 확인: https://ungcheon-mobile-schedule.jsw890122.chatgpt.site/
 
 ## 공개 배포
 
-배포 완료 후 실제 고정 서버 health, 공식 릴리스 및 자동 업데이트 자산 검증 결과를 추가한다.
+- main 반영 및 자동 배포 성공: https://github.com/mathtjungsw/school-webtool-share/actions/runs/33355349845
+- CI 모바일 검증 1분 3초, Windows 타입 검사·패키징·게시 3분 31초로 모두 통과했다.
+- 공식 릴리스: https://github.com/mathtjungsw/school-webtool-share/releases/tag/ungcheon-helper-v1.1.28
+- 공개 상태: draft=false, prerelease=false, 게시 시각 2026-08-31 12:59:24 KST.
+- 설치파일 `UngcheonSchoolHelper-Setup-1.1.28.exe`: 174,230,182바이트, 공개 HEAD HTTP200.
+- blockmap 181,700바이트, latest.yml 372바이트. `releases/latest/download/latest.yml` HTTP200, 버전1.1.28·설치파일 경로·크기가 공식 자산과 일치한다.
+- GitHub가 기록한 설치파일 SHA256: `57bdcefe23a11233e7fa32586252c26cd259121855166ca0f2c17006ba064667`.
+- 로컬과 CI는 빌드 환경이 다르므로 같은 파일 크기나 해시를 가정하지 않았다. 자동 업데이트는 CI 공식 자산을 가리킨다.
+- 이번 요청에는 사용자 PC 직접 설치가 포함되지 않았다. 검증용 브라우저 창과 서버는 종료했다.
