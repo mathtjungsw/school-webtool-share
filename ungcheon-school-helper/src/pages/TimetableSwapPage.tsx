@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, ArrowLeftRight, CheckCircle2, FileSpreadsheet,
   CalendarRange, ClipboardList, LockKeyhole, RefreshCw, Search, ShieldCheck, Upload, UserCog, UserRoundSearch, Users, X,
@@ -61,11 +61,21 @@ export default function TimetableSwapPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('exchange')
   const [commonFreeTeacherIndexes, setCommonFreeTeacherIndexes] = useState<number[]>([])
   const [preview, setPreview] = useState<PreviewSelection | null>(null)
+  const previewRegionRef = useRef<HTMLDivElement>(null)
   const [planDraft, setPlanDraft] = useState<TimetablePlanDraft>(() => createEmptyPlanDraft(config.teacherName))
   const [planLoaded, setPlanLoaded] = useState(false)
   const [changeRequests, setChangeRequests] = useState<TimetableChangeRequest[]>([])
   const [staffRoster, setStaffRoster] = useState<SharedStaffRoster | null>(null)
   const configured = Boolean(config.schoolHubUrl)
+
+  useEffect(() => {
+    const region = previewRegionRef.current
+    if (!preview || !region) return
+    const bounds = region.getBoundingClientRect()
+    if (bounds.top < 0 || bounds.bottom > window.innerHeight) {
+      region.scrollIntoView({ block: 'nearest', behavior: 'auto' })
+    }
+  }, [preview])
 
   const load = useCallback(async () => {
     if (!configured) return
@@ -493,6 +503,18 @@ export default function TimetableSwapPage() {
             ))}
           </section>
 
+          {preview && previewSimulation && (
+            <div ref={previewRegionRef}>
+              <TeacherSchedulePreview
+                teacher={timetable.teachers[preview.teacherIndex]}
+                simulation={previewSimulation}
+                mode={preview.mode}
+                onAdd={addPreviewToPlan}
+                onClose={() => setPreview(null)}
+              />
+            </div>
+          )}
+
           <section className="card p-5">
             <h2 className="font-semibold text-white flex items-center gap-2">
               {viewMode === 'exchange'
@@ -565,15 +587,6 @@ export default function TimetableSwapPage() {
             )}
           </section>
 
-          {preview && previewSimulation && (
-            <TeacherSchedulePreview
-              teacher={timetable.teachers[preview.teacherIndex]}
-              simulation={previewSimulation}
-              mode={preview.mode}
-              onAdd={addPreviewToPlan}
-              onClose={() => setPreview(null)}
-            />
-          )}
         </>
       ))}
     </div>

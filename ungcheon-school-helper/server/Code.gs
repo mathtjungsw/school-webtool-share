@@ -36,7 +36,7 @@ const NEIS_SYNC_REGISTERED_AT_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_AT';
 const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 학생 자료를 읽지 않고 아래 공개 일정 시트만 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 39;
+const MOBILE_SERVICE_VERSION = 40;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -363,6 +363,16 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'v1.1.27',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.27 · 교환·대강 미리보기 위치 개선',
+    body: [
+      '· 교사 시간표에서 교환·대강 후보를 선택하면 예상 시간표가 후보 교사 목록 바로 위에 표시됩니다.',
+      '· 예상 시간표가 화면 밖에 있을 때만 보이도록 이동하며, 변경 전·후 수업과 연강 주의, 계획서 추가 기능을 그대로 유지합니다.',
+      '· 검색도우미와 사용 매뉴얼에 새 위치를 안내하고, 기존 데스크톱 기능과 모바일 일정 연결 및 공개 주소를 유지합니다.'
+    ].join('\n'),
+    date: '2026-08-31'
+  },
   {
     key: 'v1.1.26',
     title: '[업데이트] 웅천고 업무도우미 v1.1.26 · 모바일 일정 정식 통합',
