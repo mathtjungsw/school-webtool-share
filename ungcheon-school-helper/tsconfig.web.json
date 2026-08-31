@@ -107,6 +107,8 @@
     "src/services/localFortune.ts",
     "src/services/localLuckyCard.ts",
     "src/services/widgetSettings.ts",
+    "src/services/widgetTimedSchedule.ts",
+    "src/services/widgetEventSources.ts",
     "src/services/widgetViewModel.ts",
     "src/services/widgetLocalData.ts",
     "src/services/hobong.ts",

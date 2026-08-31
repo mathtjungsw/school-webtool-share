@@ -13,6 +13,8 @@ import { logger } from './utils/logger'
 document.documentElement.setAttribute('data-theme', 'light')
 document.documentElement.classList.remove('dark')
 document.documentElement.style.colorScheme = 'light'
+if (new URLSearchParams(window.location.search).get('window') === 'widget') document.documentElement.setAttribute('data-widget-window', 'true')
+else document.documentElement.removeAttribute('data-widget-window')
 
 // console.error / console.warn → 로그 패널에 자동 기록
 // setTimeout으로 defer하여 렌더링 중 setState 경고 방지

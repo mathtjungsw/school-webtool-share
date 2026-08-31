@@ -38,8 +38,9 @@ async function main() {
   const widgetAppSource = fs.readFileSync(path.resolve(root, 'src/components/widget/WidgetApp.tsx'), 'utf8')
   const settingsPanelSource = fs.readFileSync(path.resolve(root, 'src/components/widget/WidgetSettingsPanel.tsx'), 'utf8')
   const quickToolsSource = fs.readFileSync(path.resolve(root, 'src/components/widget/WidgetQuickTools.tsx'), 'utf8')
-  assert.equal(settings.WIDGET_MODULE_IDS.length, 13)
-  assert.equal(new Set(settings.WIDGET_MODULE_IDS).size, 13)
+  assert.equal(settings.WIDGET_MODULE_IDS.length, 12)
+  assert.equal(new Set(settings.WIDGET_MODULE_IDS).size, 12)
+  assert(!settings.WIDGET_MODULE_IDS.includes('events'), '별도 오늘 주요 일정 모듈이 다시 추가됐습니다.')
   assert(!settings.WIDGET_MODULE_IDS.includes('change-summary'), '제외 기능 2가 모듈에 포함됐습니다.')
   assert(!settings.WIDGET_MODULE_IDS.includes('focus-mode'), '제외 기능 9가 모듈에 포함됐습니다.')
   assert(widgetAppSource.includes('widget.productivity.user.'), '메모·문구 저장소가 로그인 사용자별로 분리되지 않았습니다.')
@@ -55,10 +56,10 @@ async function main() {
     moduleOrder: ['tasks', 'tasks', 'unknown', 'timer'],
     shortcutIds: ['student_locator', 'student_locator', 'staff_tasks', 'calendar', 'dashboard', 'settings'],
   })
-  assert.equal(migrated.version, 2)
+  assert.equal(migrated.version, 3)
   assert.equal(migrated.density, 'compact')
   assert.deepEqual(migrated.moduleOrder.slice(0, 2), ['tasks', 'timer'])
-  assert.equal(migrated.moduleOrder.length, 13)
+  assert.equal(migrated.moduleOrder.length, 12)
   assert.equal(migrated.moduleVisibility.meal, false)
   assert.equal(migrated.moduleVisibility.fortune, false)
   assert.equal(migrated.moduleVisibility.tomorrow, true)
@@ -160,7 +161,7 @@ async function main() {
   assert.equal(snippets.length, 1)
   assert.equal((await localData.loadWidgetQuickSnippets(adapter))[0].text, '안녕하세요.')
 
-  console.log('PASS 위젯 모듈 13개 · 제외 기능 2·9 미포함 · 설정 마이그레이션')
+  console.log('PASS 위젯 모듈 12개 · 시간 지정 일정 통합 · 제외 기능 2·9 미포함 · 설정 마이그레이션')
   console.log('PASS 교시 타이머 · 내일 수업일 · 업무 마감 4구간 · 날씨 행동 알림')
   console.log('PASS 빠른 메모·문구 로컬 저장 · 날짜·글자·학번이름·교시 유틸')
 }

@@ -61,6 +61,9 @@ import {
 } from "../../services/personalOrganizer";
 import { isSharedWorkComplete } from "../../services/sharedWorkNotifications";
 import { UNGCHEON_PERIOD_PLAN } from "../../services/ungcheonSchedule";
+import WidgetTimetable from "./WidgetTimetable";
+import { buildWidgetBaseEvents, buildWidgetSupplementEvents, normalizeWidgetEventDate, type WidgetEvent } from "../../services/widgetEventSources";
+import { normalizeWidgetTimedEvents } from "../../services/widgetTimedSchedule";
 import { getLocalDailyFortune } from "../../services/localFortune";
 import {
   drawLocalLuckyCard,
@@ -144,13 +147,6 @@ export interface WidgetSettings extends WidgetProductivitySettings {
   dense: boolean;
   x?: number;
   y?: number;
-}
-
-interface WidgetEvent {
-  title: string;
-  meta: string;
-  kind: string;
-  time?: string;
 }
 
 interface WidgetTaskSummary {
@@ -252,10 +248,6 @@ function ymd(date = new Date()) {
   return format(date, "yyyy-MM-dd");
 }
 
-function compactDate(value: string) {
-  return value.replaceAll("-", "");
-}
-
 function minuteOfDay(date: Date) {
   return date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
 }
@@ -263,16 +255,6 @@ function minuteOfDay(date: Date) {
 function clockMinutes(value: string) {
   const [hours, minutes] = value.split(":").map(Number);
   return hours * 60 + minutes;
-}
-
-function periodState(index: number, now: Date) {
-  const period = UNGCHEON_PERIOD_PLAN[index];
-  if (!period) return "future";
-  const current = minuteOfDay(now);
-  const start = clockMinutes(period.start);
-  const end = clockMinutes(period.end);
-  if (current >= start && current <= end) return "current";
-  return current > end ? "past" : "future";
 }
 
 function deadlineLabel(date: string, today: string) {
@@ -389,41 +371,12 @@ async function loadDateSupplement(
     window.electron.dutyScheduleGetMonth(year, month, teacherName, force),
     window.electron.creativeScheduleGetMonth(year, month, force),
   ]);
-  const events: WidgetEvent[] = [];
-  const duties: WidgetEvent[] = [];
-
-  if (weekly.status === "fulfilled") {
-    weekly.value.events
-      .filter(item => item.date === date)
-      .forEach(item => events.push({
-        title: item.eventName,
-        meta: item.department || "주간계획",
-        kind: "weekly",
-      }));
-  }
-  if (duty.status === "fulfilled") {
-    duty.value.events
-      .filter(item => item.date === date)
-      .forEach(item => {
-        const row = {
-          title: item.title,
-          meta: `${item.time}${item.location ? ` · ${item.location}` : ""}`,
-          time: item.time,
-          kind: item.kind,
-        };
-        duties.push(row);
-        events.push(row);
-      });
-  }
-  if (creative.status === "fulfilled") {
-    creative.value.events
-      .filter(item => item.date === date)
-      .forEach(item => events.push({
-        title: item.title,
-        meta: [item.period, item.grades].filter(Boolean).join(" · "),
-        kind: "creative",
-      }));
-  }
+  const events = buildWidgetSupplementEvents(date, {
+    weekly: weekly.status === "fulfilled" ? weekly.value.events : [],
+    duty: duty.status === "fulfilled" ? duty.value.events : [],
+    creative: creative.status === "fulfilled" ? creative.value.events : [],
+  });
+  const duties = events.filter(event => event.kind === "gate" || event.kind === "meal");
   return {
     events,
     duties,
@@ -454,6 +407,11 @@ export default function WidgetApp() {
   const fetchNotices = useNoticeStore(state => state.fetchNotices);
   const [settings, setSettings] = useState<WidgetSettings>(DEFAULT_WIDGET_SETTINGS);
   const shellRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
+  const actionsRef = useRef<HTMLElement>(null);
+  const popoverRef = useRef<HTMLElement>(null);
   const remoteGenerationRef = useRef(0);
   const localGenerationRef = useRef(0);
   const activeTeacherRef = useRef(auth.teacherName);
@@ -626,7 +584,7 @@ export default function WidgetApp() {
 
       if (snapshotResult.status === "fulfilled") {
         setMeal(
-          snapshot?.meals.find(item => item.date === compactDate(currentToday))
+          snapshot?.meals.find(item => normalizeWidgetEventDate(item.date) === currentToday)
             ?.dishNames ?? [],
         );
       } else setMeal([]);
@@ -660,36 +618,10 @@ export default function WidgetApp() {
         ));
       } else setTaskItems([]);
 
-      const baseEventsForDate = (date: string): WidgetEvent[] => [
-        ...personal
-          .filter(task => task.date === date && task.showOnCalendar !== false)
-          .map(task => ({
-            title: task.title,
-            meta: task.time ?? (task.kind === "task" ? "개인 업무" : "개인 일정"),
-            time: task.time,
-            kind: task.kind === "task" ? "personal-task" : "personal-schedule",
-          })),
-        ...sharedTasks
-          .filter(task => task.deadline === date
-            && task.targetNames.includes(teacher)
-            && !isSharedWorkComplete(task, teacher))
-          .map(task => ({
-            title: task.title,
-            meta: "배부 업무 마감",
-            kind: "shared-task",
-          })),
-        ...(snapshot?.schedules ?? [])
-          .filter(item => item.date === compactDate(date))
-          .map(item => ({ title: item.eventName, meta: "학사일정", kind: "school" })),
-        ...committee.events
-          .filter(item => item.date === date && item.memberNames.includes(teacher))
-          .map(item => ({
-            title: item.title || item.committeeName,
-            meta: `${item.startTime}${item.location ? ` · ${item.location}` : ""}`,
-            time: item.startTime,
-            kind: "committee",
-          })),
-      ];
+      const baseEventsForDate = (date: string) => buildWidgetBaseEvents(date, {
+        personal, sharedTasks, schoolSchedules: snapshot?.schedules ?? [], committeeEvents: committee.events,
+        includeCompletedTasks: settings.includeCompletedTasks,
+      }, teacher);
 
       const todayRows = sortWidgetEvents([
         ...baseEventsForDate(currentToday),
@@ -727,6 +659,7 @@ export default function WidgetApp() {
     auth.authenticated,
     auth.teacherName,
     settings.continueToNextInstructionDay,
+    settings.includeCompletedTasks,
   ]);
 
   useEffect(() => {
@@ -812,22 +745,51 @@ export default function WidgetApp() {
 
   useEffect(() => {
     const shell = shellRef.current;
-    if (!shell) return;
+    const content = contentRef.current;
+    if (!shell || !content) return;
     let frame = 0;
+    let lastRequested = -1;
     const fit = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        void window.electron.widgetFitHeight(shell.scrollHeight);
+        const heightOf = (element: HTMLElement | null) => element?.getBoundingClientRect().height ?? 0;
+        const scrollBody = settings.expanded ? content.parentElement : null;
+        const style = scrollBody ? getComputedStyle(scrollBody) : null;
+        const padding = style ? parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) : 0;
+        const naturalHeight = Math.ceil(heightOf(headerRef.current) + heightOf(noticeRef.current)
+          + Math.max(content.scrollHeight, heightOf(content)) + heightOf(actionsRef.current) + padding + 2);
+        const requested = showSettings ? Math.max(naturalHeight, 320) : naturalHeight;
+        if (requested !== lastRequested) {
+          lastRequested = requested;
+          void window.electron.widgetFitHeight(requested);
+        }
       });
     };
     const observer = new ResizeObserver(fit);
-    observer.observe(shell);
+    [content, headerRef.current, noticeRef.current, actionsRef.current].forEach(element => {
+      if (element) observer.observe(element);
+    });
     fit();
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [auth.ready, auth.authenticated]);
+  }, [auth.ready, auth.authenticated, dataOwner, settings.expanded, showSettings, firstRunNotice]);
+
+  useEffect(() => {
+    if (!openPanel) return;
+    const frame = requestAnimationFrame(() => {
+      const panel = popoverRef.current;
+      const body = panel?.closest('.widget-scroll-body');
+      if (!panel || !body) return;
+      const panelBounds = panel.getBoundingClientRect();
+      const bodyBounds = body.getBoundingClientRect();
+      if (panelBounds.top < bodyBounds.top || panelBounds.bottom > bodyBounds.bottom) {
+        panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [openPanel]);
 
   const fortune = useMemo(
     () => getLocalDailyFortune(auth.teacherName || config.teacherName || "", today),
@@ -876,6 +838,8 @@ export default function WidgetApp() {
       ? { ...value, detail: [value.detail, "최신 시간표 확인 필요"].filter(Boolean).join(" · ") }
       : value;
   }, [day, now, timetableUnavailable]);
+  const timedEvents = useMemo(() => settings.showTimedEvents ? filteredEvents : [], [filteredEvents, settings.showTimedEvents]);
+  const timedEventCount = useMemo(() => normalizeWidgetTimedEvents(today, timedEvents).length, [today, timedEvents]);
   const currentLesson = timerView.currentPeriod
     ? day?.lessons[timerView.currentPeriod - 1]
     : null;
@@ -884,6 +848,9 @@ export default function WidgetApp() {
     const floor = timerView.currentPeriod ?? timerView.completedPeriod ?? 0;
     return day.lessons.find(lesson => lesson.period > floor && Boolean(lesson.value)) ?? null;
   }, [day, timerView]);
+  const nextLessonMinutes = nextActualLesson
+    ? Math.max(0, Math.ceil(clockMinutes(UNGCHEON_PERIOD_PLAN[nextActualLesson.period - 1].start) - minuteOfDay(now)))
+    : null;
   const taskBuckets = useMemo(
     () => buildTaskBuckets(
       taskItems.map(item => ({
@@ -1075,54 +1042,9 @@ export default function WidgetApp() {
   }
 
   const timetableModule = (
-    <section className="widget-section timetable-section">
-      <div className="section-title">
-        <span><Clock3 size={15} /> 오늘 시간표</span>
-        <button title="새로고침" onClick={() => void refresh(true)}>
-          <RefreshCw size={14} className={syncing ? "spin" : ""} />
-        </button>
-      </div>
-      {day?.rule.label && <div className="day-rule">{day.rule.label}</div>}
-      <div className="period-list">
-        {(day?.lessons ?? []).slice(0, 7).map((lesson, index) => {
-          const state = periodState(index, now);
-          return (
-            <div key={lesson.period} className={`period-row ${state}`}>
-              <span className="period-number">{lesson.period}</span>
-              <span className="period-time">{UNGCHEON_PERIOD_PLAN[index].start}</span>
-              <b>{lesson.value ? lesson.value.replace("\n", " · ") : "공강"}</b>
-              {lesson.badge && <em>{lesson.badge}</em>}
-              {state === "current" && <small>현재</small>}
-              {timerView.nextPeriod === lesson.period && state !== "current" && (
-                <small>{timerView.countdown}</small>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-
-  const eventsModule = (
-    <section className="widget-section events-section">
-      <div className="section-title">
-        <span>오늘 주요 일정</span>
-        <button onClick={() => window.electron.widgetOpenMain("calendar")}>전체 보기</button>
-      </div>
-      {filteredEvents.length ? (
-        <ul>
-          {filteredEvents.slice(0, 3).map((event, index) => (
-            <li key={`${event.title}-${index}`}>
-              <i data-kind={event.kind} />
-              <div><b>{event.title}</b><small>{event.meta}</small></div>
-            </li>
-          ))}
-          {filteredEvents.length > 3 && (
-            <li className="more-events">+{filteredEvents.length - 3}개 일정 더보기</li>
-          )}
-        </ul>
-      ) : <p className="empty">등록된 주요 일정이 없습니다.</p>}
-    </section>
+    <WidgetTimetable date={today} lessons={day?.lessons ?? []} now={now} events={timedEvents}
+      rule={day?.rule} timetableUnavailable={!day || timetableUnavailable} timer={timerView}
+      syncing={syncing} onRefresh={() => void refresh(true)} />
   );
 
   const mealModule = (
@@ -1200,7 +1122,6 @@ export default function WidgetApp() {
   const moduleNodes: Record<WidgetModuleId, ReactNode> = {
     timetable: timetableModule,
     timer: <WidgetPeriodTimerModule value={timerView} />,
-    events: eventsModule,
     meal: mealModule,
     fortune: fortuneModule,
     "lucky-card": luckyCardModule,
@@ -1293,10 +1214,9 @@ export default function WidgetApp() {
     <div
       ref={shellRef}
       data-widget-density={settings.density}
-      style={{ height: "auto" }}
       className={`widget-shell preset-${settings.preset} ${settings.expanded ? "is-expanded" : "is-collapsed"} widget-density-${settings.density}`}
     >
-      <header className="widget-header drag-region">
+      <header ref={headerRef} className="widget-header drag-region">
         <span className="widget-grip"><GripHorizontal size={16} /></span>
         <div className="widget-identity">
           <i className={offline ? "offline" : "online"} />
@@ -1339,7 +1259,7 @@ export default function WidgetApp() {
             onChange={patch => applySettings(patch)}
           />
           <div className="widget-event-filters">
-            <strong>오늘 주요 일정 표시</strong>
+            <strong>시간표에 표시할 일정 종류</strong>
             {[
               ["showPersonalSchedules", "개인 일정"],
               ["showPersonalTasksInEvents", "개인 업무"],
@@ -1358,7 +1278,7 @@ export default function WidgetApp() {
                 /> {label}
               </label>
             ))}
-            <small>대시보드 달력의 체크박스와 별도로 이 위젯에만 저장됩니다.</small>
+            <small>시간 또는 교시가 지정된 일정만 시간표 오른쪽에 표시합니다. 종일 일정·날짜만 있는 업무는 기존 캘린더/업무센터에서 확인하세요. 대시보드 설정과는 별도로 저장됩니다.</small>
           </div>
           {isWidgetModuleVisible(settings, "lucky-card") && (
             <label>
@@ -1373,7 +1293,7 @@ export default function WidgetApp() {
       )}
 
       {firstRunNotice && (
-        <div className="no-drag flex items-center justify-between gap-2 border-b border-amber-300 bg-amber-100 px-3 py-2 text-[9px] font-extrabold text-amber-950">
+        <div ref={noticeRef} className="widget-first-run-notice no-drag flex shrink-0 items-center justify-between gap-2 border-b border-amber-300 bg-amber-100 px-3 py-2 text-[9px] font-extrabold text-amber-950">
           <span>PC를 켜면 미니 위젯도 자동으로 시작됩니다.</span>
           <button className="rounded-md border border-amber-400 bg-white px-2 py-1 text-[9px] font-bold text-amber-950" onClick={async () => {
             await window.electron.configSet("widget.firstRunNoticeSeen", true);
@@ -1383,23 +1303,25 @@ export default function WidgetApp() {
       )}
 
       {!settings.expanded ? (
-        <section className="widget-compact">
+        <div ref={contentRef} className="widget-compact">
           <div><span>현재</span><b>{currentLesson?.value.replace("\n", " · ") || timerView.label}</b></div>
-          <div><span>다음 {timerView.countdown}</span><b>{nextActualLesson?.value.replace("\n", " · ") || "수업 없음"}</b></div>
+          <div><span>다음{nextLessonMinutes === null ? '' : ` ${nextLessonMinutes}분 후`}</span><b>{nextActualLesson?.value.replace("\n", " · ") || "수업 없음"}</b></div>
           <div className="compact-counts">
-            <span title="오늘 주요 일정"><CalendarDays size={13} /> {filteredEvents.length}</span>
+            <span title="오늘 시간 지정 일정"><CalendarDays size={13} /> {timedEventCount}</span>
             <span><BriefcaseBusiness size={13} /> {taskCount}</span>
             <span title="새 알림"><Bell size={13} /> {unread}</span>
           </div>
-        </section>
+        </div>
       ) : (
-        <main>
+        <>
+        <main className="widget-scroll-body">
+          <div ref={contentRef} className="widget-content">
           {settings.moduleOrder
             .filter(id => WIDGET_MODULE_IDS.includes(id) && isWidgetModuleVisible(settings, id))
             .map(id => <div key={id} className={`widget-module-slot widget-module-${id}`}>{moduleNodes[id]}</div>)}
 
           {openPanel && (
-            <section className="widget-popover no-drag" aria-label={openPanel === "tasks" ? "미완료 업무 요약" : "새 알림 요약"}>
+            <section ref={popoverRef} className="widget-popover no-drag" aria-label={openPanel === "tasks" ? "미완료 업무 요약" : "새 알림 요약"}>
               <div className="widget-popover-heading">
                 <b>{openPanel === "tasks" ? "미완료 업무" : "새 알림"}</b>
                 <button title="닫기" onClick={() => setOpenPanel(null)}><X size={14} /></button>
@@ -1429,7 +1351,9 @@ export default function WidgetApp() {
             </section>
           )}
 
-          <section className="widget-actions">
+          </div>
+        </main>
+          <section ref={actionsRef} className="widget-actions">
             <button className={openPanel === "tasks" ? "active" : ""} onClick={() => setOpenPanel(value => value === "tasks" ? null : "tasks")}>
               <BriefcaseBusiness size={15} /><span>미완료 업무</span><b>{taskCount}</b>
             </button>
@@ -1440,7 +1364,7 @@ export default function WidgetApp() {
               <LayoutDashboard size={15} /> 프로그램 열기
             </button>
           </section>
-        </main>
+        </>
       )}
     </div>
   );

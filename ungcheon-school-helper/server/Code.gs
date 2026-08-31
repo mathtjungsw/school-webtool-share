@@ -36,7 +36,7 @@ const NEIS_SYNC_REGISTERED_AT_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_AT';
 const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 학생 자료를 읽지 않고 아래 공개 일정 시트만 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 40;
+const MOBILE_SERVICE_VERSION = 41;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -363,6 +363,19 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'v1.1.28',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.28 · 위젯 시간표와 일정 통합',
+    body: [
+      '· 미니 위젯의 오늘 시간표 오른쪽에 시간이 지정된 개인 일정·업무, 내 위원회, 주간계획, 등교·급식지도와 창체를 함께 표시합니다.',
+      '· 기간 일정은 해당 교시·점심·쉬는시간에 걸친 영역으로, 시각만 있는 일정은 단일 시각 태그로 표시합니다. 겹치는 일정은 위젯 안에서 상세 내용을 펼쳐 볼 수 있습니다.',
+      '· 기존 오늘 주요 일정 영역은 시간표와 통합했습니다. 종일 일정과 날짜만 있는 업무는 시간표에서 제외하며 기존 캘린더·업무센터의 자료는 그대로 유지됩니다.',
+      '· 화면 높이를 넘는 위젯은 본문만 스크롤하고 상단과 하단 버튼을 유지합니다. 접기·핀·투명도 변경과 모니터 작업영역에 맞춘 창 크기도 보정했습니다.',
+      '· 시간 지정 일정 표시와 종류별 선택은 위젯 설정에서 따로 조절하며 기존 개인 설정을 보존합니다. 날짜 형식에 따라 주간계획·지도 일정이 빠지던 부분도 수정했습니다.',
+      '· 최신 교환·대강 미리보기, 모바일 일정 PWA 연결과 기존 릴리스 안내는 모두 유지합니다.'
+    ].join('\n'),
+    date: '2026-08-31'
+  },
   {
     key: 'v1.1.27',
     title: '[업데이트] 웅천고 업무도우미 v1.1.27 · 교환·대강 미리보기 위치 개선',

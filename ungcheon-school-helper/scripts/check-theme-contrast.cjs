@@ -96,6 +96,16 @@ for (const [classFragment, label] of globalFamilies) {
   }
 }
 
+const widgetCss = fs.readFileSync(path.join(projectRoot, 'src/components/widget/widgetTimedSchedule.css'), 'utf8')
+for (const tone of ['violet', 'teal', 'amber', 'blue']) {
+  const block = widgetCss.match(new RegExp(`\\.wts-${tone}\\{([^}]+)\\}`))?.[1]
+  const foreground = block?.match(/--wts-text:\s*(#[0-9a-fA-F]{6})/)?.[1]
+  const background = block?.match(/--wts-soft:\s*(#[0-9a-fA-F]{6})/)?.[1]
+  if (!foreground || !background) throw new Error(`위젯 일정 색상 토큰이 없습니다: ${tone}`)
+  assertContrast(`widget ${tone} range label`, foreground, background)
+  assertContrast(`widget ${tone} point label`, foreground, '#fffdf5')
+}
+
 if (failures.length) {
   console.error(`FAIL 테마 글자 대비 ${failures.length}건`)
   for (const failure of failures) console.error(`- ${failure}`)

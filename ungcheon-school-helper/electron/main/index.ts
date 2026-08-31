@@ -8,6 +8,7 @@ import { get as httpGet } from 'http'
 import { promisify } from 'util'
 import { autoUpdater } from 'electron-updater'
 import Store from 'electron-store'
+import { fitWidgetBounds } from './widgetGeometry'
 import { startMonitoring, stopMonitoring, isMonitoringActive } from './notifier'
 import { getWeeklyPlanMonth } from './weekly-plan'
 import { getDutyScheduleMonth } from './duty-schedule'
@@ -72,6 +73,7 @@ store.set('config.schoolHubUrl', UNGCHEON_SCHOOL_HUB_URL)
 
 let mainWindow: BrowserWindow | null = null
 let widgetWindow: BrowserWindow | null = null
+let widgetRequestedHeight = 0
 let tray: Tray | null = null
 let isQuitting = false
 
@@ -116,6 +118,14 @@ function widgetSettings(): WidgetSettings {
 function widgetSize(expanded: boolean, preset: WidgetPreset) {
   if (preset === 'minimal') return expanded ? { width: 360, height: 480 } : { width: 360, height: 96 }
   return expanded ? { width: 390, height: 600 } : { width: 390, height: 110 }
+}
+function fitWidgetWindow(requestedWidth?: number) {
+  if (!widgetWindow || widgetWindow.isDestroyed()) return
+  const current = widgetWindow.getBounds()
+  const workArea = screen.getDisplayMatching(current).workArea
+  const bounds = fitWidgetBounds(current, workArea, widgetRequestedHeight || current.height, requestedWidth)
+  widgetWindow.setMinimumSize(Math.min(350, bounds.width), Math.min(84, bounds.height))
+  if (bounds.x !== current.x || bounds.y !== current.y || bounds.width !== current.width || bounds.height !== current.height) widgetWindow.setBounds(bounds, false)
 }
 function loadRenderer(window: BrowserWindow, widget = false) {
   if (process.env['ELECTRON_RENDERER_URL']) window.loadURL(`${process.env['ELECTRON_RENDERER_URL']}${widget ? '?window=widget' : ''}`)
@@ -236,19 +246,17 @@ ipcMain.handle('widget:updateSettings', (_, patch: Partial<WidgetSettings>) => {
   if (widgetWindow) {
     widgetWindow.setAlwaysOnTop(next.pinned)
     widgetWindow.setOpacity(next.opacity)
-    const size = widgetSize(next.expanded, next.preset)
-    widgetWindow.setSize(size.width, size.height, true)
+    // Content measurements own height; pin/opacity changes must not reset it.
+    fitWidgetWindow(widgetSize(next.expanded, next.preset).width)
     widgetWindow.webContents.send('widget:settingsChanged', next)
   }
   return next
 })
 ipcMain.handle('widget:fitHeight', (_, requestedHeight: number) => {
   if (!widgetWindow || widgetWindow.isDestroyed()) return false
-  const workArea = screen.getDisplayMatching(widgetWindow.getBounds()).workArea
-  const maxHeight = Math.max(320, workArea.height - 24)
-  const height = Math.max(84, Math.min(maxHeight, Math.ceil(Number(requestedHeight) || 0)))
-  const [width, currentHeight] = widgetWindow.getSize()
-  if (Math.abs(currentHeight - height) > 1) widgetWindow.setSize(width, height, false)
+  if (!Number.isFinite(requestedHeight) || requestedHeight <= 0) return false
+  widgetRequestedHeight = Math.ceil(requestedHeight)
+  fitWidgetWindow()
   return true
 })
 ipcMain.handle('widget:openMain', (_, page = '') => { showMainWindow(String(page)); return true })
@@ -1144,21 +1152,23 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
 
 function createWidgetWindow() {
   if (widgetWindow && !widgetWindow.isDestroyed()) {
+    fitWidgetWindow()
     widgetWindow.show()
     widgetWindow.focus()
     return widgetWindow
   }
   const settings = widgetSettings()
   const size = widgetSize(settings.expanded, settings.preset)
-  const workArea = screen.getPrimaryDisplay().workArea
+  const workArea = Number.isFinite(settings.x) && Number.isFinite(settings.y)
+    ? screen.getDisplayMatching({ x: Number(settings.x), y: Number(settings.y), ...size }).workArea
+    : screen.getPrimaryDisplay().workArea
   const desiredX = Number.isFinite(settings.x) ? Number(settings.x) : workArea.x + workArea.width - size.width - 18
   const desiredY = Number.isFinite(settings.y) ? Number(settings.y) : workArea.y + 18
-  const x = Math.max(workArea.x, Math.min(desiredX, workArea.x + workArea.width - size.width))
-  const y = Math.max(workArea.y, Math.min(desiredY, workArea.y + workArea.height - Math.min(size.height, workArea.height)))
+  const bounds = fitWidgetBounds({ ...size, x: desiredX, y: desiredY }, workArea, size.height)
+  widgetRequestedHeight = size.height
   widgetWindow = new BrowserWindow({
-    ...size,
-    x, y,
-    minWidth: 350, minHeight: 84,
+    ...bounds,
+    minWidth: Math.min(350, bounds.width), minHeight: Math.min(84, bounds.height),
     frame: false, transparent: true, backgroundColor: '#00000000', resizable: false,
     alwaysOnTop: settings.pinned, skipTaskbar: true, show: false, hasShadow: true,
     icon: process.env['ELECTRON_RENDERER_URL'] ? join(__dirname, '../../resources/icon.png') : join(process.resourcesPath, 'icon.png'),
@@ -1168,13 +1178,24 @@ function createWidgetWindow() {
   widgetWindow.once('ready-to-show', () => widgetWindow?.show())
   widgetWindow.on('moved', () => {
     if (!widgetWindow) return
+    fitWidgetWindow()
     const [x, y] = widgetWindow.getPosition()
     store.set(WIDGET_SETTINGS_KEY, { ...widgetSettings(), x, y })
   })
   widgetWindow.on('close', event => {
     if (!isQuitting) { event.preventDefault(); widgetWindow?.hide() }
   })
-  widgetWindow.on('closed', () => { widgetWindow = null })
+  const refitOnDisplayChange = () => fitWidgetWindow()
+  screen.on('display-metrics-changed', refitOnDisplayChange)
+  screen.on('display-added', refitOnDisplayChange)
+  screen.on('display-removed', refitOnDisplayChange)
+  widgetWindow.on('closed', () => {
+    screen.removeListener('display-metrics-changed', refitOnDisplayChange)
+    screen.removeListener('display-added', refitOnDisplayChange)
+    screen.removeListener('display-removed', refitOnDisplayChange)
+    widgetWindow = null
+    widgetRequestedHeight = 0
+  })
   loadRenderer(widgetWindow, true)
   return widgetWindow
 }

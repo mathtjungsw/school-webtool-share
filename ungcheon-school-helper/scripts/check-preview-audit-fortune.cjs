@@ -78,12 +78,12 @@ for (const value of [
   "showGateDuty",
   "showMealDuty",
   "showCreativeActivities",
-  "대시보드 달력의 체크박스와 별도로",
+  "대시보드 설정과는 별도로 저장됩니다",
 ])
   requireText(
     widget + widgetCss,
     value,
-    `위젯 주요 일정 독립 필터가 없습니다: ${value}`,
+    `위젯 시간 지정 일정 독립 필터가 없습니다: ${value}`,
   );
 for (const forbidden of [
   "listPulledLessonsForTeacher(teacher, today, today).map",

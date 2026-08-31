@@ -1,9 +1,9 @@
-* {
+html[data-widget-window="true"] * {
   box-sizing: border-box;
 }
-html,
-body,
-#root {
+html[data-widget-window="true"],
+html[data-widget-window="true"] body,
+html[data-widget-window="true"] #root {
   width: 100%;
   height: 100%;
   margin: 0;
@@ -13,6 +13,7 @@ body,
   color: #172033;
 }
 .widget-shell {
+  position: relative;
   width: 100%;
   height: 100%;
   border: 1px solid rgba(148, 163, 184, 0.45);
@@ -42,6 +43,7 @@ body,
   border-radius: 15px;
 }
 .widget-header {
+  flex-shrink: 0;
   height: 60px;
   min-height: 60px;
   padding: 10px 11px;
@@ -133,7 +135,10 @@ footer button {
   line-height: 1.35;
 }
 .widget-shell main {
-  overflow: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 10px 11px 8px;
   display: flex;
   flex-direction: column;

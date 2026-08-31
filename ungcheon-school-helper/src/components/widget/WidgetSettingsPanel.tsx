@@ -33,7 +33,6 @@ export interface WidgetSettingsPanelProps {
 const MODULE_LABELS: Record<WidgetModuleId, string> = {
   timetable: '오늘 시간표',
   timer: '현재 교시 타이머',
-  events: '오늘 주요 일정',
   meal: '오늘 급식',
   fortune: '오늘의 운세',
   'lucky-card': '오늘의 행운카드',
@@ -181,6 +180,11 @@ export default function WidgetSettingsPanel({
       </div>
 
       <div className="widget-productivity-settings-block widget-module-detail-settings">
+        <label className="check">
+          <input type="checkbox" checked={settings.showTimedEvents} disabled={disabled}
+            onChange={event => commit({ showTimedEvents: event.target.checked })} />
+          시간표의 시간 지정 일정 표시
+        </label>
         <div className="widget-productivity-settings-title">
           <Gauge size={14} aria-hidden="true" />
           <div>

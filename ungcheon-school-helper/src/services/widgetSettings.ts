@@ -9,7 +9,6 @@
 export const WIDGET_MODULE_IDS = [
   'timetable',
   'timer',
-  'events',
   'meal',
   'fortune',
   'lucky-card',
@@ -57,7 +56,8 @@ export interface WidgetEndOfDaySettings {
 }
 
 export interface WidgetProductivitySettings {
-  version: 2
+  version: 3
+  showTimedEvents: boolean
   moduleOrder: WidgetModuleId[]
   moduleVisibility: Record<WidgetModuleId, boolean>
   density: WidgetDensity
@@ -72,7 +72,6 @@ export interface WidgetProductivitySettings {
 const DEFAULT_MODULE_VISIBILITY: Record<WidgetModuleId, boolean> = {
   timetable: true,
   timer: true,
-  events: true,
   meal: true,
   fortune: true,
   'lucky-card': true,
@@ -86,7 +85,8 @@ const DEFAULT_MODULE_VISIBILITY: Record<WidgetModuleId, boolean> = {
 }
 
 export const DEFAULT_WIDGET_PRODUCTIVITY_SETTINGS: WidgetProductivitySettings = {
-  version: 2,
+  version: 3,
+  showTimedEvents: true,
   moduleOrder: [...WIDGET_MODULE_IDS],
   moduleVisibility: { ...DEFAULT_MODULE_VISIBILITY },
   density: 'default',
@@ -178,6 +178,19 @@ export function normalizeWidgetProductivitySettings(value: unknown): WidgetProdu
   const input = isRecord(value) ? value : {}
   const weather = isRecord(input.weatherAlerts) ? input.weatherAlerts : {}
   const endOfDay = isRecord(input.endOfDay) ? input.endOfDay : {}
+  const legacyVisibility = isRecord(input.moduleVisibility) ? input.moduleVisibility : {}
+  const legacyEventsVisible = typeof legacyVisibility.events === 'boolean' ? legacyVisibility.events
+    : Array.isArray(input.enabledModules) ? input.enabledModules.includes('events')
+      : input.showEvents === true
+  const showTimedEvents = typeof input.showTimedEvents === 'boolean' ? input.showTimedEvents
+    : typeof legacyVisibility.events === 'boolean' ? legacyVisibility.events
+      : Array.isArray(input.enabledModules) ? input.enabledModules.includes('events')
+        : booleanValue(input.showEvents, true)
+  const moduleVisibility = normalizeModuleVisibility(input)
+  // The old events card had its own visibility. Keep explicitly visible events
+  // reachable after merging it into the timetable, but never undo a v3 choice.
+  const legacySchema = typeof input.version === 'number' ? input.version < 3 : true
+  if (legacySchema && legacyEventsVisible && showTimedEvents) moduleVisibility.timetable = true
   const density: WidgetDensity = input.density === 'compact'
     || input.density === 'default'
     || input.density === 'detailed'
@@ -187,9 +200,10 @@ export function normalizeWidgetProductivitySettings(value: unknown): WidgetProdu
       : 'default'
 
   return {
-    version: 2,
+    version: 3,
+    showTimedEvents,
     moduleOrder: normalizeModuleOrder(input.moduleOrder),
-    moduleVisibility: normalizeModuleVisibility(input),
+    moduleVisibility,
     density,
     shortcutIds: normalizeShortcutIds(input.shortcutIds),
     tomorrowStartTime: validTime(input.tomorrowStartTime, DEFAULT_WIDGET_PRODUCTIVITY_SETTINGS.tomorrowStartTime),
