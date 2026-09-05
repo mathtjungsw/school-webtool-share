@@ -24,4 +24,11 @@
 
 ## 공개 배포 확인
 
-- 실제 고정 Apps Script, 모바일 Sites 공개판, GitHub Actions 및 공식 설치파일 확인 결과는 배포 완료 후 이 문서에 덧붙인다.
+- 최신 통합 커밋 `a8102e1f383d42937f2cab1cc2a1801d89d7d2e4`를 `origin/main`에 푸시했다.
+- 기존 고정 Apps Script 배포를 프로젝트 버전 72로 갱신했다. 공개 `health` POST 응답은 `ok: true`, 서비스 버전 43이며 기존 주소, ScriptProperty와 로그인 세션을 유지했다.
+- 모바일 Sites는 저장 버전 10(모바일 앱 1.1.27, 소스 커밋 `6948fde7b837b24dcdb2aa0e2b6db2b44c8c3ea4`)을 기존 공개 주소에 게시했다. 공개 HTML은 HTTP 200을 반환했고, 핵심 JavaScript 3개와 서비스 워커의 SHA-256이 이번 빌드와 각각 일치했다.
+- 공개 모바일 주소: `https://ungcheon-mobile-schedule.jsw890122.chatgpt.site`
+- GitHub Actions 실행 `33931596251`이 성공했다. 정식 릴리스 `ungcheon-helper-v1.1.30`은 2026-09-05 09:06(KST)에 게시됐고 대상 커밋은 위 통합 커밋과 일치한다.
+- 공식 설치파일 `UngcheonSchoolHelper-Setup-1.1.30.exe`: 174,230,794바이트, SHA-256 `72cbf295ad1bae2fded0194bfb1532c4bb769f1c58a10758461c626766208750`.
+- 공개 `latest.yml`은 HTTP 200으로 내려받아지며 버전 1.1.30, 같은 설치파일명과 같은 크기를 가리킨다. 설치파일 HEAD 요청도 HTTP 200과 같은 크기를 반환했다.
+- 실제 이름·공통 비밀번호를 새로 입력하는 인수 검사는 자격정보를 소스·로그에 남기지 않기 위해 자동화하지 않았다. 로그인 만료 분리, 35초 제한, 범위 급식, 금지된 학생/NEIS 필드 제외는 계약·단위·통합 테스트와 배포 가드로 검증했다.
