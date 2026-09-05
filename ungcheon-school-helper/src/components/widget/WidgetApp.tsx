@@ -15,6 +15,7 @@ import {
   ChevronUp,
   ClipboardCheck,
   Clock3,
+  GripVertical,
   GripHorizontal,
   HeartHandshake,
   Landmark,
@@ -29,6 +30,23 @@ import {
   Utensils,
   X,
 } from "lucide-react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import QRCode from "qrcode";
@@ -149,6 +167,28 @@ export interface WidgetSettings extends WidgetProductivitySettings {
   dense: boolean;
   x?: number;
   y?: number;
+}
+
+function SortableWidgetModule({ id, collapsed, onToggle, children }: {
+  id: WidgetModuleId;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div ref={setNodeRef} key={id}
+      className={`widget-module-slot widget-module-${id} ${isDragging ? "is-dragging" : ""}`}
+      data-module-collapsed={collapsed}
+      style={{ transform: CSS.Transform.toString(transform), transition }}>
+      <WidgetModuleDisclosure collapsed={collapsed} onToggle={onToggle}
+        dragHandle={<button type="button" ref={setActivatorNodeRef}
+          className="widget-module-drag-handle no-drag" title="기능 순서 이동"
+          aria-label="기능 순서 이동" {...attributes} {...listeners}><GripVertical size={13} /></button>}>
+        {children}
+      </WidgetModuleDisclosure>
+    </div>
+  );
 }
 
 interface WidgetTaskSummary {
@@ -401,6 +441,10 @@ export function isWidgetActionableChange(
 }
 
 export default function WidgetApp() {
+  const dragSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   const loadConfig = useAppStore(state => state.loadConfig);
   const config = useAppStore(state => state.config);
   const auth = useAuthStore();
@@ -462,10 +506,24 @@ export default function WidgetApp() {
     };
   }, [auth.teacherName]);
 
+  const settingsWriteRevisionRef = useRef(0);
   const applySettings = useCallback(async (patch: WidgetSettingsPatch<WidgetSettings>) => {
+    const revision = ++settingsWriteRevisionRef.current;
     const next = await window.electron.widgetUpdateSettings(patch);
-    setSettings(normalizeWidgetSettings(next));
+    if (revision === settingsWriteRevisionRef.current) setSettings(normalizeWidgetSettings(next));
   }, []);
+
+  const reorderModules = useCallback((event: DragEndEvent) => {
+    const activeId = event.active.id as WidgetModuleId;
+    const overId = event.over?.id as WidgetModuleId | undefined;
+    if (!overId || activeId === overId) return;
+    const from = settings.moduleOrder.indexOf(activeId);
+    const to = settings.moduleOrder.indexOf(overId);
+    if (from < 0 || to < 0) return;
+    const moduleOrder = arrayMove(settings.moduleOrder, from, to);
+    setSettings(current => normalizeWidgetSettings({ ...current, moduleOrder }));
+    void applySettings({ moduleOrder });
+  }, [applySettings, settings.moduleOrder]);
 
   const refreshLocal = useCallback(async () => {
     const generation = ++localGenerationRef.current;
@@ -1322,15 +1380,17 @@ export default function WidgetApp() {
         <>
         <main className="widget-scroll-body">
           <div ref={contentRef} className="widget-content">
-          {settings.moduleOrder
-            .filter(id => WIDGET_MODULE_IDS.includes(id) && isWidgetModuleVisible(settings, id))
-            .map(id => <div key={id} className={`widget-module-slot widget-module-${id}`}
-              data-module-collapsed={settings.moduleCollapsed[id]}>
-              <WidgetModuleDisclosure collapsed={settings.moduleCollapsed[id]}
-                onToggle={() => void applySettings({ moduleCollapsed: { [id]: !settings.moduleCollapsed[id] } })}>
-                {moduleNodes[id]}
-              </WidgetModuleDisclosure>
-            </div>)}
+          <DndContext sensors={dragSensors} collisionDetection={closestCenter} onDragEnd={reorderModules}>
+            <SortableContext items={settings.moduleOrder.filter(id => isWidgetModuleVisible(settings, id))}
+              strategy={verticalListSortingStrategy}>
+              {settings.moduleOrder
+                .filter(id => WIDGET_MODULE_IDS.includes(id) && isWidgetModuleVisible(settings, id))
+                .map(id => <SortableWidgetModule key={id} id={id} collapsed={settings.moduleCollapsed[id]}
+                  onToggle={() => void applySettings({ moduleCollapsed: { [id]: !settings.moduleCollapsed[id] } })}>
+                  {moduleNodes[id]}
+                </SortableWidgetModule>)}
+            </SortableContext>
+          </DndContext>
 
           {openPanel && (
             <section ref={popoverRef} className="widget-popover no-drag" aria-label={openPanel === "tasks" ? "미완료 업무 요약" : "새 알림 요약"}>

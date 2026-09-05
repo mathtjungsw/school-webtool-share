@@ -5,6 +5,7 @@ export interface PersonalTask {
   title: string
   date: string
   time?: string
+  endTime?: string
   priority: PersonalTaskPriority
   completed: boolean
   memo?: string
@@ -29,11 +30,15 @@ function normalizeTask(value: unknown): PersonalTask | null {
   const task = value as Partial<PersonalTask>
   if (typeof task.id !== 'string' || typeof task.title !== 'string' || !isDate(task.date)) return null
   const now = new Date().toISOString()
+  const time = typeof task.time === 'string' && /^\d{2}:\d{2}$/.test(task.time) ? task.time : undefined
+  const endTime = time && typeof task.endTime === 'string' && /^\d{2}:\d{2}$/.test(task.endTime)
+    && task.endTime > time ? task.endTime : undefined
   return {
     id: task.id,
     title: task.title.trim(),
     date: task.date,
-    time: typeof task.time === 'string' && /^\d{2}:\d{2}$/.test(task.time) ? task.time : undefined,
+    time,
+    endTime,
     priority: task.priority === 'high' || task.priority === 'low' ? task.priority : 'normal',
     completed: Boolean(task.completed),
     memo: typeof task.memo === 'string' ? task.memo : '',

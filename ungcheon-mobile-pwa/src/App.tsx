@@ -6,7 +6,7 @@ import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { friendlyLoginError, isSessionExpiredError, loadDashboard, markDashboardCached, mergeDashboardWithCache, MobileRequestTimeoutError, SESSION_EXPIRED_MESSAGE, verifyViewer } from './api'
 import { deleteUserCache, readUserCache, writeUserCache } from './cache'
-import { DAYS, DEFAULT_VISIBILITY, SOURCE_LABELS, collectEvents, eventFingerprint, findTeacher, lessonFocus, newEventFingerprints, parseSlot, rangeForToday, schoolClock, timetableForDate, ymd } from './domain'
+import { DAYS, DEFAULT_VISIBILITY, SOURCE_LABELS, buildMobileTimelineRows, collectEvents, eventFingerprint, findTeacher, lessonFocus, newEventFingerprints, parseSlot, rangeForToday, schoolClock, sortMealsByType, timetableForDate, ymd } from './domain'
 import type { DashboardPayload, LessonView, MealInfo, MobileEvent, MobileResourceKey, MobileResourceState, MobileResourceStatus, ScheduleSource } from './types'
 import { VISUAL_NAME, visualFixture } from './visualFixture'
 
@@ -68,19 +68,26 @@ export function MealPanel({ meals, status, isToday = true }: { meals: MealInfo[]
     : status?.state === 'cached'
       ? `이 기기에 저장된 ${isToday ? '오늘' : '이 날짜의'} 급식 자료가 없습니다.`
       : `${isToday ? '오늘' : '선택한 날짜에'} 공유된 급식 정보가 없습니다.`
-  return <section className="panel meal-panel"><div className="panel-title"><div className="panel-icon meal"><UtensilsCrossed size={17} /></div><div><p>{isToday ? 'TODAY MEAL' : 'DAY PREVIEW'}</p><h2>{title}</h2></div>{status ? <StatusBadge status={status} /> : <span>{meals.length ? `${meals.length}식` : '없음'}</span>}</div><div className="meal-list">{meals.map((meal, index) => <article className="meal-block" key={`${meal.date}-${meal.mealType}-${index}`}><div className="meal-heading"><strong>{meal.mealType || '급식'}</strong>{meal.calories && <span>{meal.calories}</span>}</div><div className="meal-dishes">{meal.dishNames.map((dish, dishIndex) => <span key={`${dish}-${dishIndex}`}>{dish}</span>)}</div></article>)}{!meals.length && <div className="empty">{emptyText}</div>}</div></section>
+  const orderedMeals = sortMealsByType(meals)
+  return <section className="panel meal-panel"><div className="panel-title"><div className="panel-icon meal"><UtensilsCrossed size={17} /></div><div><p>{isToday ? 'TODAY MEAL' : 'DAY PREVIEW'}</p><h2>{title}</h2></div>{status ? <StatusBadge status={status} /> : <span>{meals.length ? `${meals.length}식` : '없음'}</span>}</div><div className="meal-list">{orderedMeals.map((meal, index) => <article className="meal-block" key={`${meal.date}-${meal.mealType}-${index}`}><div className="meal-heading"><strong>{meal.mealType || '급식'}</strong>{meal.calories && <span>{meal.calories}</span>}</div><div className="meal-dishes">{meal.dishNames.map((dish, dishIndex) => <span key={`${dish}-${dishIndex}`}>{dish}</span>)}</div></article>)}{!meals.length && <div className="empty">{emptyText}</div>}</div></section>
 }
 
-function LessonList({ lessons, teacherFound }: { lessons: LessonView[]; teacherFound: boolean }) {
+export function DailyTimeline({ lessons, events, teacherFound, isNew = () => false }: {
+  lessons: LessonView[]; events: MobileEvent[]; teacherFound: boolean; isNew?: (event: MobileEvent) => boolean
+}) {
   if (!teacherFound) return <div className="empty">등록된 교사 시간표를 찾지 못했습니다.</div>
-  if (!lessons.length) return <div className="empty">주말에는 정규 수업이 없습니다.</div>
-  return <div className="lesson-list">{lessons.map(lesson => {
-    const parsed = parseSlot(lesson.value)
-    return <div className={`lesson-row ${lesson.changed ? 'changed' : ''}`} key={lesson.period}>
-      <span className="period"><b>{lesson.period}</b><small>교시</small></span>
-      <div className="lesson-copy"><strong>{lesson.value ? (parsed.subject || parsed.className) : '공강'}</strong>{lesson.value && parsed.subject && <small>{parsed.className}</small>}{lesson.note && <em>{lesson.note}</em>}</div>
-    </div>
-  })}</div>
+  const rows = buildMobileTimelineRows(lessons, events)
+  if (!rows.length) return <div className="empty">표시할 수업이나 시간 지정 일정이 없습니다.</div>
+  return <div className="daily-timeline">
+    <div className="daily-timeline-head"><strong>수업</strong><strong>시간 지정 일정</strong></div>
+    {rows.map(row => {
+      const parsed = parseSlot(row.lesson?.value ?? '')
+      return <div className={`daily-timeline-row row-${row.kind} ${row.lesson?.changed ? 'changed' : ''}`} key={row.id}>
+        <div className="timeline-lesson"><div className="timeline-clock"><b>{row.label}</b><small>{row.start}~{row.end}</small></div>{row.kind === 'period' && <div className="lesson-copy"><strong>{row.lesson?.value ? (parsed.subject || parsed.className) : '공강'}</strong>{row.lesson?.value && parsed.subject && <small>{parsed.className}</small>}{row.lesson?.note && <em>{row.lesson.note}</em>}</div>}</div>
+        <div className="timeline-events">{row.events.map(event => <article className={`timeline-event source-${event.source} ${isNew(event) ? 'is-new' : ''}`} key={`${row.id}-${event.id}`}><div><strong>{event.title}</strong><small>{[event.startTime ? `${event.startTime}${event.endTime ? `~${event.endTime}` : ''}` : event.time, event.label].filter(Boolean).join(' · ')}</small></div>{isNew(event) && <b className="new-badge">NEW</b>}</article>)}{!row.events.length && <span className="timeline-empty">—</span>}</div>
+      </div>
+    })}
+  </div>
 }
 
 function startMinutes(time: string | undefined) {
@@ -355,7 +362,7 @@ export default function App() {
       {data && view === 'today' && <>
         <DateNavigator dates={previewDates} selected={selectedDate} today={today} onSelect={setSelectedDate} />
         {selectedDate === today && <NowNextCard lessons={selectedLessons} events={selectedEvents} minuteOfDay={clock.minutes} />}
-        <section className="panel timetable-primary"><div className="panel-title"><div className="panel-icon"><Clock3 size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘의 교사 시간표' : '선택한 날의 교사 시간표'}</h2></div><StatusBadge status={timetableStatus} /></div><LessonList lessons={selectedLessons} teacherFound={Boolean(teacher)} /></section>
+        <section className="panel timetable-primary"><div className="panel-title"><div className="panel-icon"><Clock3 size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘의 교사 시간표' : '선택한 날의 교사 시간표'}</h2></div><StatusBadge status={timetableStatus} /></div><DailyTimeline lessons={selectedLessons} events={selectedEvents} teacherFound={Boolean(teacher)} isNew={isNew} /></section>
         <section className="panel"><div className="panel-title"><div className="panel-icon secondary"><CalendarDays size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘 일정' : '선택한 날의 일정'}</h2></div><StatusBadge status={scheduleStatus} /></div><div className="event-list">{selectedEvents.map(event => <EventCard key={event.id} event={event} isNew={isNew(event)} />)}{!selectedEvents.length && <div className="empty">표시할 일정이 없습니다.</div>}</div></section>
         <MealPanel meals={selectedMeals} status={mealStatus} isToday={selectedDate === today} />
       </>}

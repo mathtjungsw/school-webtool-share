@@ -60,6 +60,9 @@ export interface StaffChecklist {
   description: string
   deadline: string
   startDate: string
+  scheduledDate?: string
+  startTime?: string
+  endTime?: string
   priority: StaffTaskPriority
   status: StaffTaskStatus
   linkUrl: string

@@ -28,6 +28,7 @@ const NEIS_SCHEDULE_SHEET = 'NEIS학사일정';
 const NEIS_CLASS_TIMETABLE_SHEET = 'NEIS학급시간표';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
 const STAFF_ASSIGNMENTS_2026_APPLIED_KEY = 'UNG_STAFF_ASSIGNMENTS_2026_APPLIED';
+const STAFF_NAME_MIGRATION_1_1_30_KEY = 'UNG_STAFF_NAME_MIGRATION_1_1_30';
 const OFFICIAL_RELEASE_NOTICE_RESET_KEY = 'UNG_OFFICIAL_RELEASE_NOTICE_RESET_1_1_2';
 const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
 const NEIS_SYNC_DEVICE_ID_PROPERTY = 'UNG_NEIS_SYNC_DEVICE_ID';
@@ -36,7 +37,7 @@ const NEIS_SYNC_REGISTERED_AT_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_AT';
 const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 학생 자료를 읽지 않고 아래 공개 일정 시트만 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 42;
+const MOBILE_SERVICE_VERSION = 43;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -51,7 +52,7 @@ const STAFF_ASSIGNMENTS_2026 = [
   ['배병희', '교무기획부', '국어', ''], ['이혜원', '교무기획부', '영어', '1-6'],
   ['김윤미', '교무기획부', '일본어', '3-7'],
   ['김혜경', '인성안전부', '생명과학', ''], ['박은실', '인성안전부', '수학', ''],
-  ['최대식', '인성안전부', '물리', ''], ['김성혜', '인성안전부', '윤리', '3-4'],
+  ['전종택', '인성안전부', '물리', ''], ['김성혜', '인성안전부', '윤리', '3-4'],
   ['박선욱', '인성안전부', '음악', '1-4'], ['이찬희', '인성안전부', '', ''],
   ['정승원', '교육과정부', '수학', ''], ['이송은', '교육과정부', '일반사회', ''],
   ['김소영', '교육과정부', '수학', ''], ['김해주', '교육과정부', '수학', '2-6'],
@@ -363,6 +364,19 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'v1.1.30',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.30 · 시간 지정 일정과 위젯 순서 개선',
+    body: [
+      '· 업무와 개인 일정에 시작 시간과 선택적인 종료 시간을 저장합니다. 시작 시간만 있으면 해당 시각에, 종료 시간까지 있으면 시간 범위와 마치는 시각을 표시합니다.',
+      '· 미니 위젯의 기능 제목 손잡이를 끌어 순서를 바꿀 수 있으며 환경설정과 같은 순서를 저장합니다.',
+      '· 7교시 시간을 15:40~16:30으로 바로잡아 현재·다음 수업과 남은 시간 계산에 함께 반영했습니다.',
+      '· 교직원 변경에 따라 현재 운영 명렬과 데스크톱·모바일 시간표의 최대식을 전종택으로 교체했습니다.',
+      '· 모바일 일정의 오늘 시간표를 왼쪽 수업, 오른쪽 시간 지정 일정으로 나눠 표시하고 중식을 석식보다 위에 배치합니다.',
+      '· 기존 데스크톱 기능, 모바일 72시간 로그인과 공개 주소, 학생 자료 제외 원칙 및 이전 릴리스 안내를 모두 유지합니다.'
+    ].join('\n'),
+    date: '2026-09-05'
+  },
   {
     key: 'v1.1.29',
     title: '[업데이트] 웅천고 업무도우미 v1.1.29 · 위젯 기능별 접기와 한 줄 시간표',
@@ -979,6 +993,7 @@ function ensureSheets_() {
   ]);
   repairStaffHomeroomCells_(book);
   ensureStaffAssignments2026_(book);
+  migrateStaffName1_1_30_(book);
   ensureDataSheet_(book, STUDENT_ROSTER_META_SHEET, [
     'version', 'sourceFileName', 'uploadedBy', 'uploadedAt', 'studentCount'
   ]);
@@ -989,7 +1004,8 @@ function ensureSheets_() {
   ensureDataSheet_(book, STAFF_CHECKLISTS_SHEET, [
     'id', 'title', 'description', 'deadline', 'creatorName', 'createdAt',
     'closed', 'itemsJson', 'targetNamesJson', 'startDate', 'priority', 'status',
-    'linkUrl', 'departmentNamesJson', 'updatedAt', 'requestId'
+    'linkUrl', 'departmentNamesJson', 'updatedAt', 'requestId',
+    'scheduledDate', 'startTime', 'endTime'
   ]);
   ensureDataSheet_(book, STAFF_CHECKLIST_RESPONSES_SHEET, [
     'checklistId', 'teacherName', 'checkedItemIdsJson', 'memo', 'updatedAt'
@@ -1032,7 +1048,8 @@ function ensureStaffChecklistSheets_() {
   ensureDataSheet_(book, STAFF_CHECKLISTS_SHEET, [
     'id', 'title', 'description', 'deadline', 'creatorName', 'createdAt',
     'closed', 'itemsJson', 'targetNamesJson', 'startDate', 'priority', 'status',
-    'linkUrl', 'departmentNamesJson', 'updatedAt', 'requestId'
+    'linkUrl', 'departmentNamesJson', 'updatedAt', 'requestId',
+    'scheduledDate', 'startTime', 'endTime'
   ]);
   ensureDataSheet_(book, STAFF_CHECKLIST_RESPONSES_SHEET, [
     'checklistId', 'teacherName', 'checkedItemIdsJson', 'memo', 'updatedAt'
@@ -1094,6 +1111,52 @@ function ensureStaffAssignments2026_(book) {
     ]]);
   }
   properties.setProperty(STAFF_ASSIGNMENTS_2026_APPLIED_KEY, 'true');
+}
+
+function migrateStaffName1_1_30_(book) {
+  const properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty(STAFF_NAME_MIGRATION_1_1_30_KEY) === 'true') return;
+  const oldName = '최대식';
+  const newName = '전종택';
+  let changed = false;
+  const roster = book.getSheetByName(STAFF_ROSTER_SHEET);
+  if (roster && roster.getLastRow() >= 2) {
+    const range = roster.getRange(2, 2, roster.getLastRow() - 1, 1);
+    const values = range.getValues();
+    let rosterChanged = false;
+    values.forEach(function(row) {
+      if (String(row[0] || '').trim() === oldName) { row[0] = newName; rosterChanged = true; }
+    });
+    if (rosterChanged) { range.setValues(values); changed = true; }
+  }
+  const timetable = book.getSheetByName(TIMETABLE_SHEET);
+  if (timetable && timetable.getLastRow() >= 2) {
+    const range = timetable.getRange(2, 1, timetable.getLastRow() - 1, 2);
+    const values = range.getValues();
+    let timetableChanged = false;
+    values.forEach(function(row) {
+      if (String(row[0] || '').trim() === oldName) { row[0] = newName; timetableChanged = true; }
+      const label = String(row[1] || '');
+      if (label === oldName || label.indexOf(oldName + '(') === 0) {
+        row[1] = label.replace(oldName, newName);
+        timetableChanged = true;
+      }
+    });
+    if (timetableChanged) { range.setValues(values); changed = true; }
+  }
+  if (changed) {
+    const meta = readObjects_(STAFF_ROSTER_META_SHEET)[0] || {};
+    replaceSheetRows_(STAFF_ROSTER_META_SHEET, [[
+      (Number(meta.version) || 0) + 1,
+      String(meta.sourceFileName || ''),
+      '교직원 변경 반영',
+      new Date().toISOString(),
+      roster ? Math.max(0, roster.getLastRow() - 1) : 0
+    ]]);
+    touchSyncResource_('staffRoster');
+    touchSyncResource_('timetable');
+  }
+  properties.setProperty(STAFF_NAME_MIGRATION_1_1_30_KEY, 'true');
 }
 
 function normalizeStaffHomeroom_(value) {
@@ -1818,6 +1881,9 @@ function listStaffChecklists_(body) {
         createdAt: iso_(row.createdAt),
         closed: toBooleanValue_(row.closed),
         startDate: dateOnly_(row.startDate) || dateOnly_(row.createdAt),
+        scheduledDate: dateOnly_(row.scheduledDate),
+        startTime: normalizeCommitteeTime_(row.startTime),
+        endTime: normalizeCommitteeTime_(row.endTime),
         priority: ['low', 'normal', 'high'].indexOf(String(row.priority || '')) >= 0
           ? String(row.priority) : 'normal',
         status: ['planned', 'in_progress', 'completed', 'hold'].indexOf(String(row.status || '')) >= 0
@@ -1842,6 +1908,9 @@ function addStaffChecklist_(body) {
   const description = clean_(body.description, 1000);
   const deadline = clean_(body.deadline, 10);
   const startDate = clean_(body.startDate, 10) || new Date().toISOString().slice(0, 10);
+  const scheduledDate = clean_(body.scheduledDate, 10);
+  const startTime = normalizeCommitteeTime_(body.startTime);
+  const endTime = normalizeCommitteeTime_(body.endTime);
   const priority = ['low', 'normal', 'high'].indexOf(String(body.priority || '')) >= 0
     ? String(body.priority) : 'normal';
   const status = ['planned', 'in_progress', 'completed', 'hold'].indexOf(String(body.status || '')) >= 0
@@ -1856,6 +1925,12 @@ function addStaffChecklist_(body) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) throw new Error('시작일 형식이 올바르지 않습니다.');
   if (deadline && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) throw new Error('마감일 형식이 올바르지 않습니다.');
   if (deadline && deadline < startDate) throw new Error('마감일은 시작일보다 빠를 수 없습니다.');
+  if (startTime && !/^\d{2}:\d{2}$/.test(startTime)) throw new Error('시작 시간 형식이 올바르지 않습니다.');
+  if (endTime && !/^\d{2}:\d{2}$/.test(endTime)) throw new Error('종료 시간 형식이 올바르지 않습니다.');
+  if (scheduledDate && !/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) throw new Error('진행 날짜 형식이 올바르지 않습니다.');
+  if (startTime && !scheduledDate) throw new Error('시간을 지정하려면 진행 날짜를 입력하세요.');
+  if (endTime && !startTime) throw new Error('종료 시간을 지정하려면 시작 시간을 입력하세요.');
+  if (startTime && endTime && startTime >= endTime) throw new Error('종료 시간은 시작 시간보다 늦어야 합니다.');
   if (linkUrl && !/^https?:\/\//i.test(linkUrl)) throw new Error('관련 링크는 http 또는 https 주소로 입력하세요.');
 
   const roster = getStaffRoster_();
@@ -1884,7 +1959,8 @@ function addStaffChecklist_(body) {
     SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_CHECKLISTS_SHEET).appendRow([
       id, title, description, deadline, creatorName, createdAt, status === 'completed',
       JSON.stringify(items), JSON.stringify(targetNames), startDate, priority, status,
-      linkUrl, JSON.stringify(departmentNames), createdAt, requestId
+      linkUrl, JSON.stringify(departmentNames), createdAt, requestId,
+      scheduledDate, startTime, endTime
     ]);
     touchSyncResource_('staffChecklists');
     return { id: id };
@@ -1906,6 +1982,9 @@ function updateStaffChecklist_(body) {
   const description = clean_(body.description, 1000);
   const startDate = clean_(body.startDate, 10);
   const deadline = clean_(body.deadline, 10);
+  const scheduledDate = clean_(body.scheduledDate, 10);
+  const startTime = normalizeCommitteeTime_(body.startTime);
+  const endTime = normalizeCommitteeTime_(body.endTime);
   const priority = ['low', 'normal', 'high'].indexOf(String(body.priority || '')) >= 0
     ? String(body.priority) : 'normal';
   const status = ['planned', 'in_progress', 'completed', 'hold'].indexOf(String(body.status || '')) >= 0
@@ -1915,6 +1994,12 @@ function updateStaffChecklist_(body) {
   if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) throw new Error('시작일 형식이 올바르지 않습니다.');
   if (deadline && !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) throw new Error('마감일 형식이 올바르지 않습니다.');
   if (startDate && deadline && deadline < startDate) throw new Error('마감일은 시작일보다 빠를 수 없습니다.');
+  if (startTime && !/^\d{2}:\d{2}$/.test(startTime)) throw new Error('시작 시간 형식이 올바르지 않습니다.');
+  if (endTime && !/^\d{2}:\d{2}$/.test(endTime)) throw new Error('종료 시간 형식이 올바르지 않습니다.');
+  if (scheduledDate && !/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) throw new Error('진행 날짜 형식이 올바르지 않습니다.');
+  if (startTime && !scheduledDate) throw new Error('시간을 지정하려면 진행 날짜를 입력하세요.');
+  if (endTime && !startTime) throw new Error('종료 시간을 지정하려면 시작 시간을 입력하세요.');
+  if (startTime && endTime && startTime >= endTime) throw new Error('종료 시간은 시작 시간보다 늦어야 합니다.');
   if (linkUrl && !/^https?:\/\//i.test(linkUrl)) throw new Error('관련 링크는 http 또는 https 주소로 입력하세요.');
 
   const roster = getStaffRoster_();
@@ -1945,6 +2030,7 @@ function updateStaffChecklist_(body) {
       status === 'completed', JSON.stringify(items), JSON.stringify(targetNames),
       startDate, priority, status, linkUrl, JSON.stringify(departmentNames), updatedAt
     ]]);
+    sheet.getRange(row + 1, 17, 1, 3).setValues([[scheduledDate, startTime, endTime]]);
     touchSyncResource_('staffChecklists');
     return { updatedAt: updatedAt };
   }

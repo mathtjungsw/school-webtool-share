@@ -119,7 +119,7 @@ const supplement = {
   ],
 }
 const personal = [
-  { id: 'p1', date: '20260831', title: '개인 일정', time: '10:45', kind: 'schedule' },
+  { id: 'p1', date: '20260831', title: '개인 일정', time: '10:45', endTime: '11:05', kind: 'schedule' },
   { id: 'p2', date, title: '개인 업무', time: '11:00', kind: 'task', completed: false },
   { id: 'p3', date, title: '완료 업무', time: '11:10', kind: 'task', completed: true },
   { id: 'p4', date, title: '숨긴 일정', time: '11:20', kind: 'schedule', showOnCalendar: false },
@@ -127,7 +127,11 @@ const personal = [
 ]
 const base = {
   personal,
-  sharedTasks: [{ id: 's1', deadline: '20260831', title: '업무 마감', targetNames: [teacher], responses: [], items: [], status: 'open' }],
+  sharedTasks: [
+    { id: 's1', deadline: '20260831', title: '업무 마감', targetNames: [teacher], responses: [], items: [], status: 'open' },
+    { id: 's2', deadline: '20260910', scheduledDate: '20260831', startTime: '15:40', title: '시각 업무', targetNames: [teacher], responses: [], items: [], status: 'open' },
+    { id: 's3', deadline: '20260910', scheduledDate: '20260831', startTime: '13:10', endTime: '13:25', title: '기간 업무', targetNames: [teacher], responses: [], items: [], status: 'open' },
+  ],
   schoolSchedules: [{ date: '20260831', eventName: '학사일정 3학년' }],
   committeeEvents: [
     { id: 'c1', date: '20260831', title: '위원회', committeeName: '합성위원회', memberNames: [teacher], startTime: '13:10', endTime: '13:25', location: '회의실' },
@@ -167,6 +171,16 @@ test('personal and committee adapters preserve visibility, completion and end ti
   assert.equal(committee.startTime, '13:10')
   assert.equal(committee.endTime, '13:25')
   assert.equal(committee.location, '회의실')
+  const personalSchedule = events.find(event => event.title === '개인 일정')
+  assert.equal(personalSchedule.startTime, '10:45')
+  assert.equal(personalSchedule.endTime, '11:05')
+  const pointTask = events.find(event => event.title === '시각 업무')
+  assert.equal(pointTask.startTime, '15:40')
+  assert.equal(pointTask.endTime, undefined)
+  assert.equal(pointTask.allDay, false)
+  const rangedTask = events.find(event => event.title === '기간 업무')
+  assert.equal(rangedTask.startTime, '13:10')
+  assert.equal(rangedTask.endTime, '13:25')
   assert.ok(adapters.buildWidgetBaseEvents(date, { ...base, includeCompletedTasks: true }, teacher).some(event => event.title === '완료 업무'))
   assert.deepEqual(adapters.buildWidgetBaseEvents(date, base, ''), [])
 })
@@ -174,7 +188,7 @@ test('adapters feed timetable model while untimed/all-day items remain available
   const events = [...adapters.buildWidgetBaseEvents(date, base, teacher), ...adapters.buildWidgetSupplementEvents(date, supplement)]
   const lessons = Array.from({ length: 7 }, (_, i) => ({ period: i + 1, value: i === 0 ? '합성 수업' : '' }))
   const output = model.buildWidgetTimedSchedule({ date, lessons, events, instruction: true, timetableAvailable: true })
-  assert.equal(output.events.length, 9)
+  assert.equal(output.events.length, 11)
   for (const title of ['시간 없는 일정', '업무 마감', '학사일정 3학년', '학년 행사 3학년', '학사 행사', '종일 행사 09:00']) {
     assert.ok(events.some(event => event.title === title), `Summary lost ${title}`)
     assert.ok(!output.events.some(event => event.title === title), `Untimed lane entry ${title}`)
@@ -211,5 +225,8 @@ test('renderer connects filtered timed events and settings without a separate ev
   assert.match(app, /nextLessonMinutes/)
   assert.match(app, /ref=\{popoverRef\}/)
   assert.match(app, /\}, \[openPanel\]\)/, 'Only a user-opened footer panel triggers its scroll effect')
+  for (const marker of ['DndContext', 'SortableContext', 'useSortable', 'verticalListSortingStrategy', 'arrayMove']) assert.match(app, new RegExp(marker))
+  assert.match(app, /aria-label="기능 순서 이동"/)
+  assert.match(app, /applySettings\(\{ moduleOrder \}\)/)
 })
 console.log(`Widget timed integration: ${count} checks passed.`)

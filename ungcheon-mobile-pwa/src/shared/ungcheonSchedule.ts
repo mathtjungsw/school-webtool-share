@@ -11,7 +11,7 @@ export const UNGCHEON_PERIOD_PLAN: UngcheonPeriod[] = [
   { period: '4', start: '11:40', end: '12:30' },
   { period: '5', start: '13:30', end: '14:20' },
   { period: '6', start: '14:30', end: '15:20' },
-  { period: '7', start: '15:30', end: '16:20' },
+  { period: '7', start: '15:40', end: '16:30' },
   { period: '8', start: '16:40', end: '17:30' },
 ]
 

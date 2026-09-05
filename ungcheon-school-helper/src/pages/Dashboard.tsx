@@ -714,9 +714,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       department: item.kind === 'gate' ? '등교지도' : '급식지도',
       source: item.kind === 'gate' ? 'gateDuty' as const : 'mealDuty' as const,
     })),
-    ...sharedTasks.filter(task => task.deadline).map(task => ({
-      date: toYmd(task.deadline),
-      eventName: task.title,
+    ...sharedTasks.filter(task => task.deadline || (task.scheduledDate && task.startTime)).map(task => ({
+      date: toYmd(task.startTime && task.scheduledDate ? task.scheduledDate : task.deadline),
+      eventName: `${task.startTime ? `${task.startTime}${task.endTime ? `~${task.endTime}` : ''} ` : ''}${task.title}`,
       department: task.departmentNames.length ? task.departmentNames.join('·') : '공유 업무',
       source: 'sharedWork' as const,
       completed: isSharedWorkComplete(task, config.teacherName?.trim() ?? ''),
@@ -724,7 +724,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     })),
     ...personalTasks.filter(task => task.showOnCalendar !== false).map(task => ({
       date: toYmd(task.date),
-      eventName: `${task.time ? `${task.time} ` : ''}${task.title}`,
+      eventName: `${task.time ? `${task.time}${task.endTime ? `~${task.endTime}` : ''} ` : ''}${task.title}`,
       department: '개인 업무',
       source: 'personal' as const,
       completed: task.completed,

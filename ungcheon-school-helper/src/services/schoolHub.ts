@@ -553,6 +553,9 @@ export const addStaffChecklist = (input: {
   description: string
   startDate: string
   deadline: string
+  scheduledDate: string
+  startTime: string
+  endTime: string
   priority: StaffChecklist['priority']
   status: StaffChecklist['status']
   linkUrl: string
@@ -570,6 +573,9 @@ export const updateStaffChecklist = (input: {
   description: string
   startDate: string
   deadline: string
+  scheduledDate: string
+  startTime: string
+  endTime: string
   priority: StaffChecklist['priority']
   status: StaffChecklist['status']
   linkUrl: string

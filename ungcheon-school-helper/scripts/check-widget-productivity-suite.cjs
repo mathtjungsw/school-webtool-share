@@ -82,7 +82,7 @@ async function main() {
   const lesson = viewModel.getWidgetPeriodTiming(new Date(2026, 7, 31, 9, 0))
   const breakTime = viewModel.getWidgetPeriodTiming(new Date(2026, 7, 31, 9, 35))
   const lunch = viewModel.getWidgetPeriodTiming(new Date(2026, 7, 31, 12, 45))
-  const finished = viewModel.getWidgetPeriodTiming(new Date(2026, 7, 31, 16, 21))
+  const finished = viewModel.getWidgetPeriodTiming(new Date(2026, 7, 31, 16, 31))
   assert.equal(before.phase, 'before-school')
   assert.equal(before.remainingMinutes, 10)
   assert.equal(lesson.phase, 'lesson')

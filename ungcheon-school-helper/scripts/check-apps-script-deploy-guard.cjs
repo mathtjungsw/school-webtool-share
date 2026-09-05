@@ -7,7 +7,7 @@ const { validate, inspectSource } = require('./apps-script-deploy-guard.cjs')
 
 // Generated test data only. Never put a real mobile password/token here.
 const fixture = `
-const MOBILE_SERVICE_VERSION = 39;
+const MOBILE_SERVICE_VERSION = 43;
 const MOBILE_SESSION_HOURS = 72;
 const MOBILE_SESSION_PROPERTY_PREFIX = 'UNG_MOBILE_SESSION_';
 const MOBILE_SHARED_PASSWORD_HASH_PROPERTY = 'UNG_MOBILE_SHARED_PASSWORD_HASH';
@@ -65,10 +65,10 @@ function pass(label, task) { task(); checks++; }
 function fails(label, change, expected, baselines = []) {
  pass(label, () => assert.throws(() => validate({ localSource: change(fixture), baselines }), expected, label))
 }
-pass('integrated contract', () => assert.equal(validate({ localSource: fixture }).serviceVersion, 39))
+pass('integrated contract', () => assert.equal(validate({ localSource: fixture }).serviceVersion, 43))
 fails('syntax errors', text => text + '\nfunction broken( {', /syntax check/)
 fails('missing action', text => text.replace("action === 'verifyMobileViewer'", "action === 'oldLogin'"), /mobile action/)
-fails('old service version', text => text.replace('VERSION = 39', 'VERSION = 38'), /integrated version/)
+fails('old service version', text => text.replace('VERSION = 43', 'VERSION = 42'), /integrated version/)
 fails('wrong session duration', text => text.replace('HOURS = 72', 'HOURS = 24'), /must remain 72/)
 fails('credential property rename', text => text.replace('UNG_MOBILE_SHARED_PASSWORD_HASH', 'RENAMED'), /property names/)
 fails('contract downgrade', text => text.replace('contractVersion: 3', 'contractVersion: 2'), /contractVersion 3/)
@@ -86,7 +86,7 @@ fails('desktop release omission', text => text.replace("key: 'v1.1.25'", "key: '
 fails('main desktop function omission', text => text.replace('function listStaffChecklists_() { return readObjects_(STAFF_CHECKLISTS_SHEET); }', ''), /function removed/, [{ source: fixture, label: 'main' }])
 fails('baseline action omission', text => text.replace("action === 'listStaffChecklists'", "action === 'oldAction'"), /action removed/, [{ source: fixture, label: 'main' }])
 fails('release content replacement', text => text.replace('desktop widgets', 'replacement mobile notice'), /release note content removed/, [{ source: fixture, label: 'main' }])
-fails('remote version downgrade', text => text, /version downgrade/, [{ source: fixture.replace('VERSION = 39', 'VERSION = 40'), label: 'fixed', deployed: true }])
+fails('remote version downgrade', text => text, /version downgrade/, [{ source: fixture.replace('VERSION = 43', 'VERSION = 44'), label: 'fixed', deployed: true }])
 fails('same service version changed code', text => text + '\n// changed', /newer MOBILE_SERVICE_VERSION/, [{ source: fixture, label: 'fixed', deployed: true }])
 pass('idempotent same-source redeployment', () => assert.equal(validate({ localSource: fixture, baselines: [{ source: fixture, deployed: true }] }).ok, true))
 pass('merge release bodies', () => assert.equal(validate({ localSource: fixture.replace('desktop widgets', 'desktop widgets\\nmobile widgets'), baselines: [{ source: fixture }] }).ok, true))
@@ -106,7 +106,7 @@ pass('mobile and routing integration allowlist', () => assert.equal(validate({
  baselines: [mainBaseline]
 }).ok, true))
 
-const oldRemote = fixture.replace('VERSION = 39', 'VERSION = 38').replace('return readObjects_(STAFF_CHECKLISTS_SHEET);', 'return [];').replace("'staff-checklists'", "'legacy-staff-sheet'")
+const oldRemote = fixture.replace('VERSION = 43', 'VERSION = 42').replace('return readObjects_(STAFF_CHECKLISTS_SHEET);', 'return [];').replace("'staff-checklists'", "'legacy-staff-sheet'")
 pass('three-way accepts desktop work already approved on main', () => assert.equal(validate({ localSource: fixture, baselines: [mainBaseline, { source: oldRemote, label: 'fixed deployment', deployed: true }] }).ok, true))
 fails('three-way blocks reverting main desktop implementation to remote legacy', text => text.replace('return readObjects_(STAFF_CHECKLISTS_SHEET);', 'return [];'), /protected desktop function changed/, [mainBaseline, { source: oldRemote, label: 'fixed deployment', deployed: true }])
 const remoteOnlyDefinitions = '\nfunction remoteDesktopHelper_() { return "remote-only"; }\nconst REMOTE_DESKTOP_SHEET = "remote-only-sheet";'

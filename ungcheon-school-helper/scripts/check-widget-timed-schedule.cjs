@@ -60,7 +60,7 @@ test('lunch, cross-period break and point markers map to exact clock intervals',
   assert.equal(point.timeLabel, '15:40')
   const pointPiece = model.segments.find(segment => segment.lesson?.period === 7).pieces[0]
   assert.equal(pointPiece.heightPercent, 0)
-  assert.equal(pointPiece.topPercent, 20)
+  assert.equal(pointPiece.topPercent, 0)
 })
 test('all-day, different dates, missing/invalid/reversed times are excluded', () => {
   const model = build({ ...base, events: [event('all', '09:00', '10:00', { allDay: true }), event('other', '09:00', '10:00', { date: '2026-09-01' }),
@@ -73,7 +73,7 @@ test('before/after-school segments appear only when touched by timed events', ()
   assert.deepEqual(plain(model.segments.filter(segment => segment.kind !== 'lesson').map(segment => segment.kind)), ['before', 'after'])
   assert.equal(model.events.find(item => item.id === 'late').end, 1439)
   assert.equal(model.segments.at(-1).end, 1440)
-  const boundary = build({ ...base, events: [event('boundary', '16:20')] })
+  const boundary = build({ ...base, events: [event('boundary', '16:30')] })
   assert.equal(boundary.segments.at(-1).kind, 'after')
   assert.equal(boundary.segments.at(-1).pieces[0].event.point, true)
 })
@@ -111,7 +111,7 @@ test('render preserves current lesson countdown, next actual lesson, badge and p
   assert.ok(html.includes('당김수업'))
   assert.ok(html.includes('wts-current'))
   assert.ok(html.includes('aria-label="시각 15:40 제출시각"'))
-  assert.ok(!html.includes('15:40~'))
+  assert.ok(!html.includes('aria-label="기간 15:40'))
 })
 test('render offers overlap expansion instead of horizontal overflow or unreadable many lanes', () => {
   const html = render([event('a', '13:30', '14:10'), event('b', '13:40', '14:00'), event('c', '13:45', '13:55')])

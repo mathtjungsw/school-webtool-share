@@ -53,8 +53,8 @@ export default function SettingsPage() {
   const [period3Start, setPeriod3Start] = useState(config.period3Start ?? '10:40')
   const [period4Start, setPeriod4Start] = useState(config.period4Start ?? '11:30')
   const [period5Start, setPeriod5Start] = useState(config.period5Start ?? '13:30')
-  const [period6Start, setPeriod6Start] = useState(config.period6Start ?? '14:20')
-  const [period7Start, setPeriod7Start] = useState(config.period7Start ?? '15:10')
+  const [period6Start, setPeriod6Start] = useState(config.period6Start ?? '14:30')
+  const [period7Start, setPeriod7Start] = useState(config.period7Start ?? '15:40')
   const [lunchStart, setLunchStart] = useState(config.lunchStart ?? '')
   const [lunchEnd, setLunchEnd] = useState(config.lunchEnd ?? '')
   const [teacherClasses, setTeacherClasses] = useState<Array<{grade:string;classNm:string;subject:string}>>(
@@ -92,7 +92,7 @@ export default function SettingsPage() {
   const handlePeriod5Change = (time: string) => {
     setPeriod5Start(time)
     setPeriod6Start(addMinutes(time, interval))
-    setPeriod7Start(addMinutes(time, interval * 2))
+    setPeriod7Start(addMinutes(time, interval * 2 + 10))
   }
 
   useEffect(() => {
@@ -132,8 +132,8 @@ export default function SettingsPage() {
     setPeriod3Start(config.period3Start ?? '10:40')
     setPeriod4Start(config.period4Start ?? '11:30')
     setPeriod5Start(config.period5Start ?? '13:30')
-    setPeriod6Start(config.period6Start ?? '14:20')
-    setPeriod7Start(config.period7Start ?? '15:10')
+    setPeriod6Start(config.period6Start ?? '14:30')
+    setPeriod7Start(config.period7Start ?? '15:40')
     setLunchStart(config.lunchStart ?? '')
     setLunchEnd(config.lunchEnd ?? '')
     setTeacherClasses(config.teacherClasses ?? [])

@@ -1,4 +1,4 @@
-import { DEFAULT_VISIBILITY, collectEvents, lessonFocus, newEventFingerprints, rangeForToday, schoolClock, timetableForDate } from './domain'
+import { DEFAULT_VISIBILITY, buildMobileTimelineRows, collectEvents, lessonFocus, newEventFingerprints, rangeForToday, schoolClock, timetableForDate } from './domain'
 import type { DashboardPayload, TeacherTimetable, TimetableChange } from './types'
 import { describe, expect, it } from 'vitest'
 
@@ -39,6 +39,36 @@ describe('모바일 일정 도메인', () => {
     expect(lessonFocus(lessons, 9 * 60 + 31)).toMatchObject({ state: 'between', nextPeriod: 5 })
     expect(lessonFocus(lessons, 16 * 60 + 40)).toMatchObject({ state: 'during', currentPeriod: 8 })
     expect(lessonFocus(lessons, 17 * 60 + 30)).toMatchObject({ state: 'after' })
+  })
+
+  it('7교시는 15시 40분부터 16시 30분까지로 계산한다', () => {
+    const lessons = Array.from({ length: 7 }, (_, index) => ({ period: index + 1, value: index === 6 ? '301\n물리' : '' }))
+    expect(lessonFocus(lessons, 15 * 60 + 39)).toMatchObject({ state: 'between', nextPeriod: 7, minutesUntil: 1 })
+    expect(lessonFocus(lessons, 15 * 60 + 40)).toMatchObject({ state: 'during', currentPeriod: 7 })
+    expect(lessonFocus(lessons, 16 * 60 + 30)).toMatchObject({ state: 'after' })
+  })
+
+  it('시간 지정 일정은 교시 오른쪽에 놓고 수업 변경은 중복하지 않는다', () => {
+    const lessons = Array.from({ length: 7 }, (_, index) => ({ period: index + 1, value: index === 6 ? '301\n물리' : '' }))
+    const rows = buildMobileTimelineRows(lessons, [
+      { id:'c1', date:'2026-09-03', title:'위원회', source:'committee', label:'교육과정위원회', time:'15:50', startTime:'15:50', endTime:'16:10' },
+      { id:'p1', date:'2026-09-03', title:'단일 일정', source:'weekly', label:'교무부', time:'15:45' },
+      { id:'x1', date:'2026-09-03', title:'수업 교환', source:'timetableChange', label:'승인' },
+    ])
+    const seventh = rows.find(row => row.id === 'period-7')!
+    expect(seventh.start).toBe('15:40')
+    expect(seventh.end).toBe('16:30')
+    expect(seventh.events.map(event => event.title)).toEqual(['위원회', '단일 일정'])
+  })
+
+  it('수업 없는 날에는 가짜 공강 7칸 없이 실제 시간 일정만 표시한다', () => {
+    const rows = buildMobileTimelineRows([], [
+      { id:'holiday-event', date:'2026-09-07', title:'연수', source:'weekly', label:'교무부', startTime:'14:00', endTime:'15:00' },
+      { id:'all-day', date:'2026-09-07', title:'재량휴업일', source:'schoolEvent', label:'학사일정' },
+    ])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ label:'시간 일정', start:'14:00', end:'15:00' })
+    expect(rows.some(row => row.kind === 'period')).toBe(false)
   })
 
   it('일정 정렬 변경은 NEW가 아니고 내용 변경만 NEW로 판정한다', () => {

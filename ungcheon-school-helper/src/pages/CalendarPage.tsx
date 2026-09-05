@@ -128,12 +128,13 @@ interface TaskDraft {
   title: string
   date: string
   time: string
+  endTime: string
   priority: PersonalTaskPriority
   memo: string
 }
 
 function emptyDraft(date: string): TaskDraft {
-  return { title: '', date, time: '', priority: 'normal', memo: '' }
+  return { title: '', date, time: '', endTime: '', priority: 'normal', memo: '' }
 }
 
 export default function CalendarPage() {
@@ -350,8 +351,9 @@ export default function CalendarPage() {
       const completed = task.status === 'completed' || task.closed || (task.items.length > 0 && task.items.every(item => own?.checkedItemIds.includes(item.id)))
       return ({
       id: `shared-work-${task.id}`,
-      date: task.deadline,
+      date: task.startTime && task.scheduledDate ? task.scheduledDate : task.deadline,
       title: task.title,
+      time: task.startTime ? `${task.startTime}${task.endTime ? `~${task.endTime}` : ''}` : undefined,
       source: 'sharedWork' as const,
       label: task.departmentNames.length ? task.departmentNames.join(' · ') : '공유 업무',
       completed,
@@ -360,7 +362,7 @@ export default function CalendarPage() {
       id: `personal-${task.id}`,
       date: task.date,
       title: task.title,
-      time: task.time,
+      time: task.time ? `${task.time}${task.endTime ? `~${task.endTime}` : ''}` : undefined,
       source: 'personal' as const,
       label: '개인 업무',
       completed: task.completed,
@@ -413,7 +415,7 @@ export default function CalendarPage() {
 
   const editTask = (task: PersonalTask) => {
     setSelectedDate(task.date)
-    setDraft({ id: task.id, title: task.title, date: task.date, time: task.time ?? '', priority: task.priority, memo: task.memo ?? '' })
+    setDraft({ id: task.id, title: task.title, date: task.date, time: task.time ?? '', endTime: task.endTime ?? '', priority: task.priority, memo: task.memo ?? '' })
     setMessage('')
   }
 
@@ -427,14 +429,15 @@ export default function CalendarPage() {
     event.preventDefault()
     const title = draft.title.trim()
     if (!title) return
+    if (draft.endTime && (!draft.time || draft.endTime <= draft.time)) { setMessage('종료 시간은 시작 시간보다 늦게 입력해 주세요.'); return }
     const now = new Date().toISOString()
     if (draft.id) {
       await persistTasks(tasks.map(task => task.id === draft.id
-        ? { ...task, title, date: draft.date, time: draft.time || undefined, priority: draft.priority, memo: draft.memo.trim(), updatedAt: now }
+        ? { ...task, title, date: draft.date, time: draft.time || undefined, endTime: draft.time && draft.endTime ? draft.endTime : undefined, priority: draft.priority, memo: draft.memo.trim(), updatedAt: now }
         : task), '개인 업무를 수정했습니다.')
     } else {
       await persistTasks([...tasks, {
-        id: createPersonalTaskId(), title, date: draft.date, time: draft.time || undefined,
+        id: createPersonalTaskId(), title, date: draft.date, time: draft.time || undefined, endTime: draft.time && draft.endTime ? draft.endTime : undefined,
         priority: draft.priority, completed: false, memo: draft.memo.trim(), createdAt: now, updatedAt: now,
       }], '개인 업무를 등록했습니다.')
     }
@@ -568,8 +571,9 @@ export default function CalendarPage() {
               <label className="block"><span className="mb-1 block text-[10px] font-semibold text-slate-500">업무 제목</span><input required value={draft.title} onChange={event => setDraft(current => ({ ...current, title: event.target.value }))} placeholder="해야 할 일을 입력하세요" /></label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block"><span className="mb-1 block text-[10px] font-semibold text-slate-500">마감일</span><input type="date" required value={draft.date} onChange={event => setDraft(current => ({ ...current, date: event.target.value }))} /></label>
-                <label className="block"><span className="mb-1 block text-[10px] font-semibold text-slate-500">시간</span><input type="time" value={draft.time} onChange={event => setDraft(current => ({ ...current, time: event.target.value }))} /></label>
+                <label className="block"><span className="mb-1 block text-[10px] font-semibold text-slate-500">시작 시간</span><input type="time" value={draft.time} onChange={event => setDraft(current => ({ ...current, time: event.target.value, endTime: event.target.value ? current.endTime : '' }))} /></label>
               </div>
+              <label className="block"><span className="mb-1 block text-[10px] font-semibold text-slate-500">종료 시간(선택)</span><input type="time" value={draft.endTime} min={draft.time || undefined} disabled={!draft.time} onChange={event => setDraft(current => ({ ...current, endTime: event.target.value }))} /></label>
               <label className="block"><span className="mb-1 block text-[10px] font-semibold text-slate-500">중요도</span><select value={draft.priority} onChange={event => setDraft(current => ({ ...current, priority: event.target.value as PersonalTaskPriority }))}><option value="low">낮음</option><option value="normal">보통</option><option value="high">높음</option></select></label>
               <label className="block"><span className="mb-1 block text-[10px] font-semibold text-slate-500">메모</span><textarea rows={3} value={draft.memo} onChange={event => setDraft(current => ({ ...current, memo: event.target.value }))} placeholder="필요한 내용을 간단히 적으세요" /></label>
               <button className="btn-primary w-full" type="submit"><Save size={13} />{draft.id ? '수정 저장' : '업무 등록'}</button>

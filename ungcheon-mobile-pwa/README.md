@@ -2,7 +2,7 @@
 
 PC용 `ungcheon-school-helper`와 같은 최신 main에서 관리하는 교직원용 읽기 전용 모바일 앱입니다. 개인 업무·개인 일정·학생 자료·검색도우미·승인 및 편집 기능은 포함하지 않습니다.
 
-공개 주소는 **https://ungcheon-mobile-schedule.jsw890122.chatgpt.site** 이며 기존 Sites 프로젝트와 Apps Script 고정 주소를 그대로 사용합니다. 데스크톱 v1.1.26 / 모바일 1.1.26 / 공유 서비스 39 통합본입니다.
+공개 주소는 **https://ungcheon-mobile-schedule.jsw890122.chatgpt.site** 이며 기존 Sites 프로젝트와 Apps Script 고정 주소를 그대로 사용합니다. 데스크톱 v1.1.30 / 모바일 1.1.27 / 공유 서비스 43 통합본입니다.
 
 ## 재사용하는 조회 계약
 

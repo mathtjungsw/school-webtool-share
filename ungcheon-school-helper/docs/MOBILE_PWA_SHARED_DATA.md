@@ -9,7 +9,7 @@
 - 고정 deployment: `AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w`.
 - Apps Script URL: <https://script.google.com/macros/s/AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w/exec>.
 - 모바일 PWA 공개 URL: <https://ungcheon-mobile-schedule.jsw890122.chatgpt.site>. PWA 배포 설정과 데스크톱 환경설정도 이 주소를 그대로 사용한다. 새 사이트/호스트/주소로 바꾸지 않는다.
-- 통합 릴리스는 데스크톱 v1.1.26, Apps Script `MOBILE_SERVICE_VERSION = 39`를 기준으로 한다. 이후 변경 시 버전을 올리며, 현재 실제 원격 버전보다 내려가지 않는다.
+- 현재 통합 릴리스는 데스크톱 v1.1.30, 모바일 PWA v1.1.27, Apps Script `MOBILE_SERVICE_VERSION = 43`을 기준으로 한다. 이후 변경 시 버전을 올리며, 현재 실제 원격 버전보다 내려가지 않는다.
 
 ## 로그인과 응답
 

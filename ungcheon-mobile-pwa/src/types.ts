@@ -7,6 +7,8 @@ export interface MobileEvent {
   source: ScheduleSource
   label: string
   time?: string
+  startTime?: string
+  endTime?: string
 }
 
 export interface StaffMember { name: string }
@@ -49,7 +51,7 @@ export interface TimetableChange {
   updatedAt?: string
 }
 export interface MobileScheduleBundle {
-  events: Array<{ date: string; title: string; source: 'weekly' | 'creative' | 'schoolEvent' | 'gateDuty' | 'mealDuty'; label: string; time?: string }>
+  events: Array<{ date: string; title: string; source: 'weekly' | 'creative' | 'schoolEvent' | 'gateDuty' | 'mealDuty'; label: string; time?: string; startTime?: string; endTime?: string }>
   teacherTimetable: TeacherTimetable | null
   committeeEvents: CommitteeEvent[]
   timetableChanges: TimetableChange[]

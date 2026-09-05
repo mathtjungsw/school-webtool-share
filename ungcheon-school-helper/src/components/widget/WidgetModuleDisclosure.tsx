@@ -6,14 +6,15 @@ interface DisclosureState {
   collapsed: boolean
   onToggle: () => void
   bodyId?: string
+  dragHandle?: ReactNode
 }
 
 const DisclosureContext = createContext<DisclosureState>({ collapsed: false, onToggle: () => {} })
 
 /** Presentation only: children stay mounted and the caller owns durable settings. */
-export function WidgetModuleDisclosure({ collapsed, onToggle, children }: DisclosureState & { children: ReactNode }) {
+export function WidgetModuleDisclosure({ collapsed, onToggle, dragHandle, children }: DisclosureState & { children: ReactNode }) {
   const bodyId = useId()
-  return <DisclosureContext.Provider value={{ collapsed, onToggle, bodyId }}>{children}</DisclosureContext.Provider>
+  return <DisclosureContext.Provider value={{ collapsed, onToggle, bodyId, dragHandle }}>{children}</DisclosureContext.Provider>
 }
 
 export function useWidgetModuleDisclosure() {
@@ -28,9 +29,10 @@ export function WidgetModuleHeader({ title, icon, summary, badge, actions, class
   actions?: ReactNode
   className?: string
 }) {
-  const { collapsed, onToggle, bodyId } = useWidgetModuleDisclosure()
+  const { collapsed, onToggle, bodyId, dragHandle } = useWidgetModuleDisclosure()
   return (
     <header className={`widget-module-heading ${collapsed ? 'is-collapsed' : ''} ${className}`}>
+      {dragHandle}
       <span className="widget-module-heading-label">{icon}<strong>{title}</strong></span>
       {collapsed
         ? <span className="widget-module-summary" title={summary}>{summary}</span>

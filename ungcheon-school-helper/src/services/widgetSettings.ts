@@ -108,7 +108,7 @@ export const DEFAULT_WIDGET_PRODUCTIVITY_SETTINGS: WidgetProductivitySettings = 
   },
   endOfDay: {
     enabled: false,
-    time: '16:20',
+    time: '16:30',
     includeTasks: true,
     includeTomorrowLesson: true,
     includeTomorrowDuty: true,

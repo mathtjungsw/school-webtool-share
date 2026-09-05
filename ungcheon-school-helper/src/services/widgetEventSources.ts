@@ -98,13 +98,15 @@ export function buildWidgetBaseEvents(date: string, sources: {
       && item.showOnCalendar !== false
       && (item.kind !== 'task' || !item.completed || sources.includeCompletedTasks))
       .map(item => ({ id: `personal:${item.id}`, date: targetDate, title: item.title,
-        meta: item.time || (item.kind === 'task' ? '개인 업무' : '개인 일정'),
+        meta: item.time ? `${item.time}${item.endTime ? `~${item.endTime}` : ''}` : (item.kind === 'task' ? '개인 업무' : '개인 일정'),
         kind: item.kind === 'task' ? 'personal-task' : 'personal-schedule',
-        startTime: item.time, time: item.time, allDay: !item.time })),
-    ...sources.sharedTasks.filter(item => normalizeWidgetEventDate(item.deadline) === targetDate
+        startTime: item.time, endTime: item.endTime, time: item.time, allDay: !item.time })),
+    ...sources.sharedTasks.filter(item => normalizeWidgetEventDate(item.startTime && item.scheduledDate ? item.scheduledDate : item.deadline) === targetDate
       && item.targetNames.includes(teacherName) && !isSharedWorkComplete(item, teacherName))
       .map(item => ({ id: `shared:${item.id}`, date: targetDate, title: item.title,
-        meta: '배부 업무 마감', kind: 'shared-task', allDay: true })),
+        meta: item.startTime ? `배부 업무 · ${item.startTime}${item.endTime ? `~${item.endTime}` : ''}` : '배부 업무 마감',
+        kind: 'shared-task', startTime: item.startTime || undefined, endTime: item.endTime || undefined,
+        time: item.startTime || undefined, allDay: !item.startTime })),
     ...sources.schoolSchedules.filter(item => normalizeWidgetEventDate(item.date) === targetDate)
       .map((item, index) => ({ id: `school:${targetDate}:${index}`, date: targetDate, title: item.eventName,
         meta: '학사일정', kind: 'school', allDay: true })),

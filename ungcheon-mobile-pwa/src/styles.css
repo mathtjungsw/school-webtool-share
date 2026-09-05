@@ -199,6 +199,36 @@ input:focus { border-color: #28624e; box-shadow: 0 0 0 3px rgba(40, 98, 78, .12)
 .lesson-copy strong, .week-grid div strong { display: block; font-size: 13px; }
 .lesson-copy > small, .week-grid small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
 .lesson-copy em, .week-grid em { display: block; margin-top: 3px; color: #9a5a0a; font-size: 9px; font-style: normal; font-weight: 780; }
+.daily-timeline { padding: 4px 10px 9px; overflow: hidden; }
+.daily-timeline-head, .daily-timeline-row { display: grid; grid-template-columns: minmax(0, 43%) minmax(0, 57%); }
+.daily-timeline-head { min-height: 26px; align-items: center; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 9px; }
+.daily-timeline-head strong { padding: 0 8px; }
+.daily-timeline-head strong + strong { border-left: 1px solid var(--line); }
+.daily-timeline-row { min-height: 48px; border-bottom: 1px solid var(--line); }
+.daily-timeline-row:last-child { border-bottom: 0; }
+.timeline-lesson { min-width: 0; display: flex; align-items: center; gap: 7px; padding: 6px 7px; }
+.timeline-clock { flex: 0 0 auto; min-width: 43px; }
+.timeline-clock b, .timeline-clock small { display: block; }
+.timeline-clock b { font-size: 10px; }
+.timeline-clock small { margin-top: 2px; color: var(--muted); font-size: 8px; white-space: nowrap; }
+.timeline-lesson .lesson-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.timeline-events { min-width: 0; display: grid; align-content: center; gap: 3px; padding: 4px 5px; border-left: 1px solid var(--line); background: color-mix(in srgb, var(--surface-soft) 55%, transparent); }
+.timeline-event { min-width: 0; display: flex; align-items: center; gap: 4px; padding: 4px 5px; border-left: 3px solid var(--brand); border-radius: 5px; background: var(--surface); }
+.timeline-event > div { min-width: 0; flex: 1; }
+.timeline-event strong, .timeline-event small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-event strong { font-size: 9.5px; }
+.timeline-event small { margin-top: 1px; color: var(--muted); font-size: 8px; }
+.timeline-empty { color: color-mix(in srgb, var(--muted) 45%, transparent); font-size: 10px; }
+.daily-timeline-row.row-lunch, .daily-timeline-row.row-break { min-height: 36px; }
+.daily-timeline-row.row-lunch .timeline-lesson { background: color-mix(in srgb, #fbbf24 10%, transparent); }
+.daily-timeline-row.changed .timeline-lesson { background: color-mix(in srgb, #f59e0b 12%, transparent); }
+@media (max-width: 390px) {
+  .daily-timeline { padding-inline: 6px; }
+  .daily-timeline-head, .daily-timeline-row { grid-template-columns: minmax(0, 42%) minmax(0, 58%); }
+  .timeline-lesson { gap: 4px; padding-inline: 4px; }
+  .timeline-clock { min-width: 38px; }
+  .timeline-clock small { font-size: 7.5px; }
+}
 .changed { background: rgba(231, 184, 82, .13) !important; }
 
 .event-list { display: flex; flex-direction: column; gap: 8px; padding: 10px; }

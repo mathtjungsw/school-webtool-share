@@ -1,5 +1,5 @@
 import { addDays, format, startOfWeek } from 'date-fns'
-import type { DashboardPayload, LessonView, MobileEvent, ScheduleSource, TeacherTimetable, TimetableChange } from './types'
+import type { DashboardPayload, LessonView, MealInfo, MobileEvent, ScheduleSource, TeacherTimetable, TimetableChange } from './types'
 import { PULLED_LESSONS_2026 } from './shared/pulledLessons2026'
 import { UNGCHEON_PERIOD_PLAN } from './shared/ungcheonSchedule'
 
@@ -36,6 +36,73 @@ function minutesOf(value: string) {
   return hour * 60 + minute
 }
 
+export function sortMealsByType(meals: readonly MealInfo[]) {
+  const rank = (value: string) => value.includes('조식') ? 0 : value.includes('중식') ? 1 : value.includes('석식') ? 2 : 3
+  return [...meals].sort((a, b) => rank(a.mealType) - rank(b.mealType))
+}
+
+export interface MobileTimelineRow {
+  id: string
+  kind: 'before' | 'period' | 'break' | 'lunch' | 'after'
+  label: string
+  start: string
+  end: string
+  lesson?: LessonView
+  events: MobileEvent[]
+}
+
+function eventRange(event: MobileEvent) {
+  const text = [event.startTime, event.endTime].filter(Boolean).join('~') || event.time || event.title
+  const matches = [...text.matchAll(/(?<!\d)([01]?\d|2[0-3]):([0-5]\d)(?!\d)/g)]
+  const clock = (match: RegExpMatchArray) => `${match[1].padStart(2, '0')}:${match[2]}`
+  let start = event.startTime || (matches[0] ? clock(matches[0]) : '')
+  let end = event.endTime || (matches[1] ? clock(matches[1]) : '')
+  if (!start && event.source === 'creative') {
+    const periods = [...event.title.matchAll(/(?<!\d)([1-7])(?=\s*(?:[~～〜·,]|교시))/g)].map(match => Number(match[1]))
+    if (periods.length) {
+      const first = UNGCHEON_PERIOD_PLAN[Math.min(...periods) - 1]
+      const last = UNGCHEON_PERIOD_PLAN[Math.max(...periods) - 1]
+      start = first?.start || ''
+      end = last?.end || ''
+    }
+  }
+  if (!start || !/^\d{2}:\d{2}$/.test(start) || (end && !/^\d{2}:\d{2}$/.test(end))) return null
+  return { start, end: end && end > start ? end : start, point: !end || end <= start }
+}
+
+export function buildMobileTimelineRows(lessons: LessonView[], events: MobileEvent[]): MobileTimelineRow[] {
+  const timed = events.filter(event => event.source !== 'timetableChange' && event.source !== 'pulledLesson')
+    .map(event => ({ event, range: eventRange(event) })).filter((item): item is { event: MobileEvent; range: NonNullable<ReturnType<typeof eventRange>> } => Boolean(item.range))
+  if (!lessons.length) {
+    return timed.map((item, index) => ({
+      id: `timed-event-${item.event.id}-${index}`,
+      kind: 'before',
+      label: '시간 일정',
+      start: item.range.start,
+      end: item.range.end,
+      events: [item.event],
+    }))
+  }
+  const first = UNGCHEON_PERIOD_PLAN[0]
+  const last = UNGCHEON_PERIOD_PLAN[6]
+  const overlaps = (start: string, end: string) => timed.filter(item => item.range.point
+    ? item.range.start >= start && item.range.start < end
+    : item.range.start < end && item.range.end > start).map(item => item.event)
+  const rows: MobileTimelineRow[] = []
+  const before = timed.filter(item => item.range.start < first.start)
+  if (before.length) rows.push({ id: 'before', kind: 'before', label: '수업 전', start: before.map(item => item.range.start).sort()[0], end: first.start, events: before.map(item => item.event) })
+  UNGCHEON_PERIOD_PLAN.slice(0, 7).forEach((period, index) => {
+    rows.push({ id: `period-${period.period}`, kind: 'period', label: `${period.period}교시`, start: period.start, end: period.end, lesson: lessons[index], events: overlaps(period.start, period.end) })
+    const next = UNGCHEON_PERIOD_PLAN[index + 1]
+    if (!next || index >= 6) return
+    const gapEvents = overlaps(period.end, next.start)
+    if (index === 3 || gapEvents.length) rows.push({ id: `gap-${period.period}`, kind: index === 3 ? 'lunch' : 'break', label: index === 3 ? '점심' : '쉬는 시간', start: period.end, end: next.start, events: gapEvents })
+  })
+  const after = timed.filter(item => item.range.point ? item.range.start >= last.end : item.range.end > last.end)
+  if (after.length) rows.push({ id: 'after', kind: 'after', label: '수업 후', start: last.end, end: after.map(item => item.range.end).sort().at(-1) || last.end, events: after.map(item => item.event) })
+  return rows
+}
+
 export interface LessonFocus {
   state: 'before' | 'during' | 'between' | 'after' | 'none'
   currentPeriod?: number
@@ -49,13 +116,14 @@ export interface LessonFocus {
 
 export function lessonFocus(lessons: LessonView[], minuteOfDay: number): LessonFocus {
   if (!lessons.length) return { state: 'none' }
-  const currentPlan = UNGCHEON_PERIOD_PLAN.find(item => minuteOfDay >= minutesOf(item.start) && minuteOfDay < minutesOf(item.end))
-  const nextPlan = UNGCHEON_PERIOD_PLAN.find(item => minutesOf(item.start) > minuteOfDay && Boolean(lessons[Number(item.period) - 1]?.value))
+  const activePlan = UNGCHEON_PERIOD_PLAN.slice(0, lessons.length)
+  const currentPlan = activePlan.find(item => minuteOfDay >= minutesOf(item.start) && minuteOfDay < minutesOf(item.end))
+  const nextPlan = activePlan.find(item => minutesOf(item.start) > minuteOfDay && Boolean(lessons[Number(item.period) - 1]?.value))
   const state: LessonFocus['state'] = currentPlan
     ? 'during'
-    : minuteOfDay < minutesOf(UNGCHEON_PERIOD_PLAN[0].start)
+    : minuteOfDay < minutesOf(activePlan[0].start)
       ? 'before'
-      : minuteOfDay >= minutesOf(UNGCHEON_PERIOD_PLAN[UNGCHEON_PERIOD_PLAN.length - 1].end)
+      : minuteOfDay >= minutesOf(activePlan[activePlan.length - 1].end)
         ? 'after'
         : 'between'
   const currentPeriod = currentPlan ? Number(currentPlan.period) : undefined
@@ -108,7 +176,7 @@ export function timetableForDate(teacher: TeacherTimetable | null, date: string,
 }
 export function collectEvents(data: DashboardPayload, name: string): MobileEvent[] {
   const events: MobileEvent[] = (data.bundle?.events ?? []).map((item, index) => ({ ...item, id: `bundle-${item.source}-${item.date}-${index}` }))
-  data.committees.events.filter(event => event.memberNames.includes(name)).forEach(event => events.push({ id: `committee-${event.id}`, date: event.date, title: event.title, source: 'committee', label: event.committeeName, time: event.startTime }))
+  data.committees.events.filter(event => event.memberNames.includes(name)).forEach(event => events.push({ id: `committee-${event.id}`, date: event.date, title: event.title, source: 'committee', label: event.committeeName, time: event.startTime, startTime: event.startTime, endTime: event.endTime }))
   data.changes.filter(item => isApplied(item, name)).forEach(item => {
     const title = item.kind === 'exchange' ? `수업 교환 · ${item.originalClass} ↔ ${item.replacementClass}` : `대강 · ${item.originalClass} ${item.originalSubject}`
     ;[...new Set([item.originalDate, item.replacementDate])].forEach(date => events.push({ id: `change-${item.id}-${date}`, date, title, source: 'timetableChange', label: item.status === 'approved' ? '승인된 수업 변경' : '우선 반영' }))

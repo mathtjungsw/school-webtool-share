@@ -19,7 +19,7 @@ export const UNGCHEON_DEFAULT_CONFIG: AppConfig = {
   period4Start: '11:40',
   period5Start: '13:30',
   period6Start: '14:30',
-  period7Start: '15:30',
+  period7Start: '15:40',
 }
 
 interface AppState {
@@ -137,6 +137,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // 1.0.41의 migrations.* 키는 보안 화이트리스트에 없어 시작 중 저장 예외를 일으켰다.
     const migrations = ((all as Record<string, unknown>).dashboard ?? {}) as Record<string, unknown>
     const applyNeisDefaultOff = migrations.neisScheduleDefaultOffV1 !== true
+    const applyPeriod7Correction = migrations.period7TimeCorrectionV1 !== true
 
     // API 키는 safeStorage에서 별도 로드 (없으면 기존 plain 값 유지 — 마이그레이션)
     const apiKeys = await window.electron.apiKeyGetAll()
@@ -151,6 +152,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // 기존 기본값(true)이 저장된 PC도 이번 업데이트에서 한 번만 꺼짐으로 전환한다.
     // 이후 사용자가 켜거나 끈 선택은 그대로 유지된다.
     if (applyNeisDefaultOff) cfg.showNeisSchedule = false
+    if (applyPeriod7Correction && (!nested.period7Start || nested.period7Start === '15:30')) cfg.period7Start = '15:40'
 
     set({ config: cfg, isConfigLoaded: true })
 
@@ -170,6 +172,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (applyNeisDefaultOff) {
       patch['config.showNeisSchedule'] = false
       patch['dashboard.neisScheduleDefaultOffV1'] = true
+    }
+    if (applyPeriod7Correction) {
+      if (!nested.period7Start || nested.period7Start === '15:30') patch['config.period7Start'] = '15:40'
+      patch['dashboard.period7TimeCorrectionV1'] = true
     }
     if (Object.keys(patch).length > 0) {
       try {

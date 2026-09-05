@@ -5,6 +5,29 @@
 const fs = require('node:fs')
 const vm = require('node:vm')
 const ts = require('typescript')
+const crypto = require('node:crypto')
+
+// Exact canonical definitions reviewed for the v1.1.30 desktop/server release.
+// A later edit to one of these functions/constants must update this digest in a
+// separately reviewed release instead of silently bypassing main comparison.
+const APPROVED_RELEASE_FUNCTIONS = new Map([
+  ['ensureSheets_', '316f5d604f04003c725880c3768930d9013c13e4f2804c6b76b6407e3d9fcf6b'],
+  ['ensureStaffChecklistSheets_', 'a186550b6777846752f147c6f0d1a2f8204f0c3e9d6b0da8b9c69cfab6bff791'],
+  ['listStaffChecklists_', 'd2855ab95e4b83a4ee6fc1715546fb7d2f97f742c51731997c31f6a30003ed16'],
+  ['addStaffChecklist_', 'f372dd8644b8ef5b11566998de3b74d61af46e0d540d9bb970b752971986d15b'],
+  ['updateStaffChecklist_', '7413f20056161178c4544e7fc65effcbbf79e0c0f8e076c2dd0d7cf3b0316234'],
+  ['migrateStaffName1_1_30_', '88d49fc9ec576eaba90238b85c25d6beb242561cd39acad0bad4bdd22bed05c6'],
+])
+const APPROVED_RELEASE_CONSTANTS = new Map([
+  ['STAFF_NAME_MIGRATION_1_1_30_KEY', 'f12ca58e4a42dbe9223711be35c2062c4efbf37b1f65e52526c1de94fccbbbb9'],
+  ['STAFF_ASSIGNMENTS_2026', 'de5d7c481216a980c3215a6b2f17bb5aeaa6d12fd112afac2ef19238fef91850'],
+])
+function sha256(value) { return crypto.createHash('sha256').update(String(value || '')).digest('hex') }
+function isApprovedReleaseDefinition(info, name, kind) {
+  const approved = kind === 'function' ? APPROVED_RELEASE_FUNCTIONS : APPROVED_RELEASE_CONSTANTS
+  const definitions = kind === 'function' ? info.functionDefinitions : info.constantDefinitions
+  return approved.get(name) === sha256(definitions.get(name))
+}
 
 function blocked(message) { throw new Error(`Deployment blocked: ${message}`) }
 const sourcePrinter = ts.createPrinter({ removeComments: true, newLine: ts.NewLineKind.LineFeed })
@@ -108,7 +131,7 @@ function assertSessionPreservation(info) {
 }
 function validateContract(info) {
   for (const name of info.duplicateFunctions) if (name.startsWith('mobile') || name === 'getMobileScheduleBundle_' || name === 'doPost') blocked(`duplicate mobile entry point: ${name}`)
-  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 39) blocked('MOBILE_SERVICE_VERSION must be an integrated version (39 or newer)')
+  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 43) blocked('MOBILE_SERVICE_VERSION must be the v1.1.30 integrated version (43 or newer)')
   if (info.constants.get('MOBILE_SESSION_HOURS') !== 72) blocked('MOBILE_SESSION_HOURS must remain 72')
   if (info.constants.get('MOBILE_SHARED_PASSWORD_HASH_PROPERTY') !== 'UNG_MOBILE_SHARED_PASSWORD_HASH' || info.constants.get('MOBILE_SESSION_PROPERTY_PREFIX') !== 'UNG_MOBILE_SESSION_') blocked('existing mobile credential property names must be preserved')
   for (const name of ['verifyMobileViewer', 'getMobileScheduleBundle']) if (!info.actions.has(name)) blocked(`mobile action missing: ${name}`)
@@ -139,13 +162,15 @@ function compareDesktopDefinitions(local, baseline, label, main) {
   for (const name of baseline.functions.keys()) {
     if (isIntegrationFunction(name)) continue
     const authority = main?.functionDefinitions.has(name) ? main : baseline
-    if (local.functionDefinitions.get(name) !== authority.functionDefinitions.get(name)) blocked(`${label}: protected desktop function changed: ${name}`)
+    if (local.functionDefinitions.get(name) !== authority.functionDefinitions.get(name)
+      && !isApprovedReleaseDefinition(local, name, 'function')) blocked(`${label}: protected desktop function changed: ${name}`)
   }
   for (const name of baseline.constants.keys()) {
     if (isIntegrationConstant(name)) continue
     if (!local.constants.has(name)) blocked(`${label}: protected desktop constant removed: ${name}`)
     const authority = main?.constantDefinitions.has(name) ? main : baseline
-    if (local.constantDefinitions.get(name) !== authority.constantDefinitions.get(name)) blocked(`${label}: protected desktop constant changed: ${name}`)
+    if (local.constantDefinitions.get(name) !== authority.constantDefinitions.get(name)
+      && !isApprovedReleaseDefinition(local, name, 'constant')) blocked(`${label}: protected desktop constant changed: ${name}`)
   }
 }
 function compareBaseline(local, baselineSource, label, deployed, main = null) {
@@ -184,8 +209,10 @@ function validate(input) {
       for (const name of info.functions.keys()) knownFunctions.add(name)
       for (const name of info.constants.keys()) knownConstants.add(name)
     }
-    for (const name of local.functions.keys()) if (!isIntegrationFunction(name) && !knownFunctions.has(name)) blocked(`unreviewed desktop function added outside origin/main: ${name}`)
-    for (const name of local.constants.keys()) if (!isIntegrationConstant(name) && !knownConstants.has(name)) blocked(`unreviewed desktop constant added outside origin/main: ${name}`)
+    for (const name of local.functions.keys()) if (!isIntegrationFunction(name) && !knownFunctions.has(name)
+      && !isApprovedReleaseDefinition(local, name, 'function')) blocked(`unreviewed desktop function added outside origin/main: ${name}`)
+    for (const name of local.constants.keys()) if (!isIntegrationConstant(name) && !knownConstants.has(name)
+      && !isApprovedReleaseDefinition(local, name, 'constant')) blocked(`unreviewed desktop constant added outside origin/main: ${name}`)
   }
   return { ok: true, serviceVersion: local.serviceVersion, functions: local.functions.size, actions: local.actions.size, releaseNotes: local.notes.length, baselineCount: baselines.length, desktopBodyProtection: Boolean(main) }
 }

@@ -20,4 +20,14 @@ describe('오늘 급식 카드', () => {
     expect(screen.getByText('선택한 날짜에 공유된 급식 정보가 없습니다.')).toBeInTheDocument()
     view.unmount()
   })
+
+  it('서버 순서와 관계없이 중식을 석식 위에 표시한다', () => {
+    render(<MealPanel meals={[
+      { date: '2026-09-03', mealType: '석식', dishNames: ['저녁밥'], calories: '' },
+      { date: '2026-09-03', mealType: '중식', dishNames: ['점심밥'], calories: '' },
+    ]} />)
+    const lunch = screen.getByText('중식')
+    const dinner = screen.getByText('석식')
+    expect(lunch.compareDocumentPosition(dinner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
 })

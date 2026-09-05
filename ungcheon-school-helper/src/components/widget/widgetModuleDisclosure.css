@@ -13,6 +13,16 @@
 .widget-module-heading-label { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
 .widget-module-heading-label > svg { width: 13px; height: 13px; flex: 0 0 auto; }
 .widget-module-heading-label > strong { font-size: 10px; font-weight: 800; }
+.widget-shell .widget-module-drag-handle {
+  display: grid; place-items: center; flex: 0 0 20px;
+  width: 20px; height: 20px; padding: 0; margin: 0;
+  border: 0; border-radius: 5px; background: transparent; color: #94a3b8;
+  cursor: grab; touch-action: none; -webkit-app-region: no-drag;
+}
+.widget-shell .widget-module-drag-handle:hover { background: #e2e8f0; color: #334155; }
+.widget-shell .widget-module-drag-handle:active { cursor: grabbing; }
+.widget-shell .widget-module-drag-handle:focus-visible { outline: 2px solid #2563eb; outline-offset: 1px; }
+.widget-shell .widget-module-slot.is-dragging { z-index: 5; opacity: .72; }
 .widget-module-summary { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; color: #475569; font-size: 10px; }
 .widget-module-heading-badge { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .widget-module-heading-actions { display: flex; align-items: center; gap: 3px; flex: 0 0 auto; }
