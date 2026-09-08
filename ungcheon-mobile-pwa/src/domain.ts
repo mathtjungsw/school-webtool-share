@@ -57,17 +57,24 @@ function eventRange(event: MobileEvent) {
   const clock = (match: RegExpMatchArray) => `${match[1].padStart(2, '0')}:${match[2]}`
   let start = event.startTime || (matches[0] ? clock(matches[0]) : '')
   let end = event.endTime || (matches[1] ? clock(matches[1]) : '')
+  let periodStart = Number.isInteger(event.periodStart) ? Number(event.periodStart) : 0
+  let periodEnd = Number.isInteger(event.periodEnd) ? Number(event.periodEnd) : periodStart
   if (!start && event.source === 'creative') {
-    const periods = [...event.title.matchAll(/(?<!\d)([1-7])(?=\s*(?:[~～〜·,]|교시))/g)].map(match => Number(match[1]))
-    if (periods.length) {
-      const first = UNGCHEON_PERIOD_PLAN[Math.min(...periods) - 1]
-      const last = UNGCHEON_PERIOD_PLAN[Math.max(...periods) - 1]
+    if (!periodStart) {
+      const periods = [...event.title.matchAll(/(?<!\d)([1-7])(?:\s*(?:~|～|〜|－|–|—|·|,)\s*([1-7]))?\s*교시/g)]
+        .flatMap(match => [Number(match[1]), Number(match[2])].filter(value => Number.isInteger(value)))
+      periodStart = periods.length ? Math.min(...periods) : 0
+      periodEnd = periods.length ? Math.max(...periods) : 0
+    }
+    if (periodStart >= 1 && periodStart <= 7 && periodEnd >= periodStart && periodEnd <= 7) {
+      const first = UNGCHEON_PERIOD_PLAN[periodStart - 1]
+      const last = UNGCHEON_PERIOD_PLAN[periodEnd - 1]
       start = first?.start || ''
       end = last?.end || ''
     }
   }
   if (!start || !/^\d{2}:\d{2}$/.test(start) || (end && !/^\d{2}:\d{2}$/.test(end))) return null
-  return { start, end: end && end > start ? end : start, point: !end || end <= start }
+  return { start, end: end && end > start ? end : start, point: !end || end <= start, periodStart, periodEnd }
 }
 
 export function buildMobileTimelineRows(lessons: LessonView[], events: MobileEvent[]): MobileTimelineRow[] {
@@ -85,14 +92,19 @@ export function buildMobileTimelineRows(lessons: LessonView[], events: MobileEve
   }
   const first = UNGCHEON_PERIOD_PLAN[0]
   const last = UNGCHEON_PERIOD_PLAN[6]
-  const overlaps = (start: string, end: string) => timed.filter(item => item.range.point
-    ? item.range.start >= start && item.range.start < end
-    : item.range.start < end && item.range.end > start).map(item => item.event)
+  const overlaps = (start: string, end: string, period?: number) => timed.filter(item => {
+    if (item.range.periodStart) {
+      return period !== undefined && period >= item.range.periodStart && period <= item.range.periodEnd
+    }
+    return item.range.point
+      ? item.range.start >= start && item.range.start < end
+      : item.range.start < end && item.range.end > start
+  }).map(item => item.event)
   const rows: MobileTimelineRow[] = []
   const before = timed.filter(item => item.range.start < first.start)
   if (before.length) rows.push({ id: 'before', kind: 'before', label: '수업 전', start: before.map(item => item.range.start).sort()[0], end: first.start, events: before.map(item => item.event) })
   UNGCHEON_PERIOD_PLAN.slice(0, 7).forEach((period, index) => {
-    rows.push({ id: `period-${period.period}`, kind: 'period', label: `${period.period}교시`, start: period.start, end: period.end, lesson: lessons[index], events: overlaps(period.start, period.end) })
+    rows.push({ id: `period-${period.period}`, kind: 'period', label: `${period.period}교시`, start: period.start, end: period.end, lesson: lessons[index], events: overlaps(period.start, period.end, Number(period.period)) })
     const next = UNGCHEON_PERIOD_PLAN[index + 1]
     if (!next || index >= 6) return
     const gapEvents = overlaps(period.end, next.start)

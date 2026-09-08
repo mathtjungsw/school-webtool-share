@@ -131,7 +131,7 @@ function assertSessionPreservation(info) {
 }
 function validateContract(info) {
   for (const name of info.duplicateFunctions) if (name.startsWith('mobile') || name === 'getMobileScheduleBundle_' || name === 'doPost') blocked(`duplicate mobile entry point: ${name}`)
-  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 43) blocked('MOBILE_SERVICE_VERSION must be the v1.1.30 integrated version (43 or newer)')
+  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 44) blocked('MOBILE_SERVICE_VERSION must include the mobile creative-period hotfix (44 or newer)')
   if (info.constants.get('MOBILE_SESSION_HOURS') !== 72) blocked('MOBILE_SESSION_HOURS must remain 72')
   if (info.constants.get('MOBILE_SHARED_PASSWORD_HASH_PROPERTY') !== 'UNG_MOBILE_SHARED_PASSWORD_HASH' || info.constants.get('MOBILE_SESSION_PROPERTY_PREFIX') !== 'UNG_MOBILE_SESSION_') blocked('existing mobile credential property names must be preserved')
   for (const name of ['verifyMobileViewer', 'getMobileScheduleBundle']) if (!info.actions.has(name)) blocked(`mobile action missing: ${name}`)

@@ -37,7 +37,7 @@ const NEIS_SYNC_REGISTERED_AT_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_AT';
 const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 학생 자료를 읽지 않고 아래 공개 일정 시트만 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 43;
+const MOBILE_SERVICE_VERSION = 44;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -376,6 +376,16 @@ const RELEASE_NOTES = [
       '· 기존 데스크톱 기능, 모바일 72시간 로그인과 공개 주소, 학생 자료 제외 원칙 및 이전 릴리스 안내를 모두 유지합니다.'
     ].join('\n'),
     date: '2026-09-05'
+  },
+  {
+    key: 'mobile-service-creative-period-2026-09-09',
+    title: '[모바일 일정 긴급 수정] 창체 교시 표시 바로잡기',
+    body: [
+      '· 창체 일정의 적용 학년 숫자를 교시로 잘못 인식해 모든 시간표 행에 반복 표시하던 오류를 수정했습니다.',
+      '· 창체 시트의 교시 값을 모바일 응답에 별도로 제공하고, 단일·연속 교시 일정은 해당 교시에만 표시합니다.',
+      '· 창체 교시 일정은 쉬는 시간과 점심시간에 반복 표시하지 않으며 기존 로그인·공개 주소와 데스크톱 기능은 그대로 유지합니다.'
+    ].join('\n'),
+    date: '2026-09-09'
   },
   {
     key: 'v1.1.29',
@@ -2838,6 +2848,14 @@ function mobileWeeklyEvents_(fromDate, toDate) {
   return result;
 }
 
+function mobileCreativePeriodRange_(value) {
+  const numbers = String(value == null ? '' : value).match(/[1-7]/g) || [];
+  if (!numbers.length) return null;
+  const periods = numbers.map(Number).filter(function(period) { return period >= 1 && period <= 7; });
+  if (!periods.length) return null;
+  return { start: Math.min.apply(null, periods), end: Math.max.apply(null, periods) };
+}
+
 function mobileCreativeEvents_(fromDate, toDate) {
   const book = SpreadsheetApp.openById(MOBILE_CREATIVE_SCHEDULE_ID);
   const result = [];
@@ -2850,7 +2868,13 @@ function mobileCreativeEvents_(fromDate, toDate) {
     const period = clean_(row[2], 30);
     const guidance = clean_(row[9], 150);
     const detail = [period && period + '교시', grades && grades + '학년', guidance].filter(Boolean).join(', ');
-    result.push({ date: date, title: detail ? activity + '(' + detail + ')' : activity, source: 'creative', label: clean_(row[8], 60) || '창체' });
+    const item = { date: date, title: detail ? activity + '(' + detail + ')' : activity, source: 'creative', label: clean_(row[8], 60) || '창체' };
+    const periodRange = mobileCreativePeriodRange_(row[2]);
+    if (periodRange) {
+      item.periodStart = periodRange.start;
+      item.periodEnd = periodRange.end;
+    }
+    result.push(item);
   });
   const schoolSheet = book.getSheetByName('학사일정_2학기');
   if (schoolSheet) schoolSheet.getDataRange().getDisplayValues().forEach(function(row) {

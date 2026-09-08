@@ -61,6 +61,34 @@ describe('모바일 일정 도메인', () => {
     expect(seventh.events.map(event => event.title)).toEqual(['위원회', '단일 일정'])
   })
 
+  it('창체 제목의 적용 학년 숫자를 교시로 오인하지 않는다', () => {
+    const lessons = Array.from({ length: 7 }, (_, index) => ({ period: index + 1, value: '' }))
+    const rows = buildMobileTimelineRows(lessons, [
+      { id:'a5', date:'2026-09-10', title:'동아리활동(5교시, 1·2·3학년)', source:'creative', label:'창체' },
+      { id:'a6', date:'2026-09-10', title:'동아리활동(6교시, 1·3학년)', source:'creative', label:'창체' },
+      { id:'a7', date:'2026-09-10', title:'학급특색활동(7교시, 1·2학년, 부담임)', source:'creative', label:'창체' },
+    ])
+    expect(rows.find(row => row.id === 'period-1')?.events).toEqual([])
+    expect(rows.find(row => row.id === 'period-5')?.events.map(event => event.id)).toEqual(['a5'])
+    expect(rows.find(row => row.id === 'period-6')?.events.map(event => event.id)).toEqual(['a6'])
+    expect(rows.find(row => row.id === 'period-7')?.events.map(event => event.id)).toEqual(['a7'])
+    expect(rows.filter(row => row.kind === 'break' || row.kind === 'lunch').every(row => row.events.length === 0)).toBe(true)
+  })
+
+  it('명시적 창체 교시와 엄격한 구형 제목 범위를 해당 교시에만 배치한다', () => {
+    const lessons = Array.from({ length: 7 }, (_, index) => ({ period: index + 1, value: '' }))
+    const rows = buildMobileTimelineRows(lessons, [
+      { id:'explicit', date:'2026-09-10', title:'동아리활동(5교시, 1·2·3학년)', source:'creative', label:'창체', periodStart: 6, periodEnd: 6 },
+      { id:'legacy', date:'2026-09-10', title:'자율활동(5~6교시, 1·2학년)', source:'creative', label:'창체' },
+      { id:'all-day', date:'2026-09-10', title:'학년별 창체 안내(1·2·3학년)', source:'creative', label:'창체' },
+    ])
+    expect(rows.find(row => row.id === 'period-5')?.events.map(event => event.id)).toEqual(['legacy'])
+    expect(rows.find(row => row.id === 'period-6')?.events.map(event => event.id)).toEqual(['explicit', 'legacy'])
+    expect(rows.find(row => row.id === 'period-7')?.events).toEqual([])
+    expect(rows.flatMap(row => row.events).some(event => event.id === 'all-day')).toBe(false)
+    expect(rows.filter(row => row.kind === 'break' || row.kind === 'lunch').every(row => row.events.length === 0)).toBe(true)
+  })
+
   it('수업 없는 날에는 가짜 공강 7칸 없이 실제 시간 일정만 표시한다', () => {
     const rows = buildMobileTimelineRows([], [
       { id:'holiday-event', date:'2026-09-07', title:'연수', source:'weekly', label:'교무부', startTime:'14:00', endTime:'15:00' },

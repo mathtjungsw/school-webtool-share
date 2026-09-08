@@ -147,10 +147,10 @@ test('Date calendar operations follow the Apps Script manifest timezone', () => 
   assert.equal(h.context.mobileNearestDate_(31, 1, '2026-08-30', '2026-09-12'), '2026-08-31');
 });
 
-test('service v43+, current desktop version and earlier desktop/mobile release notices are retained', () => {
+test('service v44+, current desktop version and earlier desktop/mobile release notices are retained', () => {
   const h = harness();
   const packageVersion = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')).version;
-  assert.ok(h.constants.version >= 43);
+  assert.ok(h.constants.version >= 44);
   assert.equal(h.constants.notes[0].key, `v${packageVersion}`);
   for (const key of ['v1.1.24', 'v1.1.25', 'v1.1.26', 'mobile-service-2026-08-26', 'mobile-service-2026-08-30', 'mobile-service-meal-range-2026-08-30']) {
     assert.equal(h.constants.notes.filter(note => note.key === key).length, 1, key);
@@ -206,6 +206,9 @@ test('contract 3 retains all event sources and only the selected teacher timetab
   assert.equal(bundle.teacherTimetable.slots.length, 35);
   assert.equal(bundle.teacherTimetable.slots[0].value, '101\n국어');
   assert.deepEqual([...new Set(bundle.events.map(event => event.source))].sort(), ['creative', 'gateDuty', 'mealDuty', 'schoolEvent', 'weekly']);
+  const creative = bundle.events.find(event => event.source === 'creative');
+  assert.equal(creative.periodStart, 5);
+  assert.equal(creative.periodEnd, 5);
   assert.deepEqual(Object.keys(bundle.sourceStatus).sort(), ['changes', 'committee', 'creative', 'gateDuty', 'mealDuty', 'meals', 'timetable', 'weekly']);
   Object.values(bundle.sourceStatus).forEach(status => { assert.equal(status.state, 'fresh'); assert.ok(status.lastSuccessAt); });
 });
