@@ -41,7 +41,7 @@ const NEIS_SYNC_REGISTERED_AT_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_AT';
 const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 학생 자료를 읽지 않고 아래 공개 일정 시트만 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 45;
+const MOBILE_SERVICE_VERSION = 46;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -387,6 +387,18 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'v1.1.32',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.32 · 오늘 시간표와 업무·일정 병렬 표시',
+    body: [
+      '· 대시보드의 선택 날짜 교사 시간표를 왼쪽 수업, 오른쪽 시간 지정 업무·일정의 2열 구조로 표시합니다.',
+      '· 위원회, 주간계획, 창체, 등교·급식지도와 개인·공유 업무를 실제 시각에 맞는 교시 행에 표시하고 시작·진행·종료 상태를 구분합니다.',
+      '· 시간이 없는 종일 업무는 특정 교시를 차지하지 않고 시간표 상단에 간결하게 표시하며 대시보드의 기존 자료별·완료 여부 필터를 따릅니다.',
+      '· 교시로 등록한 업무는 저장된 과거 시각보다 현재 학교 일과시간을 우선해 위젯과 대시보드에 표시합니다.',
+      '· v1.1.31의 일일 시간표 예외 10건, 66명 교직원 명렬, 모바일 공개 주소와 72시간 로그인 및 이전 릴리스 안내를 모두 유지합니다.'
+    ].join('\n'),
+    date: '2026-09-11'
+  },
   {
     key: 'v1.1.31',
     title: '[업데이트] 웅천고 업무도우미 v1.1.31 · 일일 시간표 예외와 업무 입력 통합',

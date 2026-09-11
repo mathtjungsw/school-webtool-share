@@ -62,7 +62,7 @@ import {
   normalizeDashboardTaskStatusVisibility,
   type DashboardTaskStatusVisibility,
 } from '../services/dashboardTaskVisibility'
-import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
+import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_PLAN, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
 import {
   getSpecialTimetableDay, getTimetableDayIndex, getTimetableSourceDate,
   SPECIAL_TIMETABLE_DAYS,
@@ -97,6 +97,31 @@ interface DashboardScheduleEvent {
   department?: string
   completed?: boolean
   taskId?: string
+  startTime?: string
+  endTime?: string
+  allDay?: boolean
+}
+
+function dashboardTextTiming(text: string) {
+  const matches = [...text.matchAll(/(?<![\d:])([01]?\d|2[0-3]):([0-5]\d)(?!\d)/g)]
+  const clock = (match: RegExpMatchArray) => `${match[1].padStart(2, '0')}:${match[2]}`
+  return { startTime: matches[0] ? clock(matches[0]) : '', endTime: matches[1] ? clock(matches[1]) : '' }
+}
+
+function dashboardPeriodTiming(periodText: string) {
+  const periods = [...new Set((periodText.match(/[1-7]/g) ?? []).map(Number))].sort((a, b) => a - b)
+  const first = periods.length ? UNGCHEON_PERIOD_PLAN[periods[0] - 1] : null
+  const last = periods.length ? UNGCHEON_PERIOD_PLAN[periods.at(-1)! - 1] : null
+  return { startTime: first?.start ?? '', endTime: last?.end ?? '' }
+}
+
+function dashboardTaskTiming(task: StaffChecklist) {
+  if (task.timeInputMode === 'period' && task.startPeriod && task.endPeriod) {
+    const first = UNGCHEON_PERIOD_PLAN[task.startPeriod - 1]
+    const last = UNGCHEON_PERIOD_PLAN[task.endPeriod - 1]
+    if (first && last) return { startTime: first.start, endTime: last.end }
+  }
+  return { startTime: task.startTime ?? '', endTime: task.endTime ?? '' }
 }
 
 type DashboardScheduleSource = DashboardScheduleEvent['source']
@@ -702,35 +727,43 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       date: item.date,
       eventName: item.eventName,
       source: 'neis' as const,
+      allDay: true,
     })),
-    ...weeklyPlan.events.map(item => ({
-      date: item.date,
-      eventName: item.eventName,
-      department: item.department,
-      source: 'weekly' as const,
-    })),
-    ...creativeSchedule.events.map(item => ({ date: item.date, eventName: item.title, department: item.kind === 'activity' ? (item.department || '창의적체험활동') : '창체 학사일정', source: item.kind === 'activity' ? 'creative' as const : 'schoolEvent' as const })),
+    ...weeklyPlan.events.map(item => {
+      const timing = dashboardTextTiming(item.eventName)
+      return { date: item.date, eventName: item.eventName, department: item.department,
+        source: 'weekly' as const, ...timing, allDay: !timing.startTime }
+    }),
+    ...creativeSchedule.events.map(item => {
+      const timing = item.kind === 'activity' ? dashboardPeriodTiming(item.period) : { startTime: '', endTime: '' }
+      return { date: item.date, eventName: item.title, department: item.kind === 'activity' ? (item.department || '창의적체험활동') : '창체 학사일정',
+        source: item.kind === 'activity' ? 'creative' as const : 'schoolEvent' as const, ...timing, allDay: !timing.startTime }
+    }),
     ...timetableChanges.filter(item => isTimetableChangeAppliedForTeacher(item, config.teacherName?.trim() ?? '')).flatMap(item => [...new Set([item.originalDate, item.replacementDate])].map(date => ({ date: toYmd(date), eventName: timetableChangeSummary(item), department: item.status !== 'approved' && item.requesterAppliedAt ? '나만 우선 반영' : '승인된 수업변경', source: 'timetableChange' as const }))),
     ...committeeEvents.map(item => ({
       date: toYmd(item.date),
       eventName: `${item.startTime} ${item.title}`,
       department: item.committeeName,
       source: 'committee' as const,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      allDay: !item.startTime,
     })),
-    ...dutySchedule.events.map(item => ({
-      date: item.date,
-      eventName: `${item.time} ${item.title}`,
-      department: item.kind === 'gate' ? '등교지도' : '급식지도',
-      source: item.kind === 'gate' ? 'gateDuty' as const : 'mealDuty' as const,
-    })),
-    ...sharedTasks.filter(task => task.deadline || (task.startDate && task.startTime)).map(task => ({
-      date: toYmd(task.startTime ? (task.startDate || task.scheduledDate || task.deadline) : task.deadline),
-      eventName: `${task.startTime ? `${task.startTime}${task.endTime ? `~${task.endTime}` : ''} ` : ''}${task.title}`,
-      department: task.departmentNames.length ? task.departmentNames.join('·') : '공유 업무',
-      source: 'sharedWork' as const,
-      completed: isSharedWorkComplete(task, config.teacherName?.trim() ?? ''),
-      taskId: task.id,
-    })),
+    ...dutySchedule.events.map(item => {
+      const timing = dashboardTextTiming(item.time)
+      return { date: item.date, eventName: `${item.time} ${item.title}`, department: item.kind === 'gate' ? '등교지도' : '급식지도',
+        source: item.kind === 'gate' ? 'gateDuty' as const : 'mealDuty' as const, ...timing, allDay: !timing.startTime }
+    }),
+    ...sharedTasks.filter(task => task.deadline || task.startDate).map(task => {
+      const timing = dashboardTaskTiming(task)
+      return {
+        date: toYmd(timing.startTime ? (task.startDate || task.scheduledDate || task.deadline) : task.deadline),
+        eventName: `${timing.startTime ? `${timing.startTime}${timing.endTime ? `~${timing.endTime}` : ''} ` : ''}${task.title}`,
+        department: task.departmentNames.length ? task.departmentNames.join('·') : '공유 업무',
+        source: 'sharedWork' as const, completed: isSharedWorkComplete(task, config.teacherName?.trim() ?? ''), taskId: task.id,
+        ...timing, allDay: !timing.startTime,
+      }
+    }),
     ...personalTasks.filter(task => task.showOnCalendar !== false).map(task => ({
       date: toYmd(task.date),
       eventName: `${task.time ? `${task.time}${task.endTime ? `~${task.endTime}` : ''} ` : ''}${task.title}`,
@@ -738,12 +771,16 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       source: 'personal' as const,
       completed: task.completed,
       taskId: task.id,
+      startTime: task.time,
+      endTime: task.endTime,
+      allDay: !task.time,
     })),
     ...SPECIAL_TIMETABLE_DAYS.map(item => ({
       date: toYmd(item.date),
       eventName: item.title,
       department: '시간표 운영',
       source: 'schoolEvent' as const,
+      allDay: true,
     })),
     ...effectiveTeacherPulledLessons.map(item => ({
       date: toYmd(item.date),
@@ -1044,6 +1081,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                 timetableChanges={timetableChanges}
                 pulledLessons={pulledLessons}
                 timetableOverrides={timetableOverrides}
+                scheduleEvents={combinedSchedule}
               />
             </DashCard>
           </div>
@@ -1671,7 +1709,7 @@ function ClassStatusBanner({ status }: { status: ClassStatus }) {
 
 // ─── TimetableSection ─────────────────────────────────────────────
 function TimetableSection({
-  timetable, teacherTT, sharedTeacher, selectedDate, config, periodRanges, currentTime, classStatus, onNavigate, timetableChanges, pulledLessons, timetableOverrides
+  timetable, teacherTT, sharedTeacher, selectedDate, config, periodRanges, currentTime, classStatus, onNavigate, timetableChanges, pulledLessons, timetableOverrides, scheduleEvents
 }: {
   timetable: TimetableEntry[]
   teacherTT: TimetableEntry[]
@@ -1685,6 +1723,7 @@ function TimetableSection({
   timetableChanges: TimetableChangeRequest[]
   pulledLessons: PulledLesson[]
   timetableOverrides: DailyTimetableOverride[]
+  scheduleEvents: DashboardScheduleEvent[]
 }) {
   const weekDates = getWeekDates(selectedDate)
   const DAY = ['월','화','수','목','금']
@@ -1731,6 +1770,34 @@ function TimetableSection({
     )
   }
 
+  const renderSharedDailyCell = (date: string, period: string) => {
+    if (!sharedTeacher) return null
+    const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
+    const pulled = effectivePulled.find(item => item.date === isoDate && String(item.period) === period)
+    if (pulled) return { text: `당김 ${pulled.classLabel}`, sub: `${pulled.subject}${pulled.substituteTeacherName ? ' · 보강' : ''}`, colorClass: 'bg-lime-50 text-lime-900 ring-1 ring-lime-200', isNow: date === todayYmd && period === currentPeriod }
+    const dayIndex = getTimetableDayIndex(date)
+    const slotIndex = schoolTimetableSlotIndex(dayIndex, Number(period))
+    if (slotIndex < 0) return null
+    const baseValues = sharedTeacher.slots.slice(dayIndex * 7, dayIndex * 7 + 7).map(item => item.value)
+    const overriddenValues = applyDailyTimetableOverridesToTeacher(sharedTeacher, isoDate, baseValues, timetableOverrides)
+    const slot = { ...sharedTeacher.slots[slotIndex], value: overriddenValues[Number(period) - 1] ?? '' }
+    const change = timetableChanges.find(item => isTimetableChangeAppliedForTeacher(item, sharedTeacher.name) && (
+      (item.originalDate === isoDate && item.originalSlotIndex === slotIndex) ||
+      (item.kind === 'exchange' && item.replacementDate === isoDate && item.replacementSlotIndex === slotIndex)
+    ))
+    if (change) {
+      const firstSide = change.originalDate === isoDate && change.originalSlotIndex === slotIndex
+      const assignedTeacher = firstSide ? change.replacementTeacher : change.originalTeacher
+      const className = firstSide ? change.originalClass : change.replacementClass
+      const subject = firstSide ? change.originalSubject : change.replacementSubject
+      if (assignedTeacher === sharedTeacher.name) return { text: className || subject, sub: `${subject} · 승인 반영`, colorClass: 'bg-fuchsia-50 text-fuchsia-900 ring-1 ring-fuchsia-200', isNow: date === todayYmd && period === currentPeriod }
+      if (change.originalTeacher === sharedTeacher.name || change.replacementTeacher === sharedTeacher.name) return { text: slot?.value.split(/\r?\n/)[0] || className, sub: `변경 담당 · ${assignedTeacher}`, colorClass: 'bg-amber-50 text-amber-900 ring-1 ring-amber-200', isNow: false }
+    }
+    if (!slot?.value) return null
+    const lines = slot.value.split(/\r?\n/).filter(Boolean)
+    return { text: lines[0] || slot.value, sub: lines.slice(1).join(' · '), colorClass: slot.locked ? 'bg-slate-100 text-slate-700' : 'bg-violet-50 text-violet-900', isNow: date === todayYmd && period === currentPeriod }
+  }
+
   return (
     <div className="space-y-4">
       {classStatus && classStatus.type !== 'weekend' && (
@@ -1744,6 +1811,14 @@ function TimetableSection({
             <span className="text-[10px] font-semibold text-violet-300 bg-violet-500/15 px-2 py-1 rounded-lg">👩‍🏫 {sharedTeacher.name} 선생님</span>
             <span className="text-[10px] text-slate-500">관리자 공유 시간표 · 원본 읽기 전용</span>
           </div>
+          <DailyTeacherSchedule
+            date={selectedYmd}
+            currentPeriod={isToday(selectedDate) ? currentPeriod : null}
+            periodRanges={periodRanges}
+            events={scheduleEvents}
+            renderCell={renderSharedDailyCell}
+          />
+          <p className="mb-2 mt-4 text-[10px] font-bold text-slate-600">주간 시간표</p>
           <WeekGrid
             weekDates={weekDates}
             DAY={DAY}
@@ -1879,6 +1954,77 @@ function TimetableSection({
 }
 
 function isToday(dateStr: string) { return dateStr === todayStr() }
+
+function dashboardClockMinutes(value?: string) {
+  const match = /^(\d{1,2}):([0-5]\d)$/.exec(value ?? '')
+  if (!match) return null
+  const minutes = Number(match[1]) * 60 + Number(match[2])
+  return minutes >= 0 && minutes < 24 * 60 ? minutes : null
+}
+
+function dashboardEventTitle(event: DashboardScheduleEvent) {
+  return event.eventName.replace(/^\s*\d{1,2}:\d{2}(?:\s*[~～〜–—-]\s*\d{1,2}:\d{2})?\s*/, '').trim() || event.eventName
+}
+
+function DailyTeacherSchedule({ date, currentPeriod, periodRanges, events, renderCell }: {
+  date: string
+  currentPeriod: string | null
+  periodRanges: [number, number, string][]
+  events: DashboardScheduleEvent[]
+  renderCell: (date: string, period: string) => { text: string; sub: string; colorClass: string; isNow: boolean } | null
+}) {
+  const selectedEvents = events.filter(event => toYmd(event.date) === date)
+  const timedEvents = selectedEvents.filter(event => event.startTime && !['timetableChange', 'pulledLesson'].includes(event.source))
+  const allDayTasks = selectedEvents.filter(event => event.allDay && (event.source === 'sharedWork' || event.source === 'personal'))
+  const tone: Partial<Record<DashboardScheduleSource, string>> = {
+    committee: 'border-amber-300 bg-amber-50 text-amber-950',
+    sharedWork: 'border-fuchsia-300 bg-fuchsia-50 text-fuchsia-950',
+    personal: 'border-emerald-300 bg-emerald-50 text-emerald-950',
+    weekly: 'border-sky-300 bg-sky-50 text-sky-950',
+    creative: 'border-teal-300 bg-teal-50 text-teal-950',
+    gateDuty: 'border-cyan-300 bg-cyan-50 text-cyan-950',
+    mealDuty: 'border-orange-300 bg-orange-50 text-orange-950',
+  }
+  const rows = UNGCHEON_PERIOD_PLAN.slice(0, 7).map(plan => {
+    const configured = periodRanges.find(([, , period]) => period === plan.period)
+    const start = configured?.[0] ?? dashboardClockMinutes(plan.start)!
+    const end = configured?.[1] ?? dashboardClockMinutes(plan.end)!
+    const matching = timedEvents.filter(event => {
+      const eventStart = dashboardClockMinutes(event.startTime)
+      const eventEnd = dashboardClockMinutes(event.endTime)
+      if (eventStart === null) return false
+      return eventEnd === null ? eventStart >= start && eventStart < end : eventStart < end && eventEnd > start
+    })
+    return { plan, lesson: renderCell(date, plan.period), events: matching, start, end }
+  })
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2">
+        <p className="text-[11px] font-black text-slate-900">선택 날짜 시간표 · 업무·일정</p>
+        <p className="text-[10px] font-semibold text-slate-600">{date.slice(4, 6)}월 {date.slice(6, 8)}일</p>
+      </div>
+      {allDayTasks.length > 0 && <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-amber-50 px-3 py-2 text-[10px] text-amber-950"><span className="font-black">종일 업무</span>{allDayTasks.map(event => <span key={`${event.source}-${event.taskId ?? event.eventName}`} className="rounded-md border border-amber-200 bg-white px-2 py-1 font-semibold">{dashboardEventTitle(event)}</span>)}</div>}
+      <div className="grid grid-cols-[minmax(115px,0.85fr)_minmax(0,1.15fr)] border-b border-slate-200 bg-slate-50 text-[10px] font-black text-slate-700"><div className="border-r border-slate-200 px-3 py-1.5">수업</div><div className="px-3 py-1.5">업무·일정</div></div>
+      {rows.map(({ plan, lesson, events: rowEvents, start, end }) => {
+        const active = currentPeriod === plan.period
+        return <div key={plan.period} className={clsx('grid min-h-11 grid-cols-[minmax(115px,0.85fr)_minmax(0,1.15fr)] border-b border-slate-100 last:border-0', active && 'bg-sky-50')}>
+          <div className="flex min-w-0 items-center gap-2 border-r border-slate-200 px-2 py-1.5">
+            <div className={clsx('flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-black', active ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-700')}>{plan.period}</div>
+            <div className="min-w-0"><p className="text-[9px] font-semibold text-slate-500">{plan.start}~{plan.end}</p><p className="truncate text-[11px] font-black text-slate-900">{lesson?.text || '공강'}</p>{lesson?.sub && <p className="truncate text-[9px] font-semibold text-slate-600">{lesson.sub}</p>}</div>
+          </div>
+          <div className="flex min-w-0 flex-wrap content-center gap-1 px-2 py-1.5">
+            {rowEvents.length ? rowEvents.map((event, index) => {
+              const eventStart = dashboardClockMinutes(event.startTime)!
+              const eventEnd = dashboardClockMinutes(event.endTime)
+              const status = eventEnd === null ? '시각' : eventStart >= start && eventStart < end ? '시작' : eventEnd > start && eventEnd <= end ? '종료' : '진행'
+              return <span key={`${event.source}-${event.taskId ?? event.eventName}-${index}`} title={`${event.startTime}${event.endTime ? `~${event.endTime}` : ''} · ${event.department ?? ''}`} className={clsx('max-w-full truncate rounded-md border-l-2 px-2 py-1 text-[9px] font-bold', tone[event.source] ?? 'border-slate-300 bg-slate-50 text-slate-900')}><span className="mr-1 opacity-70">{status}</span>{dashboardEventTitle(event)}</span>
+            }) : <span className="text-[9px] text-slate-400">-</span>}
+          </div>
+        </div>
+      })}
+    </div>
+  )
+}
 
 function WeekGrid({ weekDates, DAY, todayYmd, selectedYmd, currentPeriod, periodRanges = [], lunch, renderCell }: {
   weekDates: string[]

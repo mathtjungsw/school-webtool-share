@@ -52,6 +52,15 @@ function creativeRanges(period: string): Array<{ startTime: string; endTime: str
   return groups.map(group => ({ startTime: UNGCHEON_PERIOD_PLAN[group[0] - 1].start, endTime: UNGCHEON_PERIOD_PLAN[group.at(-1)! - 1].end }))
 }
 
+function staffChecklistTiming(item: StaffChecklist) {
+  if (item.timeInputMode === 'period' && item.startPeriod && item.endPeriod) {
+    const first = UNGCHEON_PERIOD_PLAN[item.startPeriod - 1]
+    const last = UNGCHEON_PERIOD_PLAN[item.endPeriod - 1]
+    if (first && last) return { startTime: first.start, endTime: last.end }
+  }
+  return { startTime: item.startTime || undefined, endTime: item.endTime || undefined }
+}
+
 export function buildWidgetSupplementEvents(date: string, sources: {
   weekly: readonly WeeklyPlanEvent[]
   duty: readonly DutyScheduleEvent[]
@@ -101,12 +110,15 @@ export function buildWidgetBaseEvents(date: string, sources: {
         meta: item.time ? `${item.time}${item.endTime ? `~${item.endTime}` : ''}` : (item.kind === 'task' ? '개인 업무' : '개인 일정'),
         kind: item.kind === 'task' ? 'personal-task' : 'personal-schedule',
         startTime: item.time, endTime: item.endTime, time: item.time, allDay: !item.time })),
-    ...sources.sharedTasks.filter(item => normalizeWidgetEventDate(item.startTime ? (item.startDate || item.scheduledDate || item.deadline) : item.deadline) === targetDate
-      && item.targetNames.includes(teacherName) && !isSharedWorkComplete(item, teacherName))
-      .map(item => ({ id: `shared:${item.id}`, date: targetDate, title: item.title,
-        meta: item.startTime ? `배부 업무 · ${item.startTime}${item.endTime ? `~${item.endTime}` : ''}` : '배부 업무 마감',
-        kind: 'shared-task', startTime: item.startTime || undefined, endTime: item.endTime || undefined,
-        time: item.startTime || undefined, allDay: !item.startTime })),
+    ...sources.sharedTasks.flatMap(item => {
+      const timing = staffChecklistTiming(item)
+      const itemDate = normalizeWidgetEventDate(timing.startTime ? (item.startDate || item.scheduledDate || item.deadline) : item.deadline)
+      if (itemDate !== targetDate || !item.targetNames.includes(teacherName) || isSharedWorkComplete(item, teacherName)) return []
+      return [{ id: `shared:${item.id}`, date: targetDate, title: item.title,
+        meta: timing.startTime ? `배부 업무 · ${item.timeInputMode === 'period' && item.startPeriod ? `${item.startPeriod}${item.endPeriod && item.endPeriod !== item.startPeriod ? `~${item.endPeriod}` : ''}교시 · ` : ''}${timing.startTime}${timing.endTime ? `~${timing.endTime}` : ''}` : '배부 업무 마감',
+        kind: 'shared-task', startTime: timing.startTime, endTime: timing.endTime,
+        time: timing.startTime, allDay: !timing.startTime }]
+    }),
     ...sources.schoolSchedules.filter(item => normalizeWidgetEventDate(item.date) === targetDate)
       .map((item, index) => ({ id: `school:${targetDate}:${index}`, date: targetDate, title: item.eventName,
         meta: '학사일정', kind: 'school', allDay: true })),
