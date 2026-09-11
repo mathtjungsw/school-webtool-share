@@ -63,6 +63,9 @@ export interface StaffChecklist {
   scheduledDate?: string
   startTime?: string
   endTime?: string
+  timeInputMode?: 'time' | 'period'
+  startPeriod?: number
+  endPeriod?: number
   priority: StaffTaskPriority
   status: StaffTaskStatus
   linkUrl: string
@@ -132,9 +135,11 @@ export function sortStaffMembers(members: StaffMember[]): StaffMember[] {
     const normalized = compact(position)
     if (normalized === '교장') return 0
     if (normalized === '교감') return 1
-    if (normalized.includes('교사')) return 2
-    if (normalized === '교무실무원') return 3
-    return 4
+    if (normalized === '행정실장') return 2
+    if (normalized.includes('교사')) return 3
+    const order = ['행정과장', '행정주임', '시설관리', '사무행정', '교무행정', '영양사', '조리사', '조리실무사', '청소', '당직']
+    const index = order.indexOf(normalized)
+    return index >= 0 ? index + 4 : 99
   }
   return [...members].sort((a, b) => {
     const rank = positionRank(a.position) - positionRank(b.position)
@@ -168,7 +173,8 @@ export function parseStaffRosterWorkbook(bytes: number[]): StaffMember[] {
         const homeroomColumn = nearbyColumns.find(column => compact(header[column]) === '담임')
 
         for (let rowIndex = headerIndex + 1; rowIndex < rows.length; rowIndex += 1) {
-          const name = clean(rows[rowIndex]?.[nameColumn])
+          const rawName = clean(rows[rowIndex]?.[nameColumn])
+          const name = rawName === '최대식' ? '전종택' : rawName
           const position = clean(rows[rowIndex]?.[positionColumn])
           const department = departmentColumn === undefined
             ? ''

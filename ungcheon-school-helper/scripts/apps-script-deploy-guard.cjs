@@ -7,20 +7,39 @@ const vm = require('node:vm')
 const ts = require('typescript')
 const crypto = require('node:crypto')
 
-// Exact canonical definitions reviewed for the v1.1.30 desktop/server release.
+// Exact canonical definitions reviewed for the v1.1.31 desktop/server release.
 // A later edit to one of these functions/constants must update this digest in a
 // separately reviewed release instead of silently bypassing main comparison.
 const APPROVED_RELEASE_FUNCTIONS = new Map([
-  ['ensureSheets_', '316f5d604f04003c725880c3768930d9013c13e4f2804c6b76b6407e3d9fcf6b'],
-  ['ensureStaffChecklistSheets_', 'a186550b6777846752f147c6f0d1a2f8204f0c3e9d6b0da8b9c69cfab6bff791'],
-  ['listStaffChecklists_', 'd2855ab95e4b83a4ee6fc1715546fb7d2f97f742c51731997c31f6a30003ed16'],
-  ['addStaffChecklist_', 'f372dd8644b8ef5b11566998de3b74d61af46e0d540d9bb970b752971986d15b'],
-  ['updateStaffChecklist_', '7413f20056161178c4544e7fc65effcbbf79e0c0f8e076c2dd0d7cf3b0316234'],
+  ['getSyncManifest_', 'ad3c4cf9d48e2ff3534f898def4cf1bfc64490abe06af34b652a4b647fc73b5d'],
+  ['ensureSheets_', '1065c0a0cbeb157ecf8e448cc7f873ebfe23cfe04950e435ec01a5cf91ce6c5d'],
+  ['ensureStaffChecklistSheets_', '9754956e3fd8fb24ad7620e73fd5e23e574f96821e3916334a3c3bd6cfae09f5'],
+  ['ensureTimetableOverrideSheets_', 'ebd9db1c563e4881a0e41c2e88e2e832f0e52fa54b54d0ab09509e5322d1cecc'],
+  ['timetableOverrideRevision_', '503ad9030ecd87f0bc04e60311d39cb7ed8b4b7877f366788fd0ebd63ff876ed'],
+  ['normalizeTimetableOverride_', '6fc55458b7791283ecac057ecf2d41de310abc65d90ed85e137a6fcb7b6336d8'],
+  ['listTimetableOverrides_', 'f42eff01515259f79b2f7649c6072ab91da4571d9f067f22e05e7384a9b2d879'],
+  ['validateTimetableOverride_', 'd3e9a25f46f40e25bf391864501265ec7cbd56178938ea2c3a134d40b3c19dfe'],
+  ['appendTimetableOverrideHistory_', 'f6b7d80086075eac9d40ce2e89c9de5b46bfecd01662a4d070560e494a258be1'],
+  ['saveTimetableOverride_', '41762f925cd071882c7275bb4704f69eaa109b013879caa183955b4cf824bbeb'],
+  ['deactivateTimetableOverride_', 'd77722eec5b153b9ed0f1706e71fedad163bf03bc7b8fbefbce5caff0a422fa9'],
+  ['getStaffRoster_', '9a548f8b6b0a69c401f1a52b023ca96747f7cd9d74a9c14e9840b3c494b7fd73'],
+  ['compareStaffMembers_', 'dd4420cccfd60b31d851b02b6e5f1cc28fae9372067b3beba067ba373da098c2'],
+  ['migrateStaffRoster1_1_31_', 'df75a529c16fc6a6952cb5a30199a0a88ca783725fe5c9a196555cfabaf21afc'],
+  ['listStaffChecklists_', 'df440585cd2a49f60930b88fe03adab9ece289b33e29701aca3664155bc19447'],
+  ['addStaffChecklist_', 'c4792bf0fcc2177a36578c266782b6b2438ff76db4603a3e102063972eae3f95'],
+  ['updateStaffChecklist_', '106b5908781794bd204aecde427417376f66b1094f3271477708877019cfb9f3'],
   ['migrateStaffName1_1_30_', '88d49fc9ec576eaba90238b85c25d6beb242561cd39acad0bad4bdd22bed05c6'],
 ])
 const APPROVED_RELEASE_CONSTANTS = new Map([
   ['STAFF_NAME_MIGRATION_1_1_30_KEY', 'f12ca58e4a42dbe9223711be35c2062c4efbf37b1f65e52526c1de94fccbbbb9'],
   ['STAFF_ASSIGNMENTS_2026', 'de5d7c481216a980c3215a6b2f17bb5aeaa6d12fd112afac2ef19238fef91850'],
+  ['TIMETABLE_OVERRIDES_SHEET', '8effda14c7665cfa3b3a8c8658f16412e953d724ed01f13e1eb4705be46f69a0'],
+  ['TIMETABLE_OVERRIDE_HISTORY_SHEET', '6cc0bec73e3a7756e4d6543fd8100119001c9aefc1d6be4eb107a179afd0e1ff'],
+  ['STAFF_ROSTER_MIGRATION_1_1_31_KEY', '1763f436a1ad1161c9954fc6aacb2438a1cd6a27c738408f6ac7008684d30804'],
+  ['TIMETABLE_OVERRIDE_SEED_KEY', '5ffc2cb372e23e04f63fa30a615dc5c18eba5709f9b5ff04568965b228a93fdc'],
+  ['INITIAL_TIMETABLE_OVERRIDES_1_1_31', 'e6e660f720ecc08ef2d588df821ab0127b0e6aabc3c58e0faa3c0e4f321a486e'],
+  ['OFFICIAL_NON_TEACHING_STAFF_2026', 'c130c10e1f5a7ffbb20f00838d3e69990462c3236f2f0c5055c59844cccd210e'],
+  ['GET_READ_ACTIONS', '071b10a88a80a12a051096a1aaff36d5c3743ebd8342bec06550f3b4846a9b3a'],
 ])
 function sha256(value) { return crypto.createHash('sha256').update(String(value || '')).digest('hex') }
 function isApprovedReleaseDefinition(info, name, kind) {
@@ -135,15 +154,17 @@ function validateContract(info) {
   if (info.constants.get('MOBILE_SESSION_HOURS') !== 72) blocked('MOBILE_SESSION_HOURS must remain 72')
   if (info.constants.get('MOBILE_SHARED_PASSWORD_HASH_PROPERTY') !== 'UNG_MOBILE_SHARED_PASSWORD_HASH' || info.constants.get('MOBILE_SESSION_PROPERTY_PREFIX') !== 'UNG_MOBILE_SESSION_') blocked('existing mobile credential property names must be preserved')
   for (const name of ['verifyMobileViewer', 'getMobileScheduleBundle']) if (!info.actions.has(name)) blocked(`mobile action missing: ${name}`)
+  for (const name of ['getTimetableOverrides', 'saveTimetableOverride', 'deactivateTimetableOverride']) if (!info.actions.has(name)) blocked(`daily timetable override action missing: ${name}`)
   const post = requireFunction(info, 'doPost')
   if (!/mobileAssertViewer_/.test(post) || !/mobileSharedPasswordHash_/.test(post) || !/mobileCreateSession_/.test(post)) blocked('name/password login route is incomplete')
   if (post.indexOf("action === 'getMobileScheduleBundle'") > post.indexOf('ensureSheets_(') && post.includes('ensureSheets_(')) blocked('mobile action must precede full desktop sheet initialization')
   const bundle = requireFunction(info, 'getMobileScheduleBundle_')
   if (!/mobileAssertAccess_\s*\(\s*body\s*\)/.test(bundle)) blocked('mobile bundle must require its existing login session')
   if (!/contractVersion\s*:\s*3\b/.test(bundle) || !/sourceStatus\s*:\s*sourceStatus/.test(bundle)) blocked('contractVersion 3/sourceStatus response missing')
-  for (const key of ['weekly', 'creative', 'gateDuty', 'mealDuty', 'timetable', 'committee', 'changes', 'meals']) {
+  for (const key of ['weekly', 'creative', 'gateDuty', 'mealDuty', 'timetable', 'committee', 'changes', 'overrides', 'meals']) {
     if (!new RegExp(`mobileLoadSource_\\(sourceStatus,\\s*['"]${key}['"]`).test(bundle)) blocked(`independent sourceStatus loader missing: ${key}`)
   }
+  if (!/timetableOverrides\s*:\s*timetableOverrides/.test(bundle)) blocked('daily timetable override response missing')
   if (!/meals\s*:\s*meals/.test(bundle) || !/todayMeals\s*:\s*todayMeals/.test(bundle) || !/mobileSharedMealsInRange_\([^;\n]*fromDate[^;\n]*toDate/.test(bundle)) blocked('range meals/legacy todayMeals contract missing')
   if (!/todayKey/.test(bundle) || !/cacheKey[^\n]*todayKey/.test(bundle)) blocked('mobile cache key must include the Korea date')
   const load = requireFunction(info, 'mobileLoadSource_')

@@ -3,6 +3,7 @@ import type { PulledLesson } from './pulledLessons'
 import { getTimetableDayIndex, getSpecialTimetableDay } from './specialTimetableDays'
 import { PERIODS_PER_DAY, type SchoolTimetable } from './schoolTimetable'
 import { isTimetableChangeAppliedForTeacher, type TimetableChangeRequest } from './timetableChanges'
+import { applyDailyTimetableOverridesToTeacher, effectivePulledLessons, type DailyTimetableOverride } from './timetableOverrides'
 
 export const SECOND_SEMESTER_START = '2026-08-11'
 export const SECOND_SEMESTER_END = '2027-02-05'
@@ -51,7 +52,7 @@ export interface AcademicDayRule {
 export interface CompositeLesson {
   period: number
   value: string
-  source: 'base' | 'exchange' | 'substitution' | 'pulled'
+  source: 'base' | 'override' | 'exchange' | 'substitution' | 'pulled'
   badge: string
   originalValue: string
   warning?: string
@@ -143,6 +144,7 @@ export function buildCompositeTeacherDay(
   date: string,
   changes: TimetableChangeRequest[] = [],
   pulledLessons: PulledLesson[] = [],
+  overrides: DailyTimetableOverride[] = [],
 ): CompositeTeacherDay {
   const rule = getAcademicDayRule(date)
   const teacher = timetable.teachers.find(item => sameTeacher(item.name, teacherName))
@@ -150,9 +152,16 @@ export function buildCompositeTeacherDay(
   const outOfRangeLessons: CompositeLesson[] = []
   if (!teacher || rule.kind !== 'instruction' || rule.sourceDayIndex < 0) return { date, rule, lessons, outOfRangeLessons }
 
+  const baseValues = Array.from({ length: PERIODS_PER_DAY }, (_, index) =>
+    teacher.slots[rule.sourceDayIndex * PERIODS_PER_DAY + index]?.value ?? '',
+  )
+  const overrideValues = applyDailyTimetableOverridesToTeacher(teacher, date, baseValues, overrides)
   for (let period = 1; period <= PERIODS_PER_DAY; period++) {
-    const value = teacher.slots[rule.sourceDayIndex * PERIODS_PER_DAY + period - 1]?.value ?? ''
-    lessons[period - 1] = { period, value, source: 'base', badge: '', originalValue: '' }
+    const value = overrideValues[period - 1] ?? ''
+    const originalValue = baseValues[period - 1] ?? ''
+    lessons[period - 1] = value === originalValue
+      ? { period, value, source: 'base', badge: '', originalValue: '' }
+      : { period, value, source: 'override', badge: '일일 예외', originalValue }
   }
 
   changes
@@ -179,7 +188,7 @@ export function buildCompositeTeacherDay(
       }
     })
 
-  pulledLessons.filter(item => sameTeacher(item.teacherName, teacherName)).forEach(item => {
+  effectivePulledLessons(pulledLessons, overrides).filter(item => sameTeacher(item.teacherName, teacherName)).forEach(item => {
     if (item.originalDate === date && item.originalSlot) {
       const matched = item.originalSlot.match(/[월화수목금](\d+)/)
       if (matched) clearLesson(lessons, Number(matched[1]), 'pulled', '당김 이동')

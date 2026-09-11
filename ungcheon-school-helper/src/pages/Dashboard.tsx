@@ -40,6 +40,7 @@ import { useWeather } from '../components/useWeather'
 import { getSharedNeisSnapshot } from '../services/sharedNeis'
 import {
   getSchoolTimetable,
+  getTimetableOverrides,
   listStaffChecklists,
   listCommitteeState,
   submitStaffChecklist,
@@ -69,6 +70,7 @@ import {
 import type { CreativeScheduleResult, DutyScheduleResult, MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
 import { isTimetableChangeAppliedForTeacher, listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
 import { listPulledLessonsForTeacher, pulledLessonTitle, type PulledLesson } from '../services/pulledLessons'
+import { applyDailyTimetableOverridesToTeacher, effectivePulledLessons, type DailyTimetableOverride } from '../services/timetableOverrides'
 import {
   addDays, eachDayOfInterval, endOfMonth, endOfWeek, format,
   isSameMonth, startOfMonth, startOfWeek,
@@ -308,6 +310,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const [timetable, setTimetable] = useState<TimetableEntry[]>([])
   const [teacherTT, setTeacherTT] = useState<TimetableEntry[]>([])
   const [sharedTeacher, setSharedTeacher] = useState<TeacherTimetable | null>(null)
+  const [timetableOverrides, setTimetableOverrides] = useState<DailyTimetableOverride[]>([])
   const [committeeEvents, setCommitteeEvents] = useState<CommitteeEvent[]>([])
   const [sharedTasks, setSharedTasks] = useState<StaffChecklist[]>([])
   const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>([])
@@ -430,10 +433,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const periodRanges = UNGCHEON_PERIOD_RANGES
   const hasTeacher = !!(config.teacherClasses?.length)
   const pulledLessons = useMemo(() => listPulledLessonsForTeacher(config.teacherName?.trim() ?? ''), [config.teacherName])
+  const effectiveTeacherPulledLessons = useMemo(() => effectivePulledLessons(pulledLessons, timetableOverrides), [pulledLessons, timetableOverrides])
 
   useEffect(() => {
     if (!config.schoolHubUrl || !config.teacherName?.trim()) {
       setSharedTeacher(null)
+      setTimetableOverrides([])
       setCommitteeEvents([])
       setSharedTasks([])
       return
@@ -443,8 +448,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       getSchoolTimetable().catch(() => null),
       listCommitteeState().catch(() => ({ assignments: [], events: [] })),
       listStaffChecklists(config.teacherName!.trim()).catch(() => []),
+      getTimetableOverrides(false).catch(() => []),
     ])
-      .then(([shared, committeeState, tasks]) => {
+      .then(([shared, committeeState, tasks, overrides]) => {
         if (cancelled) return
         const name = config.teacherName!.trim()
         setSharedTeacher(shared?.teachers.find(teacher =>
@@ -452,12 +458,14 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
         ) ?? null)
         setCommitteeEvents(committeeState.events.filter(event => event.memberNames.includes(name)))
         setSharedTasks(tasks)
+        setTimetableOverrides(overrides)
       })
       .catch(() => {
         if (!cancelled) {
           setSharedTeacher(null)
           setCommitteeEvents([])
           setSharedTasks([])
+          setTimetableOverrides([])
         }
       })
     return () => { cancelled = true }
@@ -485,7 +493,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     const unsubscribeTasks = subscribeHubResource<StaffChecklist[]>('staffChecklists', (tasks, cacheKey) => {
       if (cacheKey.includes(`staffChecklists:${name}:`)) setSharedTasks(tasks)
     })
-    return () => { unsubscribeTimetable(); unsubscribeCommittees(); unsubscribeTasks() }
+    const unsubscribeOverrides = subscribeHubResource<DailyTimetableOverride[]>('timetableOverrides', setTimetableOverrides)
+    return () => { unsubscribeTimetable(); unsubscribeCommittees(); unsubscribeTasks(); unsubscribeOverrides() }
   }, [config.schoolHubUrl, config.teacherName])
 
   useEffect(() => {
@@ -714,8 +723,8 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       department: item.kind === 'gate' ? '등교지도' : '급식지도',
       source: item.kind === 'gate' ? 'gateDuty' as const : 'mealDuty' as const,
     })),
-    ...sharedTasks.filter(task => task.deadline || (task.scheduledDate && task.startTime)).map(task => ({
-      date: toYmd(task.startTime && task.scheduledDate ? task.scheduledDate : task.deadline),
+    ...sharedTasks.filter(task => task.deadline || (task.startDate && task.startTime)).map(task => ({
+      date: toYmd(task.startTime ? (task.startDate || task.scheduledDate || task.deadline) : task.deadline),
       eventName: `${task.startTime ? `${task.startTime}${task.endTime ? `~${task.endTime}` : ''} ` : ''}${task.title}`,
       department: task.departmentNames.length ? task.departmentNames.join('·') : '공유 업무',
       source: 'sharedWork' as const,
@@ -736,7 +745,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       department: '시간표 운영',
       source: 'schoolEvent' as const,
     })),
-    ...pulledLessons.map(item => ({
+    ...effectiveTeacherPulledLessons.map(item => ({
       date: toYmd(item.date),
       eventName: pulledLessonTitle(item),
       department: '당김수업',
@@ -759,10 +768,10 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     if (sharedTeacher) {
       const dayIndex = getTimetableDayIndex(timetableDate)
       if (dayIndex >= 0) {
-        sharedTeacher.slots
-          .slice(dayIndex * 7, (dayIndex + 1) * 7)
-          .forEach((slot, offset) => {
-            if (slot.value) todaySubjects[String(offset + 1)] = slot.value.split(/\r?\n/).filter(Boolean).join(' ')
+        const baseValues = sharedTeacher.slots.slice(dayIndex * 7, (dayIndex + 1) * 7).map(slot => slot.value)
+        applyDailyTimetableOverridesToTeacher(sharedTeacher, timetableDate, baseValues, timetableOverrides)
+          .forEach((value, offset) => {
+            if (value) todaySubjects[String(offset + 1)] = value.split(/\r?\n/).filter(Boolean).join(' ')
           })
       }
     } else if (hasTeacher && config.teacherClasses) {
@@ -780,7 +789,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       timetable.filter(t => t.date === getTimetableSourceDate(toYmd(timetableDate)))
         .forEach(t => { todaySubjects[String(t.period)] = t.subject })
     }
-    pulledLessons.filter(item => item.date === timetableDate).forEach(item => {
+    effectiveTeacherPulledLessons.filter(item => item.date === timetableDate).forEach(item => {
       todaySubjects[String(item.period)] = `당김 ${item.classLabel} ${item.subject}`
     })
   }
@@ -1034,6 +1043,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
                 onNavigate={onNavigate}
                 timetableChanges={timetableChanges}
                 pulledLessons={pulledLessons}
+                timetableOverrides={timetableOverrides}
               />
             </DashCard>
           </div>
@@ -1661,7 +1671,7 @@ function ClassStatusBanner({ status }: { status: ClassStatus }) {
 
 // ─── TimetableSection ─────────────────────────────────────────────
 function TimetableSection({
-  timetable, teacherTT, sharedTeacher, selectedDate, config, periodRanges, currentTime, classStatus, onNavigate, timetableChanges, pulledLessons
+  timetable, teacherTT, sharedTeacher, selectedDate, config, periodRanges, currentTime, classStatus, onNavigate, timetableChanges, pulledLessons, timetableOverrides
 }: {
   timetable: TimetableEntry[]
   teacherTT: TimetableEntry[]
@@ -1674,6 +1684,7 @@ function TimetableSection({
   onNavigate: (id: string) => void
   timetableChanges: TimetableChangeRequest[]
   pulledLessons: PulledLesson[]
+  timetableOverrides: DailyTimetableOverride[]
 }) {
   const weekDates = getWeekDates(selectedDate)
   const DAY = ['월','화','수','목','금']
@@ -1681,6 +1692,7 @@ function TimetableSection({
   const hasTeacher = !!(config.teacherClasses?.length)
   const selectedYmd = toYmd(selectedDate)
   const [showClassTimetable, setShowClassTimetable] = useState(true)
+  const effectivePulled = useMemo(() => effectivePulledLessons(pulledLessons, timetableOverrides), [pulledLessons, timetableOverrides])
 
   useEffect(() => {
     void window.electron.configGet('dashboard.classTimetable.visible.v1').then(value => {
@@ -1710,7 +1722,7 @@ function TimetableSection({
     )
   }
 
-  if (!config.grade && !config.classNm && !hasTeacher && !sharedTeacher && pulledLessons.length === 0) {
+  if (!config.grade && !config.classNm && !hasTeacher && !sharedTeacher && effectivePulled.length === 0) {
     return (
       <>
         {classStatus && classStatus.type !== 'weekend' && <ClassStatusBanner status={classStatus} />}
@@ -1742,12 +1754,14 @@ function TimetableSection({
             lunch={lunch}
             renderCell={(date, period) => {
               const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
-              const pulled = pulledLessons.find(item => item.date === isoDate && String(item.period) === period)
+              const pulled = effectivePulled.find(item => item.date === isoDate && String(item.period) === period)
               if (pulled) return { text: `당김 ${pulled.classLabel}`, sub: `${pulled.subject}${pulled.substituteTeacherName ? ' · 보강' : ''}`, colorClass: 'bg-lime-500/20 text-lime-100 ring-1 ring-lime-400/30', isNow: date === todayYmd && period === currentPeriod }
               const dayIndex = getTimetableDayIndex(date)
               const slotIndex = schoolTimetableSlotIndex(dayIndex, Number(period))
               if (slotIndex < 0) return null
-              const slot = sharedTeacher.slots[slotIndex]
+              const baseValues = sharedTeacher.slots.slice(dayIndex * 7, dayIndex * 7 + 7).map(item => item.value)
+              const overriddenValues = applyDailyTimetableOverridesToTeacher(sharedTeacher, isoDate, baseValues, timetableOverrides)
+              const slot = { ...sharedTeacher.slots[slotIndex], value: overriddenValues[Number(period) - 1] ?? '' }
               const change = timetableChanges.find(item => isTimetableChangeAppliedForTeacher(item, sharedTeacher.name) && (
                 (item.originalDate === isoDate && item.originalSlotIndex === slotIndex) ||
                 (item.kind === 'exchange' && item.replacementDate === isoDate && item.replacementSlotIndex === slotIndex)
@@ -1798,7 +1812,7 @@ function TimetableSection({
             lunch={lunch}
             renderCell={(date, period) => {
               const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
-              const pulled = pulledLessons.find(item => item.date === isoDate && String(item.period) === period)
+              const pulled = effectivePulled.find(item => item.date === isoDate && String(item.period) === period)
               if (pulled) return { text: `당김 ${pulled.classLabel}`, sub: `${pulled.subject}${pulled.substituteTeacherName ? ' · 보강' : ''}`, colorClass: 'bg-lime-500/20 text-lime-100 ring-1 ring-lime-400/30', isNow: date === todayYmd && period === currentPeriod }
               const entry = config.teacherClasses!.reduce<{label:string;subject:string;colorIdx:number}|null>((acc, tc, idx) => {
                 if (acc) return acc
@@ -1820,12 +1834,12 @@ function TimetableSection({
         </div>
       )}
 
-      {!sharedTeacher && !hasTeacher && pulledLessons.length > 0 && (
+      {!sharedTeacher && !hasTeacher && effectivePulled.length > 0 && (
         <div>
           <div className="mb-2 flex items-center gap-2"><span className="rounded-lg bg-lime-500/15 px-2 py-1 text-[10px] font-semibold text-lime-200">📚 내 당김수업</span><span className="text-[10px] text-slate-500">2026학년도 2학기 계획 반영</span></div>
           <WeekGrid weekDates={weekDates} DAY={DAY} todayYmd={todayYmd} selectedYmd={selectedYmd} currentPeriod={isToday(selectedDate) ? currentPeriod : null} periodRanges={periodRanges} lunch={lunch} renderCell={(date, period) => {
             const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
-            const pulled = pulledLessons.find(item => item.date === isoDate && String(item.period) === period)
+            const pulled = effectivePulled.find(item => item.date === isoDate && String(item.period) === period)
             return pulled ? { text: `당김 ${pulled.classLabel}`, sub: pulled.subject, colorClass: 'bg-lime-500/20 text-lime-100 ring-1 ring-lime-400/30', isNow: date === todayYmd && period === currentPeriod } : null
           }} />
         </div>

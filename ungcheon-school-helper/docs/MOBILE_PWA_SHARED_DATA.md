@@ -1,6 +1,6 @@
 # 모바일 일정 PWA 공유 데이터 계약
 
-기준일·최종 확인일: 2026-09-09. 출처: 최신 `origin/main`의 웅천고 업무도우미, 기존 고정 Apps Script 소스, 모바일 일정 PWA 구현·회귀검사. 이 문서는 데스크톱과 모바일을 하나의 배포 계약으로 유지하기 위한 개발 지침이다.
+기준일·최종 확인일: 2026-09-11. 출처: 최신 `origin/main`의 웅천고 업무도우미, 기존 고정 Apps Script 소스, 모바일 일정 PWA 구현·회귀검사. 이 문서는 데스크톱과 모바일을 하나의 배포 계약으로 유지하기 위한 개발 지침이다.
 
 ## 유지할 공개 주소와 기반
 
@@ -9,14 +9,15 @@
 - 고정 deployment: `AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w`.
 - Apps Script URL: <https://script.google.com/macros/s/AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w/exec>.
 - 모바일 PWA 공개 URL: <https://ungcheon-mobile-schedule.jsw890122.chatgpt.site>. PWA 배포 설정과 데스크톱 환경설정도 이 주소를 그대로 사용한다. 새 사이트/호스트/주소로 바꾸지 않는다.
-- 현재 통합 릴리스는 데스크톱 v1.1.30, 모바일 PWA v1.1.28, Apps Script `MOBILE_SERVICE_VERSION = 44`를 기준으로 한다. 이후 변경 시 버전을 올리며, 현재 실제 원격 버전보다 내려가지 않는다.
+- 현재 통합 릴리스는 데스크톱 v1.1.31, 모바일 PWA v1.1.29, Apps Script `MOBILE_SERVICE_VERSION = 45`를 기준으로 한다. 이후 변경 시 버전을 올리며, 현재 실제 원격 버전보다 내려가지 않는다.
 
 ## 로그인과 응답
 
 - `verifyMobileViewer`: 교직원 명렬의 이름과 기존 공통 비밀번호를 확인한다.
 - 세션은 72시간이다. `UNG_MOBILE_SHARED_PASSWORD_HASH`, `UNG_MOBILE_SESSION_` 접두사 및 현재 유효한 세션을 보존한다. 코드 배포에 비밀번호 변경/속성 초기화 작업을 섞지 않는다.
 - `getMobileScheduleBundle`: 로그인한 교사의 읽기 전용 자료를 제공한다. `contractVersion: 3`과 `sourceStatus`를 유지한다.
-- 출처는 주간계획, 창체, 창체 학사일정, 등교지도, 급식지도, 교사 시간표, 내 위원회, 승인·반영된 수업 변경, 급식이다.
+- 출처는 주간계획, 창체, 창체 학사일정, 등교지도, 급식지도, 교사 시간표, 내 위원회, 승인·반영된 수업 변경, 일일 시간표 예외, 급식이다.
+- `timetableOverrides`는 공유 `일일시간표예외` 시트의 활성 자료만 요청 범위에 맞춰 전달한다. 모바일은 이 자료를 교사 주간시간표와 당김수업에 덮어쓰며 직접 수정하지 않는다.
 - 각 출처는 독립 오류 경계로 읽는다. `fresh`는 자료가 있는 정상 응답, `empty`는 정상 0건, `unavailable`은 해당 출처 읽기 실패다. 한 출처 실패가 전체 조회 실패가 되어서는 안 된다.
 - 학생 명렬·학생 시간표·NEIS 학사일정·NEIS 학급시간표 및 기타 학생 개인정보는 모바일 응답에 포함하지 않는다. 데스크톱 전용 기능은 기존대로 유지한다.
 - 개인 일정·개인 업무는 PC에서만 확인 가능하다고 모바일에 안내한다.

@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { CalendarDays, Clock3, Download, FileSpreadsheet, MapPin, Printer, RefreshCw, Search, ShieldCheck, Upload, UserRoundSearch } from 'lucide-react'
 import clsx from 'clsx'
-import { getSchoolTimetable, getSharedStudentRoster, getSharedStudentTimetable, subscribeHubResource } from '../services/schoolHub'
+import { getSchoolTimetable, getSharedStudentRoster, getSharedStudentTimetable, getTimetableOverrides, subscribeHubResource } from '../services/schoolHub'
 import { getSharedNeisSnapshot, type SharedNeisSnapshot } from '../services/sharedNeis'
 import { STUDENT_TIMETABLE_DAYS, type PersonalTimetable, type SharedStudentTimetable, type StudentTimetableDay } from '../services/studentTimetable'
 import type { SharedStudentRoster, StudentRosterEntry } from '../services/rosterAttendance'
@@ -11,6 +11,8 @@ import { applyStudentLessonOverride } from '../services/effectiveTimetable'
 import { useAppStore } from '../stores/appStore'
 import { getSpecialTimetableDay, getTimetableDayIndex, localDateKey } from '../services/specialTimetableDays'
 import { canonicalStudentId, studentIdsMatch } from '../services/studentId'
+import { PULLED_LESSONS_2026 } from '../data/pulledLessons2026'
+import { effectivePulledLessons, findStudentTimetableOverride, type DailyTimetableOverride } from '../services/timetableOverrides'
 import { schoolTimetableSlotIndex, type SchoolTimetable } from '../services/schoolTimetable'
 import { applyHelpClassLocation } from '../services/helpClassSchedule'
 import {
@@ -93,6 +95,7 @@ export default function StudentLocatorPage() {
   const [clock, setClock] = useState(new Date())
   const [changes, setChanges] = useState<TimetableChangeRequest[]>([])
   const [schoolTimetable, setSchoolTimetable] = useState<SchoolTimetable | null>(null)
+  const [timetableOverrides, setTimetableOverrides] = useState<DailyTimetableOverride[]>([])
   const [activeTab, setActiveTab] = useState<'current' | 'specific'>('current')
   const [batchInputs, setBatchInputs] = useState<StudentLocationInputRow[]>([])
   const [batchFileName, setBatchFileName] = useState('')
@@ -106,12 +109,13 @@ export default function StudentLocatorPage() {
   const load = async (force = false) => {
     setLoading(true); setError('')
     try {
-      const [nextDataset, nextRoster, nextNeis, nextChanges, nextSchoolTimetable] = await Promise.all([
+      const [nextDataset, nextRoster, nextNeis, nextChanges, nextSchoolTimetable, nextOverrides] = await Promise.all([
         getSharedStudentTimetable(force), getSharedStudentRoster(force), getSharedNeisSnapshot(force),
         listTimetableChanges(teacherName, '', '', true),
         getSchoolTimetable(force),
+        getTimetableOverrides(false, force),
       ])
-      setDataset(nextDataset); setRoster(nextRoster); setSharedNeis(nextNeis); setChanges(nextChanges); setSchoolTimetable(nextSchoolTimetable)
+      setDataset(nextDataset); setRoster(nextRoster); setSharedNeis(nextNeis); setChanges(nextChanges); setSchoolTimetable(nextSchoolTimetable); setTimetableOverrides(nextOverrides)
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
     finally { setLoading(false) }
@@ -121,6 +125,7 @@ export default function StudentLocatorPage() {
   useEffect(() => subscribeHubResource<SharedStudentRoster | null>('studentRoster', setRoster), [])
   useEffect(() => subscribeHubResource<SharedNeisSnapshot | null>('sharedNeis', setSharedNeis), [])
   useEffect(() => subscribeHubResource<SchoolTimetable | null>('timetable', setSchoolTimetable), [])
+  useEffect(() => subscribeHubResource<DailyTimetableOverride[]>('timetableOverrides', setTimetableOverrides), [])
   useEffect(() => { const timer = window.setInterval(() => setClock(new Date()), 30_000); return () => window.clearInterval(timer) }, [])
 
   const candidates = useMemo(() => {
@@ -155,12 +160,17 @@ export default function StudentLocatorPage() {
 
   const resolveSlot = (periodNumber: number) => {
     if (!selected || !day) return undefined
-    const personalSlot = selected.slots[`${day}${periodNumber}`]
+    const dailyOverride = findStudentTimetableOverride(timetableOverrides, dateKey, selected.student.grade, selected.student.className, periodNumber)
+    const sourceDate = dailyOverride?.action === 'copy' ? dailyOverride.sourceDate : dateKey
+    const sourceDayIndex = getTimetableDayIndex(sourceDate)
+    const sourceDay = sourceDayIndex >= 0 ? STUDENT_TIMETABLE_DAYS[sourceDayIndex] : day
+    const sourcePeriod = dailyOverride?.action === 'copy' ? dailyOverride.sourcePeriod : periodNumber
+    const personalSlot = dailyOverride?.action === 'clear' ? undefined : selected.slots[`${sourceDay}${sourcePeriod}`]
     const neisSlot = sharedNeis?.timetables.find(item =>
-      item.date === dateKey.replace(/-/g, '') &&
+      item.date === sourceDate.replace(/-/g, '') &&
       String(Number(item.grade)) === String(Number(selected.student.grade)) &&
       String(Number(item.classNm)) === String(Number(selected.student.className)) &&
-      Number(item.period) === periodNumber,
+      Number(item.period) === sourcePeriod,
     )
     const baseSlot = personalSlot?.subject ? personalSlot : neisSlot ? {
       day,
@@ -171,11 +181,13 @@ export default function StudentLocatorPage() {
       raw: '',
       selectedCourse: false,
     } : personalSlot
-    const slotIndex = schoolTimetableSlotIndex(dayIndex, periodNumber)
+    const slotIndex = schoolTimetableSlotIndex(sourceDayIndex, sourcePeriod)
     const effectiveSlot = slotIndex >= 0
       ? applyStudentLessonOverride(baseSlot, selected.student.classLabel, dateKey, slotIndex, changes)
       : baseSlot
-    return applyHelpClassLocation(effectiveSlot, selected.student, day, periodNumber)
+    const pulled = effectivePulledLessons(PULLED_LESSONS_2026, timetableOverrides).find(item => item.date === dateKey && item.period === periodNumber && item.classLabel.replace(/\D/g, '') === selected.student.classLabel.replace(/\D/g, ''))
+    const resolved = pulled ? { day, period: periodNumber, subject: pulled.subject, teacher: pulled.teacherName, classroom: '', raw: pulled.subject, selectedCourse: false } : effectiveSlot
+    return applyHelpClassLocation(resolved, selected.student, day, periodNumber)
   }
   const slot = period ? resolveSlot(Number(period.period)) : undefined
   const previousSlot = adjacent?.previous ? resolveSlot(Number(adjacent.previous.period)) : undefined
@@ -221,7 +233,7 @@ export default function StudentLocatorPage() {
   const runBatchLookup = () => {
     if (!batchInputs.length) { setBatchMessage('먼저 작성한 Excel 입력 파일을 불러와 주세요.'); return }
     if (!batchPeriods.length) { setBatchMessage('조회할 교시를 하나 이상 선택해 주세요.'); return }
-    const rows = buildStudentSpecificLocationRows({ inputs: batchInputs, date: batchDate, periods: batchPeriods, dataset, roster, schoolTimetable, sharedNeis, changes })
+    const rows = buildStudentSpecificLocationRows({ inputs: batchInputs, date: batchDate, periods: batchPeriods, dataset, roster, schoolTimetable, sharedNeis, changes, timetableOverrides })
     setBatchRows(rows)
     const changed = rows.filter(row => row.scheduleState === 'changed').length
     const review = rows.filter(row => row.scheduleState === 'review' || ['mismatch', 'not_found'].includes(row.validation)).length

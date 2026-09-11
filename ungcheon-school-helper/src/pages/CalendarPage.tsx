@@ -351,7 +351,7 @@ export default function CalendarPage() {
       const completed = task.status === 'completed' || task.closed || (task.items.length > 0 && task.items.every(item => own?.checkedItemIds.includes(item.id)))
       return ({
       id: `shared-work-${task.id}`,
-      date: task.startTime && task.scheduledDate ? task.scheduledDate : task.deadline,
+      date: task.startTime ? (task.startDate || task.scheduledDate || task.deadline) : task.deadline,
       title: task.title,
       time: task.startTime ? `${task.startTime}${task.endTime ? `~${task.endTime}` : ''}` : undefined,
       source: 'sharedWork' as const,

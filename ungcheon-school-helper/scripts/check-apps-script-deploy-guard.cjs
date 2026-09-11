@@ -22,6 +22,9 @@ function doPost(e) {
  const action = e.action;
  if (action === 'verifyMobileViewer') return mobileCreateSession_(mobileAssertViewer_(mobileSharedPasswordHash_()));
  if (action === 'getMobileScheduleBundle') return getMobileScheduleBundle_(e);
+ if (action === 'getTimetableOverrides') return [];
+ if (action === 'saveTimetableOverride') return [];
+ if (action === 'deactivateTimetableOverride') return [];
  if (action === 'listStaffChecklists') return listStaffChecklists_();
  ensureSheets_();
 }
@@ -54,9 +57,10 @@ function getMobileScheduleBundle_(body) {
  const todayKey = '20260830'; const cacheKey = 'mobile:' + todayKey + fromDate + toDate;
  const sourceStatus = {};
  ${['weekly', 'creative', 'gateDuty', 'mealDuty', 'timetable', 'committee', 'changes'].map(key => `mobileLoadSource_(sourceStatus, '${key}', [], function() { return []; });`).join('\n')}
+ const timetableOverrides = mobileLoadSource_(sourceStatus, 'overrides', [], function() { return []; });
  const meals = mobileLoadSource_(sourceStatus, 'meals', [], function() { return mobileSharedMealsInRange_(fromDate, toDate); });
  const todayMeals = meals.filter(function(meal) { return meal.date === todayKey; });
- return { meals: meals, todayMeals: todayMeals, contractVersion: 3, sourceStatus: sourceStatus };
+ return { timetableOverrides: timetableOverrides, meals: meals, todayMeals: todayMeals, contractVersion: 3, sourceStatus: sourceStatus };
 }
 `
 
@@ -77,7 +81,7 @@ fails('missing range meals', text => text.replace('meals: meals,', ''), /range m
 fails('missing legacy meals', text => text.replace('todayMeals: todayMeals,', ''), /legacy todayMeals/)
 fails('date range omission', text => text.replace('dateKey <= toKey', 'true'), /date range/)
 fails('forbidden direct NEIS API', text => text.replace('const fromKey = fromDate;', 'UrlFetchApp.fetch("https://open.neis.go.kr"); const fromKey = fromDate;'), /forbidden mobile/)
-fails('forbidden student field', text => text.replace('return { meals: meals', 'return { studentRoster: [], meals: meals'), /forbidden student/)
+fails('forbidden student field', text => text.replace('return { timetableOverrides:', 'return { studentRoster: [], timetableOverrides:'), /forbidden student/)
 fails('whole property wipe', text => text + '\nfunction reset() { PropertiesService.getScriptProperties().deleteAllProperties(); }', /blanket/)
 fails('property replacement wipe', text => text + '\nfunction reset() { PropertiesService.getScriptProperties().setProperties({}, true); }', /replacement/)
 fails('active session removal', text => text.replace('if (Number(JSON.parse(all[key]).expiresAt) <= Date.now()) ', ''), /existing credentials or active sessions/)

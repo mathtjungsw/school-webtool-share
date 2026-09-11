@@ -16,6 +16,7 @@ import {
   StudentRosterEntry,
 } from './rosterAttendance'
 import { studentIdParts } from './studentId'
+import type { DailyTimetableOverride } from './timetableOverrides'
 
 export type NoticeLevel = 'info' | 'important' | 'urgent'
 
@@ -105,6 +106,7 @@ export type HubResource =
   | 'committees'
   | 'sharedNeis'
   | 'timetableChanges'
+  | 'timetableOverrides'
 
 interface SyncManifest {
   generatedAt: string
@@ -151,12 +153,14 @@ const MUTATION_RESOURCE: Record<string, HubResource | undefined> = {
   replaceNeisSnapshot: 'sharedNeis',
   createTimetableChange: 'timetableChanges', respondTimetableChange: 'timetableChanges',
   applyTimetableChangeForRequester: 'timetableChanges', cancelTimetableChange: 'timetableChanges',
+  saveTimetableOverride: 'timetableOverrides', deactivateTimetableOverride: 'timetableOverrides',
 }
 
 const BACKGROUND_INTERVAL_MS: Record<HubResource, number> = {
   staffChecklists: 2 * 60_000,
   committees: 2 * 60_000,
   timetableChanges: 2 * 60_000,
+  timetableOverrides: 2 * 60_000,
   timetable: 5 * 60_000,
   studentTimetable: 5 * 60_000,
   sharedNeis: 5 * 60_000,
@@ -329,6 +333,9 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
       'respondTimetableChange',
       'applyTimetableChangeForRequester',
       'cancelTimetableChange',
+      'getTimetableOverrides',
+      'saveTimetableOverride',
+      'deactivateTimetableOverride',
       'getNeisSyncStatus',
       'registerNeisSyncDevice',
       'revokeNeisSyncDevice',
@@ -471,6 +478,17 @@ export const replaceSchoolTimetable = (
   uploadedBy,
 })
 
+export const getTimetableOverrides = (includeInactive = false, force = false) =>
+  cachedHubRequest<DailyTimetableOverride[]>(`timetableOverrides:${includeInactive ? 'all' : 'active'}`, 'timetableOverrides', {
+    action: 'getTimetableOverrides', includeInactive,
+  }, force)
+
+export const saveTimetableOverride = (override: Partial<DailyTimetableOverride>, adminPassword: string, updatedBy: string) =>
+  hubRequest<DailyTimetableOverride>({ action: 'saveTimetableOverride', override, adminPassword, updatedBy })
+
+export const deactivateTimetableOverride = (id: string, adminPassword: string, updatedBy: string) =>
+  hubRequest<{ updatedAt: string }>({ action: 'deactivateTimetableOverride', id, adminPassword, updatedBy })
+
 export const getSharedStudentTimetable = (force = false) =>
   cachedHubRequest<SharedStudentTimetable | null>('studentTimetable', 'studentTimetable', { action: 'getStudentTimetable' }, force)
 
@@ -556,6 +574,9 @@ export const addStaffChecklist = (input: {
   scheduledDate: string
   startTime: string
   endTime: string
+  timeInputMode: 'time' | 'period'
+  startPeriod: number
+  endPeriod: number
   priority: StaffChecklist['priority']
   status: StaffChecklist['status']
   linkUrl: string
@@ -576,6 +597,9 @@ export const updateStaffChecklist = (input: {
   scheduledDate: string
   startTime: string
   endTime: string
+  timeInputMode: 'time' | 'period'
+  startPeriod: number
+  endPeriod: number
   priority: StaffChecklist['priority']
   status: StaffChecklist['status']
   linkUrl: string
@@ -662,6 +686,7 @@ export function preloadSchoolHubCache(viewerName = '') {
       getSharedStudentRoster(),
       listCommitteeState(),
       cachedHubAction('sharedNeis', 'sharedNeis', { action: 'getNeisSnapshot' }),
+      getTimetableOverrides(),
     ]
     if (viewerName.trim()) {
       const name = viewerName.trim()

@@ -104,6 +104,7 @@
     "src/services/specialTimetableDays.ts",
     "src/services/pulledLessons.ts",
     "src/services/teacherTimetableCalendar.ts",
+    "src/services/timetableOverrides.ts",
     "src/services/localFortune.ts",
     "src/services/localLuckyCard.ts",
     "src/services/widgetSettings.ts",

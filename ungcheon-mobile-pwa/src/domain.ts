@@ -1,7 +1,8 @@
 import { addDays, format, startOfWeek } from 'date-fns'
-import type { DashboardPayload, LessonView, MealInfo, MobileEvent, ScheduleSource, TeacherTimetable, TimetableChange } from './types'
+import type { DailyTimetableOverride, DashboardPayload, LessonView, MealInfo, MobileEvent, ScheduleSource, TeacherTimetable, TimetableChange } from './types'
 import { PULLED_LESSONS_2026 } from './shared/pulledLessons2026'
 import { UNGCHEON_PERIOD_PLAN } from './shared/ungcheonSchedule'
+import { applyTeacherOverrides, effectiveMobilePulledLessons } from './timetableOverrides'
 
 export const DAYS = ['월', '화', '수', '목', '금']
 export const SOURCE_LABELS: Record<ScheduleSource, string> = {
@@ -162,11 +163,14 @@ export function parseSlot(value: string) {
 export function isApplied(change: TimetableChange, name: string) {
   return change.status === 'approved' || Boolean(change.requesterAppliedAt && change.requesterName === name)
 }
-export function timetableForDate(teacher: TeacherTimetable | null, date: string, changes: TimetableChange[], teacherName: string): LessonView[] {
+export function timetableForDate(teacher: TeacherTimetable | null, date: string, changes: TimetableChange[], teacherName: string, overrides: DailyTimetableOverride[] = []): LessonView[] {
   const dayIndex = new Date(`${date}T12:00:00`).getDay() - 1
   if (!teacher || dayIndex < 0 || dayIndex > 4) return []
-  const hasEighth = PULLED_LESSONS_2026.some(item => item.date === date && item.teacherName.trim() === teacherName.trim() && item.period === 8)
-  const lessons: LessonView[] = Array.from({ length: hasEighth ? 8 : 7 }, (_, index) => ({ period: index + 1, value: teacher.slots[dayIndex * 7 + index]?.value ?? '' }))
+  const pulledLessons = effectiveMobilePulledLessons(PULLED_LESSONS_2026, overrides)
+  const hasEighth = pulledLessons.some(item => item.date === date && item.teacherName.trim() === teacherName.trim() && item.period === 8)
+  const rawBase = Array.from({ length: 7 }, (_, index) => teacher.slots[dayIndex * 7 + index]?.value ?? '')
+  const overrideBase = applyTeacherOverrides(teacher, date, rawBase, overrides)
+  const lessons: LessonView[] = Array.from({ length: hasEighth ? 8 : 7 }, (_, index) => ({ period: index + 1, value: overrideBase[index] ?? '' }))
   changes.filter(item => isApplied(item, teacherName)).forEach(change => {
     if (change.originalDate === date) {
       const cell = lessons[change.originalSlotIndex % 7]
@@ -179,7 +183,7 @@ export function timetableForDate(teacher: TeacherTimetable | null, date: string,
       if (change.replacementTeacher === teacherName) Object.assign(cell, { value: '', changed: true, note: `교환 · ${change.originalTeacher}` })
     }
   })
-  PULLED_LESSONS_2026.filter(item => item.date === date && item.teacherName.trim() === teacherName.trim()).forEach(item => {
+  pulledLessons.filter(item => item.date === date && item.teacherName.trim() === teacherName.trim()).forEach(item => {
     const cell = lessons[item.period - 1] ?? { period: item.period, value: '' }
     Object.assign(cell, { value: `${item.classLabel}\n${item.subject}`, changed: true, note: item.substituteTeacherName ? `당김 · ${item.substituteTeacherName} 보강` : '당김수업' })
     if (!lessons[item.period - 1]) lessons.push(cell)
@@ -193,7 +197,7 @@ export function collectEvents(data: DashboardPayload, name: string): MobileEvent
     const title = item.kind === 'exchange' ? `수업 교환 · ${item.originalClass} ↔ ${item.replacementClass}` : `대강 · ${item.originalClass} ${item.originalSubject}`
     ;[...new Set([item.originalDate, item.replacementDate])].forEach(date => events.push({ id: `change-${item.id}-${date}`, date, title, source: 'timetableChange', label: item.status === 'approved' ? '승인된 수업 변경' : '우선 반영' }))
   })
-  PULLED_LESSONS_2026.filter(item => item.teacherName.trim() === name.trim()).forEach(item => events.push({ id: item.id, date: item.date, title: `${item.period}교시 ${item.classLabel} ${item.subject}`, source: 'pulledLesson', label: '당김수업' }))
+  effectiveMobilePulledLessons(PULLED_LESSONS_2026, data.bundle?.timetableOverrides ?? []).filter(item => item.teacherName.trim() === name.trim()).forEach(item => events.push({ id: item.id, date: item.date, title: `${item.period}교시 ${item.classLabel} ${item.subject}`, source: 'pulledLesson', label: '당김수업' }))
   return events.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
 }
 

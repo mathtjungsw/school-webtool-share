@@ -55,6 +55,7 @@ import { useAuthStore } from "../../stores/authStore";
 import { useNoticeStore } from "../../stores/noticeStore";
 import {
   getSchoolTimetable,
+  getTimetableOverrides,
   listCommitteeState,
   listStaffChecklists,
   type CommitteeState,
@@ -559,6 +560,7 @@ export default function WidgetApp() {
         sharedTasksResult,
         committeeResult,
         supplementsResult,
+        overridesResult,
       ] = await Promise.all([
         Promise.allSettled([getSchoolTimetable(force)]).then(result => result[0]),
         Promise.allSettled([
@@ -576,6 +578,7 @@ export default function WidgetApp() {
               : loadDateSupplement(targetDate, teacher, force),
           ]),
         ]).then(result => result[0]),
+        Promise.allSettled([getTimetableOverrides(false, force)]).then(result => result[0]),
       ]);
 
       if (generation !== remoteGenerationRef.current || teacher !== activeTeacherRef.current) return;
@@ -605,6 +608,7 @@ export default function WidgetApp() {
           { events: [], duties: [], failed: true },
           { events: [], duties: [], failed: true },
         ];
+      const overrides = overridesResult.status === "fulfilled" ? overridesResult.value : [];
 
       if (timetable) {
         setDay(buildCompositeTeacherDay(
@@ -613,6 +617,7 @@ export default function WidgetApp() {
           currentToday,
           changes,
           listPulledLessonsForTeacher(teacher, currentToday, currentToday),
+          overrides,
         ));
       } else setDay(null);
 
@@ -623,6 +628,7 @@ export default function WidgetApp() {
           targetDate,
           changes,
           listPulledLessonsForTeacher(teacher, targetDate, targetDate),
+          overrides,
         )
         : null;
 

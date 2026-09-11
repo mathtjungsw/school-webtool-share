@@ -101,7 +101,7 @@ export function buildWidgetBaseEvents(date: string, sources: {
         meta: item.time ? `${item.time}${item.endTime ? `~${item.endTime}` : ''}` : (item.kind === 'task' ? '개인 업무' : '개인 일정'),
         kind: item.kind === 'task' ? 'personal-task' : 'personal-schedule',
         startTime: item.time, endTime: item.endTime, time: item.time, allDay: !item.time })),
-    ...sources.sharedTasks.filter(item => normalizeWidgetEventDate(item.startTime && item.scheduledDate ? item.scheduledDate : item.deadline) === targetDate
+    ...sources.sharedTasks.filter(item => normalizeWidgetEventDate(item.startTime ? (item.startDate || item.scheduledDate || item.deadline) : item.deadline) === targetDate
       && item.targetNames.includes(teacherName) && !isSharedWorkComplete(item, teacherName))
       .map(item => ({ id: `shared:${item.id}`, date: targetDate, title: item.title,
         meta: item.startTime ? `배부 업무 · ${item.startTime}${item.endTime ? `~${item.endTime}` : ''}` : '배부 업무 마감',

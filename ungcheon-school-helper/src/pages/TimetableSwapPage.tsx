@@ -10,7 +10,9 @@ import { useAuthStore } from '../stores/authStore'
 import TeacherSchedulePreview from '../components/timetable/TeacherSchedulePreview'
 import TeacherTimetableWorkspace from '../components/timetable/TeacherTimetableWorkspace'
 import TimetablePlanEditor from '../components/timetable/TimetablePlanEditor'
-import { getSchoolTimetable, getSharedStaffRoster, replaceSchoolTimetable, subscribeHubResource } from '../services/schoolHub'
+import { getSchoolTimetable, getSharedStaffRoster, getTimetableOverrides, replaceSchoolTimetable, subscribeHubResource } from '../services/schoolHub'
+import type { DailyTimetableOverride } from '../services/timetableOverrides'
+import TimetableOverrideManager from '../components/timetable/TimetableOverrideManager'
 import {
   chooseAndParseTimetable,
   findCommonFreeSlots,
@@ -39,7 +41,7 @@ import { applyTimetableChangeForRequester, cancelTimetableChange, createTimetabl
 import type { TimetablePlanEntry } from '../services/timetablePlan'
 import type { SharedStaffRoster } from '../services/rosterAttendance'
 
-type ViewMode = 'exchange' | 'substitution' | 'common_free' | 'teacher_schedule' | 'manager_schedule' | 'plan'
+type ViewMode = 'exchange' | 'substitution' | 'common_free' | 'teacher_schedule' | 'manager_schedule' | 'daily_overrides' | 'plan'
 type PreviewSelection = {
   mode: 'exchange' | 'substitution'
   teacherIndex: number
@@ -66,6 +68,7 @@ export default function TimetableSwapPage() {
   const [planLoaded, setPlanLoaded] = useState(false)
   const [changeRequests, setChangeRequests] = useState<TimetableChangeRequest[]>([])
   const [staffRoster, setStaffRoster] = useState<SharedStaffRoster | null>(null)
+  const [timetableOverrides, setTimetableOverrides] = useState<DailyTimetableOverride[]>([])
   const configured = Boolean(config.schoolHubUrl)
 
   useEffect(() => {
@@ -82,8 +85,9 @@ export default function TimetableSwapPage() {
     setLoading(true)
     setError('')
     try {
-      const next = await getSchoolTimetable()
+      const [next, overrides] = await Promise.all([getSchoolTimetable(), getTimetableOverrides(false)])
       setTimetable(next)
+      setTimetableOverrides(overrides)
       setSelectedSlot(null)
       setPreview(null)
     } catch (e) {
@@ -99,6 +103,7 @@ export default function TimetableSwapPage() {
     setSelectedSlot(null)
     setPreview(null)
   }), [])
+  useEffect(() => subscribeHubResource<DailyTimetableOverride[]>('timetableOverrides', data => setTimetableOverrides(data.filter(item => item.active))), [])
 
   const loadStaffRoster = useCallback(async () => {
     if (!configured) return setStaffRoster(null)
@@ -357,6 +362,12 @@ export default function TimetableSwapPage() {
           icon={<UserCog size={14} />}
           label="시간표 업무 담당자"
         />
+        {isAdmin && <ModeButton
+          active={viewMode === 'daily_overrides'}
+          onClick={() => { setViewMode('daily_overrides'); setSelectedSlot(null); setPreview(null) }}
+          icon={<CalendarRange size={14} />}
+          label="일일 시간표 예외 관리"
+        />}
         <ModeButton
           active={viewMode === 'plan'}
           onClick={() => { setViewMode('plan'); setPreview(null) }}
@@ -386,7 +397,9 @@ export default function TimetableSwapPage() {
         </div>
       )}
 
-      {timetable && teacher && (viewMode === 'plan' ? (<>
+      {viewMode === 'daily_overrides' && isAdmin ? (
+        <TimetableOverrideManager adminPassword={adminPassword} updatedBy={loggedInTeacherName.trim() || '관리자'} onChanged={async () => { setTimetableOverrides(await getTimetableOverrides(false, true)) }} />
+      ) : timetable && teacher && (viewMode === 'plan' ? (<>
         <TimetablePlanEditor
           draft={planDraft}
           timetable={timetable}
@@ -397,9 +410,9 @@ export default function TimetableSwapPage() {
         />
         <ChangeRequestHistory items={changeRequests} teacherName={config.teacherName?.trim() ?? ''} onChanged={loadChangeRequests} />
       </>) : viewMode === 'teacher_schedule' ? (
-        <TeacherTimetableWorkspace mode="teacher" timetable={timetable} currentTeacherName={loggedInTeacherName.trim()} configured={configured} staffRoster={staffRoster} />
+        <TeacherTimetableWorkspace mode="teacher" timetable={timetable} currentTeacherName={loggedInTeacherName.trim()} configured={configured} staffRoster={staffRoster} overrides={timetableOverrides} />
       ) : viewMode === 'manager_schedule' ? (
-        <TeacherTimetableWorkspace mode="manager" timetable={timetable} currentTeacherName={loggedInTeacherName.trim()} configured={configured} staffRoster={staffRoster} />
+        <TeacherTimetableWorkspace mode="manager" timetable={timetable} currentTeacherName={loggedInTeacherName.trim()} configured={configured} staffRoster={staffRoster} overrides={timetableOverrides} />
       ) : viewMode === 'common_free' ? (
         <CommonFreeTimePanel
           timetable={timetable}

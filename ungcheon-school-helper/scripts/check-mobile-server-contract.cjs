@@ -77,6 +77,9 @@ function harness() {
       { date: '20260901', mealType: '석식', dishNamesJson: '["저녁 밥"]', calories: '700', ntrInfo: 'must-not-be-returned' },
       { date: '20261001', mealType: '중식', dishNamesJson: '["범위 밖"]', calories: '500' },
     ],
+    일일시간표예외: [
+      { id: 'override-1', date: '2026-09-11', targetGrade: '1', targetClass: '', targetPeriod: 7, action: 'copy', sourceDate: '2026-09-23', sourcePeriod: 7, note: '수요일 7교시 운영', active: true, createdBy: '관리자', createdAt: '2026-08-30T01:00:00Z', updatedAt: '2026-08-30T01:00:00Z' },
+    ],
   };
   const books = {};
   const context = vm.createContext({
@@ -117,7 +120,7 @@ function harness() {
     },
   });
   vm.runInContext(source, context);
-  vm.runInContext('readObjects_ = __readRows; ensureSheets_ = function() { throw new Error("Mobile fast path required"); };', context);
+  vm.runInContext('readObjects_ = __readRows; listTimetableOverrides_ = function() { return __readRows("일일시간표예외").map(normalizeTimetableOverride_).filter(function(item) { return item.active; }); }; ensureSheets_ = function() { throw new Error("Mobile fast path required"); };', context);
   const constants = vm.runInContext('({ version: MOBILE_SERVICE_VERSION, weekly: MOBILE_WEEKLY_PLAN_ID, creative: MOBILE_CREATIVE_SCHEDULE_ID, gate: MOBILE_GATE_DUTY_ID, meal: MOBILE_MEAL_DUTY_ID, notes: RELEASE_NOTES })', context);
   const weekly = sheet('2026.8.31', [['부서', '31(월)', '1(화)'], ['교무부', '교직원 회의', '주간계획']]);
   books[constants.weekly] = { getSheets: () => [weekly] };
@@ -209,7 +212,8 @@ test('contract 3 retains all event sources and only the selected teacher timetab
   const creative = bundle.events.find(event => event.source === 'creative');
   assert.equal(creative.periodStart, 5);
   assert.equal(creative.periodEnd, 5);
-  assert.deepEqual(Object.keys(bundle.sourceStatus).sort(), ['changes', 'committee', 'creative', 'gateDuty', 'mealDuty', 'meals', 'timetable', 'weekly']);
+  assert.deepEqual(Object.keys(bundle.sourceStatus).sort(), ['changes', 'committee', 'creative', 'gateDuty', 'mealDuty', 'meals', 'overrides', 'timetable', 'weekly']);
+  assert.equal(bundle.timetableOverrides[0].id, 'override-1');
   Object.values(bundle.sourceStatus).forEach(status => { assert.equal(status.state, 'fresh'); assert.ok(status.lastSuccessAt); });
 });
 
@@ -241,7 +245,7 @@ test('mobile response and read path exclude student and forbidden NEIS datasets'
   }
   assert.ok(h.readNames.includes('NEIS급식'));
   assert.equal(h.readNames.some(name => /학생|NEIS학사일정|NEIS학급시간표/.test(name)), false);
-  assert.deepEqual(Object.keys(result.data).sort(), ['committeeEvents', 'contractVersion', 'events', 'fetchedAt', 'meals', 'servedAt', 'sourceStatus', 'teacherTimetable', 'timetableChanges', 'todayMeals']);
+  assert.deepEqual(Object.keys(result.data).sort(), ['committeeEvents', 'contractVersion', 'events', 'fetchedAt', 'meals', 'servedAt', 'sourceStatus', 'teacherTimetable', 'timetableChanges', 'timetableOverrides', 'todayMeals']);
 });
 
 test('one failing source does not fail other data or cache the partial result', () => {

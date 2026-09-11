@@ -334,14 +334,14 @@ export default function App() {
   const sharedMeals = data?.bundle?.meals ?? data?.bundle?.todayMeals ?? []
   const selectedMeals = sharedMeals.filter(meal => meal.date === selectedDate)
   const teacher = data ? findTeacher(data.timetable, session.name) : null
-  const selectedLessons = data ? timetableForDate(teacher, selectedDate, data.changes, session.name) : []
+  const selectedLessons = data ? timetableForDate(teacher, selectedDate, data.changes, session.name, data.bundle?.timetableOverrides ?? []) : []
   const selectedClassCount = selectedLessons.filter(lesson => Boolean(lesson.value)).length
   const dateSet = view === 'today' ? [selectedDate] : view === 'week' ? range.thisWeek : range.nextWeek
   const heading = view === 'today' ? format(new Date(`${selectedDate}T12:00:00`), 'M월 d일 EEEE', { locale: ko }) : view === 'week' ? '이번 주 일정' : view === 'next' ? '다음 주 일정' : '주간 교사 시간표'
   const timetableStatus = summarizeStatus(data, ['timetable'])
   const scheduleStatus = summarizeStatus(data, ['weekly', 'creative', 'gateDuty', 'mealDuty', 'committee', 'changes'])
   const mealStatus = summarizeStatus(data, ['meals'], '자료 없음')
-  const weeklyPeriodCount = data ? Math.max(7, ...range.thisWeek.slice(0, 5).map(date => timetableForDate(teacher, date, data.changes, session.name).length)) : 7
+  const weeklyPeriodCount = data ? Math.max(7, ...range.thisWeek.slice(0, 5).map(date => timetableForDate(teacher, date, data.changes, session.name, data.bundle?.timetableOverrides ?? []).length)) : 7
   const isNew = (event: MobileEvent) => newKeys.includes(eventFingerprint(event))
   const visibleNewCount = allEvents.filter(isNew).length
 
@@ -371,7 +371,7 @@ export default function App() {
         return <section className={`day-panel ${date === today ? 'today' : ''}`} key={date}><div className="day-heading"><strong>{format(new Date(`${date}T12:00:00`), 'M.d')}</strong><span>{format(new Date(`${date}T12:00:00`), 'EEE', { locale: ko })}</span><i>{dayEvents.length}</i></div><div className="event-list">{dayEvents.map(event => <EventCard key={event.id} event={event} isNew={isNew(event)} />)}{!dayEvents.length && <div className="empty compact">일정 없음</div>}</div></section>
       })}</div>}
       {data && view === 'timetable' && <section className="weekly-table"><div className="week-grid header"><span>교시</span>{DAYS.map(day => <strong key={day}>{day}</strong>)}</div>{Array.from({ length: weeklyPeriodCount }, (_, periodIndex) => <div className="week-grid" key={periodIndex}><span>{periodIndex + 1}</span>{range.thisWeek.slice(0, 5).map(date => {
-          const lesson = timetableForDate(teacher, date, data.changes, session.name)[periodIndex]
+          const lesson = timetableForDate(teacher, date, data.changes, session.name, data.bundle?.timetableOverrides ?? [])[periodIndex]
           const parsed = parseSlot(lesson?.value ?? '')
           return <div key={date} className={lesson?.changed ? 'changed' : ''}><strong>{parsed.subject || (lesson?.value ? parsed.className : '—')}</strong>{parsed.subject && <small>{parsed.className}</small>}{lesson?.note && <em>{lesson.note}</em>}</div>
         })}</div>)}</section>}

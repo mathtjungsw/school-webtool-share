@@ -44,6 +44,7 @@ import {
   classifySharedWorkDeadline, isNewSharedWork, isSharedWorkComplete,
   loadSharedWorkLastViewedAt, markSharedWorkViewed,
 } from '../services/sharedWorkNotifications'
+import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 
 type Tab = 'checklists' | 'roster' | 'training'
 type StaffPageMode = 'checklists' | 'roster'
@@ -218,6 +219,9 @@ interface SharedTaskDraft {
   scheduledDate: string
   startTime: string
   endTime: string
+  timeInputMode: 'time' | 'period'
+  startPeriod: number
+  endPeriod: number
   priority: StaffTaskPriority
   status: StaffTaskStatus
   linkUrl: string
@@ -240,7 +244,8 @@ const PRIORITY_LABEL: Record<StaffTaskPriority, string> = { low: '낮음', norma
 function emptySharedTask(): SharedTaskDraft {
   return {
     requestId: crypto.randomUUID(),
-    title: '', description: '', startDate: today(), deadline: today(), scheduledDate: '', startTime: '', endTime: '', priority: 'normal',
+    title: '', description: '', startDate: today(), deadline: today(), scheduledDate: '', startTime: '', endTime: '',
+    timeInputMode: 'time', startPeriod: 1, endPeriod: 1, priority: 'normal',
     status: 'in_progress', linkUrl: '', itemsText: '', targetNames: [], departmentNames: [],
   }
 }
@@ -358,6 +363,7 @@ function ChecklistTab(props: {
       id: task.id, requestId: crypto.randomUUID(), title: task.title, description: task.description, startDate: task.startDate || today(),
       deadline: task.deadline || today(), priority: task.priority, status: task.status,
       scheduledDate: task.scheduledDate || '', startTime: task.startTime || '', endTime: task.endTime || '',
+      timeInputMode: task.timeInputMode || 'time', startPeriod: task.startPeriod || 1, endPeriod: task.endPeriod || task.startPeriod || 1,
       linkUrl: task.linkUrl, itemsText: task.items.map(item => item.label).join('\n'),
       targetNames: task.targetNames, departmentNames: task.departmentNames,
     })
@@ -374,8 +380,12 @@ function ChecklistTab(props: {
     if (!teacherName) return onError('환경설정에서 본인 이름을 먼저 입력하세요.')
     const items = form.itemsText.split('\n').map(value => value.trim()).filter(Boolean)
     if (!items.length || !form.targetNames.length) return onError('확인 항목과 배부 대상 교원을 선택하세요.')
-    if (form.startTime && !form.scheduledDate) return onError('시간을 지정하려면 진행 날짜를 입력하세요.')
-    if (form.endTime && (!form.startTime || form.endTime <= form.startTime)) return onError('종료 시간은 시작 시간보다 늦게 입력하세요.')
+    const periodStart = UNGCHEON_PERIOD_PLAN[form.startPeriod - 1]
+    const periodEnd = UNGCHEON_PERIOD_PLAN[form.endPeriod - 1]
+    const startTime = form.timeInputMode === 'period' ? periodStart?.start ?? '' : form.startTime
+    const endTime = form.timeInputMode === 'period' ? periodEnd?.end ?? '' : form.endTime
+    if (form.timeInputMode === 'period' && (!periodStart || !periodEnd || form.endPeriod < form.startPeriod)) return onError('시작·종료 교시를 확인하세요.')
+    if (form.startDate === form.deadline && endTime && (!startTime || endTime <= startTime)) return onError('같은 날짜의 종료 시간은 시작 시간보다 늦게 입력하세요.')
     setSaving(true)
     onError('')
     try {
@@ -384,7 +394,8 @@ function ChecklistTab(props: {
           checklistId: form.id, viewerName: teacherName, adminPassword: isAdmin ? adminPassword : '',
           title: form.title, description: form.description, startDate: form.startDate,
           deadline: form.deadline, priority: form.priority, status: form.status,
-          scheduledDate: form.scheduledDate, startTime: form.startTime, endTime: form.endTime,
+          scheduledDate: startTime ? form.startDate : '', startTime, endTime,
+          timeInputMode: form.timeInputMode, startPeriod: form.timeInputMode === 'period' ? form.startPeriod : 0, endPeriod: form.timeInputMode === 'period' ? form.endPeriod : 0,
           linkUrl: form.linkUrl, items, targetNames: form.targetNames,
           departmentNames: form.departmentNames,
         })
@@ -394,7 +405,8 @@ function ChecklistTab(props: {
           requestId: form.requestId || crypto.randomUUID(),
           title: form.title, description: form.description, startDate: form.startDate,
           deadline: form.deadline, priority: form.priority, status: form.status,
-          scheduledDate: form.scheduledDate, startTime: form.startTime, endTime: form.endTime,
+          scheduledDate: startTime ? form.startDate : '', startTime, endTime,
+          timeInputMode: form.timeInputMode, startPeriod: form.timeInputMode === 'period' ? form.startPeriod : 0, endPeriod: form.timeInputMode === 'period' ? form.endPeriod : 0,
           linkUrl: form.linkUrl, creatorName: teacherName, items,
           targetNames: form.targetNames, departmentNames: form.departmentNames,
         })
@@ -445,8 +457,7 @@ function ChecklistTab(props: {
             <input required maxLength={100} className="input-field" placeholder="업무 제목" value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} />
             <textarea maxLength={1000} className="input-field min-h-20 resize-y" placeholder="업무 설명·안내" value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} />
             <textarea required maxLength={2000} className="input-field min-h-24 resize-y" placeholder={'세부 확인 항목 1\n세부 확인 항목 2'} value={form.itemsText} onChange={event => setForm({ ...form, itemsText: event.target.value })} />
-            <div className="grid grid-cols-2 gap-2"><label className="field-label">시작일<input type="date" required className="input-field mt-1" value={form.startDate} onChange={event => setForm({ ...form, startDate: event.target.value })} /></label><label className="field-label">마감일<input type="date" required className="input-field mt-1" value={form.deadline} onChange={event => setForm({ ...form, deadline: event.target.value })} /></label></div>
-            <fieldset className="rounded-xl border border-sky-200 bg-sky-50/70 p-3"><legend className="px-1 text-[11px] font-bold text-sky-900">실제 진행 시간(선택)</legend><p className="mb-2 text-[10px] text-slate-600">시작 시간만 입력하면 해당 시각에 표시되고, 종료 시간까지 입력하면 시간 범위로 표시됩니다.</p><div className="grid grid-cols-3 gap-2"><label className="field-label">진행 날짜<input type="date" className="input-field mt-1" value={form.scheduledDate} onChange={event => setForm({ ...form, scheduledDate: event.target.value })} /></label><label className="field-label">시작 시간<input type="time" className="input-field mt-1" value={form.startTime} onChange={event => setForm({ ...form, startTime: event.target.value, endTime: event.target.value ? form.endTime : '' })} /></label><label className="field-label">종료 시간<input type="time" className="input-field mt-1" value={form.endTime} min={form.startTime || undefined} disabled={!form.startTime} onChange={event => setForm({ ...form, endTime: event.target.value })} /></label></div></fieldset>
+            <fieldset className="rounded-xl border border-sky-200 bg-sky-50/70 p-3"><legend className="px-1 text-[11px] font-bold text-sky-900">업무 기간</legend><div className="mb-3 flex items-center justify-between gap-2"><p className="text-[10px] text-slate-600">시간을 비우면 종일로 처리합니다.</p><div className="flex rounded-lg border border-sky-200 bg-white p-0.5"><button type="button" onClick={() => setForm({ ...form, timeInputMode: 'time' })} className={clsx('rounded-md px-2 py-1 text-[10px] font-bold', form.timeInputMode === 'time' ? 'bg-sky-100 text-sky-900' : 'text-slate-500')}>시간으로 입력</button><button type="button" onClick={() => setForm({ ...form, timeInputMode: 'period' })} className={clsx('rounded-md px-2 py-1 text-[10px] font-bold', form.timeInputMode === 'period' ? 'bg-sky-100 text-sky-900' : 'text-slate-500')}>교시로 입력</button></div></div><div className="grid gap-3 sm:grid-cols-2"><div className="rounded-lg border border-slate-200 bg-white p-2"><span className="field-label">시작</span><div className="mt-1 grid grid-cols-2 gap-2"><input type="date" required className="input-field" value={form.startDate} onChange={event => setForm({ ...form, startDate: event.target.value })} />{form.timeInputMode === 'time' ? <input type="time" className="input-field" value={form.startTime} onChange={event => setForm({ ...form, startTime: event.target.value, endTime: event.target.value ? form.endTime : '' })} /> : <select className="input-field" value={form.startPeriod} onChange={event => setForm({ ...form, startPeriod: Number(event.target.value), endPeriod: Math.max(Number(event.target.value), form.endPeriod) })}>{UNGCHEON_PERIOD_PLAN.slice(0, 7).map(item => <option key={item.period} value={item.period}>{item.period}교시</option>)}</select>}</div></div><div className="rounded-lg border border-slate-200 bg-white p-2"><span className="field-label">마감</span><div className="mt-1 grid grid-cols-2 gap-2"><input type="date" required className="input-field" value={form.deadline} min={form.startDate} onChange={event => setForm({ ...form, deadline: event.target.value })} />{form.timeInputMode === 'time' ? <input type="time" className="input-field" value={form.endTime} min={form.startDate === form.deadline ? form.startTime || undefined : undefined} disabled={!form.startTime} onChange={event => setForm({ ...form, endTime: event.target.value })} /> : <select className="input-field" value={form.endPeriod} onChange={event => setForm({ ...form, endPeriod: Number(event.target.value) })}>{UNGCHEON_PERIOD_PLAN.slice(0, 7).filter(item => Number(item.period) >= form.startPeriod).map(item => <option key={item.period} value={item.period}>{item.period}교시</option>)}</select>}</div></div></div>{form.timeInputMode === 'period' && <p className="mt-2 text-[10px] font-bold text-sky-800">{form.startPeriod}{form.endPeriod !== form.startPeriod ? `~${form.endPeriod}` : ''}교시 · {UNGCHEON_PERIOD_PLAN[form.startPeriod - 1]?.start}~{UNGCHEON_PERIOD_PLAN[form.endPeriod - 1]?.end}으로 표시됩니다.</p>}</fieldset>
             <div className="grid grid-cols-2 gap-2"><label className="field-label">우선순위<select className="input-field mt-1" value={form.priority} onChange={event => setForm({ ...form, priority: event.target.value as StaffTaskPriority })}><option value="low">낮음</option><option value="normal">보통</option><option value="high">높음</option></select></label><label className="field-label">업무 상태<select className="input-field mt-1" value={form.status} onChange={event => setForm({ ...form, status: event.target.value as StaffTaskStatus })}><option value="planned">예정</option><option value="in_progress">진행 중</option><option value="hold">보류</option><option value="completed">완료</option></select></label></div>
             <label className="field-label">관련 링크<div className="relative mt-1"><Link2 size={13} className="absolute left-3 top-2.5 text-slate-600" /><input type="url" className="input-field pl-8" placeholder="https://..." value={form.linkUrl} onChange={event => setForm({ ...form, linkUrl: event.target.value })} /></div></label>
             <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
@@ -506,7 +517,7 @@ function SharedTaskCard(props: {
   return (
     <article className={clsx('card p-5', checklist.priority === 'high' && checklist.status !== 'completed' && 'border-rose-500/20')}>
       <div className="flex items-start justify-between gap-3"><button type="button" onClick={() => setExpanded(value => !value)} className="min-w-0 flex-1 text-left"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-white">{checklist.title}</h2>{isNew && <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-bold text-violet-200">새 업무</span>}<span className={clsx('rounded-full px-2 py-0.5 text-[10px]', STATUS_STYLE[checklist.status])}>{STATUS_LABEL[checklist.status]}</span><span className={clsx('rounded-full px-2 py-0.5 text-[10px]', checklist.priority === 'high' ? 'bg-rose-500/12 text-rose-300' : 'bg-white/5 text-slate-500')}>우선순위 {PRIORITY_LABEL[checklist.priority]}</span></div><p className="mt-1 text-[11px] font-semibold text-slate-400">마감 {checklist.deadline || '미지정'} · {checklist.creatorName} 작성{checklist.departmentNames.length ? ` · ${checklist.departmentNames.join(' · ')}` : ''}</p></button><div className="flex flex-shrink-0 gap-1"><button type="button" onClick={() => setExpanded(value => !value)} className="btn-ghost p-2" title={expanded ? '세부 내용 접기' : '세부 내용 보기'}>{expanded ? <ArrowUp size={13} /> : <ArrowDown size={13} />}</button>{canManage && <button onClick={() => onEdit(checklist)} className="btn-ghost p-2" title="수정"><Pencil size={13} /></button>}<button onClick={() => onDuplicate(checklist)} className="btn-ghost p-2" title="복제"><ClipboardCopy size={13} /></button>{canManage && <button onClick={remove} className="btn-ghost p-2 text-rose-400" title="삭제"><Trash2 size={13} /></button>}</div></div>
-      {expanded && <>{checklist.startTime && checklist.scheduledDate && <p className="mt-3 rounded-lg bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900">진행 {checklist.scheduledDate} · {checklist.startTime}{checklist.endTime ? `~${checklist.endTime}` : ''}</p>}{checklist.description && <p className="mt-3 whitespace-pre-wrap text-xs text-slate-400">{checklist.description}</p>}{checklist.linkUrl && <a href={checklist.linkUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] text-sky-300 hover:underline"><ExternalLink size={11} />관련 자료 열기</a>}
+      {expanded && <>{checklist.startTime && <p className="mt-3 rounded-lg bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900">진행 {checklist.startDate}{checklist.deadline !== checklist.startDate ? ` ~ ${checklist.deadline}` : ''} · {checklist.timeInputMode === 'period' && checklist.startPeriod ? `${checklist.startPeriod}${checklist.endPeriod && checklist.endPeriod !== checklist.startPeriod ? `~${checklist.endPeriod}` : ''}교시 · ` : ''}{checklist.startTime}{checklist.endTime ? `~${checklist.endTime}` : ''}</p>}{checklist.description && <p className="mt-3 whitespace-pre-wrap text-xs text-slate-400">{checklist.description}</p>}{checklist.linkUrl && <a href={checklist.linkUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] text-sky-300 hover:underline"><ExternalLink size={11} />관련 자료 열기</a>}
       {assigned && <div className="mt-4 space-y-2 rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-3">{checklist.items.map(item => <label key={item.id} className="flex items-start gap-2 text-xs text-slate-300"><input type="checkbox" className="mt-0.5" checked={checked.includes(item.id)} disabled={checklist.closed} onChange={event => setChecked(current => event.target.checked ? [...new Set([...current, item.id])] : current.filter(id => id !== item.id))} /><span className={checked.includes(item.id) ? 'text-slate-500 line-through' : ''}>{item.label}</span></label>)}<div className="flex gap-2 pt-1"><input className="input-field flex-1 text-xs" maxLength={300} placeholder="진행 메모(선택)" value={memo} onChange={event => setMemo(event.target.value)} disabled={checklist.closed} /><button onClick={save} disabled={saving || checklist.closed} className="btn-primary flex items-center gap-1.5 px-4"><Save size={13} />{saving ? '저장 중' : '저장'}</button></div></div>}
       {checklist.canManage && <div className="mt-4"><div className="mb-2 flex items-center justify-between text-xs"><span className="font-semibold text-slate-300">대상자 진행 현황</span><div className="flex items-center gap-2"><button onClick={copyIncomplete} disabled={!incompleteNames.length} className="text-[10px] text-sky-300 disabled:text-slate-600">미완료자 복사</button><span className="text-emerald-300">{doneCount}/{checklist.targetNames.length}명 완료</span></div></div><div className="mb-3 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-emerald-500" style={{ width: `${checklist.targetNames.length ? doneCount / checklist.targetNames.length * 100 : 0}%` }} /></div><div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{checklist.targetNames.map(name => { const response = checklist.responses.find(item => item.teacherName === name); const itemCount = response?.checkedItemIds.filter(id => checklist.items.some(item => item.id === id)).length ?? 0; const complete = itemCount === checklist.items.length; return <div key={name} className={clsx('rounded-lg border px-2.5 py-2 text-[11px]', complete ? 'border-emerald-500/20 bg-emerald-500/7' : 'border-white/5 bg-white/[0.02]')}><div className="flex justify-between gap-2"><span className="text-slate-300">{name}</span><span className={complete ? 'text-emerald-300' : 'text-slate-600'}>{itemCount}/{checklist.items.length}</span></div>{response?.memo && <p className="mt-1 truncate text-[9px] text-slate-600" title={response.memo}>{response.memo}</p>}</div>})}</div></div>}</>}
     </article>
@@ -556,7 +567,17 @@ function RosterTab({
     if (!filePath) return
     try {
       const members = parseStaffRosterWorkbook(await window.electron.readFile(filePath))
-      setDraft(members)
+      const existingByName = new Map((roster?.members ?? []).map(member => [member.name, member]))
+      setDraft(sortStaffMembers(members.map(member => {
+        const existing = existingByName.get(member.name)
+        return existing ? {
+          ...member,
+          id: existing.id || member.id,
+          department: member.department || existing.department,
+          subject: member.subject || existing.subject,
+          homeroom: member.homeroom || existing.homeroom,
+        } : member
+      })))
       setSourceFileName(filePath.split(/[\\/]/).pop() ?? '')
       onSuccess(`${members.length}명의 교직원 명렬을 읽었습니다. 내용을 확인하고 저장하세요.`)
     } catch (uploadError) {

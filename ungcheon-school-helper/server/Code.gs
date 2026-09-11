@@ -22,6 +22,8 @@ const STAFF_CHECKLIST_RESPONSES_SHEET = '업무체크응답';
 const COMMITTEE_MEMBERS_SHEET = '위원회명단';
 const COMMITTEE_EVENTS_SHEET = '위원회일정';
 const TIMETABLE_CHANGES_SHEET = '교환대강반영';
+const TIMETABLE_OVERRIDES_SHEET = '일일시간표예외';
+const TIMETABLE_OVERRIDE_HISTORY_SHEET = '일일시간표예외이력';
 const NEIS_SYNC_META_SHEET = 'NEIS동기화정보';
 const NEIS_MEALS_SHEET = 'NEIS급식';
 const NEIS_SCHEDULE_SHEET = 'NEIS학사일정';
@@ -29,6 +31,8 @@ const NEIS_CLASS_TIMETABLE_SHEET = 'NEIS학급시간표';
 const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
 const STAFF_ASSIGNMENTS_2026_APPLIED_KEY = 'UNG_STAFF_ASSIGNMENTS_2026_APPLIED';
 const STAFF_NAME_MIGRATION_1_1_30_KEY = 'UNG_STAFF_NAME_MIGRATION_1_1_30';
+const STAFF_ROSTER_MIGRATION_1_1_31_KEY = 'UNG_STAFF_ROSTER_MIGRATION_1_1_31';
+const TIMETABLE_OVERRIDE_SEED_KEY = 'UNG_TIMETABLE_OVERRIDE_SEED_1_1_31';
 const OFFICIAL_RELEASE_NOTICE_RESET_KEY = 'UNG_OFFICIAL_RELEASE_NOTICE_RESET_1_1_2';
 const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
 const NEIS_SYNC_DEVICE_ID_PROPERTY = 'UNG_NEIS_SYNC_DEVICE_ID';
@@ -37,7 +41,7 @@ const NEIS_SYNC_REGISTERED_AT_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_AT';
 const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 학생 자료를 읽지 않고 아래 공개 일정 시트만 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 44;
+const MOBILE_SERVICE_VERSION = 45;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -45,6 +49,18 @@ const MOBILE_MEAL_DUTY_ID = '10cPw-KaYGNPSN-JYDCmNC7MqPhUVOwtoIzD7kS6qKRE';
 const MOBILE_SHARED_PASSWORD_HASH_PROPERTY = 'UNG_MOBILE_SHARED_PASSWORD_HASH';
 const MOBILE_SESSION_PROPERTY_PREFIX = 'UNG_MOBILE_SESSION_';
 const MOBILE_SESSION_HOURS = 72;
+const INITIAL_TIMETABLE_OVERRIDES_1_1_31 = [
+  ['seed-20260911-g1-p7', '2026-09-11', '1', '', 7, 'copy', '2026-09-23', 7, '9월 23일 수요일 7교시 수업 운영'],
+  ['seed-20260911-g2-p7', '2026-09-11', '2', '', 7, 'copy', '2026-09-23', 7, '9월 23일 수요일 7교시 수업 운영'],
+  ['seed-20260911-g3-p7', '2026-09-11', '3', '', 7, 'move_pulled', '2026-09-23', 7, '9월 23일 7교시 당김수업을 오늘 운영'],
+  ['seed-20260923-all-p1', '2026-09-23', '', '', 1, 'copy', '2026-09-23', 2, '기존 2교시 수업을 1교시에 운영'],
+  ['seed-20260923-all-p2', '2026-09-23', '', '', 2, 'copy', '2026-09-23', 3, '기존 3교시 수업을 2교시에 운영'],
+  ['seed-20260923-all-p3', '2026-09-23', '', '', 3, 'copy', '2026-09-23', 4, '기존 4교시 수업을 3교시에 운영'],
+  ['seed-20260923-all-p4', '2026-09-23', '', '', 4, 'copy', '2026-09-23', 5, '기존 5교시 수업을 4교시에 운영'],
+  ['seed-20260923-all-p5', '2026-09-23', '', '', 5, 'copy', '2026-09-23', 6, '기존 6교시 수업을 5교시에 운영'],
+  ['seed-20260923-all-p6', '2026-09-23', '', '', 6, 'clear', '', 0, '6교시 수업 없음'],
+  ['seed-20260923-all-p7', '2026-09-23', '', '', 7, 'clear', '', 0, '7교시 수업 없음']
+];
 // 2026학년도 업무분장 원문에서 담임·교과·부서만 선별한 자료입니다.
 // 업무, 세부업무, 부담임 등 나머지 원문 정보는 저장하지 않습니다.
 const STAFF_ASSIGNMENTS_2026 = [
@@ -75,6 +91,13 @@ const STAFF_ASSIGNMENTS_2026 = [
   ['이영재', '3학년부', '체육', '3-3'], ['전우석', '3학년부', '지구과학', '3-5'],
   ['이경민', '3학년부', '영어', '3-1'], ['신숙자', '3학년부', '수학', '3-2'],
   ['정유현', '3학년부', '국어', '3-6']
+];
+const OFFICIAL_NON_TEACHING_STAFF_2026 = [
+  ['김우열', '행정실장'], ['문은희', '행정과장'], ['박정희', '행정주임'], ['정지수', '행정주임'],
+  ['이문원', '시설관리'], ['문소영', '사무행정'], ['오지윤', '교무행정'], ['이선경', '영양사'],
+  ['홍인숙', '조리사'], ['강해선', '조리실무사'], ['고윤경', '조리실무사'], ['김미령', '조리실무사'],
+  ['윤외희', '조리실무사'], ['윤하영', '조리실무사'], ['정현선', '조리실무사'], ['조경염', '조리실무사'],
+  ['최혜진', '조리실무사'], ['전영애', '청소'], ['이정우', '당직']
 ];
 // 시험 운영 중의 변경 기록은 소스 이력으로만 보관하고 공지에는 다시 게시하지 않습니다.
 const LEGACY_RELEASE_NOTES = [
@@ -364,6 +387,18 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'v1.1.31',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.31 · 일일 시간표 예외와 업무 입력 통합',
+    body: [
+      '· 공유 구글시트와 관리자 화면에서 날짜·학년·학급·교시별 예외 시간표를 관리하며 프로그램 재배포 없이 수업 복사, 교시 비우기와 당김수업 이동을 반영합니다.',
+      '· 9월 11일 7교시와 9월 23일 교시 이동 운영안을 데스크톱·학생 위치 찾기·위젯·모바일 시간표에 동일하게 반영했습니다.',
+      '· 업무 시작일·마감일에 선택 시간 또는 교시를 바로 입력하고, 시간이 없으면 종일 업무로 처리하도록 입력 구조를 통합했습니다.',
+      '· 청렴 연수 등록부 기준 66명 교직원과 직책 우선순위·가나다순 정렬을 적용하고 기존 부서·교과·담임 정보는 보존합니다.',
+      '· 기존 데스크톱 기능, 모바일 72시간 로그인과 공개 주소, 학생 자료 제외 원칙 및 이전 릴리스 안내를 모두 유지합니다.'
+    ].join('\n'),
+    date: '2026-09-11'
+  },
   {
     key: 'v1.1.30',
     title: '[업데이트] 웅천고 업무도우미 v1.1.30 · 시간 지정 일정과 위젯 순서 개선',
@@ -713,6 +748,7 @@ const GET_READ_ACTIONS = [
   'listStaffChecklists',
   'listCommitteeState',
   'listTimetableChanges',
+  'getTimetableOverrides',
   'getNeisSyncStatus',
   'getNeisSnapshot'
 ];
@@ -837,6 +873,15 @@ function doPost(e) {
       return json_({ ok: true });
     }
     if (action === 'listTimetableChanges') return json_({ ok: true, data: listTimetableChanges_(body) });
+    if (action === 'getTimetableOverrides') return json_({ ok: true, data: listTimetableOverrides_(body) });
+    if (action === 'saveTimetableOverride') {
+      requireAdmin_(body.adminPassword);
+      return json_({ ok: true, data: saveTimetableOverride_(body) });
+    }
+    if (action === 'deactivateTimetableOverride') {
+      requireAdmin_(body.adminPassword);
+      return json_({ ok: true, data: deactivateTimetableOverride_(body) });
+    }
     if (action === 'createTimetableChange') return json_({ ok: true, data: createTimetableChange_(body) });
     if (action === 'respondTimetableChange') return json_({ ok: true, data: respondTimetableChange_(body) });
     if (action === 'applyTimetableChangeForRequester') return json_({ ok: true, data: applyTimetableChangeForRequester_(body) });
@@ -899,6 +944,7 @@ function getSyncManifest_() {
       sharedNeis: versionOf_(NEIS_SYNC_META_SHEET),
       staffChecklists: activityOf_('staffChecklists', [STAFF_CHECKLISTS_SHEET, STAFF_CHECKLIST_RESPONSES_SHEET])
       ,timetableChanges: activityOf_('timetableChanges', [TIMETABLE_CHANGES_SHEET])
+      ,timetableOverrides: timetableOverrideRevision_()
     }
   };
 }
@@ -1004,6 +1050,7 @@ function ensureSheets_() {
   repairStaffHomeroomCells_(book);
   ensureStaffAssignments2026_(book);
   migrateStaffName1_1_30_(book);
+  migrateStaffRoster1_1_31_(book);
   ensureDataSheet_(book, STUDENT_ROSTER_META_SHEET, [
     'version', 'sourceFileName', 'uploadedBy', 'uploadedAt', 'studentCount'
   ]);
@@ -1015,7 +1062,7 @@ function ensureSheets_() {
     'id', 'title', 'description', 'deadline', 'creatorName', 'createdAt',
     'closed', 'itemsJson', 'targetNamesJson', 'startDate', 'priority', 'status',
     'linkUrl', 'departmentNamesJson', 'updatedAt', 'requestId',
-    'scheduledDate', 'startTime', 'endTime'
+    'scheduledDate', 'startTime', 'endTime', 'timeInputMode', 'startPeriod', 'endPeriod'
   ]);
   ensureDataSheet_(book, STAFF_CHECKLIST_RESPONSES_SHEET, [
     'checklistId', 'teacherName', 'checkedItemIdsJson', 'memo', 'updatedAt'
@@ -1034,6 +1081,7 @@ function ensureSheets_() {
     'originalSubject', 'replacementSubject', 'note', 'createdAt', 'respondedAt', 'responderName', 'updatedAt',
     'requesterAppliedAt'
   ]);
+  ensureTimetableOverrideSheets_(book);
   repairTimetableChangeClassCells_(book);
   ensureDataSheet_(book, NEIS_SYNC_META_SHEET, [
     'version', 'schoolName', 'fromDate', 'toDate', 'fetchedAt', 'uploadedAt',
@@ -1059,7 +1107,7 @@ function ensureStaffChecklistSheets_() {
     'id', 'title', 'description', 'deadline', 'creatorName', 'createdAt',
     'closed', 'itemsJson', 'targetNamesJson', 'startDate', 'priority', 'status',
     'linkUrl', 'departmentNamesJson', 'updatedAt', 'requestId',
-    'scheduledDate', 'startTime', 'endTime'
+    'scheduledDate', 'startTime', 'endTime', 'timeInputMode', 'startPeriod', 'endPeriod'
   ]);
   ensureDataSheet_(book, STAFF_CHECKLIST_RESPONSES_SHEET, [
     'checklistId', 'teacherName', 'checkedItemIdsJson', 'memo', 'updatedAt'
@@ -1085,6 +1133,133 @@ function ensureDataSheet_(book, name, headers) {
     sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
   }
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+}
+
+function ensureTimetableOverrideSheets_(book) {
+  const headers = [
+    'id', 'date', 'targetGrade', 'targetClass', 'targetPeriod', 'action',
+    'sourceDate', 'sourcePeriod', 'note', 'active', 'createdBy', 'createdAt', 'updatedAt'
+  ];
+  ensureDataSheet_(book, TIMETABLE_OVERRIDES_SHEET, headers);
+  ensureDataSheet_(book, TIMETABLE_OVERRIDE_HISTORY_SHEET, [
+    'id', 'overrideId', 'operation', 'snapshotJson', 'updatedBy', 'updatedAt'
+  ]);
+  const properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty(TIMETABLE_OVERRIDE_SEED_KEY) === 'true') return;
+  const sheet = book.getSheetByName(TIMETABLE_OVERRIDES_SHEET);
+  const existingIds = {};
+  readObjects_(TIMETABLE_OVERRIDES_SHEET).forEach(function(row) { existingIds[String(row.id || '')] = true; });
+  const now = new Date().toISOString();
+  const rows = INITIAL_TIMETABLE_OVERRIDES_1_1_31.filter(function(item) { return !existingIds[item[0]]; }).map(function(item) {
+    return item.concat([true, '초기 운영안', now, now]);
+  });
+  if (rows.length) sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, headers.length).setValues(rows);
+  properties.setProperty(TIMETABLE_OVERRIDE_SEED_KEY, 'true');
+  touchSyncResource_('timetableOverrides');
+}
+
+function timetableOverrideRevision_() {
+  const book = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = book && book.getSheetByName(TIMETABLE_OVERRIDES_SHEET);
+  if (!sheet) return 'o:missing';
+  const values = sheet.getDataRange().getDisplayValues();
+  return 'o:' + sha256_(JSON.stringify(values)).slice(0, 24);
+}
+
+function normalizeTimetableOverride_(row) {
+  return {
+    id: String(row.id || ''),
+    date: dateOnly_(row.date),
+    targetGrade: clean_(row.targetGrade, 1),
+    targetClass: clean_(row.targetClass, 2),
+    targetPeriod: Number(row.targetPeriod) || 0,
+    action: ['copy', 'clear', 'move_pulled'].indexOf(String(row.action || '')) >= 0 ? String(row.action) : 'copy',
+    sourceDate: dateOnly_(row.sourceDate),
+    sourcePeriod: Number(row.sourcePeriod) || 0,
+    note: clean_(row.note, 200),
+    active: toBooleanValue_(row.active),
+    createdBy: clean_(row.createdBy, 30),
+    createdAt: iso_(row.createdAt),
+    updatedAt: iso_(row.updatedAt || row.createdAt)
+  };
+}
+
+function listTimetableOverrides_(body) {
+  const book = SpreadsheetApp.getActiveSpreadsheet();
+  ensureTimetableOverrideSheets_(book);
+  const includeInactive = toBooleanValue_(body && body.includeInactive);
+  return readObjects_(TIMETABLE_OVERRIDES_SHEET).map(normalizeTimetableOverride_)
+    .filter(function(item) { return item.id && item.date && (includeInactive || item.active); })
+    .sort(function(a, b) { return a.date.localeCompare(b.date) || a.targetPeriod - b.targetPeriod || a.targetGrade.localeCompare(b.targetGrade); });
+}
+
+function validateTimetableOverride_(source) {
+  const item = normalizeTimetableOverride_(source || {});
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(item.date)) throw new Error('적용 날짜를 확인하세요.');
+  if (item.targetGrade && !/^[123]$/.test(item.targetGrade)) throw new Error('대상 학년은 1~3학년만 입력할 수 있습니다.');
+  if (item.targetClass && (!item.targetGrade || !/^\d{1,2}$/.test(item.targetClass))) throw new Error('대상 학급을 입력하려면 학년도 함께 선택하세요.');
+  if (item.targetPeriod < 1 || item.targetPeriod > 7) throw new Error('적용 교시는 1~7교시로 입력하세요.');
+  if (item.action !== 'clear') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(item.sourceDate)) throw new Error('가져올 날짜를 확인하세요.');
+    if (item.sourcePeriod < 1 || item.sourcePeriod > 7) throw new Error('가져올 교시는 1~7교시로 입력하세요.');
+  }
+  return item;
+}
+
+function appendTimetableOverrideHistory_(item, operation, updatedBy) {
+  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_OVERRIDE_HISTORY_SHEET).appendRow([
+    Utilities.getUuid(), item.id, operation, JSON.stringify(item), updatedBy, new Date().toISOString()
+  ]);
+}
+
+function saveTimetableOverride_(body) {
+  const book = SpreadsheetApp.getActiveSpreadsheet();
+  ensureTimetableOverrideSheets_(book);
+  const rawInput = body.override || {};
+  if (rawInput.active === undefined || rawInput.active === null || rawInput.active === '') rawInput.active = true;
+  const input = validateTimetableOverride_(rawInput);
+  const updatedBy = clean_(body.updatedBy, 30) || '관리자';
+  const sheet = book.getSheetByName(TIMETABLE_OVERRIDES_SHEET);
+  const values = sheet.getDataRange().getValues();
+  const now = new Date().toISOString();
+  for (let rowIndex = 1; rowIndex < values.length; rowIndex++) {
+    if (String(values[rowIndex][0] || '') !== input.id) continue;
+    const previous = normalizeTimetableOverride_(readObjects_(TIMETABLE_OVERRIDES_SHEET)[rowIndex - 1] || {});
+    appendTimetableOverrideHistory_(previous, 'update', updatedBy);
+    const next = [input.id, input.date, input.targetGrade, input.targetClass, input.targetPeriod, input.action,
+      input.action === 'clear' ? '' : input.sourceDate, input.action === 'clear' ? 0 : input.sourcePeriod,
+      input.note, input.active, previous.createdBy || updatedBy, previous.createdAt || now, now];
+    sheet.getRange(rowIndex + 1, 1, 1, next.length).setValues([next]);
+    touchSyncResource_('timetableOverrides');
+    return normalizeTimetableOverride_({ id: next[0], date: next[1], targetGrade: next[2], targetClass: next[3], targetPeriod: next[4], action: next[5], sourceDate: next[6], sourcePeriod: next[7], note: next[8], active: next[9], createdBy: next[10], createdAt: next[11], updatedAt: next[12] });
+  }
+  const id = input.id || Utilities.getUuid();
+  const next = [id, input.date, input.targetGrade, input.targetClass, input.targetPeriod, input.action,
+    input.action === 'clear' ? '' : input.sourceDate, input.action === 'clear' ? 0 : input.sourcePeriod,
+    input.note, input.active !== false, updatedBy, now, now];
+  sheet.appendRow(next);
+  appendTimetableOverrideHistory_(normalizeTimetableOverride_({ id: id, date: next[1], targetGrade: next[2], targetClass: next[3], targetPeriod: next[4], action: next[5], sourceDate: next[6], sourcePeriod: next[7], note: next[8], active: next[9], createdBy: next[10], createdAt: next[11], updatedAt: next[12] }), 'create', updatedBy);
+  touchSyncResource_('timetableOverrides');
+  return normalizeTimetableOverride_({ id: id, date: next[1], targetGrade: next[2], targetClass: next[3], targetPeriod: next[4], action: next[5], sourceDate: next[6], sourcePeriod: next[7], note: next[8], active: next[9], createdBy: next[10], createdAt: next[11], updatedAt: next[12] });
+}
+
+function deactivateTimetableOverride_(body) {
+  const id = clean_(body.id, 100);
+  const updatedBy = clean_(body.updatedBy, 30) || '관리자';
+  const book = SpreadsheetApp.getActiveSpreadsheet();
+  ensureTimetableOverrideSheets_(book);
+  const sheet = book.getSheetByName(TIMETABLE_OVERRIDES_SHEET);
+  const values = sheet.getDataRange().getValues();
+  for (let rowIndex = 1; rowIndex < values.length; rowIndex++) {
+    if (String(values[rowIndex][0] || '') !== id) continue;
+    const previous = normalizeTimetableOverride_(readObjects_(TIMETABLE_OVERRIDES_SHEET)[rowIndex - 1] || {});
+    appendTimetableOverrideHistory_(previous, 'deactivate', updatedBy);
+    sheet.getRange(rowIndex + 1, 10).setValue(false);
+    sheet.getRange(rowIndex + 1, 13).setValue(new Date().toISOString());
+    touchSyncResource_('timetableOverrides');
+    return { updatedAt: new Date().toISOString() };
+  }
+  throw new Error('비활성화할 예외 시간표를 찾지 못했습니다.');
 }
 
 function ensureStaffAssignments2026_(book) {
@@ -1687,11 +1862,12 @@ function getStaffRoster_() {
   const metaRows = readObjects_(STAFF_ROSTER_META_SHEET);
   if (!metaRows.length) return null;
   const meta = metaRows[0];
-  const members = readObjects_(STAFF_ROSTER_SHEET)
+  const byName = {};
+  readObjects_(STAFF_ROSTER_SHEET)
     .map(function(row) {
       return {
         id: String(row.id || ''),
-        name: String(row.name || ''),
+        name: String(row.name || '') === '최대식' ? '전종택' : String(row.name || ''),
         position: String(row.position || ''),
         department: String(row.department || ''),
         subject: String(row.subject || ''),
@@ -1699,7 +1875,11 @@ function getStaffRoster_() {
       };
     })
     .filter(function(member) { return member.id && member.name; })
-    .sort(compareStaffMembers_);
+    .forEach(function(member) { if (!byName[member.name]) byName[member.name] = member; });
+  OFFICIAL_NON_TEACHING_STAFF_2026.forEach(function(item) {
+    if (!byName[item[0]]) byName[item[0]] = { id: 'official-' + sha256_(item[0]).slice(0, 12), name: item[0], position: item[1], department: '', subject: '', homeroom: '' };
+  });
+  const members = Object.keys(byName).map(function(name) { return byName[name]; }).sort(compareStaffMembers_);
   return {
     version: Number(meta.version) || 1,
     sourceFileName: String(meta.sourceFileName || ''),
@@ -1765,12 +1945,56 @@ function compareStaffMembers_(a, b) {
     const value = String(position || '').replace(/\s/g, '');
     if (value === '교장') return 0;
     if (value === '교감') return 1;
-    if (value.indexOf('교사') >= 0) return 2;
-    if (value === '교무실무원') return 3;
-    return 4;
+    if (value === '행정실장') return 2;
+    if (value.indexOf('교사') >= 0) return 3;
+    const order = ['행정과장', '행정주임', '시설관리', '사무행정', '교무행정', '영양사', '조리사', '조리실무사', '청소', '당직'];
+    const index = order.indexOf(value);
+    return index >= 0 ? index + 4 : 99;
   }
   const rank = rank_(a.position) - rank_(b.position);
   return rank || String(a.name || '').localeCompare(String(b.name || ''), 'ko');
+}
+
+function migrateStaffRoster1_1_31_(book) {
+  const properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty(STAFF_ROSTER_MIGRATION_1_1_31_KEY) === 'true') return;
+  const sheet = book && book.getSheetByName(STAFF_ROSTER_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
+  const byName = {};
+  rows.forEach(function(row) {
+    let name = clean_(row[1], 30);
+    if (name === '최대식') name = '전종택';
+    if (!name) return;
+    row[1] = name;
+    if (!byName[name]) byName[name] = row;
+    else {
+      for (let column = 2; column < 6; column++) if (!byName[name][column] && row[column]) byName[name][column] = row[column];
+    }
+  });
+  OFFICIAL_NON_TEACHING_STAFF_2026.forEach(function(item) {
+    const name = item[0];
+    const position = item[1];
+    if (byName[name]) {
+      if (!clean_(byName[name][2], 30) || name === '김우열') byName[name][2] = position;
+      return;
+    }
+    byName[name] = [Utilities.getUuid(), name, position, '', '', ''];
+  });
+  const merged = Object.keys(byName).map(function(name) { return byName[name]; });
+  merged.sort(function(a, b) { return compareStaffMembers_({ name: a[1], position: a[2] }, { name: b[1], position: b[2] }); });
+  sheet.getRange('F:F').setNumberFormat('@');
+  replaceSheetRows_(STAFF_ROSTER_SHEET, merged);
+  const meta = readObjects_(STAFF_ROSTER_META_SHEET)[0] || {};
+  replaceSheetRows_(STAFF_ROSTER_META_SHEET, [[
+    (Number(meta.version) || 0) + 1,
+    String(meta.sourceFileName || '2026. 학교로 찾아가는 청렴 연수 등록부.xlsx'),
+    '청렴 연수 등록부 반영',
+    new Date().toISOString(),
+    merged.length
+  ]]);
+  properties.setProperty(STAFF_ROSTER_MIGRATION_1_1_31_KEY, 'true');
+  touchSyncResource_('staffRoster');
 }
 
 function getStudentRoster_() {
@@ -1894,6 +2118,9 @@ function listStaffChecklists_(body) {
         scheduledDate: dateOnly_(row.scheduledDate),
         startTime: normalizeCommitteeTime_(row.startTime),
         endTime: normalizeCommitteeTime_(row.endTime),
+        timeInputMode: String(row.timeInputMode || '') === 'period' ? 'period' : 'time',
+        startPeriod: Number(row.startPeriod) || 0,
+        endPeriod: Number(row.endPeriod) || 0,
         priority: ['low', 'normal', 'high'].indexOf(String(row.priority || '')) >= 0
           ? String(row.priority) : 'normal',
         status: ['planned', 'in_progress', 'completed', 'hold'].indexOf(String(row.status || '')) >= 0
@@ -1921,6 +2148,9 @@ function addStaffChecklist_(body) {
   const scheduledDate = clean_(body.scheduledDate, 10);
   const startTime = normalizeCommitteeTime_(body.startTime);
   const endTime = normalizeCommitteeTime_(body.endTime);
+  const timeInputMode = String(body.timeInputMode || '') === 'period' ? 'period' : 'time';
+  const startPeriod = Number(body.startPeriod) || 0;
+  const endPeriod = Number(body.endPeriod) || 0;
   const priority = ['low', 'normal', 'high'].indexOf(String(body.priority || '')) >= 0
     ? String(body.priority) : 'normal';
   const status = ['planned', 'in_progress', 'completed', 'hold'].indexOf(String(body.status || '')) >= 0
@@ -1938,9 +2168,10 @@ function addStaffChecklist_(body) {
   if (startTime && !/^\d{2}:\d{2}$/.test(startTime)) throw new Error('시작 시간 형식이 올바르지 않습니다.');
   if (endTime && !/^\d{2}:\d{2}$/.test(endTime)) throw new Error('종료 시간 형식이 올바르지 않습니다.');
   if (scheduledDate && !/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) throw new Error('진행 날짜 형식이 올바르지 않습니다.');
-  if (startTime && !scheduledDate) throw new Error('시간을 지정하려면 진행 날짜를 입력하세요.');
+  if (startTime && !startDate) throw new Error('시간을 지정하려면 시작일을 입력하세요.');
   if (endTime && !startTime) throw new Error('종료 시간을 지정하려면 시작 시간을 입력하세요.');
-  if (startTime && endTime && startTime >= endTime) throw new Error('종료 시간은 시작 시간보다 늦어야 합니다.');
+  if (startDate === deadline && startTime && endTime && startTime >= endTime) throw new Error('같은 날짜의 종료 시간은 시작 시간보다 늦어야 합니다.');
+  if (timeInputMode === 'period' && (startPeriod < 1 || startPeriod > 7 || endPeriod < startPeriod || endPeriod > 7)) throw new Error('교시는 1~7교시 범위로 입력하세요.');
   if (linkUrl && !/^https?:\/\//i.test(linkUrl)) throw new Error('관련 링크는 http 또는 https 주소로 입력하세요.');
 
   const roster = getStaffRoster_();
@@ -1970,7 +2201,7 @@ function addStaffChecklist_(body) {
       id, title, description, deadline, creatorName, createdAt, status === 'completed',
       JSON.stringify(items), JSON.stringify(targetNames), startDate, priority, status,
       linkUrl, JSON.stringify(departmentNames), createdAt, requestId,
-      scheduledDate, startTime, endTime
+      scheduledDate || (startTime ? startDate : ''), startTime, endTime, timeInputMode, startPeriod, endPeriod
     ]);
     touchSyncResource_('staffChecklists');
     return { id: id };
@@ -1995,6 +2226,9 @@ function updateStaffChecklist_(body) {
   const scheduledDate = clean_(body.scheduledDate, 10);
   const startTime = normalizeCommitteeTime_(body.startTime);
   const endTime = normalizeCommitteeTime_(body.endTime);
+  const timeInputMode = String(body.timeInputMode || '') === 'period' ? 'period' : 'time';
+  const startPeriod = Number(body.startPeriod) || 0;
+  const endPeriod = Number(body.endPeriod) || 0;
   const priority = ['low', 'normal', 'high'].indexOf(String(body.priority || '')) >= 0
     ? String(body.priority) : 'normal';
   const status = ['planned', 'in_progress', 'completed', 'hold'].indexOf(String(body.status || '')) >= 0
@@ -2007,9 +2241,10 @@ function updateStaffChecklist_(body) {
   if (startTime && !/^\d{2}:\d{2}$/.test(startTime)) throw new Error('시작 시간 형식이 올바르지 않습니다.');
   if (endTime && !/^\d{2}:\d{2}$/.test(endTime)) throw new Error('종료 시간 형식이 올바르지 않습니다.');
   if (scheduledDate && !/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) throw new Error('진행 날짜 형식이 올바르지 않습니다.');
-  if (startTime && !scheduledDate) throw new Error('시간을 지정하려면 진행 날짜를 입력하세요.');
+  if (startTime && !startDate) throw new Error('시간을 지정하려면 시작일을 입력하세요.');
   if (endTime && !startTime) throw new Error('종료 시간을 지정하려면 시작 시간을 입력하세요.');
-  if (startTime && endTime && startTime >= endTime) throw new Error('종료 시간은 시작 시간보다 늦어야 합니다.');
+  if (startDate === deadline && startTime && endTime && startTime >= endTime) throw new Error('같은 날짜의 종료 시간은 시작 시간보다 늦어야 합니다.');
+  if (timeInputMode === 'period' && (startPeriod < 1 || startPeriod > 7 || endPeriod < startPeriod || endPeriod > 7)) throw new Error('교시는 1~7교시 범위로 입력하세요.');
   if (linkUrl && !/^https?:\/\//i.test(linkUrl)) throw new Error('관련 링크는 http 또는 https 주소로 입력하세요.');
 
   const roster = getStaffRoster_();
@@ -2040,7 +2275,7 @@ function updateStaffChecklist_(body) {
       status === 'completed', JSON.stringify(items), JSON.stringify(targetNames),
       startDate, priority, status, linkUrl, JSON.stringify(departmentNames), updatedAt
     ]]);
-    sheet.getRange(row + 1, 17, 1, 3).setValues([[scheduledDate, startTime, endTime]]);
+    sheet.getRange(row + 1, 17, 1, 6).setValues([[scheduledDate || (startTime ? startDate : ''), startTime, endTime, timeInputMode, startPeriod, endPeriod]]);
     touchSyncResource_('staffChecklists');
     return { updatedAt: updatedAt };
   }
@@ -3020,6 +3255,11 @@ function getMobileScheduleBundle_(body) {
       return change.status === 'approved' || Boolean(change.requesterAppliedAt && change.requesterName === viewerName);
     });
   });
+  const timetableOverrides = mobileLoadSource_(sourceStatus, 'overrides', [], function() {
+    return listTimetableOverrides_({ includeInactive: false }).filter(function(item) {
+      return item.date >= fromDate && item.date <= toDate || item.sourceDate >= fromDate && item.sourceDate <= toDate;
+    });
+  });
   const todayIsoDate = todayKey.slice(0, 4) + '-' + todayKey.slice(4, 6) + '-' + todayKey.slice(6, 8);
   const sharedMeals = mobileLoadSource_(sourceStatus, 'meals', [], function() {
     // 요청 범위 밖의 날짜를 선택해도 구버전 todayMeals는 오늘 급식을 유지합니다.
@@ -3036,6 +3276,7 @@ function getMobileScheduleBundle_(body) {
   }).sort(function(a, b) { return a.date.localeCompare(b.date) || String(a.time || '').localeCompare(String(b.time || '')); }),
     teacherTimetable: teacherTimetable, committeeEvents: committeeEvents,
     timetableChanges: timetableChanges,
+    timetableOverrides: timetableOverrides,
     meals: meals,
     todayMeals: todayMeals,
     contractVersion: 3,

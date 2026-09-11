@@ -7,6 +7,7 @@ import type { SchoolTimetable } from '../../services/schoolTimetable'
 import { TIMETABLE_DAYS } from '../../services/schoolTimetable'
 import { listTimetableChanges, type TimetableChangeRequest } from '../../services/timetableChanges'
 import type { SharedStaffRoster } from '../../services/rosterAttendance'
+import type { DailyTimetableOverride } from '../../services/timetableOverrides'
 import {
   academicScheduleSummary,
   buildCompositeTeacherDay,
@@ -27,6 +28,7 @@ interface Props {
   currentTeacherName: string
   configured: boolean
   staffRoster?: SharedStaffRoster | null
+  overrides?: DailyTimetableOverride[]
 }
 
 const MONTH_LABELS: Record<string, string> = {
@@ -34,7 +36,7 @@ const MONTH_LABELS: Record<string, string> = {
   '2026-11': '2026년 11월', '2026-12': '2026년 12월', '2027-02': '2027년 2월',
 }
 
-export default function TeacherTimetableWorkspace({ mode, timetable, currentTeacherName, configured, staffRoster }: Props) {
+export default function TeacherTimetableWorkspace({ mode, timetable, currentTeacherName, configured, staffRoster, overrides = [] }: Props) {
   const [teacherView, setTeacherView] = useState<TeacherView>('month')
   const [monthKey, setMonthKey] = useState('2026-08')
   const [selectedDate, setSelectedDate] = useState('2026-08-25')
@@ -58,7 +60,7 @@ export default function TeacherTimetableWorkspace({ mode, timetable, currentTeac
 
   useEffect(() => { void loadChanges() }, [loadChanges])
   if (mode === 'manager') {
-    return <ManagerSchedule timetable={timetable} staffRoster={staffRoster} changes={changes} weekKey={weekKey} onWeekChange={setWeekKey} loading={loading} onRefresh={() => void loadChanges(true)} />
+    return <ManagerSchedule timetable={timetable} staffRoster={staffRoster} changes={changes} overrides={overrides} weekKey={weekKey} onWeekChange={setWeekKey} loading={loading} onRefresh={() => void loadChanges(true)} />
   }
 
   const teacher = timetable.teachers.find(item => normalizeName(item.name) === normalizeName(currentTeacherName))
@@ -66,9 +68,9 @@ export default function TeacherTimetableWorkspace({ mode, timetable, currentTeac
     return <section className="card p-6 text-center"><CalendarDays size={30} className="mx-auto text-amber-500" /><h2 className="mt-3 text-base font-black text-slate-950 dark:text-white">로그인한 교사의 시간표를 찾지 못했습니다</h2><p className="mt-2 text-sm font-semibold text-slate-600 dark:text-slate-300">현재 로그인 이름 “{currentTeacherName || '미설정'}”이 관리자가 올린 시간표의 교사명과 일치하는지 확인해 주세요. 다른 교사의 시간표는 시간표 업무 담당자 탭에서만 확인할 수 있습니다.</p></section>
   }
   const monthDates = monthCalendarDates(monthKey)
-  const days = monthDates.map(date => buildCompositeTeacherDay(timetable, teacher.name, date, changes, PULLED_LESSONS_2026))
-  const selectedDay = buildCompositeTeacherDay(timetable, teacher.name, selectedDate, changes, PULLED_LESSONS_2026)
-  const selectedWeek = weekDates(selectedDate).map(date => buildCompositeTeacherDay(timetable, teacher.name, date, changes, PULLED_LESSONS_2026))
+  const days = monthDates.map(date => buildCompositeTeacherDay(timetable, teacher.name, date, changes, PULLED_LESSONS_2026, overrides))
+  const selectedDay = buildCompositeTeacherDay(timetable, teacher.name, selectedDate, changes, PULLED_LESSONS_2026, overrides)
+  const selectedWeek = weekDates(selectedDate).map(date => buildCompositeTeacherDay(timetable, teacher.name, date, changes, PULLED_LESSONS_2026, overrides))
   const summary = summarizeDays(days)
   const scheduleInfo = academicScheduleSummary()
 
@@ -163,7 +165,7 @@ function DayDetail({ day }: { day: CompositeTeacherDay }) {
   return <section className="card p-4"><h3 className="text-sm font-black text-white">{day.date} 상세 시간표</h3><p className="mt-1 text-xs font-semibold text-slate-400">{day.rule.specialWeekdayLabel || day.rule.label || '기본 요일 시간표 운영'}</p><div className="mt-3 grid gap-2 sm:grid-cols-4 lg:grid-cols-7">{day.lessons.map(item => <div key={item.period} className={clsx('rounded-xl border border-white/10 p-3', item.source === 'pulled' ? 'bg-emerald-500/15' : item.source !== 'base' ? 'bg-violet-500/15' : 'bg-white/[0.025]')}><LessonLine lesson={item} expanded /></div>)}</div></section>
 }
 
-function ManagerSchedule({ timetable, staffRoster, changes, weekKey, onWeekChange, loading, onRefresh }: { timetable: SchoolTimetable; staffRoster?: SharedStaffRoster | null; changes: TimetableChangeRequest[]; weekKey: string; onWeekChange: (value: string) => void; loading: boolean; onRefresh: () => void }) {
+function ManagerSchedule({ timetable, staffRoster, changes, overrides, weekKey, onWeekChange, loading, onRefresh }: { timetable: SchoolTimetable; staffRoster?: SharedStaffRoster | null; changes: TimetableChangeRequest[]; overrides: DailyTimetableOverride[]; weekKey: string; onWeekChange: (value: string) => void; loading: boolean; onRefresh: () => void }) {
   const [query, setQuery] = useState('')
   const [subjectFilter, setSubjectFilter] = useState('all')
   const [dayFilter, setDayFilter] = useState('all')
@@ -175,8 +177,8 @@ function ManagerSchedule({ timetable, staffRoster, changes, weekKey, onWeekChang
   const rows = useMemo(() => timetable.teachers.map(teacher => ({
     teacher,
     subject: staffSubject(teacher.name, staffRoster),
-    days: dates.map(date => buildCompositeTeacherDay(timetable, teacher.name, date, changes, PULLED_LESSONS_2026)),
-  })), [changes, dates.join('|'), staffRoster, timetable])
+    days: dates.map(date => buildCompositeTeacherDay(timetable, teacher.name, date, changes, PULLED_LESSONS_2026, overrides)),
+  })), [changes, dates.join('|'), overrides, staffRoster, timetable])
   const subjects = [...new Set(rows.map(row => row.subject).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'))
   const filtered = rows.filter(row => {
     const haystack = `${row.teacher.name} ${row.teacher.label} ${row.subject}`.toLocaleLowerCase('ko-KR')

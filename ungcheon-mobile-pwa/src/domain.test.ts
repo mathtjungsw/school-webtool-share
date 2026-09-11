@@ -1,5 +1,5 @@
 import { DEFAULT_VISIBILITY, buildMobileTimelineRows, collectEvents, lessonFocus, newEventFingerprints, rangeForToday, schoolClock, timetableForDate } from './domain'
-import type { DashboardPayload, TeacherTimetable, TimetableChange } from './types'
+import type { DailyTimetableOverride, DashboardPayload, TeacherTimetable, TimetableChange } from './types'
 import { describe, expect, it } from 'vitest'
 
 const teacher: TeacherTimetable = { name: '홍길동', label: '홍길동', load: '', slots: Array.from({ length: 35 }, (_, index) => ({ value: index === 0 ? '101\n국어' : '', locked: false })) }
@@ -46,6 +46,31 @@ describe('모바일 일정 도메인', () => {
     expect(lessonFocus(lessons, 15 * 60 + 39)).toMatchObject({ state: 'between', nextPeriod: 7, minutesUntil: 1 })
     expect(lessonFocus(lessons, 15 * 60 + 40)).toMatchObject({ state: 'during', currentPeriod: 7 })
     expect(lessonFocus(lessons, 16 * 60 + 30)).toMatchObject({ state: 'after' })
+  })
+
+  it('공유 일일 예외로 9월 11일 수요일 7교시와 9월 23일 교시 이동을 반영한다', () => {
+    const slots = Array.from({ length: 35 }, (_, index) => ({ value: `기존${index + 1}`, locked: false }))
+    slots[2 * 7 + 6].value = '201\n수학'
+    const source: TeacherTimetable = { name: '홍길동', label: '홍길동', load: '', slots }
+    const base = { id:'', targetClass:'', note:'', active:true, createdBy:'관리자', createdAt:'2026-09-01', updatedAt:'2026-09-01' }
+    const overrides: DailyTimetableOverride[] = [
+      { ...base, id:'g2', date:'2026-09-11', targetGrade:'2', targetPeriod:7, action:'copy', sourceDate:'2026-09-23', sourcePeriod:7 },
+      ...[1,2,3,4,5].map(period => ({ ...base, id:`shift-${period}`, date:'2026-09-23', targetGrade:'', targetPeriod:period, action:'copy' as const, sourceDate:'2026-09-23', sourcePeriod:period + 1 })),
+      { ...base, id:'clear-6', date:'2026-09-23', targetGrade:'', targetPeriod:6, action:'clear', sourceDate:'', sourcePeriod:0 },
+      { ...base, id:'clear-7', date:'2026-09-23', targetGrade:'', targetPeriod:7, action:'clear', sourceDate:'', sourcePeriod:0 },
+    ]
+    expect(timetableForDate(source, '2026-09-11', [], '홍길동', overrides)[6].value).toBe('201\n수학')
+    const shifted = timetableForDate(source, '2026-09-23', [], '홍길동', overrides)
+    expect(shifted.slice(0, 5).map(item => item.value)).toEqual(['기존16','기존17','기존18','기존19','기존20'])
+    expect(shifted[5].value).toBe('')
+    expect(shifted[6].value).toBe('')
+  })
+
+  it('3학년 9월 23일 7교시 당김수업을 9월 11일 7교시로 이동한다', () => {
+    const teacher: TeacherTimetable = { name:'박선욱', label:'박선욱', load:'', slots:Array.from({ length:35 }, () => ({ value:'', locked:false })) }
+    const move: DailyTimetableOverride = { id:'move', date:'2026-09-11', targetGrade:'3', targetClass:'', targetPeriod:7, action:'move_pulled', sourceDate:'2026-09-23', sourcePeriod:7, note:'당김수업 이동', active:true, createdBy:'관리자', createdAt:'2026-09-01', updatedAt:'2026-09-01' }
+    expect(timetableForDate(teacher, '2026-09-11', [], '박선욱', [move])[6]).toMatchObject({ value:'3-1\nI2_음연', changed:true, note:'당김수업' })
+    expect(timetableForDate(teacher, '2026-09-23', [], '박선욱', [move])[6].value).toBe('')
   })
 
   it('시간 지정 일정은 교시 오른쪽에 놓고 수업 변경은 중복하지 않는다', () => {

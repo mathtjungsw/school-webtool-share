@@ -11,6 +11,7 @@ import { getAcademicDayRule } from './teacherTimetableCalendar'
 import type { PersonalTimetable, PersonalTimetableSlot, SharedStudentTimetable, StudentTimetableDay } from './studentTimetable'
 import { canonicalStudentId, studentIdsMatch } from './studentId'
 import type { TimetableChangeRequest } from './timetableChanges'
+import { effectivePulledLessons, findStudentTimetableOverride, type DailyTimetableOverride } from './timetableOverrides'
 
 export interface StudentLocationInputRow {
   rowNumber: number
@@ -216,26 +217,38 @@ function matchingUnconfirmedChange(changes: TimetableChangeRequest[], classLabel
   })
 }
 
-function pulledFor(classLabel: string, date: string, day: StudentTimetableDay, period: number) {
+function pulledFor(classLabel: string, date: string, day: StudentTimetableDay, period: number, overrides: DailyTimetableOverride[]) {
   const wanted = normalizeClassCode(classLabel)
-  const applied = PULLED_LESSONS_2026.find(item => item.date === date && item.period === period && normalizeClassCode(item.classLabel) === wanted)
+  const effective = effectivePulledLessons(PULLED_LESSONS_2026, overrides)
+  const applied = effective.find(item => item.date === date && item.period === period && normalizeClassCode(item.classLabel) === wanted)
   if (applied) return { kind: 'applied' as const, item: applied }
-  const moved = PULLED_LESSONS_2026.find(item => item.originalDate === date && item.originalSlot === `${day}${period}` && normalizeClassCode(item.classLabel) === wanted)
+  const moved = PULLED_LESSONS_2026.find((item, index) => {
+    const changed = effective[index]
+    return normalizeClassCode(item.classLabel) === wanted && (
+      (item.originalDate === date && item.originalSlot === `${day}${period}`) ||
+      (item.date === date && item.period === period && (changed.date !== item.date || changed.period !== item.period))
+    )
+  })
   return moved ? { kind: 'moved' as const, item: moved } : null
 }
 
-function locateStudent(entry: StudentDirectoryEntry, date: string, period: number, school: SchoolTimetable | null, neis: SharedNeisSnapshot | null, changes: TimetableChangeRequest[]) {
+function locateStudent(entry: StudentDirectoryEntry, date: string, period: number, school: SchoolTimetable | null, neis: SharedNeisSnapshot | null, changes: TimetableChangeRequest[], overrides: DailyTimetableOverride[]) {
   const rule = getAcademicDayRule(date)
-  const day = rule.sourceDayIndex >= 0 ? TIMETABLE_DAYS[rule.sourceDayIndex] : undefined
+  const targetDay = rule.sourceDayIndex >= 0 ? TIMETABLE_DAYS[rule.sourceDayIndex] : undefined
   const baseSource = entry.timetable ? '학생 개인시간표' : 'NEIS 학급시간표'
-  if (rule.kind !== 'instruction' || !day) return { day: '', subject: '', classroom: '', teacher: '', source: `학사일정 · ${rule.label}`, state: 'no_lesson' as const, label: '수업 없음', message: rule.label || '수업일이 아닙니다.' }
-  const personal = entry.timetable?.slots[`${day}${period}`]
-  const neisSlot = neis?.timetables.find(item => item.date === date.replace(/-/g, '') && String(Number(item.grade)) === String(Number(entry.roster.grade)) && String(Number(item.classNm)) === String(Number(entry.roster.className)) && Number(item.period) === period)
+  if (rule.kind !== 'instruction' || !targetDay) return { day: '', subject: '', classroom: '', teacher: '', source: `학사일정 · ${rule.label}`, state: 'no_lesson' as const, label: '수업 없음', message: rule.label || '수업일이 아닙니다.' }
+  const dailyOverride = findStudentTimetableOverride(overrides, date, entry.roster.grade, entry.roster.className, period)
+  const sourceDate = dailyOverride?.action === 'copy' ? dailyOverride.sourceDate : date
+  const sourceRule = getAcademicDayRule(sourceDate)
+  const sourceDay = sourceRule.sourceDayIndex >= 0 ? TIMETABLE_DAYS[sourceRule.sourceDayIndex] : targetDay
+  const sourcePeriod = dailyOverride?.action === 'copy' ? dailyOverride.sourcePeriod : period
+  const personal = dailyOverride?.action === 'clear' ? undefined : entry.timetable?.slots[`${sourceDay}${sourcePeriod}`]
+  const neisSlot = dailyOverride?.action === 'clear' ? undefined : neis?.timetables.find(item => item.date === sourceDate.replace(/-/g, '') && String(Number(item.grade)) === String(Number(entry.roster.grade)) && String(Number(item.classNm)) === String(Number(entry.roster.className)) && Number(item.period) === sourcePeriod)
   let slot: PersonalTimetableSlot | undefined = personal?.subject ? personal : neisSlot ? {
-    day, period, subject: neisSlot.subject, teacher: neisSlot.teacher, classroom: neisSlot.classroom,
+    day: targetDay, period, subject: neisSlot.subject, teacher: neisSlot.teacher, classroom: neisSlot.classroom,
     raw: '', selectedCourse: false,
   } : personal
-  const slotIndex = schoolTimetableSlotIndex(rule.sourceDayIndex, period)
+  const slotIndex = schoolTimetableSlotIndex(sourceRule.sourceDayIndex, sourcePeriod)
   slot = refineTeacher(slot, `${entry.roster.grade}-${Number(entry.roster.className)}`, slotIndex, school)
   const before = slot ? `${slot.subject}|${slot.teacher}|${slot.classroom}` : ''
   const unconfirmed = matchingUnconfirmedChange(changes, `${entry.roster.grade}-${Number(entry.roster.className)}`, date, slotIndex)
@@ -243,10 +256,13 @@ function locateStudent(entry: StudentDirectoryEntry, date: string, period: numbe
   let source = baseSource
   let state: StudentLocationScheduleState = 'normal'
   let label = '기본 시간표'
-  let message = rule.specialWeekdayLabel ? `${rule.specialWeekdayLabel}을 적용했습니다.` : ''
-  const pulled = pulledFor(`${entry.roster.grade}-${Number(entry.roster.className)}`, date, day, period)
+  let message = dailyOverride
+    ? `공유 일일 시간표 예외를 적용했습니다.${dailyOverride.note ? ` (${dailyOverride.note})` : ''}`
+    : rule.specialWeekdayLabel ? `${rule.specialWeekdayLabel}을 적용했습니다.` : ''
+  if (dailyOverride) { source = `공유 일일 시간표 예외 · ${baseSource}`; state = 'changed'; label = '일일 예외 적용' }
+  const pulled = pulledFor(`${entry.roster.grade}-${Number(entry.roster.className)}`, date, targetDay, period, overrides)
   if (pulled?.kind === 'applied') {
-    slot = { day, period, subject: pulled.item.subject, teacher: pulled.item.teacherName, classroom: '', raw: pulled.item.subject, selectedCourse: false }
+    slot = { day: targetDay, period, subject: pulled.item.subject, teacher: pulled.item.teacherName, classroom: '', raw: pulled.item.subject, selectedCourse: false }
     source = '당김수업 기록'; state = 'changed'; label = '변경 시간표 적용'; message = '당김수업이 반영되었습니다. 필요하면 원자료를 확인해 주세요.'
   } else if (pulled?.kind === 'moved') {
     slot = undefined; source = '당김수업 기록'; state = 'changed'; label = '변경 시간표 적용'; message = '이 수업은 다른 날짜로 당겨 운영되어 현재 교시는 수업 없음으로 처리했습니다.'
@@ -261,14 +277,14 @@ function locateStudent(entry: StudentDirectoryEntry, date: string, period: numbe
     state = 'review'; label = unconfirmed.requesterAppliedAt ? '나만 우선 반영 · 확인 필요' : '승인 대기 · 확인 필요'
     message = `${label}: 학생 전체에 확정 반영되지 않은 변경 요청입니다. 기본 시간표를 표시하므로 원자료를 확인해 주세요.`
   }
-  slot = applyHelpClassLocation(slot, entry.roster, day, period)
+  slot = applyHelpClassLocation(slot, entry.roster, sourceDay, sourcePeriod)
   if (slot && 'helpClass' in slot) {
     source = `${source} · 도움반 개인시간표`
     message = [message, '색칠된 도움반 개인시간표에 따라 위치를 도움반으로 표시했습니다.'].filter(Boolean).join(' ')
   }
-  if (!slot?.subject) return { day, subject: '', classroom: '', teacher: '', source, state: state === 'review' ? state : 'no_lesson' as const, label: state === 'review' ? label : '수업 없음', message: message || '등록된 수업이 없습니다.' }
+  if (!slot?.subject) return { day: targetDay, subject: '', classroom: '', teacher: '', source, state: state === 'review' ? state : 'no_lesson' as const, label: state === 'review' ? label : '수업 없음', message: message || '등록된 수업이 없습니다.' }
   const classroom = slot.classroom || `${entry.roster.grade}-${Number(entry.roster.className)}반 교실`
-  return { day, subject: slot.subject, classroom: classroom || '위치 미확정', teacher: slot.teacher || '담당 교사 미확정', source, state, label, message }
+  return { day: targetDay, subject: slot.subject, classroom: classroom || '위치 미확정', teacher: slot.teacher || '담당 교사 미확정', source, state, label, message }
 }
 
 export function buildStudentSpecificLocationRows(options: {
@@ -280,6 +296,7 @@ export function buildStudentSpecificLocationRows(options: {
   schoolTimetable: SchoolTimetable | null
   sharedNeis: SharedNeisSnapshot | null
   changes: TimetableChangeRequest[]
+  timetableOverrides?: DailyTimetableOverride[]
 }): StudentSpecificLocationRow[] {
   const directory = buildStudentDirectory(options.dataset, options.roster)
   const periods = [...new Set(options.periods)].filter(period => period >= 1 && period <= 7).sort((a, b) => a - b)
@@ -289,7 +306,7 @@ export function buildStudentSpecificLocationRows(options: {
     const resolved = resolveInput(input, directory)
     if (!resolved.entries.length) return periods.map(period => resultShell(input, options.date, day, period, resolved.validation, resolved.message))
     return resolved.entries.flatMap(entry => periods.map(period => {
-      const located = locateStudent(entry, options.date, period, options.schoolTimetable, options.sharedNeis, options.changes)
+      const located = locateStudent(entry, options.date, period, options.schoolTimetable, options.sharedNeis, options.changes, options.timetableOverrides ?? [])
       return {
         key: `${input.rowNumber}-${entry.roster.studentId}-${period}`,
         inputRowNumber: input.rowNumber, inputStudentId: input.studentId, inputName: input.name,
