@@ -1,4 +1,4 @@
-const STATIC_CACHE = 'ungcheon-mobile-static-v9'
+const STATIC_CACHE = 'ungcheon-mobile-static-v10'
 const APP_SHELL = ['', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png']
   .map(path => new URL(path, self.registration.scope).href)
 

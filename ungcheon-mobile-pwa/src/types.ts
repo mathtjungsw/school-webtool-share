@@ -21,7 +21,29 @@ export interface SchoolTimetable { version: number; title: string; uploadedAt: s
 export interface CommitteeEvent { id: string; committeeName: string; title: string; date: string; startTime: string; endTime: string; location: string; memberNames: string[] }
 export interface CommitteeState { events: CommitteeEvent[] }
 export interface MealInfo { date: string; mealType: string; dishNames: string[]; calories: string }
-export type MobileResourceKey = 'weekly' | 'creative' | 'gateDuty' | 'mealDuty' | 'timetable' | 'committee' | 'changes' | 'overrides' | 'meals'
+export type AttendanceState = 'complete' | 'partial' | 'pending'
+export interface MobileAttendanceEntry {
+  className: string
+  number: string
+  name: string
+  remark: string
+}
+export interface MobileAttendanceSummary {
+  date: string
+  period: number
+  state: AttendanceState
+  flaggedCount: number
+  enrolledCount: number
+  courseNames: string[]
+  classrooms: string[]
+  classStatus: Array<{ className: string; complete: boolean }>
+  entries: MobileAttendanceEntry[]
+  mismatchCount: number
+  sourceDate: string
+  checkedAt: string
+  rosterBasis: 'course-enrollment'
+}
+export type MobileResourceKey = 'weekly' | 'creative' | 'gateDuty' | 'mealDuty' | 'timetable' | 'committee' | 'changes' | 'overrides' | 'meals' | 'attendance'
 export type MobileResourceState = 'fresh' | 'empty' | 'cached' | 'unavailable'
 export interface MobileResourceStatus {
   state: MobileResourceState
@@ -63,6 +85,7 @@ export interface MobileScheduleBundle {
   committeeEvents: CommitteeEvent[]
   timetableChanges: TimetableChange[]
   timetableOverrides?: DailyTimetableOverride[]
+  attendanceSummaries?: MobileAttendanceSummary[]
   meals?: MealInfo[]
   todayMeals: MealInfo[]
   contractVersion?: number

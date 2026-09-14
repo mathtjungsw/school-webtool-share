@@ -40,12 +40,15 @@ const NEIS_SYNC_TOKEN_HASH_PROPERTY = 'UNG_NEIS_SYNC_TOKEN_SHA256';
 const NEIS_SYNC_REGISTERED_AT_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_AT';
 const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
-// 모바일 PWA는 학생 자료를 읽지 않고 아래 공개 일정 시트만 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 46;
+// 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
+// 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
+const MOBILE_SERVICE_VERSION = 47;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
 const MOBILE_MEAL_DUTY_ID = '10cPw-KaYGNPSN-JYDCmNC7MqPhUVOwtoIzD7kS6qKRE';
+const MOBILE_ATTENDANCE_SHEET_ID = '1z09l2HzckFRboFgEMiQrNmApunVhVxi351y01OMAWPA';
+const MOBILE_ATTENDANCE_SHEET_NAME = '3학년';
 const MOBILE_SHARED_PASSWORD_HASH_PROPERTY = 'UNG_MOBILE_SHARED_PASSWORD_HASH';
 const MOBILE_SESSION_PROPERTY_PREFIX = 'UNG_MOBILE_SESSION_';
 const MOBILE_SESSION_HOURS = 72;
@@ -398,6 +401,17 @@ const RELEASE_NOTES = [
       '· v1.1.31의 일일 시간표 예외 10건, 66명 교직원 명렬, 모바일 공개 주소와 72시간 로그인 및 이전 릴리스 안내를 모두 유지합니다.'
     ].join('\n'),
     date: '2026-09-11'
+  },
+  {
+    key: 'mobile-attendance-2026-09-14',
+    title: '[모바일 일정 업데이트] 3학년 이동수업 수강생 출결 확인',
+    body: [
+      '· 오늘의 교사 시간표에서 3학년 수업에 한해 실제 수강생 명단을 기준으로 출결 상태를 확인할 수 있습니다.',
+      '· 여러 반 수강생이 섞인 이동수업은 반별 입력 완료 여부를 합산해 입력 완료, 부분 입력, 입력 전으로 구분합니다.',
+      '· 상세 화면에는 출결 비고가 있는 수강생만 반·번호, 이름, 비고 순서로 최소 표시하며 전체 학급 명렬과 학생 시간표는 모바일로 전달하지 않습니다.',
+      '· 출결 자료는 5분 간격으로 확인하고 연결 실패 시 기기에 저장된 이전 정상 자료를 구분해 표시합니다.'
+    ].join('\n'),
+    date: '2026-09-14'
   },
   {
     key: 'v1.1.31',
@@ -3182,6 +3196,139 @@ function mobileSharedMealsInRange_(fromDate, toDate) {
     .sort(function(a, b) { return a.date.localeCompare(b.date) || a.mealType.localeCompare(b.mealType); });
 }
 
+function mobileAttendanceNumber_(value) {
+  const digits = String(value == null ? '' : value).match(/\d+/);
+  return digits ? String(Number(digits[0])) : '';
+}
+
+function mobileAttendanceSourceSlot_(date, period, timetableOverrides) {
+  const overrides = Array.isArray(timetableOverrides) ? timetableOverrides : listTimetableOverrides_({ includeInactive: false });
+  const applicable = overrides.filter(function(item) {
+    return item.active && item.date === date && Number(item.targetPeriod) === Number(period) &&
+      (!item.targetGrade || item.targetGrade === '3') && !item.targetClass;
+  });
+  if (!applicable.length) return { date: date, period: period };
+  applicable.sort(function(a, b) {
+    return Number(Boolean(b.targetGrade)) - Number(Boolean(a.targetGrade)) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));
+  });
+  const override = applicable[0];
+  if (override.action === 'clear') return null;
+  if (override.sourceDate && Number(override.sourcePeriod) > 0) return { date: override.sourceDate, period: Number(override.sourcePeriod) };
+  return { date: date, period: period };
+}
+
+function mobileAttendanceSheetSnapshot_(expectedDate) {
+  const book = SpreadsheetApp.openById(MOBILE_ATTENDANCE_SHEET_ID);
+  const sheet = book.getSheetByName(MOBILE_ATTENDANCE_SHEET_NAME);
+  if (!sheet) throw new Error('3학년 출결 시트를 찾을 수 없습니다.');
+  const values = sheet.getDataRange().getDisplayValues();
+  const sourceDate = mobileDate_(values[0] && values[0][0]);
+  if (!sourceDate || sourceDate !== expectedDate) return null;
+  const classes = {};
+  for (let column = 0; column < 21; column += 3) {
+    const header = clean_(values[2] && values[2][column], 20);
+    const className = mobileAttendanceNumber_(header);
+    if (!className) continue;
+    const completeText = clean_(values[1] && values[1][column + 2], 10).toUpperCase();
+    const records = {};
+    for (let row = 3; row < values.length; row++) {
+      const number = mobileAttendanceNumber_(values[row][column]);
+      const name = clean_(values[row][column + 1], 30);
+      if (!number || !name) continue;
+      records[number] = { name: name, remark: clean_(values[row][column + 2], 300) };
+    }
+    classes[className] = { complete: completeText === 'TRUE' || completeText === '참', records: records };
+  }
+  return { sourceDate: sourceDate, classes: classes };
+}
+
+function mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows, timetableOverrides) {
+  const sourceSlot = mobileAttendanceSourceSlot_(date, period, timetableOverrides);
+  if (!sourceSlot) return [];
+  const sourceDate = new Date(sourceSlot.date + 'T12:00:00+09:00');
+  const day = ['일', '월', '화', '수', '목', '금', '토'][sourceDate.getDay()];
+  if (!day || day === '일' || day === '토') return [];
+  const key = day + sourceSlot.period;
+  const rows = Array.isArray(personalRows) ? personalRows : readObjects_(STUDENT_TIMETABLE_SHEET);
+  return rows.map(function(row) {
+    let personal;
+    try { personal = JSON.parse(String(row.payloadJson || '')); } catch (ignore) { return null; }
+    const student = personal && personal.student || {};
+    const slot = personal && personal.slots && personal.slots[key] || {};
+    if (clean_(student.grade, 2) !== '3' || clean_(slot.teacher, 30) !== viewerName || !clean_(slot.subject, 120)) return null;
+    return {
+      className: mobileAttendanceNumber_(student.className),
+      number: mobileAttendanceNumber_(student.number),
+      name: clean_(student.name, 30),
+      subject: clean_(slot.subject, 120),
+      classroom: clean_(slot.classroom, 50)
+    };
+  }).filter(function(item) { return item && item.className && item.number && item.name; });
+}
+
+function mobileAttendanceSummaryForSlot_(viewerName, date, period, snapshot, personalRows, timetableOverrides) {
+  const enrolled = mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows, timetableOverrides);
+  if (!enrolled.length) return null;
+  const relevantClasses = [];
+  const courseNames = [];
+  const classrooms = [];
+  const entries = [];
+  let mismatchCount = 0;
+  enrolled.forEach(function(student) {
+    if (relevantClasses.indexOf(student.className) < 0) relevantClasses.push(student.className);
+    if (student.subject && courseNames.indexOf(student.subject) < 0) courseNames.push(student.subject);
+    if (student.classroom && classrooms.indexOf(student.classroom) < 0) classrooms.push(student.classroom);
+    const sourceClass = snapshot.classes[student.className];
+    const record = sourceClass && sourceClass.records[student.number];
+    if (!record || clean_(record.name, 30) !== student.name) {
+      mismatchCount++;
+      return;
+    }
+    if (record.remark) entries.push({
+      className: student.className,
+      number: student.number,
+      name: student.name,
+      remark: record.remark
+    });
+  });
+  relevantClasses.sort(function(a, b) { return Number(a) - Number(b); });
+  entries.sort(function(a, b) { return Number(a.className) - Number(b.className) || Number(a.number) - Number(b.number); });
+  const classStatus = relevantClasses.map(function(className) {
+    return { className: className, complete: Boolean(snapshot.classes[className] && snapshot.classes[className].complete) };
+  });
+  const completedCount = classStatus.filter(function(item) { return item.complete; }).length;
+  const state = completedCount === classStatus.length ? 'complete' : completedCount === 0 ? 'pending' : 'partial';
+  return {
+    date: date,
+    period: period,
+    state: state,
+    flaggedCount: entries.length,
+    enrolledCount: enrolled.length,
+    courseNames: courseNames.slice(0, 4),
+    classrooms: classrooms.slice(0, 4),
+    classStatus: classStatus,
+    entries: entries,
+    mismatchCount: mismatchCount,
+    sourceDate: snapshot.sourceDate,
+    checkedAt: new Date().toISOString(),
+    rosterBasis: 'course-enrollment'
+  };
+}
+
+function mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverrides) {
+  const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+  if (today < fromDate || today > toDate) return [];
+  const snapshot = mobileAttendanceSheetSnapshot_(today);
+  if (!snapshot) return [];
+  const personalRows = readObjects_(STUDENT_TIMETABLE_SHEET);
+  const summaries = [];
+  for (let period = 1; period <= 7; period++) {
+    const summary = mobileAttendanceSummaryForSlot_(viewerName, today, period, snapshot, personalRows, timetableOverrides);
+    if (summary) summaries.push(summary);
+  }
+  return summaries;
+}
+
 function mobileSourceCount_(value) {
   if (Array.isArray(value)) return value.length;
   return value ? 1 : 0;
@@ -3272,6 +3419,9 @@ function getMobileScheduleBundle_(body) {
       return item.date >= fromDate && item.date <= toDate || item.sourceDate >= fromDate && item.sourceDate <= toDate;
     });
   });
+  const attendanceSummaries = mobileLoadSource_(sourceStatus, 'attendance', [], function() {
+    return mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverrides);
+  });
   const todayIsoDate = todayKey.slice(0, 4) + '-' + todayKey.slice(4, 6) + '-' + todayKey.slice(6, 8);
   const sharedMeals = mobileLoadSource_(sourceStatus, 'meals', [], function() {
     // 요청 범위 밖의 날짜를 선택해도 구버전 todayMeals는 오늘 급식을 유지합니다.
@@ -3289,6 +3439,7 @@ function getMobileScheduleBundle_(body) {
     teacherTimetable: teacherTimetable, committeeEvents: committeeEvents,
     timetableChanges: timetableChanges,
     timetableOverrides: timetableOverrides,
+    attendanceSummaries: attendanceSummaries,
     meals: meals,
     todayMeals: todayMeals,
     contractVersion: 3,

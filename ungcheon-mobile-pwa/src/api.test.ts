@@ -50,4 +50,13 @@ describe('로그인 오류 안내', () => {
     const cached = markDashboardCached(payload({ events:[], teacherTimetable:null, committeeEvents:[], timetableChanges:[], todayMeals:[], fetchedAt:'2026-08-30T00:00:00Z' }))
     expect(Object.values(cached.bundle?.sourceStatus ?? {}).every(status => status.state === 'cached')).toBe(true)
   })
+
+  it('출결 출처만 실패하면 이전 수강생 출결을 유지한다', () => {
+    const summary = { date:'2026-09-14', period:2, state:'partial' as const, flaggedCount:1, enrolledCount:2, courseNames:['기하'], classrooms:['수학실'], classStatus:[{ className:'1', complete:false }, { className:'2', complete:true }], entries:[{ className:'2', number:'7', name:'김테스트', remark:'조퇴' }], mismatchCount:0, sourceDate:'2026-09-14', checkedAt:'2026-09-14T00:36:00Z', rosterBasis:'course-enrollment' as const }
+    const previous = payload({ events:[], teacherTimetable:null, committeeEvents:[], timetableChanges:[], attendanceSummaries:[summary], todayMeals:[], fetchedAt:'2026-09-14T00:36:00Z' })
+    const fresh = payload({ events:[], teacherTimetable:null, committeeEvents:[], timetableChanges:[], attendanceSummaries:[], todayMeals:[], fetchedAt:'2026-09-14T00:41:00Z', sourceStatus:{ attendance:{ state:'unavailable', mode:'live', lastAttemptAt:'2026-09-14T00:41:00Z', itemCount:0, errorCode:'READ_FAILED' } } })
+    const merged = mergeDashboardWithCache(fresh, previous)
+    expect(merged.bundle?.attendanceSummaries).toEqual([summary])
+    expect(merged.bundle?.sourceStatus?.attendance?.state).toBe('cached')
+  })
 })

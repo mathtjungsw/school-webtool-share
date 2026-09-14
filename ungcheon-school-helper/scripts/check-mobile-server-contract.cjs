@@ -33,8 +33,8 @@ function sheet(name, values) {
   }) };
 }
 
-function harness() {
-  let clock = realDate.parse('2026-08-30T03:00:00Z');
+function harness(options = {}) {
+  let clock = realDate.parse(options.now || '2026-08-30T03:00:00Z');
   const secret = crypto.randomBytes(32).toString('hex');
   const existingToken = crypto.randomBytes(32).toString('hex');
   const properties = new Map([
@@ -55,6 +55,7 @@ function harness() {
     교원명렬: [{ id: 'teacher-1', name: '테스트교사', position: '교사' }, { id: 'teacher-2', name: '다른교사', position: '교사' }],
     시간표정보: [{ version: 1, uploadedAt: '2026-08-29T01:00:00Z' }],
     시간표: [{ teacherName: '테스트교사', teacherLabel: '테스트교사(1)', slot1: '101\n국어' }, { teacherName: '다른교사', slot1: '202\n수학' }],
+    학생시간표: options.studentTimetableRows || [],
     위원회명단: [],
     위원회일정: [
       { id: 'committee-own', committeeId: '1', committeeName: '테스트위원회', title: '협의회', date: '2026-08-31', startTime: '13:10', endTime: '13:25', memberNamesJson: '["테스트교사"]' },
@@ -121,7 +122,7 @@ function harness() {
   });
   vm.runInContext(source, context);
   vm.runInContext('readObjects_ = __readRows; listTimetableOverrides_ = function() { return __readRows("일일시간표예외").map(normalizeTimetableOverride_).filter(function(item) { return item.active; }); }; ensureSheets_ = function() { throw new Error("Mobile fast path required"); };', context);
-  const constants = vm.runInContext('({ version: MOBILE_SERVICE_VERSION, weekly: MOBILE_WEEKLY_PLAN_ID, creative: MOBILE_CREATIVE_SCHEDULE_ID, gate: MOBILE_GATE_DUTY_ID, meal: MOBILE_MEAL_DUTY_ID, notes: RELEASE_NOTES })', context);
+  const constants = vm.runInContext('({ version: MOBILE_SERVICE_VERSION, weekly: MOBILE_WEEKLY_PLAN_ID, creative: MOBILE_CREATIVE_SCHEDULE_ID, gate: MOBILE_GATE_DUTY_ID, meal: MOBILE_MEAL_DUTY_ID, attendance: MOBILE_ATTENDANCE_SHEET_ID, notes: RELEASE_NOTES })', context);
   const weekly = sheet('2026.8.31', [['부서', '31(월)', '1(화)'], ['교무부', '교직원 회의', '주간계획']]);
   books[constants.weekly] = { getSheets: () => [weekly] };
   const creative = sheet('창체입력', [['날짜'], ['2026-08-31', '', 5, '', '동아리', true, false, false, '창체', '활동안내']]);
@@ -131,6 +132,13 @@ function harness() {
   const meal = sheet('급식 지도(2학기)', [['9월 1일'], ['테스트교사']]);
   books[constants.gate] = { getSheetByName: () => gate, getSheets: () => [gate] };
   books[constants.meal] = { getSheetByName: () => meal, getSheets: () => [meal] };
+  const attendanceValues = options.attendanceValues || [
+    ['2026-08-30 (일)', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ['오늘 입력 완', '', true, '오늘 입력 완', '', true, '오늘 입력 완', '', true, '오늘 입력 완', '', true, '오늘 입력 완', '', true, '오늘 입력 완', '', true, '오늘 입력 완', '', true],
+    ['1반', '이름', '비고', '2반', '이름', '비고', '3반', '이름', '비고', '4반', '이름', '비고', '5반', '이름', '비고', '6반', '이름', '비고', '7반', '이름', '비고'],
+  ];
+  const attendance = sheet('3학년', attendanceValues);
+  books[constants.attendance] = { getSheetByName: name => name === '3학년' ? attendance : null, getSheets: () => [attendance] };
   const request = overrides => ({ action: 'getMobileScheduleBundle', viewerName: '테스트교사', accessToken: existingToken, fromDate: '2026-08-30', toDate: '2026-09-12', ...overrides });
   const post = body => context.doPost({ postData: { contents: JSON.stringify(body) } });
   return { context, constants, properties, existingToken, deleted, rows, readNames, cache, cacheKeys, failSources,
@@ -212,9 +220,9 @@ test('contract 3 retains all event sources and only the selected teacher timetab
   const creative = bundle.events.find(event => event.source === 'creative');
   assert.equal(creative.periodStart, 5);
   assert.equal(creative.periodEnd, 5);
-  assert.deepEqual(Object.keys(bundle.sourceStatus).sort(), ['changes', 'committee', 'creative', 'gateDuty', 'mealDuty', 'meals', 'overrides', 'timetable', 'weekly']);
+  assert.deepEqual(Object.keys(bundle.sourceStatus).sort(), ['attendance', 'changes', 'committee', 'creative', 'gateDuty', 'mealDuty', 'meals', 'overrides', 'timetable', 'weekly']);
   assert.equal(bundle.timetableOverrides[0].id, 'override-1');
-  Object.values(bundle.sourceStatus).forEach(status => { assert.equal(status.state, 'fresh'); assert.ok(status.lastSuccessAt); });
+  Object.values(bundle.sourceStatus).forEach(status => { assert.ok(['fresh', 'empty'].includes(status.state)); assert.ok(status.lastSuccessAt); });
 });
 
 test('committee and changes are scoped to the viewer/range and approved or applied rows', () => {
@@ -235,7 +243,7 @@ test('request-range meals and legacy todayMeals use only four public fields', ()
   assert.deepEqual(future.todayMeals.map(meal => meal.date), ['2026-08-30']);
 });
 
-test('mobile response and read path exclude student and forbidden NEIS datasets', () => {
+test('mobile response excludes full student and forbidden NEIS datasets', () => {
   const h = harness();
   const result = h.post(h.request());
   assert.equal(result.ok, true);
@@ -244,8 +252,40 @@ test('mobile response and read path exclude student and forbidden NEIS datasets'
     assert.equal(responseText.includes(forbidden), false, forbidden);
   }
   assert.ok(h.readNames.includes('NEIS급식'));
-  assert.equal(h.readNames.some(name => /학생|NEIS학사일정|NEIS학급시간표/.test(name)), false);
-  assert.deepEqual(Object.keys(result.data).sort(), ['committeeEvents', 'contractVersion', 'events', 'fetchedAt', 'meals', 'servedAt', 'sourceStatus', 'teacherTimetable', 'timetableChanges', 'timetableOverrides', 'todayMeals']);
+  assert.equal(h.readNames.includes('학생시간표'), true);
+  assert.equal(h.readNames.some(name => /학생명렬|NEIS학사일정|NEIS학급시간표/.test(name)), false);
+  assert.deepEqual(Object.keys(result.data).sort(), ['attendanceSummaries', 'committeeEvents', 'contractVersion', 'events', 'fetchedAt', 'meals', 'servedAt', 'sourceStatus', 'teacherTimetable', 'timetableChanges', 'timetableOverrides', 'todayMeals']);
+});
+
+test('attendance uses the actual third-grade course roster and reports partial homeroom completion', () => {
+  const makeStudent = (className, number, name, teacher = '테스트교사') => ({ payloadJson: JSON.stringify({
+    student: { studentId: `3${className}${String(number).padStart(2, '0')}`, name, grade: '3', className: String(className), number: String(number) },
+    slots: { 월1: { subject: '기하', teacher, classroom: '수학실', selectedCourse: true } },
+    selections: [{ grade: '3', group: 'E2', courseName: '기하', teacher, classroom: '수학실' }],
+  }) });
+  const h = harness({
+    now: '2026-08-31T03:00:00Z',
+    studentTimetableRows: [makeStudent(1, 1, '수강학생1'), makeStudent(2, 2, '수강학생2'), makeStudent(2, 3, '다른교사학생', '다른교사')],
+    attendanceValues: [
+      ['2026-08-31 (월)', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['오늘 입력 완', '', false, '오늘 입력 완', '', true, '오늘 입력 완', '', true, '오늘 입력 완', '', true, '오늘 입력 완', '', true, '오늘 입력 완', '', true, '오늘 입력 완', '', true],
+      ['1반', '이름', '비고', '2반', '이름', '비고', '3반', '이름', '비고', '4반', '이름', '비고', '5반', '이름', '비고', '6반', '이름', '비고', '7반', '이름', '비고'],
+      [1, '수강학생1', '', 2, '수강학생2', '조퇴', 4, '비수강학생', '결석', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ],
+  });
+  const bundle = h.post(h.request()).data;
+  assert.equal(bundle.attendanceSummaries.length, 1);
+  const summary = bundle.attendanceSummaries[0];
+  assert.equal(summary.period, 1);
+  assert.equal(summary.rosterBasis, 'course-enrollment');
+  assert.equal(summary.state, 'partial');
+  assert.equal(summary.flaggedCount, 1);
+  assert.equal(summary.enrolledCount, 2);
+  assert.deepEqual(summary.classStatus, [{ className: '1', complete: false }, { className: '2', complete: true }]);
+  assert.deepEqual(summary.entries, [{ className: '2', number: '2', name: '수강학생2', remark: '조퇴' }]);
+  const text = JSON.stringify(bundle);
+  for (const forbidden of ['studentId', 'payloadJson', 'selections', '비수강학생', '다른교사학생']) assert.equal(text.includes(forbidden), false, forbidden);
+  assert.ok(h.readNames.includes('학생시간표'));
 });
 
 test('one failing source does not fail other data or cache the partial result', () => {

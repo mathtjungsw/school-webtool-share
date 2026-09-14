@@ -1,13 +1,13 @@
 'use client'
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, CloudOff, Download, Eye, EyeOff, Filter, LockKeyhole, LogOut, Moon, RefreshCw, Sun, UserRound, UtensilsCrossed, Zap } from 'lucide-react'
+import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, CloudOff, Download, Eye, EyeOff, Filter, LockKeyhole, LogOut, Moon, RefreshCw, Sun, UserRound, UtensilsCrossed, X, Zap } from 'lucide-react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { friendlyLoginError, isSessionExpiredError, loadDashboard, markDashboardCached, mergeDashboardWithCache, MobileRequestTimeoutError, SESSION_EXPIRED_MESSAGE, verifyViewer } from './api'
 import { deleteUserCache, readUserCache, writeUserCache } from './cache'
 import { DAYS, DEFAULT_VISIBILITY, SOURCE_LABELS, buildMobileTimelineRows, collectEvents, eventFingerprint, findTeacher, lessonFocus, newEventFingerprints, parseSlot, rangeForToday, schoolClock, sortMealsByType, timetableForDate, ymd } from './domain'
-import type { DashboardPayload, LessonView, MealInfo, MobileEvent, MobileResourceKey, MobileResourceState, MobileResourceStatus, ScheduleSource } from './types'
+import type { DashboardPayload, LessonView, MealInfo, MobileAttendanceSummary, MobileEvent, MobileResourceKey, MobileResourceState, MobileResourceStatus, ScheduleSource } from './types'
 import { VISUAL_NAME, visualFixture } from './visualFixture'
 
 const SESSION_KEY = 'ungcheon.mobile.session.v1'
@@ -72,8 +72,14 @@ export function MealPanel({ meals, status, isToday = true }: { meals: MealInfo[]
   return <section className="panel meal-panel"><div className="panel-title"><div className="panel-icon meal"><UtensilsCrossed size={17} /></div><div><p>{isToday ? 'TODAY MEAL' : 'DAY PREVIEW'}</p><h2>{title}</h2></div>{status ? <StatusBadge status={status} /> : <span>{meals.length ? `${meals.length}식` : '없음'}</span>}</div><div className="meal-list">{orderedMeals.map((meal, index) => <article className="meal-block" key={`${meal.date}-${meal.mealType}-${index}`}><div className="meal-heading"><strong>{meal.mealType || '급식'}</strong>{meal.calories && <span>{meal.calories}</span>}</div><div className="meal-dishes">{meal.dishNames.map((dish, dishIndex) => <span key={`${dish}-${dishIndex}`}>{dish}</span>)}</div></article>)}{!meals.length && <div className="empty">{emptyText}</div>}</div></section>
 }
 
-export function DailyTimeline({ lessons, events, teacherFound, isNew = () => false }: {
-  lessons: LessonView[]; events: MobileEvent[]; teacherFound: boolean; isNew?: (event: MobileEvent) => boolean
+function attendanceButtonLabel(summary: MobileAttendanceSummary) {
+  if (summary.state === 'pending') return '입력 전'
+  if (summary.state === 'partial') return `부분 입력${summary.flaggedCount ? ` · ${summary.flaggedCount}명` : ''}`
+  return summary.flaggedCount ? `출결 ${summary.flaggedCount}명` : '출결 없음'
+}
+
+export function DailyTimeline({ lessons, events, teacherFound, attendance = [], onOpenAttendance, isNew = () => false }: {
+  lessons: LessonView[]; events: MobileEvent[]; teacherFound: boolean; attendance?: MobileAttendanceSummary[]; onOpenAttendance?: (summary: MobileAttendanceSummary) => void; isNew?: (event: MobileEvent) => boolean
 }) {
   if (!teacherFound) return <div className="empty">등록된 교사 시간표를 찾지 못했습니다.</div>
   const rows = buildMobileTimelineRows(lessons, events)
@@ -82,11 +88,38 @@ export function DailyTimeline({ lessons, events, teacherFound, isNew = () => fal
     <div className="daily-timeline-head"><strong>수업</strong><strong>시간 지정 일정</strong></div>
     {rows.map(row => {
       const parsed = parseSlot(row.lesson?.value ?? '')
+      const attendanceSummary = row.kind === 'period' ? attendance.find(item => item.period === row.lesson?.period) : undefined
       return <div className={`daily-timeline-row row-${row.kind} ${row.lesson?.changed ? 'changed' : ''}`} key={row.id}>
-        <div className="timeline-lesson"><div className="timeline-clock"><b>{row.label}</b><small>{row.start}~{row.end}</small></div>{row.kind === 'period' && <div className="lesson-copy"><strong>{row.lesson?.value ? (parsed.subject || parsed.className) : '공강'}</strong>{row.lesson?.value && parsed.subject && <small>{parsed.className}</small>}{row.lesson?.note && <em>{row.lesson.note}</em>}</div>}</div>
+        <div className="timeline-lesson"><div className="timeline-clock"><b>{row.label}</b><small>{row.start}~{row.end}</small></div>{row.kind === 'period' && <div className="lesson-copy"><strong>{row.lesson?.value ? (parsed.subject || parsed.className) : '공강'}</strong>{row.lesson?.value && parsed.subject && <small>{parsed.className}</small>}{row.lesson?.note && <em>{row.lesson.note}</em>}</div>}{attendanceSummary && <button type="button" className={`attendance-pill attendance-${attendanceSummary.state}`} aria-label={`${row.label} 수강생 출결 ${attendanceButtonLabel(attendanceSummary)}`} onClick={() => onOpenAttendance?.(attendanceSummary)}>{attendanceButtonLabel(attendanceSummary)}<ChevronRight size={12} /></button>}</div>
         <div className="timeline-events">{row.events.map(event => <article className={`timeline-event source-${event.source} ${isNew(event) ? 'is-new' : ''}`} key={`${row.id}-${event.id}`}><div><strong>{event.title}</strong><small>{[event.startTime ? `${event.startTime}${event.endTime ? `~${event.endTime}` : ''}` : event.time, event.label].filter(Boolean).join(' · ')}</small></div>{isNew(event) && <b className="new-badge">NEW</b>}</article>)}{!row.events.length && <span className="timeline-empty">—</span>}</div>
       </div>
     })}
+  </div>
+}
+
+export function AttendanceSheet({ summary, onClose }: { summary: MobileAttendanceSummary; onClose: () => void }) {
+  const completeCount = summary.classStatus.filter(item => item.complete).length
+  const statusText = summary.state === 'complete'
+    ? `${summary.classStatus.length}개 반 모두 입력 완료`
+    : summary.state === 'partial'
+      ? `${summary.classStatus.length}개 반 중 ${completeCount}개 반 입력 완료`
+      : `${summary.classStatus.length}개 반 모두 입력 전`
+  const checkedAt = safeTime(summary.checkedAt)
+  return <div className="attendance-backdrop" role="presentation" onClick={onClose}>
+    <section className="attendance-sheet" role="dialog" aria-modal="true" aria-labelledby="attendance-title" onClick={event => event.stopPropagation()}>
+      <div className="attendance-handle" aria-hidden="true" />
+      <button type="button" className="attendance-close" aria-label="출결 현황 닫기" onClick={onClose}><X size={21} /></button>
+      <div className="attendance-heading">
+        <h2 id="attendance-title">{summary.period}교시 · {summary.courseNames.join(' · ') || '3학년 수업'} 수강생 출결</h2>
+        <p>{summary.classrooms.length ? `${summary.classrooms.join(' · ')} · ` : ''}실제 수강생 기준</p>
+      </div>
+      <div className={`attendance-summary attendance-${summary.state}`}><CheckCircle2 size={16} /><strong>{statusText}</strong>{checkedAt && <span>마지막 확인 {checkedAt}</span>}</div>
+      <div className="attendance-class-status" aria-label="반별 입력 상태">{summary.classStatus.map(item => <span className={item.complete ? 'complete' : 'pending'} key={item.className}>{item.className}반 {item.complete ? '입력 완료' : '입력 전'}</span>)}</div>
+      <div className="attendance-columns"><span>반·번호</span><span>이름</span><span>출결 비고</span></div>
+      <div className="attendance-list">{summary.entries.map((entry, index) => <div className="attendance-entry" key={`${entry.className}-${entry.number}-${index}`}><b>{entry.className}반 {entry.number}번</b><strong>{entry.name}</strong><span>{entry.remark}</span></div>)}{!summary.entries.length && <div className="attendance-empty">현재 입력된 출결 비고가 없습니다.</div>}</div>
+      {summary.mismatchCount > 0 && <p className="attendance-warning"><AlertTriangle size={13} /> 수강생 명단과 출결 시트가 일치하지 않는 항목 {summary.mismatchCount}건은 표시하지 않았습니다.</p>}
+      <p className="attendance-foot">5분마다 자동 확인 · 연결 실패 시 이전 정상 자료 표시</p>
+    </section>
   </div>
 }
 
@@ -177,6 +210,7 @@ export default function App() {
   const [cacheWarning, setCacheWarning] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
   const [newKeys, setNewKeys] = useState<string[]>([])
+  const [selectedAttendancePeriod, setSelectedAttendancePeriod] = useState<number | null>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (typeof window !== 'undefined' && localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light'))
   const [visibility, setVisibility] = useState<Record<ScheduleSource, boolean>>(() => {
     if (typeof window === 'undefined') return DEFAULT_VISIBILITY
@@ -222,7 +256,7 @@ export default function App() {
     sessionRef.current = null
     dataRef.current = null
     try { localStorage.removeItem(SESSION_KEY) } catch { /* 저장소가 막혀도 화면의 세션은 종료한다. */ }
-    setSession(null); setData(null); setNewKeys([]); setLoading(false)
+    setSession(null); setData(null); setNewKeys([]); setSelectedAttendancePeriod(null); setLoading(false)
     setMessage(''); setCacheWarning(''); setSessionNotice(notice)
     if (name) void deleteUserCache(name)
   }, [])
@@ -297,6 +331,13 @@ export default function App() {
   useEffect(() => { if (session && !visualMode) void refresh(session.name) }, [session, refresh])
   useEffect(() => {
     if (!session || visualMode) return
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refresh(session.name, true)
+    }, 5 * 60 * 1000)
+    return () => window.clearInterval(timer)
+  }, [refresh, session])
+  useEffect(() => {
+    if (!session || visualMode) return
     const updateAndRefresh = () => {
       const resumedAt = new Date()
       setNow(resumedAt)
@@ -333,12 +374,14 @@ export default function App() {
   const selectedEvents = allEvents.filter(event => event.date === selectedDate)
   const sharedMeals = data?.bundle?.meals ?? data?.bundle?.todayMeals ?? []
   const selectedMeals = sharedMeals.filter(meal => meal.date === selectedDate)
+  const selectedAttendanceSummaries = data?.bundle?.attendanceSummaries?.filter(item => item.date === selectedDate) ?? []
+  const selectedAttendance = selectedAttendanceSummaries.find(item => item.period === selectedAttendancePeriod) ?? null
   const teacher = data ? findTeacher(data.timetable, session.name) : null
   const selectedLessons = data ? timetableForDate(teacher, selectedDate, data.changes, session.name, data.bundle?.timetableOverrides ?? []) : []
   const selectedClassCount = selectedLessons.filter(lesson => Boolean(lesson.value)).length
   const dateSet = view === 'today' ? [selectedDate] : view === 'week' ? range.thisWeek : range.nextWeek
   const heading = view === 'today' ? format(new Date(`${selectedDate}T12:00:00`), 'M월 d일 EEEE', { locale: ko }) : view === 'week' ? '이번 주 일정' : view === 'next' ? '다음 주 일정' : '주간 교사 시간표'
-  const timetableStatus = summarizeStatus(data, ['timetable'])
+  const timetableStatus = summarizeStatus(data, ['timetable', 'attendance'])
   const scheduleStatus = summarizeStatus(data, ['weekly', 'creative', 'gateDuty', 'mealDuty', 'committee', 'changes'])
   const mealStatus = summarizeStatus(data, ['meals'], '자료 없음')
   const weeklyPeriodCount = data ? Math.max(7, ...range.thisWeek.slice(0, 5).map(date => timetableForDate(teacher, date, data.changes, session.name, data.bundle?.timetableOverrides ?? []).length)) : 7
@@ -362,7 +405,7 @@ export default function App() {
       {data && view === 'today' && <>
         <DateNavigator dates={previewDates} selected={selectedDate} today={today} onSelect={setSelectedDate} />
         {selectedDate === today && <NowNextCard lessons={selectedLessons} events={selectedEvents} minuteOfDay={clock.minutes} />}
-        <section className="panel timetable-primary"><div className="panel-title"><div className="panel-icon"><Clock3 size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘의 교사 시간표' : '선택한 날의 교사 시간표'}</h2></div><StatusBadge status={timetableStatus} /></div><DailyTimeline lessons={selectedLessons} events={selectedEvents} teacherFound={Boolean(teacher)} isNew={isNew} /></section>
+        <section className="panel timetable-primary"><div className="panel-title"><div className="panel-icon"><Clock3 size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘의 교사 시간표' : '선택한 날의 교사 시간표'}</h2></div><StatusBadge status={timetableStatus} /></div><DailyTimeline lessons={selectedLessons} events={selectedEvents} attendance={selectedAttendanceSummaries} onOpenAttendance={summary => setSelectedAttendancePeriod(summary.period)} teacherFound={Boolean(teacher)} isNew={isNew} /></section>
         <section className="panel"><div className="panel-title"><div className="panel-icon secondary"><CalendarDays size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘 일정' : '선택한 날의 일정'}</h2></div><StatusBadge status={scheduleStatus} /></div><div className="event-list">{selectedEvents.map(event => <EventCard key={event.id} event={event} isNew={isNew(event)} />)}{!selectedEvents.length && <div className="empty">표시할 일정이 없습니다.</div>}</div></section>
         <MealPanel meals={selectedMeals} status={mealStatus} isToday={selectedDate === today} />
       </>}
@@ -377,5 +420,6 @@ export default function App() {
         })}</div>)}</section>}
       {data?.cachedAt && <p className="updated-at">마지막 앱 조회 {format(new Date(data.cachedAt), 'M.d HH:mm')}</p>}
     </main>
+    {selectedAttendance && <AttendanceSheet summary={selectedAttendance} onClose={() => setSelectedAttendancePeriod(null)} />}
   </div>
 }

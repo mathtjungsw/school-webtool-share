@@ -150,7 +150,7 @@ function assertSessionPreservation(info) {
 }
 function validateContract(info) {
   for (const name of info.duplicateFunctions) if (name.startsWith('mobile') || name === 'getMobileScheduleBundle_' || name === 'doPost') blocked(`duplicate mobile entry point: ${name}`)
-  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 44) blocked('MOBILE_SERVICE_VERSION must include the mobile creative-period hotfix (44 or newer)')
+  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 47) blocked('MOBILE_SERVICE_VERSION must include the course-enrollment attendance update (47 or newer)')
   if (info.constants.get('MOBILE_SESSION_HOURS') !== 72) blocked('MOBILE_SESSION_HOURS must remain 72')
   if (info.constants.get('MOBILE_SHARED_PASSWORD_HASH_PROPERTY') !== 'UNG_MOBILE_SHARED_PASSWORD_HASH' || info.constants.get('MOBILE_SESSION_PROPERTY_PREFIX') !== 'UNG_MOBILE_SESSION_') blocked('existing mobile credential property names must be preserved')
   for (const name of ['verifyMobileViewer', 'getMobileScheduleBundle']) if (!info.actions.has(name)) blocked(`mobile action missing: ${name}`)
@@ -161,16 +161,23 @@ function validateContract(info) {
   const bundle = requireFunction(info, 'getMobileScheduleBundle_')
   if (!/mobileAssertAccess_\s*\(\s*body\s*\)/.test(bundle)) blocked('mobile bundle must require its existing login session')
   if (!/contractVersion\s*:\s*3\b/.test(bundle) || !/sourceStatus\s*:\s*sourceStatus/.test(bundle)) blocked('contractVersion 3/sourceStatus response missing')
-  for (const key of ['weekly', 'creative', 'gateDuty', 'mealDuty', 'timetable', 'committee', 'changes', 'overrides', 'meals']) {
+  for (const key of ['weekly', 'creative', 'gateDuty', 'mealDuty', 'timetable', 'committee', 'changes', 'overrides', 'meals', 'attendance']) {
     if (!new RegExp(`mobileLoadSource_\\(sourceStatus,\\s*['"]${key}['"]`).test(bundle)) blocked(`independent sourceStatus loader missing: ${key}`)
   }
   if (!/timetableOverrides\s*:\s*timetableOverrides/.test(bundle)) blocked('daily timetable override response missing')
+  if (!/attendanceSummaries\s*:\s*attendanceSummaries/.test(bundle)) blocked('course-enrollment attendance response missing')
   if (!/meals\s*:\s*meals/.test(bundle) || !/todayMeals\s*:\s*todayMeals/.test(bundle) || !/mobileSharedMealsInRange_\([^;\n]*fromDate[^;\n]*toDate/.test(bundle)) blocked('range meals/legacy todayMeals contract missing')
   if (!/todayKey/.test(bundle) || !/cacheKey[^\n]*todayKey/.test(bundle)) blocked('mobile cache key must include the Korea date')
   const load = requireFunction(info, 'mobileLoadSource_')
   for (const state of ['fresh', 'empty', 'unavailable']) if (!load.includes(`'${state}'`)) blocked(`sourceStatus state missing: ${state}`)
   const meals = requireFunction(info, 'mobileSharedMealsInRange_')
   if (!/readObjects_\(NEIS_MEALS_SHEET\)/.test(meals) || !/dateKey\s*>=\s*fromKey/.test(meals) || !/dateKey\s*<=\s*toKey/.test(meals)) blocked('shared NEIS meal date range filtering missing')
+  const attendance = requireFunction(info, 'mobileAttendanceSummaries_')
+  const attendanceStudents = requireFunction(info, 'mobileAttendanceStudentsForSlot_')
+  const attendanceSummary = requireFunction(info, 'mobileAttendanceSummaryForSlot_')
+  if (!/readObjects_\(STUDENT_TIMETABLE_SHEET\)/.test(attendanceStudents)) blocked('attendance must be matched server-side from the actual course timetable')
+  if (!/rosterBasis\s*:\s*['"]course-enrollment['"]/.test(attendanceSummary) || !/entries\s*:\s*entries/.test(attendanceSummary)) blocked('attendance response must document the course-enrollment basis and return only filtered entries')
+  if (/studentId\s*:|payloadJson\s*:|slots\s*:|selections\s*:/.test(attendanceSummary)) blocked('attendance response exposes a full student record')
   for (const [name, body] of info.functions) {
     if (!name.startsWith('mobile') && name !== 'getMobileScheduleBundle_') continue
     if (/UrlFetchApp|open\.neis\.go\.kr|NEIS_SCHEDULE_SHEET|NEIS_CLASS_TIMETABLE_SHEET|getStudentRoster_|getStudentTimetable_|getNeisSnapshot_/.test(body)) blocked(`forbidden mobile data/API dependency in ${name}`)
