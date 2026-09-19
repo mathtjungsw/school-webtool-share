@@ -53,8 +53,8 @@ const sourcePrinter = ts.createPrinter({ removeComments: true, newLine: ts.NewLi
 function canonicalNode(node, ast) { return sourcePrinter.printNode(ts.EmitHint.Unspecified, node, ast).trim() }
 // Integration changes may add mobile helpers, revise routing, and merge notices.
 // Everything else must preserve the desktop definition approved in origin/main.
-function isIntegrationFunction(name) { return name.startsWith('mobile') || ['doGet', 'doPost', 'getMobileScheduleBundle_'].includes(name) }
-function isIntegrationConstant(name) { return name.startsWith('MOBILE_') || name === 'RELEASE_NOTES' }
+function isIntegrationFunction(name) { return name.startsWith('mobile') || name.startsWith('executive') || ['doGet', 'doPost', 'getMobileScheduleBundle_'].includes(name) }
+function isIntegrationConstant(name) { return name.startsWith('MOBILE_') || name.startsWith('EXECUTIVE_') || name === 'RELEASE_NOTES' }
 function literal(node) {
   if (!node) return undefined
   if (ts.isStringLiteralLike(node)) return node.text
@@ -150,10 +150,11 @@ function assertSessionPreservation(info) {
 }
 function validateContract(info) {
   for (const name of info.duplicateFunctions) if (name.startsWith('mobile') || name === 'getMobileScheduleBundle_' || name === 'doPost') blocked(`duplicate mobile entry point: ${name}`)
-  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 47) blocked('MOBILE_SERVICE_VERSION must include the course-enrollment attendance update (47 or newer)')
+  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 48) blocked('MOBILE_SERVICE_VERSION must include changed-course attendance (48 or newer)')
   if (info.constants.get('MOBILE_SESSION_HOURS') !== 72) blocked('MOBILE_SESSION_HOURS must remain 72')
   if (info.constants.get('MOBILE_SHARED_PASSWORD_HASH_PROPERTY') !== 'UNG_MOBILE_SHARED_PASSWORD_HASH' || info.constants.get('MOBILE_SESSION_PROPERTY_PREFIX') !== 'UNG_MOBILE_SESSION_') blocked('existing mobile credential property names must be preserved')
   for (const name of ['verifyMobileViewer', 'getMobileScheduleBundle']) if (!info.actions.has(name)) blocked(`mobile action missing: ${name}`)
+  for (const name of ['verifyExecutive', 'getExecutiveScheduleBundle', 'changeExecutivePassword', 'resetExecutivePassword']) if (!info.actions.has(name)) blocked(`executive action missing: ${name}`)
   for (const name of ['getTimetableOverrides', 'saveTimetableOverride', 'deactivateTimetableOverride']) if (!info.actions.has(name)) blocked(`daily timetable override action missing: ${name}`)
   const post = requireFunction(info, 'doPost')
   if (!/mobileAssertViewer_/.test(post) || !/mobileSharedPasswordHash_/.test(post) || !/mobileCreateSession_/.test(post)) blocked('name/password login route is incomplete')
@@ -168,6 +169,7 @@ function validateContract(info) {
   if (!/attendanceSummaries\s*:\s*attendanceSummaries/.test(bundle)) blocked('course-enrollment attendance response missing')
   if (!/meals\s*:\s*meals/.test(bundle) || !/todayMeals\s*:\s*todayMeals/.test(bundle) || !/mobileSharedMealsInRange_\([^;\n]*fromDate[^;\n]*toDate/.test(bundle)) blocked('range meals/legacy todayMeals contract missing')
   if (!/todayKey/.test(bundle) || !/cacheKey[^\n]*todayKey/.test(bundle)) blocked('mobile cache key must include the Korea date')
+  if (!/attendanceContextVersion/.test(bundle) || !/cacheKey[^\n]*attendanceContextVersion/.test(bundle)) blocked('mobile cache key must include changed-course attendance context')
   const load = requireFunction(info, 'mobileLoadSource_')
   for (const state of ['fresh', 'empty', 'unavailable']) if (!load.includes(`'${state}'`)) blocked(`sourceStatus state missing: ${state}`)
   const meals = requireFunction(info, 'mobileSharedMealsInRange_')
@@ -176,6 +178,8 @@ function validateContract(info) {
   const attendanceStudents = requireFunction(info, 'mobileAttendanceStudentsForSlot_')
   const attendanceSummary = requireFunction(info, 'mobileAttendanceSummaryForSlot_')
   if (!/readObjects_\(STUDENT_TIMETABLE_SHEET\)/.test(attendanceStudents)) blocked('attendance must be matched server-side from the actual course timetable')
+  const attendanceContext = requireFunction(info, 'mobileAttendanceContext_')
+  for (const marker of ["'pulled'", "'exchange'", "'substitution'"]) if (!attendanceContext.includes(marker)) blocked(`changed-course attendance marker missing: ${marker}`)
   if (!/rosterBasis\s*:\s*['"]course-enrollment['"]/.test(attendanceSummary) || !/entries\s*:\s*entries/.test(attendanceSummary)) blocked('attendance response must document the course-enrollment basis and return only filtered entries')
   if (/studentId\s*:|payloadJson\s*:|slots\s*:|selections\s*:/.test(attendanceSummary)) blocked('attendance response exposes a full student record')
   for (const [name, body] of info.functions) {

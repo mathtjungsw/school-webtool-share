@@ -92,6 +92,7 @@ interface HubResponse<T> {
   ok: boolean
   data?: T
   error?: string
+  code?: string
 }
 
 export type HubResource =
@@ -304,9 +305,14 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
   const response = await window.electron.schoolHubRequest(request) as HubResponse<T>
   if (!response?.ok) {
     const message = response?.error || '학교 공유 서비스 요청에 실패했습니다.'
+    if (response?.code === 'LOCAL_ACTION_BLOCKED') throw new Error(message)
     const action = String(request.action ?? '')
     const needsServerUpdate = [
       'verifyAdmin',
+      'verifyExecutive',
+      'getExecutiveScheduleBundle',
+      'changeExecutivePassword',
+      'resetExecutivePassword',
       'listFeatureRequests',
       'addFeatureRequest',
       'updateFeatureRequest',
@@ -345,6 +351,7 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
     if (needsServerUpdate && message.includes('허용되지 않는 요청')) {
       throw new Error('학교 공유 서버 업데이트가 필요합니다. 관리자에게 문의하세요.')
     }
+    if (/aborted|timeout|시간 초과/i.test(message)) throw new Error('학교 공유 서비스 응답 시간이 초과되었습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.')
     throw new Error(message)
   }
   const resource = MUTATION_RESOURCE[String(request.action ?? '')]
@@ -463,6 +470,31 @@ export const listNotices = (force = false) =>
   cachedHubRequest<SchoolNotice[]>('notices', 'notices', { action: 'listNotices' }, force)
 export const verifyAdmin = (adminPassword: string) =>
   hubRequest<{ verified: boolean }>({ action: 'verifyAdmin', adminPassword })
+
+export type ExecutiveRole = 'principal' | 'vicePrincipal'
+export interface ExecutiveSession {
+  verified: boolean
+  role: ExecutiveRole
+  roleLabel: string
+  accessToken: string
+  expiresAt: string
+}
+export interface ExecutiveScheduleBundle {
+  viewerName: string
+  role: ExecutiveRole
+  timetable: SchoolTimetable | null
+  timetableChanges: import('./timetableChanges').TimetableChangeRequest[]
+  timetableOverrides: DailyTimetableOverride[]
+  fetchedAt: string
+}
+export const verifyExecutive = (viewerName: string, password: string) =>
+  hubRequest<ExecutiveSession>({ action: 'verifyExecutive', viewerName, password })
+export const getExecutiveScheduleBundle = (viewerName: string, accessToken: string) =>
+  hubRequest<ExecutiveScheduleBundle>({ action: 'getExecutiveScheduleBundle', viewerName, accessToken })
+export const changeExecutivePassword = (viewerName: string, accessToken: string, currentPassword: string, newPassword: string) =>
+  hubRequest<{ changed: boolean }>({ action: 'changeExecutivePassword', viewerName, accessToken, currentPassword, newPassword })
+export const resetExecutivePassword = (viewerName: string, adminPassword: string) =>
+  hubRequest<{ reset: boolean; role: ExecutiveRole }>({ action: 'resetExecutivePassword', viewerName, adminPassword })
 export const listFeatureRequests = (force = false) =>
   cachedHubRequest<FeatureRequest[]>('featureRequests', 'featureRequests', { action: 'listFeatureRequests' }, force)
 export const getSchoolTimetable = (force = false) =>

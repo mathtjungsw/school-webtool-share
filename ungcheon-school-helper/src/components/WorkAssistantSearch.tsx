@@ -3,6 +3,7 @@ import {
   ArrowRight, Clock3, CornerDownLeft, Lightbulb, Search, ShieldCheck, Sparkles, X,
 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
+import { useAuthStore } from '../stores/authStore'
 import ReferenceMetadataView from './ReferenceMetadata'
 import {
   searchWorkAssistant,
@@ -36,7 +37,8 @@ export default function WorkAssistantSearch({
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [recent, setRecent] = useState<string[]>(loadRecentQuestions)
   const teacherName = useAppStore(state => state.config.teacherName?.trim())
-  const results = useMemo(() => searchWorkAssistant(query), [query])
+  const executiveRole = useAuthStore(state => state.executiveRole)
+  const results = useMemo(() => searchWorkAssistant(query).filter(result => executiveRole || !result.page.startsWith('executive_')), [executiveRole, query])
 
   useEffect(() => {
     if (!open) return

@@ -92,6 +92,7 @@ export default function StudentLocatorPage() {
   const [selected, setSelected] = useState<PersonalTimetable | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [scheduleWarning, setScheduleWarning] = useState('')
   const [clock, setClock] = useState(new Date())
   const [changes, setChanges] = useState<TimetableChangeRequest[]>([])
   const [schoolTimetable, setSchoolTimetable] = useState<SchoolTimetable | null>(null)
@@ -107,15 +108,23 @@ export default function StudentLocatorPage() {
   const teacherName = useAppStore(state => state.config.teacherName?.trim() ?? '')
 
   const load = async (force = false) => {
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setScheduleWarning('')
     try {
-      const [nextDataset, nextRoster, nextNeis, nextChanges, nextSchoolTimetable, nextOverrides] = await Promise.all([
+      const [nextDataset, nextRoster, nextNeis] = await Promise.all([
         getSharedStudentTimetable(force), getSharedStudentRoster(force), getSharedNeisSnapshot(force),
+      ])
+      setDataset(nextDataset); setRoster(nextRoster); setSharedNeis(nextNeis)
+      const optional = await Promise.allSettled([
         listTimetableChanges(teacherName, '', '', true),
         getSchoolTimetable(force),
         getTimetableOverrides(false, force),
       ])
-      setDataset(nextDataset); setRoster(nextRoster); setSharedNeis(nextNeis); setChanges(nextChanges); setSchoolTimetable(nextSchoolTimetable); setTimetableOverrides(nextOverrides)
+      if (optional[0].status === 'fulfilled') setChanges(optional[0].value)
+      if (optional[1].status === 'fulfilled') setSchoolTimetable(optional[1].value)
+      if (optional[2].status === 'fulfilled') setTimetableOverrides(optional[2].value)
+      if (optional.some(result => result.status === 'rejected')) {
+        setScheduleWarning('변경 수업 정보를 확인하지 못했습니다. 실제 위치를 다시 확인해 주세요.')
+      }
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
     finally { setLoading(false) }
@@ -265,6 +274,7 @@ export default function StudentLocatorPage() {
         <button onClick={() => void load(true)} className="btn-ghost"><RefreshCw size={14} className={loading ? 'animate-spin' : ''} />새로고침</button>
       </header>
       {error && <p className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs font-bold text-rose-950">{error}</p>}
+      {scheduleWarning && <p className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-black text-amber-950">{scheduleWarning}</p>}
       <nav className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
         <button type="button" onClick={() => setActiveTab('current')} className={clsx('flex-1 rounded-xl px-4 py-3 text-sm font-black transition', activeTab === 'current' ? 'bg-cyan-700 text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100')}><MapPin className="mr-2 inline" size={16} />현재 위치 찾기</button>
         <button type="button" onClick={() => setActiveTab('specific')} className={clsx('flex-1 rounded-xl px-4 py-3 text-sm font-black transition', activeTab === 'specific' ? 'bg-indigo-700 text-white shadow-sm' : 'text-slate-700 hover:bg-slate-100')}><CalendarDays className="mr-2 inline" size={16} />학생 특정 시간 위치찾기</button>

@@ -42,6 +42,9 @@ export interface MobileAttendanceSummary {
   sourceDate: string
   checkedAt: string
   rosterBasis: 'course-enrollment'
+  changeType?: 'pulled' | 'exchange' | 'substitution' | 'override' | ''
+  originalLabel?: string
+  requiresReview?: boolean
 }
 export type MobileResourceKey = 'weekly' | 'creative' | 'gateDuty' | 'mealDuty' | 'timetable' | 'committee' | 'changes' | 'overrides' | 'meals' | 'attendance'
 export type MobileResourceState = 'fresh' | 'empty' | 'cached' | 'unavailable'

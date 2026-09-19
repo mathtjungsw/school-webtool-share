@@ -24,6 +24,8 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   { id: 'notifier', label: '업무알리미', icon: Bell, assistantCategory: '알림', searchAliases: ['일정 알림', '공지 알림'] },
   { id: 'operations_notifications', label: '통합 알림·변경센터', icon: Bell, assistantCategory: '알림', searchAliases: ['통합 알림', '변경 알림', '수업 변경 알림', '위원회 알림'] },
   { id: 'dashboard', label: '대시보드', icon: LayoutDashboard, assistantCategory: '일정', searchAliases: ['홈', '오늘 브리핑', '주간 시간표'] },
+  { id: 'executive_live_classes', label: '현재 수업 현황', icon: Building2, assistantCategory: '교장·교감', searchAliases: ['현재 교실', '수업 중 교실', '교실 현황'] },
+  { id: 'executive_teacher_schedule', label: '교사 시간표 조회', icon: UsersRound, assistantCategory: '교장·교감', searchAliases: ['전체 교사 시간표', '교사별 시간표'] },
   { id: 'calendar', label: '캘린더', icon: CalendarDays, assistantCategory: '일정', searchAliases: ['달력', '월간 일정', '통합 캘린더'] },
   { id: 'settings', label: '환경설정', icon: Settings, assistantCategory: '설정·도움말', searchAliases: ['사용자 설정', '이름 설정', '테마 설정'] },
   { id: 'admin_center', label: '관리자 센터', icon: ShieldCheck, assistantCategory: '관리자', searchAliases: ['관리자 동기화', 'NEIS 동기화'] },

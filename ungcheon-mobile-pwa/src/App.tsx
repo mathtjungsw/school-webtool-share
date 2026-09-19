@@ -73,6 +73,7 @@ export function MealPanel({ meals, status, isToday = true }: { meals: MealInfo[]
 }
 
 function attendanceButtonLabel(summary: MobileAttendanceSummary) {
+  if (summary.requiresReview) return '출결 확인 필요'
   if (summary.state === 'pending') return '입력 전'
   if (summary.state === 'partial') return `부분 입력${summary.flaggedCount ? ` · ${summary.flaggedCount}명` : ''}`
   return summary.flaggedCount ? `출결 ${summary.flaggedCount}명` : '출결 없음'
@@ -90,7 +91,7 @@ export function DailyTimeline({ lessons, events, teacherFound, attendance = [], 
       const parsed = parseSlot(row.lesson?.value ?? '')
       const attendanceSummary = row.kind === 'period' ? attendance.find(item => item.period === row.lesson?.period) : undefined
       return <div className={`daily-timeline-row row-${row.kind} ${row.lesson?.changed ? 'changed' : ''}`} key={row.id}>
-        <div className="timeline-lesson"><div className="timeline-clock"><b>{row.label}</b><small>{row.start}~{row.end}</small></div>{row.kind === 'period' && <div className="lesson-copy"><strong>{row.lesson?.value ? (parsed.subject || parsed.className) : '공강'}</strong>{row.lesson?.value && parsed.subject && <small>{parsed.className}</small>}{row.lesson?.note && <em>{row.lesson.note}</em>}</div>}{attendanceSummary && <button type="button" className={`attendance-pill attendance-${attendanceSummary.state}`} aria-label={`${row.label} 수강생 출결 ${attendanceButtonLabel(attendanceSummary)}`} onClick={() => onOpenAttendance?.(attendanceSummary)}>{attendanceButtonLabel(attendanceSummary)}<ChevronRight size={12} /></button>}</div>
+        <div className="timeline-lesson"><div className="timeline-clock"><b>{row.label}</b><small>{row.start}~{row.end}</small></div>{row.kind === 'period' && <div className="lesson-copy"><strong>{row.lesson?.value ? (parsed.subject || parsed.className) : '공강'}</strong>{row.lesson?.value && parsed.subject && <small>{parsed.className}</small>}{row.lesson?.note && <em>{row.lesson.note}</em>}</div>}{attendanceSummary && <button type="button" className={`attendance-pill attendance-${attendanceSummary.state}`} aria-label={`${row.label} 수강생 출결 ${attendanceButtonLabel(attendanceSummary)}`} onClick={() => onOpenAttendance?.(attendanceSummary)}>{attendanceSummary.changeType && <small>{attendanceSummary.changeType === 'pulled' ? '당김' : attendanceSummary.changeType === 'exchange' ? '교체' : attendanceSummary.changeType === 'substitution' ? '대강' : '예외'}</small>}{attendanceButtonLabel(attendanceSummary)}<ChevronRight size={12} /></button>}</div>
         <div className="timeline-events">{row.events.map(event => <article className={`timeline-event source-${event.source} ${isNew(event) ? 'is-new' : ''}`} key={`${row.id}-${event.id}`}><div><strong>{event.title}</strong><small>{[event.startTime ? `${event.startTime}${event.endTime ? `~${event.endTime}` : ''}` : event.time, event.label].filter(Boolean).join(' · ')}</small></div>{isNew(event) && <b className="new-badge">NEW</b>}</article>)}{!row.events.length && <span className="timeline-empty">—</span>}</div>
       </div>
     })}
@@ -112,7 +113,9 @@ export function AttendanceSheet({ summary, onClose }: { summary: MobileAttendanc
       <div className="attendance-heading">
         <h2 id="attendance-title">{summary.period}교시 · {summary.courseNames.join(' · ') || '3학년 수업'} 수강생 출결</h2>
         <p>{summary.classrooms.length ? `${summary.classrooms.join(' · ')} · ` : ''}실제 수강생 기준</p>
+        {summary.originalLabel && <p>{summary.changeType === 'pulled' ? '당김수업' : summary.changeType === 'exchange' ? '교체수업' : '변경수업'} · {summary.originalLabel}</p>}
       </div>
+      {summary.requiresReview && <p className="attendance-warning"><AlertTriangle size={13} /> 출결 대상을 안전하게 확정하지 못했습니다. 원래 수업 자료를 확인해 주세요.</p>}
       <div className={`attendance-summary attendance-${summary.state}`}><CheckCircle2 size={16} /><strong>{statusText}</strong>{checkedAt && <span>마지막 확인 {checkedAt}</span>}</div>
       <div className="attendance-class-status" aria-label="반별 입력 상태">{summary.classStatus.map(item => <span className={item.complete ? 'complete' : 'pending'} key={item.className}>{item.className}반 {item.complete ? '입력 완료' : '입력 전'}</span>)}</div>
       <div className="attendance-columns"><span>반·번호</span><span>이름</span><span>출결 비고</span></div>

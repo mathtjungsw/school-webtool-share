@@ -42,7 +42,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 47;
+const MOBILE_SERVICE_VERSION = 48;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -52,6 +52,11 @@ const MOBILE_ATTENDANCE_SHEET_NAME = '3학년';
 const MOBILE_SHARED_PASSWORD_HASH_PROPERTY = 'UNG_MOBILE_SHARED_PASSWORD_HASH';
 const MOBILE_SESSION_PROPERTY_PREFIX = 'UNG_MOBILE_SESSION_';
 const MOBILE_SESSION_HOURS = 72;
+const EXECUTIVE_PASSWORD_PROPERTY_PREFIX = 'UNG_EXECUTIVE_PASSWORD_SHA256_';
+const EXECUTIVE_SESSION_PROPERTY_PREFIX = 'UNG_EXECUTIVE_SESSION_';
+const EXECUTIVE_SESSION_HOURS = 8;
+// 초기 비밀번호는 평문으로 보관하지 않습니다.
+const EXECUTIVE_INITIAL_PASSWORD_HASH = 'mvFbM25qlhmShTffMLLmojdlafz51+dz7M7eZWBlKaA=';
 const INITIAL_TIMETABLE_OVERRIDES_1_1_31 = [
   ['seed-20260911-g1-p7', '2026-09-11', '1', '', 7, 'copy', '2026-09-23', 7, '9월 23일 수요일 7교시 수업 운영'],
   ['seed-20260911-g2-p7', '2026-09-11', '2', '', 7, 'copy', '2026-09-23', 7, '9월 23일 수요일 7교시 수업 운영'],
@@ -390,6 +395,18 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'v1.1.33',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.33 · 교장·교감 조회 메뉴와 변경수업 출결',
+    body: [
+      '· 교장과 교감 계정에 추가 비밀번호로 보호되는 조회 전용 메뉴를 제공하고, 현재 교시의 교실·과목·담당 교사와 전체 교사 시간표를 확인할 수 있습니다.',
+      '· 승인·반영된 교환·대강, 당김수업과 일일 시간표 예외를 현재 수업 현황과 교사별 실제 시간표에 함께 반영합니다.',
+      '· 모바일 3학년 수강생 출결이 교체·대강·당김으로 이동한 실제 수업을 따라가며, 원래 칸에는 중복 버튼을 남기지 않습니다.',
+      '· 학생 위치 찾기의 일일 시간표 예외 요청 차단을 수정하고, 변경자료 일부 조회 실패 시 기본 검색은 유지하면서 확인 경고를 표시합니다.',
+      '· 기존 모바일 공개 주소, Apps Script 고정 주소, 72시간 로그인과 이전 데스크톱·모바일 릴리스 안내를 모두 유지합니다.'
+    ].join('\n'),
+    date: '2026-09-19'
+  },
   {
     key: 'v1.1.32',
     title: '[업데이트] 웅천고 업무도우미 v1.1.32 · 오늘 시간표와 업무·일정 병렬 표시',
@@ -807,6 +824,13 @@ function doPost(e) {
       return json_({ ok: true, data: mobileCreateSession_(mobileViewer) });
     }
     if (action === 'getMobileScheduleBundle') return json_({ ok: true, data: getMobileScheduleBundle_(body) });
+    if (action === 'verifyExecutive') return json_({ ok: true, data: executiveVerify_(body) });
+    if (action === 'getExecutiveScheduleBundle') return json_({ ok: true, data: executiveScheduleBundle_(body) });
+    if (action === 'changeExecutivePassword') return json_({ ok: true, data: executiveChangePassword_(body) });
+    if (action === 'resetExecutivePassword') {
+      requireAdmin_(body.adminPassword);
+      return json_({ ok: true, data: executiveResetPassword_(body) });
+    }
 
     // 일반 조회에서 전체 시트 생성·보정을 매번 실행하지 않는다.
     // 쓰기 요청은 버전 변경에 필요한 스키마만 보정한다.
@@ -934,8 +958,109 @@ function doPost(e) {
       failure.code = 'MOBILE_SESSION_EXPIRED';
       failure.errorCode = 'MOBILE_SESSION_EXPIRED';
     }
+    if (error && error.code === 'EXECUTIVE_SESSION_EXPIRED') {
+      failure.code = 'EXECUTIVE_SESSION_EXPIRED';
+    }
     return json_(failure);
   }
+}
+
+function executiveIdentity_(viewerName) {
+  const name = clean_(viewerName, 30);
+  if (name === '류희열') return { name: name, role: 'principal', label: '교장' };
+  if (name === '이승훈') return { name: name, role: 'vicePrincipal', label: '교감' };
+  throw new Error('이름 또는 비밀번호가 올바르지 않습니다.');
+}
+
+function executivePasswordHash_(identity) {
+  return PropertiesService.getScriptProperties().getProperty(EXECUTIVE_PASSWORD_PROPERTY_PREFIX + identity.role) || EXECUTIVE_INITIAL_PASSWORD_HASH;
+}
+
+function executiveAudit_(identity, action) {
+  PropertiesService.getScriptProperties().setProperty('UNG_EXECUTIVE_AUDIT_' + identity.role, JSON.stringify({
+    actor: identity.name, action: action, at: new Date().toISOString()
+  }));
+}
+
+function executiveInvalidateSessions_(identity) {
+  const properties = PropertiesService.getScriptProperties();
+  const all = properties.getProperties();
+  Object.keys(all).forEach(function(key) {
+    if (key.indexOf(EXECUTIVE_SESSION_PROPERTY_PREFIX) !== 0) return;
+    try {
+      const session = JSON.parse(all[key] || '{}');
+      if (session.role === identity.role || Number(session.expiresAt) <= Date.now()) properties.deleteProperty(key);
+    } catch (ignore) { properties.deleteProperty(key); }
+  });
+}
+
+function executiveSessionExpired_() {
+  const error = new Error('보호 화면 인증이 만료되었습니다. 다시 로그인해 주세요.');
+  error.code = 'EXECUTIVE_SESSION_EXPIRED';
+  return error;
+}
+
+function executiveVerify_(body) {
+  const identity = executiveIdentity_(body.viewerName);
+  const cache = CacheService.getScriptCache();
+  const throttleKey = 'executive-fail:' + sha256_(identity.name).slice(0, 18);
+  const failures = Number(cache.get(throttleKey) || 0);
+  if (failures >= 5) throw new Error('잠시 후 다시 시도해 주세요.');
+  if (!body.password || sha256_(String(body.password)) !== executivePasswordHash_(identity)) {
+    cache.put(throttleKey, String(failures + 1), 300);
+    throw new Error('이름 또는 비밀번호가 올바르지 않습니다.');
+  }
+  cache.remove(throttleKey);
+  const accessToken = Utilities.getUuid() + Utilities.getUuid();
+  const expiresAt = Date.now() + EXECUTIVE_SESSION_HOURS * 60 * 60 * 1000;
+  const tokenKey = EXECUTIVE_SESSION_PROPERTY_PREFIX + sha256_(accessToken).replace(/[^A-Za-z0-9]/g, '').slice(0, 40);
+  PropertiesService.getScriptProperties().setProperty(tokenKey, JSON.stringify({
+    viewerName: identity.name, role: identity.role, expiresAt: expiresAt
+  }));
+  executiveAudit_(identity, 'login');
+  return { verified: true, role: identity.role, roleLabel: identity.label, accessToken: accessToken, expiresAt: new Date(expiresAt).toISOString() };
+}
+
+function executiveAssertAccess_(body) {
+  const identity = executiveIdentity_(body.viewerName);
+  const token = clean_(body.accessToken, 500);
+  if (!token) throw executiveSessionExpired_();
+  const tokenKey = EXECUTIVE_SESSION_PROPERTY_PREFIX + sha256_(token).replace(/[^A-Za-z0-9]/g, '').slice(0, 40);
+  let session = {};
+  try { session = JSON.parse(PropertiesService.getScriptProperties().getProperty(tokenKey) || '{}'); } catch (ignore) {}
+  if (session.viewerName !== identity.name || session.role !== identity.role || Number(session.expiresAt) <= Date.now()) throw executiveSessionExpired_();
+  return identity;
+}
+
+function executiveScheduleBundle_(body) {
+  const identity = executiveAssertAccess_(body);
+  return {
+    viewerName: identity.name,
+    role: identity.role,
+    timetable: getTimetable_(),
+    timetableChanges: listTimetableChanges_({ viewerName: identity.name, includeSchool: true }),
+    timetableOverrides: listTimetableOverrides_({ includeInactive: false }),
+    fetchedAt: new Date().toISOString()
+  };
+}
+
+function executiveChangePassword_(body) {
+  const identity = executiveAssertAccess_(body);
+  if (!body.currentPassword || sha256_(String(body.currentPassword)) !== executivePasswordHash_(identity)) throw new Error('현재 비밀번호가 올바르지 않습니다.');
+  const next = String(body.newPassword || '');
+  if (next.length < 4 || next.length > 30) throw new Error('새 비밀번호는 4~30자로 입력해 주세요.');
+  PropertiesService.getScriptProperties().setProperty(EXECUTIVE_PASSWORD_PROPERTY_PREFIX + identity.role, sha256_(next));
+  executiveInvalidateSessions_(identity);
+  executiveAudit_(identity, 'password-change');
+  return { changed: true };
+}
+
+function executiveResetPassword_(body) {
+  const identity = executiveIdentity_(body.viewerName);
+  PropertiesService.getScriptProperties().deleteProperty(EXECUTIVE_PASSWORD_PROPERTY_PREFIX + identity.role);
+  executiveInvalidateSessions_(identity);
+  executiveAudit_(identity, 'admin-reset');
+  return { reset: true, role: identity.role };
 }
 
 function getSyncManifest_() {
@@ -3242,20 +3367,65 @@ function mobileAttendanceSheetSnapshot_(expectedDate) {
   return { sourceDate: sourceDate, classes: classes };
 }
 
-function mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows, timetableOverrides) {
+function mobileAttendanceContext_(viewerName, date, period, timetableOverrides, timetableChanges, pulledLessons) {
+  const pulled = (Array.isArray(pulledLessons) ? pulledLessons : []).find(function(item) {
+    // 클라이언트가 보내는 최소 색인은 로그인 교사 본인의 원수업 이동만 허용합니다.
+    return clean_(item.teacherName, 30) === viewerName && clean_(item.originalTeacherName, 30) === viewerName && clean_(item.date, 10) === date && Number(item.period) === Number(period);
+  });
+  if (pulled) {
+    const matched = clean_(pulled.originalSlot, 20).match(/[월화수목금](\d+)/);
+    const originalPeriod = matched ? Number(matched[1]) : Number(pulled.originalPeriod || 0);
+    if (!clean_(pulled.originalDate, 10) || !originalPeriod || !clean_(pulled.originalTeacherName || pulled.teacherName, 30)) return { review: true, changeType: 'pulled' };
+    return { date: clean_(pulled.originalDate, 10), period: originalPeriod, teacherName: clean_(pulled.originalTeacherName || pulled.teacherName, 30), changeType: 'pulled', originalLabel: '원래 ' + clean_(pulled.originalSlot, 20) + ' 수업' };
+  }
+  const changes = Array.isArray(timetableChanges) ? timetableChanges : [];
+  for (let index = 0; index < changes.length; index++) {
+    const item = changes[index];
+    if (!clean_(item.originalClass, 30) || !clean_(item.originalSubject, 120) ||
+        (item.kind === 'exchange' && (!clean_(item.replacementClass, 30) || !clean_(item.replacementSubject, 120)))) continue;
+    const originalPeriod = Number(item.originalSlotIndex) % 7 + 1;
+    const replacementPeriod = Number(item.replacementSlotIndex) % 7 + 1;
+    if (item.kind === 'exchange') {
+      if (clean_(item.originalTeacher, 30) === viewerName && clean_(item.replacementDate, 10) === date && replacementPeriod === Number(period)) {
+        return { date: clean_(item.originalDate, 10), period: originalPeriod, teacherName: clean_(item.originalTeacher, 30), changeType: 'exchange', originalLabel: '원래 ' + clean_(item.originalDate, 10) + ' ' + originalPeriod + '교시 수업' };
+      }
+      if (clean_(item.replacementTeacher, 30) === viewerName && clean_(item.originalDate, 10) === date && originalPeriod === Number(period) && item.status === 'approved') {
+        return { date: clean_(item.replacementDate, 10), period: replacementPeriod, teacherName: clean_(item.replacementTeacher, 30), changeType: 'exchange', originalLabel: '원래 ' + clean_(item.replacementDate, 10) + ' ' + replacementPeriod + '교시 수업' };
+      }
+      if ((clean_(item.originalTeacher, 30) === viewerName && clean_(item.originalDate, 10) === date && originalPeriod === Number(period)) ||
+          (clean_(item.replacementTeacher, 30) === viewerName && clean_(item.replacementDate, 10) === date && replacementPeriod === Number(period))) return null;
+    } else {
+      if (clean_(item.replacementTeacher, 30) === viewerName && clean_(item.originalDate, 10) === date && originalPeriod === Number(period) && item.status === 'approved') {
+        return { date: clean_(item.originalDate, 10), period: originalPeriod, teacherName: clean_(item.originalTeacher, 30), changeType: 'substitution', originalLabel: '원래 담당 교사 수업' };
+      }
+      if (clean_(item.originalTeacher, 30) === viewerName && clean_(item.originalDate, 10) === date && originalPeriod === Number(period)) return null;
+    }
+  }
+  // 이동형 당김수업의 원래 칸에는 출결 버튼을 남기지 않습니다.
+  const movedOriginal = (Array.isArray(pulledLessons) ? pulledLessons : []).some(function(item) {
+    const matched = clean_(item.originalSlot, 20).match(/[월화수목금](\d+)/);
+    return clean_(item.originalTeacherName || item.teacherName, 30) === viewerName && clean_(item.originalDate, 10) === date && matched && Number(matched[1]) === Number(period) && (clean_(item.date, 10) !== date || Number(item.period) !== Number(period));
+  });
+  if (movedOriginal) return null;
   const sourceSlot = mobileAttendanceSourceSlot_(date, period, timetableOverrides);
-  if (!sourceSlot) return [];
+  if (!sourceSlot) return null;
+  return { date: sourceSlot.date, period: sourceSlot.period, teacherName: viewerName, changeType: sourceSlot.date !== date || Number(sourceSlot.period) !== Number(period) ? 'override' : '', originalLabel: '' };
+}
+
+function mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows, timetableOverrides, timetableChanges, pulledLessons) {
+  const sourceSlot = mobileAttendanceContext_(viewerName, date, period, timetableOverrides, timetableChanges, pulledLessons);
+  if (!sourceSlot || sourceSlot.review) return { students: [], context: sourceSlot };
   const sourceDate = new Date(sourceSlot.date + 'T12:00:00+09:00');
   const day = ['일', '월', '화', '수', '목', '금', '토'][sourceDate.getDay()];
-  if (!day || day === '일' || day === '토') return [];
+  if (!day || day === '일' || day === '토') return { students: [], context: sourceSlot };
   const key = day + sourceSlot.period;
   const rows = Array.isArray(personalRows) ? personalRows : readObjects_(STUDENT_TIMETABLE_SHEET);
-  return rows.map(function(row) {
+  const students = rows.map(function(row) {
     let personal;
     try { personal = JSON.parse(String(row.payloadJson || '')); } catch (ignore) { return null; }
     const student = personal && personal.student || {};
     const slot = personal && personal.slots && personal.slots[key] || {};
-    if (clean_(student.grade, 2) !== '3' || clean_(slot.teacher, 30) !== viewerName || !clean_(slot.subject, 120)) return null;
+    if (clean_(student.grade, 2) !== '3' || clean_(slot.teacher, 30) !== sourceSlot.teacherName || !clean_(slot.subject, 120)) return null;
     return {
       className: mobileAttendanceNumber_(student.className),
       number: mobileAttendanceNumber_(student.number),
@@ -3264,10 +3434,13 @@ function mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows
       classroom: clean_(slot.classroom, 50)
     };
   }).filter(function(item) { return item && item.className && item.number && item.name; });
+  return { students: students, context: sourceSlot };
 }
 
-function mobileAttendanceSummaryForSlot_(viewerName, date, period, snapshot, personalRows, timetableOverrides) {
-  const enrolled = mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows, timetableOverrides);
+function mobileAttendanceSummaryForSlot_(viewerName, date, period, snapshot, personalRows, timetableOverrides, timetableChanges, pulledLessons) {
+  const resolved = mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows, timetableOverrides, timetableChanges, pulledLessons);
+  const enrolled = resolved.students;
+  if (resolved.context && resolved.context.review) return { date: date, period: period, state: 'pending', flaggedCount: 0, enrolledCount: 0, courseNames: [], classrooms: [], classStatus: [], entries: [], mismatchCount: 0, sourceDate: snapshot.sourceDate, checkedAt: new Date().toISOString(), rosterBasis: 'course-enrollment', changeType: resolved.context.changeType, requiresReview: true, originalLabel: '' };
   if (!enrolled.length) return null;
   const relevantClasses = [];
   const courseNames = [];
@@ -3311,11 +3484,13 @@ function mobileAttendanceSummaryForSlot_(viewerName, date, period, snapshot, per
     mismatchCount: mismatchCount,
     sourceDate: snapshot.sourceDate,
     checkedAt: new Date().toISOString(),
-    rosterBasis: 'course-enrollment'
+    rosterBasis: 'course-enrollment',
+    changeType: resolved.context && resolved.context.changeType || '',
+    originalLabel: resolved.context && resolved.context.originalLabel || ''
   };
 }
 
-function mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverrides) {
+function mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverrides, timetableChanges, pulledLessons) {
   const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
   if (today < fromDate || today > toDate) return [];
   const snapshot = mobileAttendanceSheetSnapshot_(today);
@@ -3323,7 +3498,7 @@ function mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverr
   const personalRows = readObjects_(STUDENT_TIMETABLE_SHEET);
   const summaries = [];
   for (let period = 1; period <= 7; period++) {
-    const summary = mobileAttendanceSummaryForSlot_(viewerName, today, period, snapshot, personalRows, timetableOverrides);
+    const summary = mobileAttendanceSummaryForSlot_(viewerName, today, period, snapshot, personalRows, timetableOverrides, timetableChanges, pulledLessons);
     if (summary) summaries.push(summary);
   }
   return summaries;
@@ -3368,7 +3543,9 @@ function getMobileScheduleBundle_(body) {
   if (!Number.isFinite(days) || mobileDate_(new Date(fromDate + 'T00:00:00+09:00')) !== fromDate || mobileDate_(new Date(toDate + 'T00:00:00+09:00')) !== toDate || days < 0 || days > 21) throw new Error('모바일 일정은 올바른 날짜의 최대 22일 범위에서 조회할 수 있습니다.');
   // 오늘 급식 하위 호환 필드가 날짜 변경 때 즉시 달라지도록 한국 날짜를 캐시 키에 포함합니다.
   const todayKey = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd');
-  const cacheKey = 'mobile:v' + MOBILE_SERVICE_VERSION + ':' + sha256_(viewerName).slice(0, 12) + ':' + todayKey + ':' + fromDate + ':' + toDate;
+  const attendancePulledLessons = Array.isArray(body.attendancePulledLessons) ? body.attendancePulledLessons.slice(0, 300) : [];
+  const attendanceContextVersion = clean_(body.attendanceContextVersion, 100);
+  const cacheKey = 'mobile:v' + MOBILE_SERVICE_VERSION + ':' + sha256_(viewerName).slice(0, 12) + ':' + todayKey + ':' + fromDate + ':' + toDate + ':' + sha256_(attendanceContextVersion).slice(0, 8);
   let cached = null;
   try { cached = CacheService.getScriptCache().get(cacheKey); } catch (ignore) {}
   if (cached) {
@@ -3420,7 +3597,7 @@ function getMobileScheduleBundle_(body) {
     });
   });
   const attendanceSummaries = mobileLoadSource_(sourceStatus, 'attendance', [], function() {
-    return mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverrides);
+    return mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverrides, timetableChanges, attendancePulledLessons);
   });
   const todayIsoDate = todayKey.slice(0, 4) + '-' + todayKey.slice(4, 6) + '-' + todayKey.slice(6, 8);
   const sharedMeals = mobileLoadSource_(sourceStatus, 'meals', [], function() {

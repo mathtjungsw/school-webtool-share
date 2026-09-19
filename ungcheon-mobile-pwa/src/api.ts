@@ -5,6 +5,7 @@ import type {
   MobileResourceStatusMap,
   MobileScheduleBundle,
 } from './types'
+import { PULLED_LESSONS_2026 } from './shared/pulledLessons2026'
 
 export const SCHOOL_HUB_URL = 'https://script.google.com/macros/s/AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w/exec'
 
@@ -114,7 +115,17 @@ function normalizeBundle(bundle: MobileScheduleBundle): MobileScheduleBundle {
 }
 
 export async function loadDashboard(name: string, accessToken: string, fromDate: string, toDate: string, signal?: AbortSignal): Promise<DashboardPayload> {
-  const received = await secureReadAction<MobileScheduleBundle>('getMobileScheduleBundle', { viewerName: name, accessToken, fromDate, toDate }, signal)
+  const attendancePulledLessons = PULLED_LESSONS_2026
+    .filter(item => item.teacherName.trim() === name.trim() && item.originalTeacherName.trim() === name.trim())
+    .map(item => ({
+      id: item.id, date: item.date, period: item.period, classLabel: item.classLabel, subject: item.subject,
+      teacherName: item.teacherName, originalTeacherName: item.originalTeacherName,
+      originalSlot: item.originalSlot, originalDate: item.originalDate,
+    }))
+  const attendanceContextVersion = attendancePulledLessons.map(item => [item.id, item.date, item.period, item.originalDate, item.originalSlot].join(':')).join('|')
+  const received = await secureReadAction<MobileScheduleBundle>('getMobileScheduleBundle', {
+    viewerName: name, accessToken, fromDate, toDate, attendancePulledLessons, attendanceContextVersion,
+  }, signal)
   const bundle = normalizeBundle(received)
   return {
     timetable: bundle.teacherTimetable ? { version: 0, title: '교사 주간시간표', uploadedAt: bundle.sourceStatus?.timetable?.dataUpdatedAt || bundle.fetchedAt, teachers: [bundle.teacherTimetable] } : null,

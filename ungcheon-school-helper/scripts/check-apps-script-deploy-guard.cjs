@@ -7,10 +7,11 @@ const { validate, inspectSource } = require('./apps-script-deploy-guard.cjs')
 
 // Generated test data only. Never put a real mobile password/token here.
 const fixture = `
-const MOBILE_SERVICE_VERSION = 47;
+const MOBILE_SERVICE_VERSION = 48;
 const MOBILE_SESSION_HOURS = 72;
 const MOBILE_SESSION_PROPERTY_PREFIX = 'UNG_MOBILE_SESSION_';
 const MOBILE_SHARED_PASSWORD_HASH_PROPERTY = 'UNG_MOBILE_SHARED_PASSWORD_HASH';
+const EXECUTIVE_SESSION_PROPERTY_PREFIX = 'UNG_EXECUTIVE_SESSION_';
 const STAFF_CHECKLISTS_SHEET = 'staff-checklists';
 const STAFF_CHECKLIST_HEADERS = ['title', 'deadline'];
 const RELEASE_NOTES = [
@@ -22,6 +23,10 @@ function doPost(e) {
  const action = e.action;
  if (action === 'verifyMobileViewer') return mobileCreateSession_(mobileAssertViewer_(mobileSharedPasswordHash_()));
  if (action === 'getMobileScheduleBundle') return getMobileScheduleBundle_(e);
+ if (action === 'verifyExecutive') return executiveVerify_(e);
+ if (action === 'getExecutiveScheduleBundle') return executiveScheduleBundle_(e);
+ if (action === 'changeExecutivePassword') return executiveChangePassword_(e);
+ if (action === 'resetExecutivePassword') return executiveResetPassword_(e);
  if (action === 'getTimetableOverrides') return [];
  if (action === 'saveTimetableOverride') return [];
  if (action === 'deactivateTimetableOverride') return [];
@@ -54,10 +59,15 @@ function mobileSharedMealsInRange_(fromDate, toDate) {
 function mobileAttendanceStudentsForSlot_() { return readObjects_(STUDENT_TIMETABLE_SHEET); }
 function mobileAttendanceSummaryForSlot_() { const entries = []; return { entries: entries, rosterBasis: 'course-enrollment' }; }
 function mobileAttendanceSummaries_() { return []; }
+function mobileAttendanceContext_() { return { changeType: 'pulled' || 'exchange' || 'substitution' }; }
+function executiveVerify_() { return {}; }
+function executiveScheduleBundle_() { return {}; }
+function executiveChangePassword_() { return {}; }
+function executiveResetPassword_() { return {}; }
 function getMobileScheduleBundle_(body) {
  mobileAssertAccess_(body);
  const fromDate = body.fromDate; const toDate = body.toDate;
- const todayKey = '20260830'; const cacheKey = 'mobile:' + todayKey + fromDate + toDate;
+ const todayKey = '20260830'; const attendanceContextVersion = body.attendanceContextVersion || ''; const cacheKey = 'mobile:' + todayKey + fromDate + toDate + attendanceContextVersion;
  const sourceStatus = {};
  ${['weekly', 'creative', 'gateDuty', 'mealDuty', 'timetable', 'committee', 'changes'].map(key => `mobileLoadSource_(sourceStatus, '${key}', [], function() { return []; });`).join('\n')}
  const timetableOverrides = mobileLoadSource_(sourceStatus, 'overrides', [], function() { return []; });
@@ -73,10 +83,10 @@ function pass(label, task) { task(); checks++; }
 function fails(label, change, expected, baselines = []) {
  pass(label, () => assert.throws(() => validate({ localSource: change(fixture), baselines }), expected, label))
 }
-pass('integrated contract', () => assert.equal(validate({ localSource: fixture }).serviceVersion, 47))
+pass('integrated contract', () => assert.equal(validate({ localSource: fixture }).serviceVersion, 48))
 fails('syntax errors', text => text + '\nfunction broken( {', /syntax check/)
 fails('missing action', text => text.replace("action === 'verifyMobileViewer'", "action === 'oldLogin'"), /mobile action/)
-fails('old service version', text => text.replace('VERSION = 47', 'VERSION = 46'), /course-enrollment attendance/)
+fails('old service version', text => text.replace('VERSION = 48', 'VERSION = 47'), /changed-course attendance/)
 fails('wrong session duration', text => text.replace('HOURS = 72', 'HOURS = 24'), /must remain 72/)
 fails('credential property rename', text => text.replace('UNG_MOBILE_SHARED_PASSWORD_HASH', 'RENAMED'), /property names/)
 fails('contract downgrade', text => text.replace('contractVersion: 3', 'contractVersion: 2'), /contractVersion 3/)
@@ -94,7 +104,7 @@ fails('desktop release omission', text => text.replace("key: 'v1.1.25'", "key: '
 fails('main desktop function omission', text => text.replace('function listStaffChecklists_() { return readObjects_(STAFF_CHECKLISTS_SHEET); }', ''), /function removed/, [{ source: fixture, label: 'main' }])
 fails('baseline action omission', text => text.replace("action === 'listStaffChecklists'", "action === 'oldAction'"), /action removed/, [{ source: fixture, label: 'main' }])
 fails('release content replacement', text => text.replace('desktop widgets', 'replacement mobile notice'), /release note content removed/, [{ source: fixture, label: 'main' }])
-fails('remote version downgrade', text => text, /version downgrade/, [{ source: fixture.replace('VERSION = 47', 'VERSION = 48'), label: 'fixed', deployed: true }])
+fails('remote version downgrade', text => text, /version downgrade/, [{ source: fixture.replace('VERSION = 48', 'VERSION = 49'), label: 'fixed', deployed: true }])
 fails('same service version changed code', text => text + '\n// changed', /newer MOBILE_SERVICE_VERSION/, [{ source: fixture, label: 'fixed', deployed: true }])
 pass('idempotent same-source redeployment', () => assert.equal(validate({ localSource: fixture, baselines: [{ source: fixture, deployed: true }] }).ok, true))
 pass('merge release bodies', () => assert.equal(validate({ localSource: fixture.replace('desktop widgets', 'desktop widgets\\nmobile widgets'), baselines: [{ source: fixture }] }).ok, true))
@@ -114,7 +124,7 @@ pass('mobile and routing integration allowlist', () => assert.equal(validate({
  baselines: [mainBaseline]
 }).ok, true))
 
-const oldRemote = fixture.replace('VERSION = 47', 'VERSION = 46').replace('return readObjects_(STAFF_CHECKLISTS_SHEET);', 'return [];').replace("'staff-checklists'", "'legacy-staff-sheet'")
+const oldRemote = fixture.replace('VERSION = 48', 'VERSION = 47').replace('return readObjects_(STAFF_CHECKLISTS_SHEET);', 'return [];').replace("'staff-checklists'", "'legacy-staff-sheet'")
 pass('three-way accepts desktop work already approved on main', () => assert.equal(validate({ localSource: fixture, baselines: [mainBaseline, { source: oldRemote, label: 'fixed deployment', deployed: true }] }).ok, true))
 fails('three-way blocks reverting main desktop implementation to remote legacy', text => text.replace('return readObjects_(STAFF_CHECKLISTS_SHEET);', 'return [];'), /protected desktop function changed/, [mainBaseline, { source: oldRemote, label: 'fixed deployment', deployed: true }])
 const remoteOnlyDefinitions = '\nfunction remoteDesktopHelper_() { return "remote-only"; }\nconst REMOTE_DESKTOP_SHEET = "remote-only-sheet";'

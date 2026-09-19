@@ -37,6 +37,7 @@
     "src/pages/NeisPage.tsx",
     "src/pages/UngcheonSettingsPage.tsx",
     "src/pages/AdminCenterPage.tsx",
+    "src/pages/ExecutiveSchedulePage.tsx",
     "src/pages/UngcheonHelpPage.tsx",
     "src/pages/SchoolHubPage.tsx",
     "src/pages/FeatureRequestsPage.tsx",

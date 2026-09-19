@@ -962,6 +962,10 @@ const HUB_ACTIONS = new Set([
   'health',
   'getSyncManifest',
   'verifyAdmin',
+  'verifyExecutive',
+  'getExecutiveScheduleBundle',
+  'changeExecutivePassword',
+  'resetExecutivePassword',
   'listLinks',
   'addLink',
   'deleteLink',
@@ -994,6 +998,9 @@ const HUB_ACTIONS = new Set([
   'respondTimetableChange',
   'applyTimetableChangeForRequester',
   'cancelTimetableChange',
+  'getTimetableOverrides',
+  'saveTimetableOverride',
+  'deactivateTimetableOverride',
   'getNeisSyncStatus',
   'registerNeisSyncDevice',
   'revokeNeisSyncDevice',
@@ -1016,6 +1023,7 @@ const HUB_READ_ACTIONS = new Set([
   'listStaffChecklists',
   'listCommitteeState',
   'listTimetableChanges',
+  'getTimetableOverrides',
   'getNeisSyncStatus',
   'getNeisSnapshot',
 ])
@@ -1100,7 +1108,11 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
   const largePayloadActions = new Set(['replaceStudentTimetable', 'replaceStudentRoster', 'replaceStaffRoster', 'replaceNeisSnapshot'])
   const maxRequestLength = largePayloadActions.has(action) ? 8_000_000 : 500_000
   if (JSON.stringify(payload).length > maxRequestLength) return { ok: false, error: '요청 데이터가 너무 큽니다.' }
-  if (!HUB_ACTIONS.has(action)) return { ok: false, error: '허용되지 않는 요청입니다.' }
+  if (!HUB_ACTIONS.has(action)) return {
+    ok: false,
+    code: 'LOCAL_ACTION_BLOCKED',
+    error: '프로그램에 필요한 요청이 누락되었습니다. 최신 버전으로 업데이트해 주세요.',
+  }
 
   const isReadAction = HUB_READ_ACTIONS.has(action)
   const maxAttempts = isReadAction ? 3 : 1

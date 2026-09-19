@@ -8,6 +8,7 @@ import {
 import { useAdminStore } from '../stores/adminStore'
 import { useAppStore } from '../stores/appStore'
 import { describeNeisSyncReport, getNeisSyncStatus, runNeisSync, type NeisSyncStatus } from '../services/sharedNeis'
+import { resetExecutivePassword } from '../services/schoolHub'
 
 const SHORTCUTS: Array<{ page: string; title: string; detail: string; icon: LucideIcon }> = [
   { page: 'school_hub', title: '공지·학교 공유 링크', detail: '학교 공지와 교직원 공용 링크를 관리합니다.', icon: Link2 },
@@ -39,6 +40,7 @@ interface HubDiagnosticResult {
 
 export default function AdminCenterPage() {
   const isAdmin = useAdminStore(state => state.isAdmin)
+  const adminPassword = useAdminStore(state => state.adminPassword)
   const config = useAppStore(state => state.config)
   const [status, setStatus] = useState<NeisSyncStatus | null>(null)
   const [busy, setBusy] = useState(false)
@@ -49,6 +51,15 @@ export default function AdminCenterPage() {
   const [message, setMessage] = useState('')
   const [warning, setWarning] = useState('')
   const [error, setError] = useState('')
+  const [executiveResetMessage, setExecutiveResetMessage] = useState('')
+
+  const resetExecutive = async (viewerName: string) => {
+    setExecutiveResetMessage('')
+    try {
+      await resetExecutivePassword(viewerName, adminPassword)
+      setExecutiveResetMessage(`${viewerName} 계정의 추가 비밀번호를 초기값으로 되돌렸습니다.`)
+    } catch (cause) { setExecutiveResetMessage(cause instanceof Error ? cause.message : String(cause)) }
+  }
 
   const refreshStatus = async () => {
     setError('')
@@ -221,6 +232,13 @@ export default function AdminCenterPage() {
             <RefreshCw size={14} className={checkingUpdate ? 'animate-spin' : ''} />{checkingUpdate ? '확인 중...' : '지금 업데이트 확인'}
           </button>
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
+        <h2 className="flex items-center gap-2 font-black text-slate-950"><ShieldCheck size={18} className="text-emerald-700" />교장·교감 추가 비밀번호 관리</h2>
+        <p className="mt-1 text-xs font-semibold text-slate-600">본인이 비밀번호를 잊은 경우에만 초기값으로 되돌립니다. 비밀번호 값은 기록하지 않습니다.</p>
+        <div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={() => void resetExecutive('류희열')} className="btn-secondary">교장 계정 초기화</button><button type="button" onClick={() => void resetExecutive('이승훈')} className="btn-secondary">교감 계정 초기화</button></div>
+        {executiveResetMessage && <p className="mt-3 rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-800">{executiveResetMessage}</p>}
       </section>
 
       <section>

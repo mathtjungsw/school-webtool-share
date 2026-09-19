@@ -14,6 +14,7 @@ export default function App() {
   const fetchNotices = useNoticeStore(s => s.fetchNotices)
   const authReady = useAuthStore(state => state.ready)
   const authenticated = useAuthStore(state => state.authenticated)
+  const executiveExpiresAt = useAuthStore(state => state.executiveExpiresAt)
   const bootstrapAuth = useAuthStore(state => state.bootstrap)
 
   useEffect(() => {
@@ -49,14 +50,16 @@ export default function App() {
 
   useEffect(() => {
     if (!authenticated) return
-    const remaining = Date.parse(useAuthStore.getState().expiresAt) - Date.now()
+    const state = useAuthStore.getState()
+    const expiryCandidates = [state.expiresAt, state.executiveExpiresAt].filter(Boolean).map(value => Date.parse(value)).filter(Number.isFinite)
+    const remaining = Math.min(...expiryCandidates) - Date.now()
     if (remaining <= 0) {
       void useAuthStore.getState().logout()
       return
     }
     const timer = window.setTimeout(() => void useAuthStore.getState().logout(), remaining)
     return () => window.clearTimeout(timer)
-  }, [authenticated])
+  }, [authenticated, executiveExpiresAt])
 
   useEffect(() => {
     if (!authenticated || !config.schoolHubUrl) return

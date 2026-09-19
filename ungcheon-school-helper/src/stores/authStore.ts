@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { clearSchoolHubSessionCache, getSharedStaffRoster, preloadSchoolHubCache } from '../services/schoolHub'
+import { clearSchoolHubSessionCache, getSharedStaffRoster, preloadSchoolHubCache, verifyExecutive, type ExecutiveRole } from '../services/schoolHub'
 import { useAppStore } from './appStore'
 
 const SESSION_NAME_KEY = 'pilotLogin.teacherName'
@@ -13,9 +13,18 @@ interface AuthState {
   expiresAt: string
   error: string
   loading: boolean
+  executiveRole: ExecutiveRole | null
+  executiveAccessToken: string
+  executiveExpiresAt: string
   bootstrap: () => Promise<void>
-  login: (name: string) => Promise<boolean>
+  login: (name: string, executivePassword?: string) => Promise<boolean>
   logout: () => Promise<void>
+}
+
+export function executiveRoleForName(name: string): ExecutiveRole | null {
+  if (name.trim() === '류희열') return 'principal'
+  if (name.trim() === '이승훈') return 'vicePrincipal'
+  return null
 }
 
 function isFuture(value: unknown) {
@@ -30,6 +39,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   expiresAt: '',
   error: '',
   loading: false,
+  executiveRole: null,
+  executiveAccessToken: '',
+  executiveExpiresAt: '',
 
   bootstrap: async () => {
     if (!window.electron) {
@@ -42,7 +54,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     ])
     const teacherName = String(savedName ?? '').trim()
     const expiresAt = String(savedExpiresAt ?? '')
-    if (teacherName && isFuture(expiresAt)) {
+    if (teacherName && isFuture(expiresAt) && !executiveRoleForName(teacherName)) {
       if (useAppStore.getState().config.teacherName !== teacherName) {
         await useAppStore.getState().saveConfig({ teacherName })
       }
@@ -54,10 +66,10 @@ export const useAuthStore = create<AuthState>((set) => ({
       window.electron.configDelete(SESSION_NAME_KEY),
       window.electron.configDelete(SESSION_EXPIRES_KEY),
     ])
-    set({ ready: true, authenticated: false, teacherName: '', expiresAt: '' })
+    set({ ready: true, authenticated: false, teacherName: '', expiresAt: '', executiveRole: null, executiveAccessToken: '', executiveExpiresAt: '' })
   },
 
-  login: async (name) => {
+  login: async (name, executivePassword = '') => {
     const teacherName = name.trim()
     if (!teacherName) {
       set({ error: '이름을 입력해 주세요.' })
@@ -70,13 +82,30 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ error: '교직원 명렬에 등록된 이름과 일치하지 않습니다.' })
         return false
       }
+      const expectedRole = executiveRoleForName(teacherName)
+      let executiveSession = null
+      if (expectedRole) {
+        if (!executivePassword) {
+          set({ error: '추가 비밀번호를 입력해 주세요.' })
+          return false
+        }
+        executiveSession = await verifyExecutive(teacherName, executivePassword)
+      }
       const expiresAt = new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000).toISOString()
       await Promise.all([
         window.electron.configSet(SESSION_NAME_KEY, teacherName),
         window.electron.configSet(SESSION_EXPIRES_KEY, expiresAt),
         useAppStore.getState().saveConfig({ teacherName }),
       ])
-      set({ authenticated: true, teacherName, expiresAt, error: '' })
+      set({
+        authenticated: true,
+        teacherName,
+        expiresAt,
+        error: '',
+        executiveRole: executiveSession?.role ?? null,
+        executiveAccessToken: executiveSession?.accessToken ?? '',
+        executiveExpiresAt: executiveSession?.expiresAt ?? '',
+      })
       window.electron?.notifyAuthChanged()
       void preloadSchoolHubCache(teacherName)
       return true
@@ -94,7 +123,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       window.electron?.configDelete(SESSION_NAME_KEY),
       window.electron?.configDelete(SESSION_EXPIRES_KEY),
     ])
-    set({ authenticated: false, teacherName: '', expiresAt: '', error: '' })
+    set({ authenticated: false, teacherName: '', expiresAt: '', error: '', executiveRole: null, executiveAccessToken: '', executiveExpiresAt: '' })
     window.electron?.notifyAuthChanged()
   },
 }))

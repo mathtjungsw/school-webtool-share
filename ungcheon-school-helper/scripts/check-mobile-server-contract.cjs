@@ -108,6 +108,7 @@ function harness(options = {}) {
     CacheService: { getScriptCache: () => ({
       get: key => { cacheKeys.push(key); if (failCacheRead) throw new Error('cache read failure'); return cache.get(key) || null; },
       put: (key, value, ttl) => { assert.equal(ttl, 60); if (failCacheWrite) throw new Error('cache write failure'); cache.set(key, value); },
+      remove: key => cache.delete(key),
     }) },
     ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: text => ({ setMimeType: () => JSON.parse(text) }) },
     SpreadsheetApp: { openById: id => { if (failSources.has(id)) throw new Error('synthetic unavailable source'); if (!books[id]) throw new Error('unexpected source'); return books[id]; } },
@@ -257,6 +258,22 @@ test('mobile response excludes full student and forbidden NEIS datasets', () => 
   assert.deepEqual(Object.keys(result.data).sort(), ['attendanceSummaries', 'committeeEvents', 'contractVersion', 'events', 'fetchedAt', 'meals', 'servedAt', 'sourceStatus', 'teacherTimetable', 'timetableChanges', 'timetableOverrides', 'todayMeals']);
 });
 
+test('executive menu uses a separate expiring server session without touching mobile credentials', () => {
+  const h = harness();
+  h.rows.교원명렬.push({ id: 'principal-1', name: '류희열', position: '교장' });
+  const mobilePasswordHash = h.properties.get('UNG_MOBILE_SHARED_PASSWORD_HASH');
+  const login = h.post({ action: 'verifyExecutive', viewerName: '류희열', password: String(0).repeat(4) });
+  assert.equal(login.ok, true);
+  assert.equal(login.data.role, 'principal');
+  assert.ok(login.data.accessToken);
+  const protectedBundle = h.post({ action: 'getExecutiveScheduleBundle', viewerName: '류희열', accessToken: login.data.accessToken });
+  assert.equal(protectedBundle.ok, true);
+  assert.equal(protectedBundle.data.viewerName, '류희열');
+  assert.equal(protectedBundle.data.timetable.teachers.length, 2);
+  assert.equal(h.properties.get('UNG_MOBILE_SHARED_PASSWORD_HASH'), mobilePasswordHash);
+  assert.equal(h.post({ action: 'getExecutiveScheduleBundle', viewerName: '류희열', accessToken: '' }).code, 'EXECUTIVE_SESSION_EXPIRED');
+});
+
 test('attendance uses the actual third-grade course roster and reports partial homeroom completion', () => {
   const makeStudent = (className, number, name, teacher = '테스트교사') => ({ payloadJson: JSON.stringify({
     student: { studentId: `3${className}${String(number).padStart(2, '0')}`, name, grade: '3', className: String(className), number: String(number) },
@@ -286,6 +303,52 @@ test('attendance uses the actual third-grade course roster and reports partial h
   const text = JSON.stringify(bundle);
   for (const forbidden of ['studentId', 'payloadJson', 'selections', '비수강학생', '다른교사학생']) assert.equal(text.includes(forbidden), false, forbidden);
   assert.ok(h.readNames.includes('학생시간표'));
+});
+
+test('attendance follows an approved exchange course roster instead of the displayed teacher period', () => {
+  const h = harness({
+    now: '2026-08-31T03:00:00Z',
+    studentTimetableRows: [{ payloadJson: JSON.stringify({
+      student: { name: '교체수강생', grade: '3', className: '2', number: '4' },
+      slots: { 화2: { subject: '기하', teacher: '테스트교사', classroom: '수학실' } },
+    }) }],
+    attendanceValues: [
+      ['2026-08-31 (월)', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['', '', false, '', '', true, '', '', true, '', '', true, '', '', true, '', '', true, '', '', true],
+      ['1반', '이름', '비고', '2반', '이름', '비고', '3반', '이름', '비고', '4반', '이름', '비고', '5반', '이름', '비고', '6반', '이름', '비고', '7반', '이름', '비고'],
+      ['', '', '', 4, '교체수강생', '병결', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ],
+  });
+  h.rows.교환대강반영 = [{ id: 'exchange-course', kind: 'exchange', status: 'approved', requesterName: '다른교사', targetTeacherName: '테스트교사',
+    originalTeacher: '다른교사', replacementTeacher: '테스트교사', originalDate: '2026-08-31', replacementDate: '2026-09-01',
+    originalSlotIndex: 0, replacementSlotIndex: 8, originalClass: '301', originalSubject: '국어', replacementClass: '302', replacementSubject: '기하' }];
+  const summaries = h.post(h.request()).data.attendanceSummaries;
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0].period, 1);
+  assert.equal(summaries[0].changeType, 'exchange');
+  assert.equal(summaries[0].entries[0].name, '교체수강생');
+});
+
+test('attendance moves with a pulled course and disappears from its original slot', () => {
+  const h = harness({
+    now: '2026-08-31T03:00:00Z',
+    studentTimetableRows: [{ payloadJson: JSON.stringify({
+      student: { name: '당김수강생', grade: '3', className: '3', number: '5' },
+      slots: { 월2: { subject: '미적분', teacher: '테스트교사', classroom: '303' } },
+    }) }],
+    attendanceValues: [
+      ['2026-08-31 (월)', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['', '', true, '', '', true, '', '', true, '', '', true, '', '', true, '', '', true, '', '', true],
+      ['1반', '이름', '비고', '2반', '이름', '비고', '3반', '이름', '비고', '4반', '이름', '비고', '5반', '이름', '비고', '6반', '이름', '비고', '7반', '이름', '비고'],
+      ['', '', '', '', '', '', 5, '당김수강생', '지각', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ],
+  });
+  h.rows.교환대강반영 = [];
+  const pulled = [{ id: 'pulled-test', date: '2026-08-31', period: 3, classLabel: '3-3', subject: '미적분', teacherName: '테스트교사', originalTeacherName: '테스트교사', originalSlot: '월2', originalDate: '2026-08-31' }];
+  const summaries = h.post(h.request({ attendancePulledLessons: pulled, attendanceContextVersion: 'pulled-test-v1' })).data.attendanceSummaries;
+  assert.deepEqual(summaries.map(item => item.period), [3]);
+  assert.equal(summaries[0].changeType, 'pulled');
+  assert.equal(summaries[0].entries[0].name, '당김수강생');
 });
 
 test('one failing source does not fail other data or cache the partial result', () => {
@@ -318,7 +381,7 @@ test('cache keys include version, viewer, range and Korea date; responses report
   assert.equal(h.post(h.request()).ok, true);
   const repeated = h.post(h.request()).data;
   Object.values(repeated.sourceStatus).forEach(status => assert.equal(status.mode, 'response-cache'));
-  assert.match(h.cacheKeys[0], new RegExp(`^mobile:v${h.constants.version}:.*:20260830:2026-08-30:2026-09-12$`));
+  assert.match(h.cacheKeys[0], new RegExp(`^mobile:v${h.constants.version}:.*:20260830:2026-08-30:2026-09-12:`));
   h.advance(24 * 3600000);
   const nextDay = h.post(h.request()).data;
   assert.deepEqual(nextDay.todayMeals.map(meal => meal.date), ['2026-08-31']);

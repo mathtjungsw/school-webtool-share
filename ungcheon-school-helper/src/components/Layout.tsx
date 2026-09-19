@@ -7,6 +7,7 @@ import WorkAssistantSearch from './WorkAssistantSearch'
 import Dashboard from '../pages/Dashboard'
 import { useAppStore } from '../stores/appStore'
 import { useAdminStore } from '../stores/adminStore'
+import { useAuthStore } from '../stores/authStore'
 
 const NeisPage = lazy(() => import('../pages/NeisPage'))
 const CalendarPage = lazy(() => import('../pages/CalendarPage'))
@@ -48,6 +49,8 @@ const AdminCenterPage = lazy(() => import('../pages/AdminCenterPage'))
 const VolunteerWorkPage = lazy(() => import('../pages/VolunteerWorkPage'))
 const RecordPrivacyBlindPage = lazy(() => import('../pages/RecordPrivacyBlindPage'))
 const AuditEvidenceCenterPage = lazy(() => import('../pages/AuditEvidenceCenterPage'))
+const ExecutiveCurrentClassesPage = lazy(() => import('../pages/ExecutiveSchedulePage'))
+const ExecutiveTeacherSchedulePage = lazy(() => import('../pages/ExecutiveSchedulePage').then(module => ({ default: module.ExecutiveTeacherSchedulePage })))
 // 시험 기능은 번들에 포함해 검증하되 사이드바·검색 메뉴에는 노출하지 않습니다.
 const FutureOperationsPage = lazy(() => import('../features/futureOperations/FutureOperationsPage'))
 
@@ -90,6 +93,8 @@ const PAGES: Record<string, React.ComponentType> = {
   volunteer_work: VolunteerWorkPage,
   record_privacy_blind: RecordPrivacyBlindPage,
   audit_evidence: AuditEvidenceCenterPage,
+  executive_live_classes: ExecutiveCurrentClassesPage,
+  executive_teacher_schedule: ExecutiveTeacherSchedulePage,
   future_operations: FutureOperationsPage,
 }
 
@@ -105,11 +110,13 @@ export default function Layout() {
   const page = history[historyIndex]
   const logs = useAppStore(state => state.logs)
   const isAdmin = useAdminStore(state => state.isAdmin)
+  const executiveRole = useAuthStore(state => state.executiveRole)
   const logErrorCount = logs.filter(log => log.level === 'error').length
   const Page = PAGES[page]
 
   const navigate = (id: string) => {
     if (id === 'admin_center' && !isAdmin) return
+    if (id.startsWith('executive_') && !executiveRole) return
     if (id === page) return
     const next = [...history.slice(0, historyIndex + 1), id].slice(-MAX_HISTORY)
     setHistory(next)
@@ -122,6 +129,13 @@ export default function Layout() {
       setHistoryIndex(0)
     }
   }, [isAdmin, page])
+
+  useEffect(() => {
+    if (!executiveRole && page.startsWith('executive_')) {
+      setHistory([INITIAL_PAGE])
+      setHistoryIndex(0)
+    }
+  }, [executiveRole, page])
 
   useEffect(() => {
     const openAssistant = (event: KeyboardEvent) => {
