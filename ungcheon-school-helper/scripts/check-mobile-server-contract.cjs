@@ -305,6 +305,28 @@ test('attendance uses the actual third-grade course roster and reports partial h
   assert.ok(h.readNames.includes('학생시간표'));
 });
 
+test('desktop widget receives the same minimal third-grade attendance without a mobile session payload', () => {
+  const h = harness({
+    now: '2026-08-31T03:00:00Z',
+    studentTimetableRows: [{ payloadJson: JSON.stringify({
+      student: { name: '자습학생', grade: '3', className: '2', number: '8' },
+      slots: { 월1: { subject: '기하', teacher: '테스트교사', classroom: '수학실' } },
+    }) }],
+    attendanceValues: [
+      ['2026-08-31 (월)', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['', '', true, '', '', true, '', '', true, '', '', true, '', '', true, '', '', true, '', '', true],
+      ['1반', '이름', '비고', '2반', '이름', '비고', '3반', '이름', '비고', '4반', '이름', '비고', '5반', '이름', '비고', '6반', '이름', '비고', '7반', '이름', '비고'],
+      ['', '', '', 8, '자습학생', '도서관 자습', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ],
+  });
+  const result = h.post({ action: 'getWidgetAttendanceSummaries', viewerName: '테스트교사', date: '2026-08-31', attendancePulledLessons: [], attendanceContextVersion: 'widget-test-v1' });
+  assert.equal(result.ok, true);
+  assert.equal(result.data.attendanceSummaries.length, 1);
+  assert.deepEqual(result.data.attendanceSummaries[0].entries, [{ className: '2', number: '8', name: '자습학생', remark: '도서관 자습' }]);
+  const responseText = JSON.stringify(result.data);
+  for (const forbidden of ['studentId', 'payloadJson', 'slots', 'selections', 'accessToken', 'password']) assert.equal(responseText.includes(forbidden), false, forbidden);
+});
+
 test('attendance follows an approved exchange course roster instead of the displayed teacher period', () => {
   const h = harness({
     now: '2026-08-31T03:00:00Z',

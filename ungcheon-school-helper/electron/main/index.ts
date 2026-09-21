@@ -999,6 +999,7 @@ const HUB_ACTIONS = new Set([
   'applyTimetableChangeForRequester',
   'cancelTimetableChange',
   'getTimetableOverrides',
+  'getWidgetAttendanceSummaries',
   'saveTimetableOverride',
   'deactivateTimetableOverride',
   'getNeisSyncStatus',
@@ -1024,6 +1025,7 @@ const HUB_READ_ACTIONS = new Set([
   'listCommitteeState',
   'listTimetableChanges',
   'getTimetableOverrides',
+  'getWidgetAttendanceSummaries',
   'getNeisSyncStatus',
   'getNeisSnapshot',
 ])
@@ -1042,6 +1044,7 @@ const HUB_LARGE_DATA_ACTIONS = new Set([
   'replaceNeisSnapshot',
   'getStudentTimetable',
   'getStudentRoster',
+  'getWidgetAttendanceSummaries',
   'listCommitteeState',
   'saveCommitteeMembers',
   'addCommitteeEvent',

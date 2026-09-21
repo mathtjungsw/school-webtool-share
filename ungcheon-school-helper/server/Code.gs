@@ -42,7 +42,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 48;
+const MOBILE_SERVICE_VERSION = 49;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -395,6 +395,17 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'v1.1.34',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.34 · 위젯 3학년 이동수업 출결과 자습 구분',
+    body: [
+      '· 바탕화면 위젯의 오늘 시간표에서도 3학년 수업 출결을 확인하며, 승인·반영된 교체·대강·당김수업과 일일 시간표 예외를 실제 수업 교시에 맞춰 표시합니다.',
+      '· 위젯 출결 버튼은 입력 상태와 실제 출결·자습 인원을 구분하고, 버튼을 누르면 반·번호·이름·비고를 읽기 전용으로 확인할 수 있습니다.',
+      '· 모바일 PWA와 위젯에서 출결 비고에 자습만 있는 학생은 결석이 아닌 장소 이동으로 분리해 연두색으로 표시합니다.',
+      '· 기존 모바일 공개 주소, Apps Script 고정 주소, 72시간 로그인, 교장·교감 메뉴와 이전 릴리스 안내를 모두 유지합니다.'
+    ].join('\n'),
+    date: '2026-09-21'
+  },
   {
     key: 'v1.1.33',
     title: '[업데이트] 웅천고 업무도우미 v1.1.33 · 교장·교감 조회 메뉴와 변경수업 출결',
@@ -792,6 +803,7 @@ const GET_READ_ACTIONS = [
   'listCommitteeState',
   'listTimetableChanges',
   'getTimetableOverrides',
+  'getWidgetAttendanceSummaries',
   'getNeisSyncStatus',
   'getNeisSnapshot'
 ];
@@ -824,6 +836,7 @@ function doPost(e) {
       return json_({ ok: true, data: mobileCreateSession_(mobileViewer) });
     }
     if (action === 'getMobileScheduleBundle') return json_({ ok: true, data: getMobileScheduleBundle_(body) });
+    if (action === 'getWidgetAttendanceSummaries') return json_({ ok: true, data: getWidgetAttendanceSummaries_(body) });
     if (action === 'verifyExecutive') return json_({ ok: true, data: executiveVerify_(body) });
     if (action === 'getExecutiveScheduleBundle') return json_({ ok: true, data: executiveScheduleBundle_(body) });
     if (action === 'changeExecutivePassword') return json_({ ok: true, data: executiveChangePassword_(body) });
@@ -3502,6 +3515,35 @@ function mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverr
     if (summary) summaries.push(summary);
   }
   return summaries;
+}
+
+function getWidgetAttendanceSummaries_(body) {
+  const viewerName = mobileAssertViewer_(body.viewerName);
+  const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+  const date = clean_(body.date, 10);
+  if (date !== today) throw new Error('위젯 출결은 오늘 자료만 조회할 수 있습니다.');
+  const attendancePulledLessons = (Array.isArray(body.attendancePulledLessons) ? body.attendancePulledLessons : []).slice(0, 100);
+  const attendanceContextVersion = clean_(body.attendanceContextVersion, 100);
+  const cacheKey = 'widget-attendance:v' + MOBILE_SERVICE_VERSION + ':' + sha256_(viewerName).slice(0, 12) + ':' + date.replace(/-/g, '') + ':' + sha256_(attendanceContextVersion).slice(0, 8);
+  if (!body.force) {
+    try {
+      const cached = CacheService.getScriptCache().get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch (ignore) {}
+  }
+  const timetableChanges = listTimetableChanges_({ viewerName: viewerName, fromDate: date, toDate: date, includeSchool: false }).filter(function(change) {
+    if (change.status === 'cancelled' || change.status === 'rejected') return false;
+    return change.status === 'approved' || Boolean(change.requesterAppliedAt && change.requesterName === viewerName);
+  });
+  const timetableOverrides = listTimetableOverrides_({ includeInactive: false }).filter(function(item) {
+    return item.date === date || item.sourceDate === date;
+  });
+  const result = {
+    attendanceSummaries: mobileAttendanceSummaries_(viewerName, date, date, timetableOverrides, timetableChanges, attendancePulledLessons),
+    fetchedAt: new Date().toISOString()
+  };
+  try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 300); } catch (ignore) {}
+  return result;
 }
 
 function mobileSourceCount_(value) {

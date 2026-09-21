@@ -4,6 +4,7 @@ import { buildWidgetTimedSchedule, widgetClockLabel, type WidgetTimedEvent, type
 import './widgetTimedSchedule.css'
 import { WidgetModuleHeader, WidgetModuleBody } from './WidgetModuleDisclosure'
 import { getWidgetPeriodTiming } from '../../services/widgetViewModel'
+import type { WidgetAttendanceEntry, WidgetAttendanceSummary } from '../../services/schoolHub'
 
 export const WIDGET_TIMETABLE_ROW_HEIGHT = 26
 export const WIDGET_TIMETABLE_TAG_HEIGHT = 22
@@ -21,6 +22,7 @@ export interface WidgetTimetableProps {
   timer: { currentPeriod: number | null; nextPeriod: number | null; countdown?: string; remainingMinutes?: number | null }
   syncing?: boolean
   onRefresh?: () => void
+  attendance?: readonly WidgetAttendanceSummary[]
 }
 function tone(kind: string) {
   if (kind === 'committee') return 'violet'
@@ -29,8 +31,30 @@ function tone(kind: string) {
   return 'blue'
 }
 
-export default function WidgetTimetable({ date, lessons, events, now, rule, timetableUnavailable = false, syncing, onRefresh }: WidgetTimetableProps) {
-  const [detail, setDetail] = useState<{ date: string; keys: string[]; period?: number } | null>(null)
+const ATTENDANCE_EXCEPTION_PATTERN = /(결석|지각|조퇴|결과|병결|미인정|출석\s*인정|공결|체험학습|위탁교육)/
+function isSelfStudyEntry(entry: WidgetAttendanceEntry) {
+  const remark = String(entry.remark ?? '').trim()
+  return remark.includes('자습') && !ATTENDANCE_EXCEPTION_PATTERN.test(remark)
+}
+function attendanceCounts(summary: WidgetAttendanceSummary) {
+  const selfStudyCount = summary.entries.filter(isSelfStudyEntry).length
+  const listedAttendanceCount = summary.entries.length - selfStudyCount
+  return {
+    attendanceCount: Math.max(listedAttendanceCount, summary.flaggedCount - selfStudyCount, 0),
+    selfStudyCount,
+  }
+}
+function attendanceButtonLabel(summary: WidgetAttendanceSummary) {
+  if (summary.requiresReview) return '확인 필요'
+  if (summary.state === 'pending') return '입력 전'
+  const { attendanceCount, selfStudyCount } = attendanceCounts(summary)
+  const details = [attendanceCount ? `출결${attendanceCount}` : '', selfStudyCount ? `자습${selfStudyCount}` : ''].filter(Boolean).join('·')
+  if (summary.state === 'partial') return details ? `부분·${details}` : '부분 입력'
+  return details || '이상 없음'
+}
+
+export default function WidgetTimetable({ date, lessons, events, now, rule, timetableUnavailable = false, syncing, onRefresh, attendance = [] }: WidgetTimetableProps) {
+  const [detail, setDetail] = useState<{ date: string; keys: string[]; period?: number; attendancePeriod?: number } | null>(null)
   const detailsRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!detail) return
@@ -49,6 +73,9 @@ export default function WidgetTimetable({ date, lessons, events, now, rule, time
   const minute = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60
   const visibleDetails = detail?.date === date ? model.events.filter(event => detail.keys.includes(event.key)) : []
   const visibleLesson = detail?.date === date && instruction && available ? model.segments.find(segment => segment.lesson?.period === detail.period)?.lesson : undefined
+  const visibleAttendance = detail?.date === date && detail.attendancePeriod
+    ? attendance.find(summary => summary.period === detail.attendancePeriod)
+    : undefined
   const show = (items: NormalizedWidgetTimedEvent[]) => setDetail({ date, keys: items.map(event => event.key) })
   const nextActual = model.segments.find(segment => segment.lesson?.value && segment.start > minute)
   const currentSegment = model.segments.find(segment => segment.kind === 'lesson' && minute >= segment.start && minute < segment.end)
@@ -74,14 +101,29 @@ export default function WidgetTimetable({ date, lessons, events, now, rule, time
         const height = WIDGET_TIMETABLE_ROW_HEIGHT
         const laneCount = Math.max(1, segment.laneCount)
         const pieceEvents = segment.pieces.map(piece => piece.event)
+        const attendanceSummary = segment.lesson
+          ? attendance.find(summary => summary.period === segment.lesson?.period)
+          : undefined
+        const attendanceTone = attendanceSummary
+          ? attendanceSummary.requiresReview || attendanceSummary.state === 'pending'
+            ? 'pending'
+            : attendanceCounts(attendanceSummary).attendanceCount > 0
+              ? 'alert'
+              : attendanceCounts(attendanceSummary).selfStudyCount > 0
+                ? 'self-study'
+                : 'clear'
+          : ''
         return <div className={`wts-row ${current ? 'wts-current' : ''} ${next ? 'wts-next' : ''} ${segment.kind !== 'lesson' ? 'wts-gap' : ''}`} key={segment.id} style={{ minHeight: height }}>
-          <button type="button" className="wts-lesson" disabled={segment.kind !== 'lesson' || !segment.lesson} onClick={() => setDetail({ date, keys: [], period: segment.lesson?.period })} title={[segment.label, ['lesson', 'lunch', 'break'].includes(segment.kind) ? `${widgetClockLabel(segment.start)}~${widgetClockLabel(segment.end)}` : '', segment.lesson?.value, segment.lesson?.badge].filter(Boolean).join(' · ')} aria-label={`${segment.label} ${widgetClockLabel(segment.start)} ${segment.lesson?.value || (segment.kind === 'lesson' ? '공강' : '')} 상세 보기`}>
-            <b className="wts-period">{segment.label}</b><span className="wts-clock">{segment.kind === 'lesson' ? widgetClockLabel(segment.start) : (segment.kind === 'lunch' || segment.kind === 'break') ? `${widgetClockLabel(segment.start)}~${widgetClockLabel(segment.end)}` : ''}</span>
-            {segment.kind === 'lesson' && <strong>{segment.lesson ? (segment.lesson.value.replace(/\r?\n/g, ' · ') || '공강') : '시간표 없음'}</strong>}
-            {segment.lesson?.badge && <span className="wts-change-badge" title={segment.lesson.badge} aria-label={segment.lesson.badge}>변경</span>}
-            {current && segment.kind === 'lesson' && <small className="wts-countdown" title={`현재 ${Math.max(0, Math.ceil(segment.end - minute))}분 남음`} aria-label={`현재 ${Math.max(0, Math.ceil(segment.end - minute))}분 남음`}>{Math.max(0, Math.ceil(segment.end - minute))}분</small>}
-            {next && <small className="wts-countdown" title={`다음 ${Math.max(0, Math.ceil(segment.start - minute))}분 후`} aria-label={`다음 ${Math.max(0, Math.ceil(segment.start - minute))}분 후`}>{Math.max(0, Math.ceil(segment.start - minute))}분후</small>}
-          </button>
+          <div className="wts-lesson-cell">
+            <button type="button" className="wts-lesson" disabled={segment.kind !== 'lesson' || !segment.lesson} onClick={() => setDetail({ date, keys: [], period: segment.lesson?.period })} title={[segment.label, ['lesson', 'lunch', 'break'].includes(segment.kind) ? `${widgetClockLabel(segment.start)}~${widgetClockLabel(segment.end)}` : '', segment.lesson?.value, segment.lesson?.badge].filter(Boolean).join(' · ')} aria-label={`${segment.label} ${widgetClockLabel(segment.start)} ${segment.lesson?.value || (segment.kind === 'lesson' ? '공강' : '')} 상세 보기`}>
+              <b className="wts-period">{segment.label}</b><span className="wts-clock">{segment.kind === 'lesson' ? widgetClockLabel(segment.start) : (segment.kind === 'lunch' || segment.kind === 'break') ? `${widgetClockLabel(segment.start)}~${widgetClockLabel(segment.end)}` : ''}</span>
+              {segment.kind === 'lesson' && <strong>{segment.lesson ? (segment.lesson.value.replace(/\r?\n/g, ' · ') || '공강') : '시간표 없음'}</strong>}
+              {segment.lesson?.badge && <span className="wts-change-badge" title={segment.lesson.badge} aria-label={segment.lesson.badge}>변경</span>}
+              {current && segment.kind === 'lesson' && <small className="wts-countdown" title={`현재 ${Math.max(0, Math.ceil(segment.end - minute))}분 남음`} aria-label={`현재 ${Math.max(0, Math.ceil(segment.end - minute))}분 남음`}>{Math.max(0, Math.ceil(segment.end - minute))}분</small>}
+              {next && <small className="wts-countdown" title={`다음 ${Math.max(0, Math.ceil(segment.start - minute))}분 후`} aria-label={`다음 ${Math.max(0, Math.ceil(segment.start - minute))}분 후`}>{Math.max(0, Math.ceil(segment.start - minute))}분후</small>}
+            </button>
+            {attendanceSummary && <button type="button" className={`wts-attendance-button wts-attendance-${attendanceTone}`} onClick={() => setDetail({ date, keys: [], attendancePeriod: attendanceSummary.period })} aria-label={`${segment.label} 3학년 수강생 출결 ${attendanceButtonLabel(attendanceSummary)}`}>{attendanceButtonLabel(attendanceSummary)}</button>}
+          </div>
           <div className="wts-events" style={{ minHeight: height }} aria-label={`${segment.label} 일정`}>
             {segment.pieces.map(piece => {
               const event = piece.event
@@ -103,10 +145,20 @@ export default function WidgetTimetable({ date, lessons, events, now, rule, time
       })}
     </div>
     {!model.events.length && <p className="wts-empty">오늘 시간 지정 일정이 없습니다.</p>}
-    {(visibleDetails.length > 0 || visibleLesson) && <div ref={detailsRef} className="wts-details" role="region" aria-label="일정 상세" aria-live="polite">
-      <div className="wts-detail-head"><b>일정 상세 · 읽기 전용</b><button type="button" aria-label="일정 상세 닫기" onClick={() => setDetail(null)}><X size={14} /></button></div>
+    {(visibleDetails.length > 0 || visibleLesson || visibleAttendance) && <div ref={detailsRef} className="wts-details" role="region" aria-label={visibleAttendance ? '3학년 수강생 출결 상세' : '일정 상세'} aria-live="polite">
+      <div className="wts-detail-head"><b>{visibleAttendance ? `${visibleAttendance.period}교시 출결 · 읽기 전용` : '일정 상세 · 읽기 전용'}</b><button type="button" aria-label="일정 상세 닫기" onClick={() => setDetail(null)}><X size={14} /></button></div>
       {visibleDetails.map(event => <article key={event.key}><strong>{event.title}</strong><span>{event.date} · {event.timeLabel}{event.point ? ' (지정 시각)' : ''}</span>{event.location && <span>장소 · {event.location}</span>}{event.meta && <p>{event.meta}</p>}</article>)}
       {visibleLesson && <article><strong>{visibleLesson.period}교시 · 수업 상세</strong><span>{date} · {model.segments.filter(segment => segment.lesson === visibleLesson).map(segment => `${widgetClockLabel(segment.start)}~${widgetClockLabel(segment.end)}`)}</span><p>{visibleLesson.value.replace(/\r?\n/g, ' · ') || '공강'}</p>{visibleLesson.badge && <span>{visibleLesson.badge}</span>}</article>}
+      {visibleAttendance && <article className="wts-attendance-detail">
+        <strong>{visibleAttendance.courseNames.join(' · ') || '3학년 수업'} · {visibleAttendance.classrooms.join(' · ')}</strong>
+        <span>{visibleAttendance.classStatus.map(item => `${item.className}반 ${item.complete ? '입력 완료' : '입력 전'}`).join(' · ')}</span>
+        {visibleAttendance.originalLabel && <span>{visibleAttendance.changeType === 'pulled' ? '당김수업' : visibleAttendance.changeType === 'exchange' ? '교체수업' : visibleAttendance.changeType === 'substitution' ? '대강수업' : '시간표 예외'} · {visibleAttendance.originalLabel}</span>}
+        {visibleAttendance.requiresReview && <p className="wts-attendance-warning">출결 대상을 안전하게 확정하지 못했습니다. 원래 수업 자료를 확인해 주세요.</p>}
+        <div className="wts-attendance-list">{[...visibleAttendance.entries].sort((left, right) => Number(isSelfStudyEntry(left)) - Number(isSelfStudyEntry(right))).map(entry => {
+          const selfStudy = isSelfStudyEntry(entry)
+          return <div className={selfStudy ? 'self-study' : ''} key={`${entry.className}-${entry.number}-${entry.name}`}><b>{entry.className}반 {entry.number}번</b><strong>{entry.name}</strong><span>{entry.remark}{selfStudy && <small>자습 · 장소 이동</small>}</span></div>
+        })}{!visibleAttendance.entries.length && <p>현재 입력된 출결 비고가 없습니다.</p>}</div>
+      </article>}
     </div>}
     </WidgetModuleBody>
   </section>

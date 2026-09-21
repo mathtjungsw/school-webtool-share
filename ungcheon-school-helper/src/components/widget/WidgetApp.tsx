@@ -56,9 +56,11 @@ import { useNoticeStore } from "../../stores/noticeStore";
 import {
   getSchoolTimetable,
   getTimetableOverrides,
+  getWidgetAttendanceSummaries,
   listCommitteeState,
   listStaffChecklists,
   type CommitteeState,
+  type WidgetAttendanceSummary,
 } from "../../services/schoolHub";
 import { getSharedNeisSnapshot } from "../../services/sharedNeis";
 import {
@@ -465,6 +467,7 @@ export default function WidgetApp() {
   activeTeacherRef.current = auth.teacherName;
   const [now, setNow] = useState(new Date());
   const [day, setDay] = useState<CompositeTeacherDay | null>(null);
+  const [attendanceSummaries, setAttendanceSummaries] = useState<WidgetAttendanceSummary[]>([]);
   const [tomorrow, setTomorrow] = useState<TomorrowState>({
     date: addDaysYmd(ymd(), 1),
     continued: false,
@@ -548,6 +551,22 @@ export default function WidgetApp() {
     );
     const targetDate = previewTarget.target.date;
     const teacher = auth.teacherName;
+    const attendancePulledLessons = listPulledLessonsForTeacher(teacher, currentToday, currentToday)
+      .filter(item => item.originalTeacherName.trim() === teacher.trim())
+      .map(item => ({
+        id: item.id,
+        date: item.date,
+        period: item.period,
+        classLabel: item.classLabel,
+        subject: item.subject,
+        teacherName: item.teacherName,
+        originalTeacherName: item.originalTeacherName,
+        originalSlot: item.originalSlot,
+        originalDate: item.originalDate,
+      }));
+    const attendanceContextVersion = attendancePulledLessons
+      .map(item => [item.id, item.date, item.period, item.classLabel, item.subject, item.teacherName, item.originalTeacherName, item.originalDate, item.originalSlot].join(":"))
+      .join("|");
     const generation = ++remoteGenerationRef.current;
     setSyncing(true);
 
@@ -561,6 +580,7 @@ export default function WidgetApp() {
         committeeResult,
         supplementsResult,
         overridesResult,
+        attendanceResult,
       ] = await Promise.all([
         Promise.allSettled([getSchoolTimetable(force)]).then(result => result[0]),
         Promise.allSettled([
@@ -579,6 +599,15 @@ export default function WidgetApp() {
           ]),
         ]).then(result => result[0]),
         Promise.allSettled([getTimetableOverrides(false, force)]).then(result => result[0]),
+        Promise.allSettled([
+          getWidgetAttendanceSummaries(
+            teacher,
+            currentToday,
+            attendancePulledLessons,
+            attendanceContextVersion,
+            force,
+          ),
+        ]).then(result => result[0]),
       ]);
 
       if (generation !== remoteGenerationRef.current || teacher !== activeTeacherRef.current) return;
@@ -609,6 +638,9 @@ export default function WidgetApp() {
           { events: [], duties: [], failed: true },
         ];
       const overrides = overridesResult.status === "fulfilled" ? overridesResult.value : [];
+      setAttendanceSummaries(attendanceResult.status === "fulfilled"
+        ? attendanceResult.value.attendanceSummaries
+        : []);
 
       if (timetable) {
         setDay(buildCompositeTeacherDay(
@@ -715,6 +747,7 @@ export default function WidgetApp() {
         changesResult,
         snapshotResult,
         committeeResult,
+        attendanceResult,
       ].some(result => result.status === "rejected")
         || todaySupplement.failed
         || targetSupplement.failed);
@@ -760,6 +793,7 @@ export default function WidgetApp() {
     localGenerationRef.current += 1;
     setDataOwner(owner);
     setDay(null);
+    setAttendanceSummaries([]);
     setTomorrow({
       date: addDaysYmd(ymd(), 1),
       continued: false,
@@ -805,7 +839,7 @@ export default function WidgetApp() {
   useEffect(() => {
     if (!auth.authenticated || !auth.teacherName) return;
     void refresh(false);
-    const sync = window.setInterval(() => void refresh(false), 10 * 60_000);
+    const sync = window.setInterval(() => void refresh(false), 5 * 60_000);
     return () => clearInterval(sync);
   }, [auth.authenticated, auth.teacherName, refresh, today]);
 
@@ -1109,6 +1143,7 @@ export default function WidgetApp() {
 
   const timetableModule = (
     <WidgetTimetable date={today} lessons={day?.lessons ?? []} now={now} events={timedEvents}
+      attendance={attendanceSummaries}
       rule={day?.rule} timetableUnavailable={!day || timetableUnavailable} timer={timerView}
       syncing={syncing} onRefresh={() => void refresh(true)} />
   );

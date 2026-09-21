@@ -1,17 +1,20 @@
 .widget-timed-schedule{color:#172c42;min-width:0}
 .widget-timed-schedule .wts-notice,.widget-timed-schedule .wts-empty{font-size:11px;line-height:1.4;color:#475569;margin:4px 0}
-.wts-head,.wts-row{display:grid;grid-template-columns:minmax(0,1.16fr) minmax(0,1fr);gap:4px}
+.wts-head,.wts-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.9fr);gap:4px}
 .wts-head{font-size:10px;font-weight:700;color:#526478;padding:3px 4px}
 .wts-row{height:26px;position:relative;min-width:0;background:rgba(255,255,255,.66);box-shadow:inset 0 1px #dce5ee}
 .wts-row.wts-current{background:#edf6ff;box-shadow:inset 3px 0 #1675bd,inset 0 1px #dce5ee}
 .wts-row.wts-next{box-shadow:inset 3px 0 #798bc0,inset 0 1px #dce5ee}
-.widget-timed-schedule .wts-lesson{display:flex;align-items:center;gap:3px;min-width:0;height:26px;box-sizing:border-box;padding:1px 3px 1px 5px;line-height:1.2;border:0;background:transparent;text-align:left;color:#172c42;cursor:pointer;overflow:hidden;border-radius:0}
+.wts-lesson-cell{display:flex;align-items:center;min-width:0;height:26px;overflow:hidden}
+.widget-timed-schedule .wts-lesson{display:flex;align-items:center;gap:3px;flex:1 1 auto;min-width:0;height:26px;box-sizing:border-box;padding:1px 3px 1px 5px;line-height:1.2;border:0;background:transparent;text-align:left;color:#172c42;cursor:pointer;overflow:hidden;border-radius:0}
 .widget-timed-schedule .wts-lesson:disabled{opacity:1;cursor:default}
 .wts-period{flex:0 0 auto;white-space:nowrap;font-size:10px}
 .wts-clock{flex:0 0 auto;font-size:9px;color:#5b687a;white-space:nowrap;font-variant-numeric:tabular-nums}
 .wts-lesson>strong{flex:1 1 0;min-width:0;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:750}
 .wts-change-badge{flex:0 0 auto;font-size:9px;line-height:14px;border-radius:3px;padding:0 2px;color:#674493;background:#eee7f7;white-space:nowrap}
 .wts-countdown{flex:0 0 auto;font-size:9px;color:#155e85;font-weight:700;white-space:nowrap}
+.widget-timed-schedule .wts-attendance-button{flex:0 0 55px;max-width:55px;height:20px;margin-right:3px;padding:1px 3px;overflow:hidden;border:1px solid #cbd5e1;border-radius:999px;background:#f1f5f9;color:#475569;font-size:7px;font-weight:900;line-height:1.05;white-space:nowrap;text-overflow:ellipsis;cursor:pointer}
+.widget-timed-schedule .wts-attendance-alert{border-color:#f3a68e;background:#fff0ea;color:#a43b22}.widget-timed-schedule .wts-attendance-self-study{border-color:#8fc7a0;background:#e9f8ee;color:#24623d}.widget-timed-schedule .wts-attendance-clear{border-color:#9ac7b0;background:#edf8f1;color:#286044}.widget-timed-schedule .wts-attendance-pending{border-color:#d0d7de;background:#f4f6f7;color:#66727a}
 .wts-gap{background:#f5f8fb}.wts-gap .wts-clock{font-size:9px}.wts-gap .wts-period{font-size:10px}
 .wts-events{position:relative;min-width:0;border-left:1px solid #e0e8f0;isolation:isolate;height:26px;box-sizing:border-box;overflow:hidden}
 .wts-event-track{position:absolute;box-sizing:border-box;border-left:3px solid var(--wts-accent);background:var(--wts-soft);border-radius:4px;pointer-events:none;z-index:0}
@@ -26,5 +29,7 @@
 .wts-details{margin-top:5px;border:1px solid #bed0e4;border-radius:7px;padding:6px;background:#f8fbff;color:#20354b}
 .wts-detail-head{display:flex;justify-content:space-between;align-items:center;font-size:11px}.widget-timed-schedule .wts-detail-head button{background:#edf2f7;border:0;border-radius:4px;padding:4px;color:#334155;cursor:pointer}
 .wts-details article{border-top:1px solid #dce5ee;margin-top:5px;padding-top:5px;overflow-wrap:anywhere}.wts-details article>strong{display:block;font-size:12px}.wts-details article>span,.wts-details article>p{display:block;font-size:11px;line-height:1.4;margin:2px 0}
+.wts-attendance-warning{padding:5px 6px;border-radius:5px;background:#fff4d6;color:#8a560b;font-weight:750}
+.wts-attendance-list{display:grid;gap:3px;margin-top:6px}.wts-attendance-list>div{display:grid;grid-template-columns:58px minmax(52px,.75fr) minmax(84px,1.2fr);gap:5px;align-items:center;padding:5px;border-radius:6px;background:#f6f8fa;font-size:9px}.wts-attendance-list>div.self-study{border-left:3px solid #76b98a;background:#effbf2;color:#235e3b}.wts-attendance-list>div>b{color:#5c6978;font-size:8px}.wts-attendance-list>div>strong{font-size:9px}.wts-attendance-list>div>span{display:flex;flex-direction:column;align-items:flex-start;gap:2px}.wts-attendance-list>div small{padding:2px 4px;border-radius:999px;background:#d9f3df;color:#23623c;font-size:7px;font-weight:850}
 .widget-timed-schedule button:focus-visible{outline:2px solid #2563eb;outline-offset:-2px}
-@media(max-width:380px){.wts-head,.wts-row{grid-template-columns:minmax(0,1.16fr) minmax(0,1fr);gap:2px}.widget-timed-schedule .wts-lesson{gap:2px;padding-left:4px}.wts-event-label{gap:2px}}
+@media(max-width:380px){.wts-head,.wts-row{grid-template-columns:minmax(0,1.3fr) minmax(0,.9fr);gap:2px}.widget-timed-schedule .wts-lesson{gap:2px;padding-left:4px}.widget-timed-schedule .wts-attendance-button{flex-basis:49px;max-width:49px;font-size:6.5px}.wts-event-label{gap:2px}}

@@ -39,7 +39,7 @@ const APPROVED_RELEASE_CONSTANTS = new Map([
   ['TIMETABLE_OVERRIDE_SEED_KEY', '5ffc2cb372e23e04f63fa30a615dc5c18eba5709f9b5ff04568965b228a93fdc'],
   ['INITIAL_TIMETABLE_OVERRIDES_1_1_31', 'e6e660f720ecc08ef2d588df821ab0127b0e6aabc3c58e0faa3c0e4f321a486e'],
   ['OFFICIAL_NON_TEACHING_STAFF_2026', 'c130c10e1f5a7ffbb20f00838d3e69990462c3236f2f0c5055c59844cccd210e'],
-  ['GET_READ_ACTIONS', '071b10a88a80a12a051096a1aaff36d5c3743ebd8342bec06550f3b4846a9b3a'],
+  ['GET_READ_ACTIONS', 'cc5278385fc98c92d928b8b2d34e214773d53423870749e6ffaef400f982c8ea'],
 ])
 function sha256(value) { return crypto.createHash('sha256').update(String(value || '')).digest('hex') }
 function isApprovedReleaseDefinition(info, name, kind) {
@@ -53,7 +53,7 @@ const sourcePrinter = ts.createPrinter({ removeComments: true, newLine: ts.NewLi
 function canonicalNode(node, ast) { return sourcePrinter.printNode(ts.EmitHint.Unspecified, node, ast).trim() }
 // Integration changes may add mobile helpers, revise routing, and merge notices.
 // Everything else must preserve the desktop definition approved in origin/main.
-function isIntegrationFunction(name) { return name.startsWith('mobile') || name.startsWith('executive') || ['doGet', 'doPost', 'getMobileScheduleBundle_'].includes(name) }
+function isIntegrationFunction(name) { return name.startsWith('mobile') || name.startsWith('executive') || ['doGet', 'doPost', 'getMobileScheduleBundle_', 'getWidgetAttendanceSummaries_'].includes(name) }
 function isIntegrationConstant(name) { return name.startsWith('MOBILE_') || name.startsWith('EXECUTIVE_') || name === 'RELEASE_NOTES' }
 function literal(node) {
   if (!node) return undefined
@@ -149,11 +149,11 @@ function assertSessionPreservation(info) {
   if (!result?.verified || !result?.accessToken || hours < 71.99 || hours > 72.01) blocked('session lifetime must remain 72 hours')
 }
 function validateContract(info) {
-  for (const name of info.duplicateFunctions) if (name.startsWith('mobile') || name === 'getMobileScheduleBundle_' || name === 'doPost') blocked(`duplicate mobile entry point: ${name}`)
-  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 48) blocked('MOBILE_SERVICE_VERSION must include changed-course attendance (48 or newer)')
+  for (const name of info.duplicateFunctions) if (isIntegrationFunction(name)) blocked(`duplicate mobile/widget entry point: ${name}`)
+  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 49) blocked('MOBILE_SERVICE_VERSION must include desktop widget attendance (49 or newer)')
   if (info.constants.get('MOBILE_SESSION_HOURS') !== 72) blocked('MOBILE_SESSION_HOURS must remain 72')
   if (info.constants.get('MOBILE_SHARED_PASSWORD_HASH_PROPERTY') !== 'UNG_MOBILE_SHARED_PASSWORD_HASH' || info.constants.get('MOBILE_SESSION_PROPERTY_PREFIX') !== 'UNG_MOBILE_SESSION_') blocked('existing mobile credential property names must be preserved')
-  for (const name of ['verifyMobileViewer', 'getMobileScheduleBundle']) if (!info.actions.has(name)) blocked(`mobile action missing: ${name}`)
+  for (const name of ['verifyMobileViewer', 'getMobileScheduleBundle', 'getWidgetAttendanceSummaries']) if (!info.actions.has(name)) blocked(`mobile/widget action missing: ${name}`)
   for (const name of ['verifyExecutive', 'getExecutiveScheduleBundle', 'changeExecutivePassword', 'resetExecutivePassword']) if (!info.actions.has(name)) blocked(`executive action missing: ${name}`)
   for (const name of ['getTimetableOverrides', 'saveTimetableOverride', 'deactivateTimetableOverride']) if (!info.actions.has(name)) blocked(`daily timetable override action missing: ${name}`)
   const post = requireFunction(info, 'doPost')
@@ -170,6 +170,9 @@ function validateContract(info) {
   if (!/meals\s*:\s*meals/.test(bundle) || !/todayMeals\s*:\s*todayMeals/.test(bundle) || !/mobileSharedMealsInRange_\([^;\n]*fromDate[^;\n]*toDate/.test(bundle)) blocked('range meals/legacy todayMeals contract missing')
   if (!/todayKey/.test(bundle) || !/cacheKey[^\n]*todayKey/.test(bundle)) blocked('mobile cache key must include the Korea date')
   if (!/attendanceContextVersion/.test(bundle) || !/cacheKey[^\n]*attendanceContextVersion/.test(bundle)) blocked('mobile cache key must include changed-course attendance context')
+  const widgetAttendance = requireFunction(info, 'getWidgetAttendanceSummaries_')
+  if (!/mobileAssertViewer_\s*\(\s*body\.viewerName\s*\)/.test(widgetAttendance) || !/mobileAttendanceSummaries_/.test(widgetAttendance)) blocked('desktop widget attendance route must validate the viewer and reuse the course-enrollment matcher')
+  if (!/CacheService\.getScriptCache\(\)\.put\([^;]*300\)/.test(widgetAttendance)) blocked('desktop widget attendance must retain the five-minute server cache')
   const load = requireFunction(info, 'mobileLoadSource_')
   for (const state of ['fresh', 'empty', 'unavailable']) if (!load.includes(`'${state}'`)) blocked(`sourceStatus state missing: ${state}`)
   const meals = requireFunction(info, 'mobileSharedMealsInRange_')
@@ -183,7 +186,7 @@ function validateContract(info) {
   if (!/rosterBasis\s*:\s*['"]course-enrollment['"]/.test(attendanceSummary) || !/entries\s*:\s*entries/.test(attendanceSummary)) blocked('attendance response must document the course-enrollment basis and return only filtered entries')
   if (/studentId\s*:|payloadJson\s*:|slots\s*:|selections\s*:/.test(attendanceSummary)) blocked('attendance response exposes a full student record')
   for (const [name, body] of info.functions) {
-    if (!name.startsWith('mobile') && name !== 'getMobileScheduleBundle_') continue
+    if (!name.startsWith('mobile') && name !== 'getMobileScheduleBundle_' && name !== 'getWidgetAttendanceSummaries_') continue
     if (/UrlFetchApp|open\.neis\.go\.kr|NEIS_SCHEDULE_SHEET|NEIS_CLASS_TIMETABLE_SHEET|getStudentRoster_|getStudentTimetable_|getNeisSnapshot_/.test(body)) blocked(`forbidden mobile data/API dependency in ${name}`)
   }
   if (/\b(?:studentRoster|studentTimetable|studentTimetables|neisSchedule|neisClassTimetable|classTimetable|students)\s*:/.test(bundle)) blocked('forbidden student/NEIS field in mobile response')

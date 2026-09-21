@@ -340,6 +340,7 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
       'applyTimetableChangeForRequester',
       'cancelTimetableChange',
       'getTimetableOverrides',
+      'getWidgetAttendanceSummaries',
       'saveTimetableOverride',
       'deactivateTimetableOverride',
       'getNeisSyncStatus',
@@ -487,6 +488,36 @@ export interface ExecutiveScheduleBundle {
   timetableOverrides: DailyTimetableOverride[]
   fetchedAt: string
 }
+
+export type WidgetAttendanceState = 'complete' | 'partial' | 'pending'
+export interface WidgetAttendanceEntry {
+  className: string
+  number: string
+  name: string
+  remark: string
+}
+export interface WidgetAttendanceSummary {
+  date: string
+  period: number
+  state: WidgetAttendanceState
+  flaggedCount: number
+  enrolledCount: number
+  courseNames: string[]
+  classrooms: string[]
+  classStatus: Array<{ className: string; complete: boolean }>
+  entries: WidgetAttendanceEntry[]
+  mismatchCount: number
+  sourceDate: string
+  checkedAt: string
+  rosterBasis: 'course-enrollment'
+  changeType?: 'pulled' | 'exchange' | 'substitution' | 'override' | ''
+  originalLabel?: string
+  requiresReview?: boolean
+}
+export interface WidgetAttendanceBundle {
+  attendanceSummaries: WidgetAttendanceSummary[]
+  fetchedAt: string
+}
 export const verifyExecutive = (viewerName: string, password: string) =>
   hubRequest<ExecutiveSession>({ action: 'verifyExecutive', viewerName, password })
 export const getExecutiveScheduleBundle = (viewerName: string, accessToken: string) =>
@@ -495,6 +526,21 @@ export const changeExecutivePassword = (viewerName: string, accessToken: string,
   hubRequest<{ changed: boolean }>({ action: 'changeExecutivePassword', viewerName, accessToken, currentPassword, newPassword })
 export const resetExecutivePassword = (viewerName: string, adminPassword: string) =>
   hubRequest<{ reset: boolean; role: ExecutiveRole }>({ action: 'resetExecutivePassword', viewerName, adminPassword })
+
+export const getWidgetAttendanceSummaries = (
+  viewerName: string,
+  date: string,
+  attendancePulledLessons: Array<Record<string, unknown>>,
+  attendanceContextVersion: string,
+  force = false,
+) => hubRequest<WidgetAttendanceBundle>({
+  action: 'getWidgetAttendanceSummaries',
+  viewerName,
+  date,
+  attendancePulledLessons,
+  attendanceContextVersion,
+  force,
+})
 export const listFeatureRequests = (force = false) =>
   cachedHubRequest<FeatureRequest[]>('featureRequests', 'featureRequests', { action: 'listFeatureRequests' }, force)
 export const getSchoolTimetable = (force = false) =>

@@ -103,6 +103,22 @@ function render(events, overrides = {}) {
   return renderToStaticMarkup(React.createElement(WidgetTimetable, { date, lessons, events, now: new Date(2026, 7, 31, 12, 16), rule: { kind: 'instruction', label: '수업일' },
     timer: { currentPeriod: 4, nextPeriod: 5, countdown: '14분 남음', remainingMinutes: 14 }, ...overrides }))
 }
+const attendance = [{
+  date, period: 3, state: 'complete', flaggedCount: 2, enrolledCount: 2,
+  courseNames: ['기하'], classrooms: ['수학실'], classStatus: [{ className: '2', complete: true }],
+  entries: [
+    { className: '2', number: '8', name: '이자습', remark: '도서관 자습' },
+    { className: '2', number: '7', name: '김출결', remark: '조퇴' },
+  ],
+  mismatchCount: 0, sourceDate: date, checkedAt: '2026-08-31T03:00:00Z', rosterBasis: 'course-enrollment', changeType: 'pulled', originalLabel: '원래 월2 수업',
+}]
+function treeElements(node, predicate, result = []) {
+  if (!node || typeof node !== 'object') return result
+  if (Array.isArray(node)) { node.forEach(child => treeElements(child, predicate, result)); return result }
+  if (predicate(node)) result.push(node)
+  treeElements(node.props?.children, predicate, result)
+  return result
+}
 test('render preserves current lesson countdown, next actual lesson, badge and point accessibility', () => {
   const html = render([event('제출시각', '15:40')])
   assert.ok(html.includes('14분 남음'))
@@ -118,6 +134,26 @@ test('render offers overlap expansion instead of horizontal overflow or unreadab
   assert.ok(html.includes('wts-overlap'))
   assert.ok(html.includes('3개 일정 상세 보기'))
   assert.ok(html.includes('보기'))
+})
+test('third-grade attendance button separates attendance and self-study and opens read-only detail', () => {
+  const html = render([], { attendance })
+  assert.ok(html.includes('aria-label="3교시 3학년 수강생 출결 출결1·자습1"'))
+  assert.ok(html.includes('wts-attendance-alert'))
+  let detail = null
+  const Interactive = bundle('src/components/widget/WidgetTimetable.tsx', { ...React, useMemo: create => create(), useEffect: () => {}, useRef: () => ({ current: null }), useState: () => [detail, value => { detail = value }] }).default
+  const props = { date, lessons, events: [], attendance, now: new Date(2026, 7, 31, 12, 16), rule: { kind: 'instruction' }, timer: { currentPeriod: 4, nextPeriod: 5 } }
+  const button = treeElements(Interactive(props), node => node.type === 'button' && String(node.props.className).includes('wts-attendance-button'))[0]
+  assert.ok(button)
+  button.props.onClick()
+  assert.equal(detail.attendancePeriod, 3)
+  const opened = renderToStaticMarkup(Interactive(props))
+  assert.ok(opened.includes('3교시 출결 · 읽기 전용'))
+  assert.ok(opened.includes('김출결'))
+  assert.ok(opened.includes('이자습'))
+  assert.ok(opened.includes('자습 · 장소 이동'))
+  assert.ok(opened.indexOf('김출결') < opened.indexOf('이자습'))
+  assert.ok(opened.includes('class="self-study"'))
+  assert.ok(!opened.includes('<input') && !opened.includes('<form'))
 })
 test('unavailable and holiday render retain timed events without fake free lesson rows', () => {
   for (const overrides of [{ timetableUnavailable: true }, { rule: { kind: 'weekend', label: '주말' } }]) {

@@ -36,7 +36,7 @@ describe('3학년 수강생 출결', () => {
       { period: 1, value: '' },
       { period: 2, value: '304\nE2_경수' },
     ]} events={[]} teacherFound attendance={[attendance]} onOpenAttendance={open} />)
-    fireEvent.click(screen.getByRole('button', { name: /2교시 수강생 출결 부분 입력 · 1명/ }))
+    fireEvent.click(screen.getByRole('button', { name: /2교시 수강생 출결 부분 입력 · 출결 1명/ }))
     expect(open).toHaveBeenCalledWith(attendance)
     expect(screen.queryByRole('button', { name: /1교시 수강생 출결/ })).not.toBeInTheDocument()
   })
@@ -49,5 +49,30 @@ describe('3학년 수강생 출결', () => {
     expect(screen.getByText('김테스트')).toBeInTheDocument()
     expect(screen.getByText('조퇴')).toBeInTheDocument()
     expect(screen.getByText('실제 수강생 기준', { exact: false })).toBeInTheDocument()
+  })
+
+  it('자습 학생을 장소 이동으로 구분하고 실제 출결 인원과 따로 표시한다', () => {
+    const selfStudyAttendance: MobileAttendanceSummary = {
+      ...attendance,
+      state: 'complete',
+      flaggedCount: 3,
+      entries: [
+        { className: '2', number: '8', name: '이자습', remark: '도서관 자습' },
+        { className: '2', number: '7', name: '김출결', remark: '조퇴' },
+        { className: '2', number: '6', name: '박혼합', remark: '자습 후 조퇴' },
+      ],
+    }
+    const open = vi.fn()
+    const timeline = render(<DailyTimeline lessons={[{ period: 1, value: '' }, { period: 2, value: '304\nE2_경수' }]} events={[]} teacherFound attendance={[selfStudyAttendance]} onOpenAttendance={open} />)
+    expect(screen.getByRole('button', { name: /2교시 수강생 출결 출결 2명 · 자습 1명/ })).toBeInTheDocument()
+    timeline.unmount()
+
+    const sheet = render(<AttendanceSheet summary={selfStudyAttendance} onClose={vi.fn()} />)
+    const selfStudyRow = screen.getByText('이자습').closest('.attendance-entry')
+    const mixedRow = screen.getByText('박혼합').closest('.attendance-entry')
+    expect(selfStudyRow).toHaveClass('self-study')
+    expect(mixedRow).not.toHaveClass('self-study')
+    expect(screen.getByText('자습 · 장소 이동')).toBeInTheDocument()
+    expect([...sheet.container.querySelectorAll('.attendance-entry strong')].map(node => node.textContent)).toEqual(['김출결', '박혼합', '이자습'])
   })
 })

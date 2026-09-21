@@ -72,11 +72,27 @@ export function MealPanel({ meals, status, isToday = true }: { meals: MealInfo[]
   return <section className="panel meal-panel"><div className="panel-title"><div className="panel-icon meal"><UtensilsCrossed size={17} /></div><div><p>{isToday ? 'TODAY MEAL' : 'DAY PREVIEW'}</p><h2>{title}</h2></div>{status ? <StatusBadge status={status} /> : <span>{meals.length ? `${meals.length}식` : '없음'}</span>}</div><div className="meal-list">{orderedMeals.map((meal, index) => <article className="meal-block" key={`${meal.date}-${meal.mealType}-${index}`}><div className="meal-heading"><strong>{meal.mealType || '급식'}</strong>{meal.calories && <span>{meal.calories}</span>}</div><div className="meal-dishes">{meal.dishNames.map((dish, dishIndex) => <span key={`${dish}-${dishIndex}`}>{dish}</span>)}</div></article>)}{!meals.length && <div className="empty">{emptyText}</div>}</div></section>
 }
 
+const ATTENDANCE_EXCEPTION_PATTERN = /(결석|지각|조퇴|결과|병결|미인정|출석\s*인정|공결|체험학습|위탁교육)/
+
+function isSelfStudyEntry(entry: MobileAttendanceSummary['entries'][number]) {
+  const remark = String(entry.remark ?? '').trim()
+  return remark.includes('자습') && !ATTENDANCE_EXCEPTION_PATTERN.test(remark)
+}
+
+function attendanceEntryCounts(summary: MobileAttendanceSummary) {
+  const selfStudyCount = summary.entries.filter(isSelfStudyEntry).length
+  const listedAttendanceCount = summary.entries.length - selfStudyCount
+  const attendanceCount = Math.max(listedAttendanceCount, summary.flaggedCount - selfStudyCount, 0)
+  return { attendanceCount, selfStudyCount }
+}
+
 function attendanceButtonLabel(summary: MobileAttendanceSummary) {
   if (summary.requiresReview) return '출결 확인 필요'
   if (summary.state === 'pending') return '입력 전'
-  if (summary.state === 'partial') return `부분 입력${summary.flaggedCount ? ` · ${summary.flaggedCount}명` : ''}`
-  return summary.flaggedCount ? `출결 ${summary.flaggedCount}명` : '출결 없음'
+  const { attendanceCount, selfStudyCount } = attendanceEntryCounts(summary)
+  const details = [attendanceCount ? `출결 ${attendanceCount}명` : '', selfStudyCount ? `자습 ${selfStudyCount}명` : ''].filter(Boolean).join(' · ')
+  if (summary.state === 'partial') return `부분 입력${details ? ` · ${details}` : ''}`
+  return details || '출결 없음'
 }
 
 export function DailyTimeline({ lessons, events, teacherFound, attendance = [], onOpenAttendance, isNew = () => false }: {
@@ -100,6 +116,7 @@ export function DailyTimeline({ lessons, events, teacherFound, attendance = [], 
 
 export function AttendanceSheet({ summary, onClose }: { summary: MobileAttendanceSummary; onClose: () => void }) {
   const completeCount = summary.classStatus.filter(item => item.complete).length
+  const orderedEntries = [...summary.entries].sort((left, right) => Number(isSelfStudyEntry(left)) - Number(isSelfStudyEntry(right)))
   const statusText = summary.state === 'complete'
     ? `${summary.classStatus.length}개 반 모두 입력 완료`
     : summary.state === 'partial'
@@ -119,7 +136,10 @@ export function AttendanceSheet({ summary, onClose }: { summary: MobileAttendanc
       <div className={`attendance-summary attendance-${summary.state}`}><CheckCircle2 size={16} /><strong>{statusText}</strong>{checkedAt && <span>마지막 확인 {checkedAt}</span>}</div>
       <div className="attendance-class-status" aria-label="반별 입력 상태">{summary.classStatus.map(item => <span className={item.complete ? 'complete' : 'pending'} key={item.className}>{item.className}반 {item.complete ? '입력 완료' : '입력 전'}</span>)}</div>
       <div className="attendance-columns"><span>반·번호</span><span>이름</span><span>출결 비고</span></div>
-      <div className="attendance-list">{summary.entries.map((entry, index) => <div className="attendance-entry" key={`${entry.className}-${entry.number}-${index}`}><b>{entry.className}반 {entry.number}번</b><strong>{entry.name}</strong><span>{entry.remark}</span></div>)}{!summary.entries.length && <div className="attendance-empty">현재 입력된 출결 비고가 없습니다.</div>}</div>
+      <div className="attendance-list">{orderedEntries.map((entry, index) => {
+        const selfStudy = isSelfStudyEntry(entry)
+        return <div className={`attendance-entry ${selfStudy ? 'self-study' : ''}`} key={`${entry.className}-${entry.number}-${index}`}><b>{entry.className}반 {entry.number}번</b><strong>{entry.name}</strong><span className="attendance-remark">{entry.remark}{selfStudy && <small>자습 · 장소 이동</small>}</span></div>
+      })}{!summary.entries.length && <div className="attendance-empty">현재 입력된 출결 비고가 없습니다.</div>}</div>
       {summary.mismatchCount > 0 && <p className="attendance-warning"><AlertTriangle size={13} /> 수강생 명단과 출결 시트가 일치하지 않는 항목 {summary.mismatchCount}건은 표시하지 않았습니다.</p>}
       <p className="attendance-foot">5분마다 자동 확인 · 연결 실패 시 이전 정상 자료 표시</p>
     </section>
