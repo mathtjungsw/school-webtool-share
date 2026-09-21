@@ -13,15 +13,18 @@
 
 ## 검증 결과
 
-- [ ] 데스크톱 전체 typecheck 및 위젯·모바일 서버 계약 회귀검사
-- [ ] 모바일 PWA typecheck, 전체 단위·통합 테스트, 프로덕션 빌드
-- [ ] Apps Script 구문·배포 가드 및 고정 배포 사전검사
-- [ ] 실제 고정 Apps Script 주소에서 서비스 버전 49 확인
-- [ ] 데스크톱 v1.1.34 설치파일·자동 업데이트 릴리스 배포
-- [ ] 기존 모바일 PWA 공개 주소에 v1.1.34 배포
-- [ ] 응답에 전체 학생 시간표·학생 식별키·비밀번호·세션 토큰이 없는지 확인
+- [x] 데스크톱 전체 typecheck 및 위젯·모바일 서버 계약 회귀검사
+- [x] 모바일 PWA typecheck, 전체 44개 단위·통합 테스트, 프로덕션 빌드
+- [x] Apps Script 구문·55개 배포 가드 및 고정 배포 사전검사
+- [x] 실제 고정 Apps Script 주소에서 서비스 버전 49 확인
+- [x] 데스크톱 v1.1.34 설치파일·자동 업데이트 릴리스 배포
+- [x] 기존 모바일 PWA 공개 주소에 사이트 버전 16으로 v1.1.34 배포
+- [x] 응답에 전체 학생 시간표·학생 식별키·비밀번호·세션 토큰이 없는지 회귀검사
+
+Apps Script는 기존 고정 배포를 프로젝트 버전 78로 갱신했고 ScriptProperties와 기존 로그인 세션을 초기화하지 않았다. GitHub Release에는 설치파일·blockmap·`latest.yml`을 함께 게시했다.
 
 ## 고정 주소
 
 - Apps Script: <https://script.google.com/macros/s/AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w/exec>
 - 모바일 PWA: <https://ungcheon-mobile-schedule.jsw890122.chatgpt.site>
+- 데스크톱 릴리스: <https://github.com/mathtjungsw/school-webtool-share/releases/tag/ungcheon-helper-v1.1.34>
