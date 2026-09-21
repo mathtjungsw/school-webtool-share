@@ -41,6 +41,15 @@ describe('3학년 수강생 출결', () => {
     expect(screen.queryByRole('button', { name: /1교시 수강생 출결/ })).not.toBeInTheDocument()
   })
 
+  it('3학년 수업은 이동·학급수업 구분 없이 연결 상태를 숨기지 않는다', () => {
+    render(<DailyTimeline lessons={[
+      { period: 1, value: '305\n화법과 작문' },
+      { period: 2, value: '205\n수학' },
+    ]} events={[]} teacherFound attendance={[]} />)
+    expect(screen.getByRole('status', { name: '1교시 수강생 출결 연결 확인' })).toBeInTheDocument()
+    expect(screen.queryByRole('status', { name: /2교시 수강생 출결/ })).not.toBeInTheDocument()
+  })
+
   it('반·번호, 이름, 비고 순으로 실제 수강생 출결만 표시한다', () => {
     render(<AttendanceSheet summary={attendance} onClose={vi.fn()} />)
     expect(screen.getByText('2개 반 중 1개 반 입력 완료')).toBeInTheDocument()

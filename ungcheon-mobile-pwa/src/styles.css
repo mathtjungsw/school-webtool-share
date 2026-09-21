@@ -138,6 +138,8 @@ input:focus { border-color: #28624e; box-shadow: 0 0 0 3px rgba(40, 98, 78, .12)
 .section-tools { display: flex; flex: none; gap: 6px; }
 .icon-button { background: var(--surface); border: 1px solid var(--line); box-shadow: 0 4px 12px rgba(0,0,0,.04); }
 .icon-button:disabled { opacity: .5; }
+.icon-button.refresh-button { position: relative; }
+.refresh-elapsed { position: absolute; right: 3px; bottom: 2px; color: var(--muted); font-size: 7px; font-weight: 850; line-height: 1; }
 .today-stats { display: flex; gap: 6px; margin-top: 10px; }
 .today-stats span { padding: 5px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 10.5px; }
 .today-stats b { color: var(--text); font-size: 12px; }
@@ -227,6 +229,7 @@ input:focus { border-color: #28624e; box-shadow: 0 0 0 3px rgba(40, 98, 78, .12)
 .attendance-pill.attendance-complete { border-color: #84b9a2; background: #eaf7f0; color: #176047; }
 .attendance-pill.attendance-partial { border-color: #e9b860; background: #fff4d8; color: #875512; }
 .attendance-pill.attendance-pending { border-color: #cbd4cf; background: #f2f5f3; color: #5d6b64; }
+.attendance-pill.attendance-unavailable { border-color: #e3b96f; background: #fff6df; color: #8b5d18; white-space: normal; }
 @media (max-width: 390px) {
   .daily-timeline { padding-inline: 6px; }
   .daily-timeline-head, .daily-timeline-row { grid-template-columns: minmax(0, 42%) minmax(0, 58%); }

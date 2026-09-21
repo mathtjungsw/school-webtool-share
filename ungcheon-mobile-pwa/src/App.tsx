@@ -106,8 +106,9 @@ export function DailyTimeline({ lessons, events, teacherFound, attendance = [], 
     {rows.map(row => {
       const parsed = parseSlot(row.lesson?.value ?? '')
       const attendanceSummary = row.kind === 'period' ? attendance.find(item => item.period === row.lesson?.period) : undefined
+      const thirdGradeLesson = row.kind === 'period' && Boolean(row.lesson?.value) && /^3-/.test(parsed.className)
       return <div className={`daily-timeline-row row-${row.kind} ${row.lesson?.changed ? 'changed' : ''}`} key={row.id}>
-        <div className="timeline-lesson"><div className="timeline-clock"><b>{row.label}</b><small>{row.start}~{row.end}</small></div>{row.kind === 'period' && <div className="lesson-copy"><strong>{row.lesson?.value ? (parsed.subject || parsed.className) : '공강'}</strong>{row.lesson?.value && parsed.subject && <small>{parsed.className}</small>}{row.lesson?.note && <em>{row.lesson.note}</em>}</div>}{attendanceSummary && <button type="button" className={`attendance-pill attendance-${attendanceSummary.state}`} aria-label={`${row.label} 수강생 출결 ${attendanceButtonLabel(attendanceSummary)}`} onClick={() => onOpenAttendance?.(attendanceSummary)}>{attendanceSummary.changeType && <small>{attendanceSummary.changeType === 'pulled' ? '당김' : attendanceSummary.changeType === 'exchange' ? '교체' : attendanceSummary.changeType === 'substitution' ? '대강' : '예외'}</small>}{attendanceButtonLabel(attendanceSummary)}<ChevronRight size={12} /></button>}</div>
+        <div className="timeline-lesson"><div className="timeline-clock"><b>{row.label}</b><small>{row.start}~{row.end}</small></div>{row.kind === 'period' && <div className="lesson-copy"><strong>{row.lesson?.value ? (parsed.subject || parsed.className) : '공강'}</strong>{row.lesson?.value && parsed.subject && <small>{parsed.className}</small>}{row.lesson?.note && <em>{row.lesson.note}</em>}</div>}{attendanceSummary ? <button type="button" className={`attendance-pill attendance-${attendanceSummary.state}`} aria-label={`${row.label} 수강생 출결 ${attendanceButtonLabel(attendanceSummary)}`} onClick={() => onOpenAttendance?.(attendanceSummary)}>{attendanceSummary.changeType && <small>{attendanceSummary.changeType === 'pulled' ? '당김' : attendanceSummary.changeType === 'exchange' ? '교체' : attendanceSummary.changeType === 'substitution' ? '대강' : '예외'}</small>}{attendanceButtonLabel(attendanceSummary)}<ChevronRight size={12} /></button> : thirdGradeLesson ? <span className="attendance-pill attendance-unavailable" role="status" aria-label={`${row.label} 수강생 출결 연결 확인`}><AlertTriangle size={11} />연결 확인</span> : null}</div>
         <div className="timeline-events">{row.events.map(event => <article className={`timeline-event source-${event.source} ${isNew(event) ? 'is-new' : ''}`} key={`${row.id}-${event.id}`}><div><strong>{event.title}</strong><small>{[event.startTime ? `${event.startTime}${event.endTime ? `~${event.endTime}` : ''}` : event.time, event.label].filter(Boolean).join(' · ')}</small></div>{isNew(event) && <b className="new-badge">NEW</b>}</article>)}{!row.events.length && <span className="timeline-empty">—</span>}</div>
       </div>
     })}
@@ -228,6 +229,7 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState(initialDate)
   const [now, setNow] = useState(() => new Date())
   const [loading, setLoading] = useState(false)
+  const [refreshElapsed, setRefreshElapsed] = useState(0)
   const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && !navigator.onLine)
   const [message, setMessage] = useState('')
   const [cacheWarning, setCacheWarning] = useState('')
@@ -266,8 +268,12 @@ export default function App() {
     }
   }, [previewDates, today])
   useEffect(() => {
-    if ('serviceWorker' in navigator && import.meta.env.PROD) void navigator.serviceWorker.register('/sw.js').catch(() => undefined)
-  }, [])
+    if (!loading) { setRefreshElapsed(0); return }
+    const startedAt = Date.now()
+    setRefreshElapsed(0)
+    const timer = window.setInterval(() => setRefreshElapsed(Math.max(1, Math.floor((Date.now() - startedAt) / 1000))), 1_000)
+    return () => window.clearInterval(timer)
+  }, [loading])
 
   const clearSession = useCallback((notice = '') => {
     const name = sessionRef.current?.name ?? ''
@@ -422,7 +428,7 @@ export default function App() {
     {data && <div className="data-health" aria-label="자료 최신성"><span>자료 상태</span><div><b>시간표</b><StatusBadge status={timetableStatus} /></div><div><b>일정</b><StatusBadge status={scheduleStatus} /></div><div><b>급식</b><StatusBadge status={mealStatus} /></div></div>}
     <nav className="view-tabs" aria-label="일정 범위"><button role="tab" aria-selected={view === 'today'} className={view === 'today' ? 'active' : ''} onClick={() => setView('today')}>날짜</button><button role="tab" aria-selected={view === 'timetable'} className={view === 'timetable' ? 'active' : ''} onClick={() => setView('timetable')}>주간 시간표</button><button role="tab" aria-selected={view === 'week'} className={view === 'week' ? 'active' : ''} onClick={() => setView('week')}>이번 주</button><button role="tab" aria-selected={view === 'next'} className={view === 'next' ? 'active' : ''} onClick={() => setView('next')}>다음 주</button></nav>
     <main className="content">
-      <div className="section-heading"><div><p>{view === 'today' ? `${session.name} 선생님` : 'SCHEDULE'}</p><h1>{heading}</h1>{view === 'today' && <div className="today-stats"><span><b>{selectedClassCount}</b> 수업</span><span><b>{selectedEvents.length}</b> 일정</span>{visibleNewCount > 0 && <span className="new-stat"><b>{visibleNewCount}</b> 새 소식</span>}</div>}</div><div className="section-tools"><button className="icon-button" aria-label="일정 종류 설정" aria-expanded={filterOpen} onClick={() => setFilterOpen(value => !value)}><Filter size={18} /></button><button className="icon-button" aria-label="새로고침" onClick={() => refresh(session.name)} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={18} /></button></div></div>
+      <div className="section-heading"><div><p>{view === 'today' ? `${session.name} 선생님` : 'SCHEDULE'}</p><h1>{heading}</h1>{view === 'today' && <div className="today-stats"><span><b>{selectedClassCount}</b> 수업</span><span><b>{selectedEvents.length}</b> 일정</span>{visibleNewCount > 0 && <span className="new-stat"><b>{visibleNewCount}</b> 새 소식</span>}</div>}</div><div className="section-tools"><button className="icon-button" aria-label="일정 종류 설정" aria-expanded={filterOpen} onClick={() => setFilterOpen(value => !value)}><Filter size={18} /></button><button className="icon-button refresh-button" aria-label={loading ? `자료 조회 중 ${refreshElapsed}초` : '새로고침'} aria-busy={loading} onClick={() => refresh(session.name)} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={18} />{loading && <small className="refresh-elapsed">{refreshElapsed}초</small>}</button></div></div>
       {filterOpen && <section className="filter-panel"><h2>표시할 일정</h2><div className="filter-grid">{(Object.keys(SOURCE_LABELS) as ScheduleSource[]).map(source => <button key={source} className={visibility[source] ? 'selected' : ''} aria-pressed={visibility[source]} onClick={() => toggleSource(source)}><span>{visibility[source] && <Check size={13} />}</span>{SOURCE_LABELS[source]}</button>)}</div></section>}
       {!data && loading && <div className="loading-card">마지막 일정과 시간표를 확인하고 있습니다…</div>}
       {data && view === 'today' && <>

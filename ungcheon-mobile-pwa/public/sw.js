@@ -1,4 +1,4 @@
-const STATIC_CACHE = 'ungcheon-mobile-static-v10'
+const STATIC_CACHE = 'ungcheon-mobile-static-v11'
 const APP_SHELL = ['', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png']
   .map(path => new URL(path, self.registration.scope).href)
 
@@ -18,11 +18,11 @@ self.addEventListener('fetch', event => {
   // Apps Script POST 및 외부 출처 요청은 가로채거나 캐시하지 않는다.
   if (request.method !== 'GET' || url.origin !== self.location.origin) return
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() => caches.match(APP_SHELL[0])))
+    event.respondWith(fetch(request, { cache: 'no-store' }).catch(() => caches.match(APP_SHELL[0])))
     return
   }
   if (['script', 'style', 'worker'].includes(request.destination)) {
-    event.respondWith(fetch(request).then(response => {
+    event.respondWith(fetch(request, { cache: 'no-store' }).then(response => {
       if (response.ok) caches.open(STATIC_CACHE).then(cache => cache.put(request, response.clone()))
       return response
     }).catch(() => caches.match(request)))

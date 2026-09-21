@@ -42,7 +42,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 49;
+const MOBILE_SERVICE_VERSION = 50;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -403,6 +403,16 @@ const RELEASE_NOTES = [
       '· 위젯 출결 버튼은 입력 상태와 실제 출결·자습 인원을 구분하고, 버튼을 누르면 반·번호·이름·비고를 읽기 전용으로 확인할 수 있습니다.',
       '· 모바일 PWA와 위젯에서 출결 비고에 자습만 있는 학생은 결석이 아닌 장소 이동으로 분리해 연두색으로 표시합니다.',
       '· 기존 모바일 공개 주소, Apps Script 고정 주소, 72시간 로그인, 교장·교감 메뉴와 이전 릴리스 안내를 모두 유지합니다.'
+    ].join('\n'),
+    date: '2026-09-21'
+  },
+  {
+    key: 'mobile-service-attendance-match-2026-09-21',
+    title: '[모바일 개선] 3학년 전체 수업 출결 연결 안정화',
+    body: [
+      '· 이동수업과 학급수업을 구분하지 않고 3학년 실제 수강생 출결을 연결합니다.',
+      '· 공동수업 교사명과 잘린 교사명은 실제 교사시간표의 같은 교시·과목·교실을 함께 대조해 안전하게 판별합니다.',
+      '· 과목이 다른 공동수업 학생은 같은 교시에 섞지 않고, 매칭 실패는 모바일에서 출결 연결 확인으로 표시합니다.'
     ].join('\n'),
     date: '2026-09-21'
   },
@@ -3425,7 +3435,76 @@ function mobileAttendanceContext_(viewerName, date, period, timetableOverrides, 
   return { date: sourceSlot.date, period: sourceSlot.period, teacherName: viewerName, changeType: sourceSlot.date !== date || Number(sourceSlot.period) !== Number(period) ? 'override' : '', originalLabel: '' };
 }
 
-function mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows, timetableOverrides, timetableChanges, pulledLessons) {
+function mobileAttendanceSubjectKey_(value) {
+  let text = clean_(value, 120).replace(/\s+/g, '');
+  const parts = text.split('_');
+  text = clean_(parts[parts.length - 1], 120).replace(/[^0-9A-Za-z가-힣]/g, '');
+  const aliases = {
+    '화작': '화법과작문',
+    '언매': '언어와매체',
+    '경수': '경제수학',
+    '수탐': '수학과제탐구',
+    '심국': '심화국어',
+    '현문': '현대문학감상'
+  };
+  return aliases[text] || text;
+}
+
+function mobileAttendanceClassKey_(value) {
+  const text = clean_(value, 50);
+  const gradeClass = text.match(/^([1-3])\s*[-학년반]?\s*0?(\d{1,2})/);
+  if (gradeClass) return gradeClass[1] + ('0' + Number(gradeClass[2])).slice(-2);
+  const digits = (text.match(/\d+/g) || []).join('');
+  return /^[1-3]\d{2}$/.test(digits) ? digits : '';
+}
+
+function mobileAttendanceLessonAt_(timetable, teacherName, date, period) {
+  const targetDate = new Date(date + 'T12:00:00+09:00');
+  const dayIndex = targetDate.getDay() - 1;
+  if (!timetable || !Array.isArray(timetable.teachers) || dayIndex < 0 || dayIndex > 4) return null;
+  const teacher = timetable.teachers.find(function(item) { return clean_(item && item.name, 30) === teacherName; });
+  const slot = teacher && Array.isArray(teacher.slots) ? teacher.slots[dayIndex * 7 + Number(period) - 1] : null;
+  const value = clean_(slot && slot.value, 200);
+  if (!value) return null;
+  const lines = value.split(/\r?\n/).map(function(item) { return clean_(item, 120); }).filter(Boolean);
+  return { value: value, classLabel: lines[0] || '', subject: lines.slice(1).join(' ') };
+}
+
+function mobileAttendanceLessonMatches_(expectedLesson, studentSlot) {
+  if (!expectedLesson) return false;
+  const subject = mobileAttendanceSubjectKey_(studentSlot && studentSlot.subject);
+  const expectedSubject = mobileAttendanceSubjectKey_(expectedLesson.subject);
+  const classroom = mobileAttendanceClassKey_(studentSlot && studentSlot.classroom);
+  const expectedClass = mobileAttendanceClassKey_(expectedLesson.classLabel);
+  return Boolean((subject && expectedSubject && subject === expectedSubject) ||
+    (classroom && expectedClass && classroom === expectedClass));
+}
+
+function mobileAttendanceTeacherTokens_(value) {
+  return clean_(value, 100).split(/[,，、·/&+\s]+/).map(function(item) { return clean_(item, 30); }).filter(Boolean);
+}
+
+function mobileAttendanceTeacherMatches_(slotTeacher, viewerName, studentSlot, expectedLesson, timetable, date, period) {
+  const tokens = mobileAttendanceTeacherTokens_(slotTeacher);
+  if (tokens.length === 1 && tokens[0] === viewerName) return true;
+  if (tokens.indexOf(viewerName) >= 0) return mobileAttendanceLessonMatches_(expectedLesson, studentSlot);
+
+  const abbreviated = tokens.filter(function(token) {
+    return token.length >= 2 && viewerName.indexOf(token) === 0;
+  });
+  if (!abbreviated.length || !mobileAttendanceLessonMatches_(expectedLesson, studentSlot) ||
+      !timetable || !Array.isArray(timetable.teachers)) return false;
+
+  const candidates = timetable.teachers.map(function(teacher) {
+    return clean_(teacher && teacher.name, 30);
+  }).filter(function(name) {
+    if (!name || !abbreviated.some(function(token) { return name.indexOf(token) === 0; })) return false;
+    return mobileAttendanceLessonMatches_(mobileAttendanceLessonAt_(timetable, name, date, period), studentSlot);
+  }).filter(function(name, index, names) { return names.indexOf(name) === index; });
+  return candidates.length === 1 && candidates[0] === viewerName;
+}
+
+function mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows, timetableOverrides, timetableChanges, pulledLessons, timetable) {
   const sourceSlot = mobileAttendanceContext_(viewerName, date, period, timetableOverrides, timetableChanges, pulledLessons);
   if (!sourceSlot || sourceSlot.review) return { students: [], context: sourceSlot };
   const sourceDate = new Date(sourceSlot.date + 'T12:00:00+09:00');
@@ -3433,12 +3512,15 @@ function mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows
   if (!day || day === '일' || day === '토') return { students: [], context: sourceSlot };
   const key = day + sourceSlot.period;
   const rows = Array.isArray(personalRows) ? personalRows : readObjects_(STUDENT_TIMETABLE_SHEET);
+  const resolvedTimetable = timetable || getTimetable_();
+  const expectedLesson = mobileAttendanceLessonAt_(resolvedTimetable, sourceSlot.teacherName, sourceSlot.date, sourceSlot.period);
   const students = rows.map(function(row) {
     let personal;
     try { personal = JSON.parse(String(row.payloadJson || '')); } catch (ignore) { return null; }
     const student = personal && personal.student || {};
     const slot = personal && personal.slots && personal.slots[key] || {};
-    if (clean_(student.grade, 2) !== '3' || clean_(slot.teacher, 30) !== sourceSlot.teacherName || !clean_(slot.subject, 120)) return null;
+    if (clean_(student.grade, 2) !== '3' || !clean_(slot.subject, 120) ||
+        !mobileAttendanceTeacherMatches_(slot.teacher, sourceSlot.teacherName, slot, expectedLesson, resolvedTimetable, sourceSlot.date, sourceSlot.period)) return null;
     return {
       className: mobileAttendanceNumber_(student.className),
       number: mobileAttendanceNumber_(student.number),
@@ -3450,8 +3532,8 @@ function mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows
   return { students: students, context: sourceSlot };
 }
 
-function mobileAttendanceSummaryForSlot_(viewerName, date, period, snapshot, personalRows, timetableOverrides, timetableChanges, pulledLessons) {
-  const resolved = mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows, timetableOverrides, timetableChanges, pulledLessons);
+function mobileAttendanceSummaryForSlot_(viewerName, date, period, snapshot, personalRows, timetableOverrides, timetableChanges, pulledLessons, timetable) {
+  const resolved = mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows, timetableOverrides, timetableChanges, pulledLessons, timetable);
   const enrolled = resolved.students;
   if (resolved.context && resolved.context.review) return { date: date, period: period, state: 'pending', flaggedCount: 0, enrolledCount: 0, courseNames: [], classrooms: [], classStatus: [], entries: [], mismatchCount: 0, sourceDate: snapshot.sourceDate, checkedAt: new Date().toISOString(), rosterBasis: 'course-enrollment', changeType: resolved.context.changeType, requiresReview: true, originalLabel: '' };
   if (!enrolled.length) return null;
@@ -3509,9 +3591,10 @@ function mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverr
   const snapshot = mobileAttendanceSheetSnapshot_(today);
   if (!snapshot) return [];
   const personalRows = readObjects_(STUDENT_TIMETABLE_SHEET);
+  const timetable = getTimetable_();
   const summaries = [];
   for (let period = 1; period <= 7; period++) {
-    const summary = mobileAttendanceSummaryForSlot_(viewerName, today, period, snapshot, personalRows, timetableOverrides, timetableChanges, pulledLessons);
+    const summary = mobileAttendanceSummaryForSlot_(viewerName, today, period, snapshot, personalRows, timetableOverrides, timetableChanges, pulledLessons, timetable);
     if (summary) summaries.push(summary);
   }
   return summaries;

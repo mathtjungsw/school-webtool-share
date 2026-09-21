@@ -150,7 +150,7 @@ function assertSessionPreservation(info) {
 }
 function validateContract(info) {
   for (const name of info.duplicateFunctions) if (isIntegrationFunction(name)) blocked(`duplicate mobile/widget entry point: ${name}`)
-  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 49) blocked('MOBILE_SERVICE_VERSION must include desktop widget attendance (49 or newer)')
+  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 50) blocked('MOBILE_SERVICE_VERSION must include complete third-grade attendance matching (50 or newer)')
   if (info.constants.get('MOBILE_SESSION_HOURS') !== 72) blocked('MOBILE_SESSION_HOURS must remain 72')
   if (info.constants.get('MOBILE_SHARED_PASSWORD_HASH_PROPERTY') !== 'UNG_MOBILE_SHARED_PASSWORD_HASH' || info.constants.get('MOBILE_SESSION_PROPERTY_PREFIX') !== 'UNG_MOBILE_SESSION_') blocked('existing mobile credential property names must be preserved')
   for (const name of ['verifyMobileViewer', 'getMobileScheduleBundle', 'getWidgetAttendanceSummaries']) if (!info.actions.has(name)) blocked(`mobile/widget action missing: ${name}`)

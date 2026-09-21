@@ -305,6 +305,32 @@ test('attendance uses the actual third-grade course roster and reports partial h
   assert.ok(h.readNames.includes('학생시간표'));
 });
 
+test('third-grade class and movement lessons accept co-teachers and safely disambiguate abbreviated names', () => {
+  const makeStudent = (className, number, name, teacher, subject, classroom) => ({ payloadJson: JSON.stringify({
+    student: { name, grade: '3', className: String(className), number: String(number) },
+    slots: { 월1: { subject, teacher, classroom } },
+  }) });
+  const h = harness({
+    now: '2026-08-31T03:00:00Z',
+    studentTimetableRows: [
+      makeStudent(1, 1, '공동수강생', '다른교사,테스트교사', '국어', '101'),
+      makeStudent(2, 2, '축약수강생', '테스트', '국어', '101'),
+      makeStudent(3, 3, '다른과목학생', '다른교사,테스트교사', '현대문학 감상', '301'),
+    ],
+    attendanceValues: [
+      ['2026-08-31 (월)', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['', '', true, '', '', true, '', '', true, '', '', true, '', '', true, '', '', true, '', '', true],
+      ['1반', '이름', '비고', '2반', '이름', '비고', '3반', '이름', '비고', '4반', '이름', '비고', '5반', '이름', '비고', '6반', '이름', '비고', '7반', '이름', '비고'],
+      [1, '공동수강생', '지각', 2, '축약수강생', '자습', 3, '다른과목학생', '결석', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ],
+  });
+  const summaries = h.post(h.request()).data.attendanceSummaries;
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0].enrolledCount, 2);
+  assert.deepEqual(summaries[0].entries.map(entry => entry.name), ['공동수강생', '축약수강생']);
+  assert.equal(JSON.stringify(summaries).includes('다른과목학생'), false);
+});
+
 test('desktop widget receives the same minimal third-grade attendance without a mobile session payload', () => {
   const h = harness({
     now: '2026-08-31T03:00:00Z',

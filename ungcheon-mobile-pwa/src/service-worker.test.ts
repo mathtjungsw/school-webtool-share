@@ -23,4 +23,24 @@ describe('서비스 워커 전송 경계', () => {
     }
     expect(fetcher).not.toHaveBeenCalled()
   })
+
+  it('같은 출처 앱 코드와 화면은 네트워크 최신본을 먼저 확인한다', async () => {
+    const listeners: Record<string, (event: any) => void> = {}
+    const origin = 'https://ungcheon-mobile-schedule.jsw890122.chatgpt.site'
+    const response = { ok: true, clone: () => response }
+    const fetcher = vi.fn().mockResolvedValue(response)
+    const put = vi.fn()
+    vm.runInNewContext(readFileSync(resolve('public/sw.js'), 'utf8'), {
+      URL, fetch: fetcher,
+      caches: { open: vi.fn().mockResolvedValue({ put }), match: vi.fn(), keys: vi.fn().mockResolvedValue([]), delete: vi.fn() },
+      self: { registration: { scope: `${origin}/` }, location: { origin }, addEventListener: (type: string, listener: (event: unknown) => void) => { listeners[type] = listener } },
+    })
+    let responsePromise: Promise<unknown> | undefined
+    listeners.fetch({
+      request: { method: 'GET', url: `${origin}/assets/app.js`, mode: 'cors', destination: 'script' },
+      respondWith: (value: Promise<unknown>) => { responsePromise = value },
+    })
+    await responsePromise
+    expect(fetcher).toHaveBeenCalledWith(expect.objectContaining({ url: `${origin}/assets/app.js` }), { cache: 'no-store' })
+  })
 })
