@@ -11,7 +11,7 @@ import { CSS } from '@dnd-kit/utilities'
 import clsx from 'clsx'
 import { useAppStore } from '../stores/appStore'
 import { useAdminStore } from '../stores/adminStore'
-import { useAuthStore } from '../stores/authStore'
+import { executiveRoleForName, useAuthStore } from '../stores/authStore'
 import schoolLogo from '../assets/ungcheon-logo.png'
 import { isSidebarExpanded, normalizeSidebarExpandedPinned, SIDEBAR_EXPANDED_PINNED_KEY } from '../services/sidebarPreferences'
 import {
@@ -113,6 +113,8 @@ export default function Sidebar({
   const config = useAppStore(s => s.config)
   const isAdmin = useAdminStore(s => s.isAdmin)
   const executiveRole = useAuthStore(s => s.executiveRole)
+  const teacherName = useAuthStore(s => s.teacherName)
+  const executiveIdentityRole = executiveRoleForName(teacherName)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const isExpanded = isSidebarExpanded(expandedPinned, hovered, editing)
 
@@ -151,9 +153,9 @@ export default function Sidebar({
       .filter(item => !EXECUTIVE_MENU_IDS.includes(item.id))
   }, [hiddenMenus, isAdmin, menuOrder, pinnedMenus])
 
-  const executiveItems = useMemo(() => executiveRole
+  const executiveItems = useMemo(() => executiveIdentityRole
     ? EXECUTIVE_MENU_IDS.map(id => NAV_BY_ID.get(id)).filter((item): item is NavigationItem => Boolean(item))
-    : [], [executiveRole])
+    : [], [executiveIdentityRole])
 
   const dashboardItem = useMemo(() => orderedItems.find(item => item.id === 'dashboard'), [orderedItems])
   const menuItems = useMemo(() => orderedItems.filter(item => item.id !== 'dashboard'), [orderedItems])
@@ -276,7 +278,7 @@ export default function Sidebar({
               <NavButton key={dashboardItem.id} item={dashboardItem} expanded={isExpanded} editing={false} active={currentPage === dashboardItem.id} pinned={false} locked onClick={() => onNavigate(dashboardItem.id)} onTogglePinned={() => undefined} onHide={() => undefined} />
             )}
             {executiveItems.length > 0 && isExpanded && !editing && <section className="mb-1">
-              <MenuGroupHeader label={executiveRole === 'principal' ? '교장메뉴' : '교감메뉴'} count={executiveItems.length} />
+              <MenuGroupHeader label={executiveIdentityRole === 'principal' ? '교장메뉴' : '교감메뉴'} count={executiveItems.length} />
               {executiveItems.map(item => <NavButton key={item.id} item={item} expanded editing={false} active={currentPage === item.id} pinned={false} locked onClick={() => onNavigate(item.id)} onTogglePinned={() => undefined} onHide={() => undefined} />)}
             </section>}
             {executiveItems.length > 0 && !isExpanded && executiveItems.map(item => <NavButton key={item.id} item={item} expanded={false} editing={false} active={currentPage === item.id} pinned={false} locked onClick={() => onNavigate(item.id)} onTogglePinned={() => undefined} onHide={() => undefined} />)}

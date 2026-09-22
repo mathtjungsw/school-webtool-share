@@ -15,6 +15,7 @@ export default function App() {
   const authReady = useAuthStore(state => state.ready)
   const authenticated = useAuthStore(state => state.authenticated)
   const executiveExpiresAt = useAuthStore(state => state.executiveExpiresAt)
+  const lockExecutive = useAuthStore(state => state.lockExecutive)
   const bootstrapAuth = useAuthStore(state => state.bootstrap)
 
   useEffect(() => {
@@ -50,16 +51,22 @@ export default function App() {
 
   useEffect(() => {
     if (!authenticated) return
-    const state = useAuthStore.getState()
-    const expiryCandidates = [state.expiresAt, state.executiveExpiresAt].filter(Boolean).map(value => Date.parse(value)).filter(Number.isFinite)
-    const remaining = Math.min(...expiryCandidates) - Date.now()
+    const remaining = Date.parse(useAuthStore.getState().expiresAt) - Date.now()
     if (remaining <= 0) {
       void useAuthStore.getState().logout()
       return
     }
     const timer = window.setTimeout(() => void useAuthStore.getState().logout(), remaining)
     return () => window.clearTimeout(timer)
-  }, [authenticated, executiveExpiresAt])
+  }, [authenticated])
+
+  useEffect(() => {
+    if (!authenticated || !executiveExpiresAt) return
+    const remaining = Date.parse(executiveExpiresAt) - Date.now()
+    if (remaining <= 0) { lockExecutive(); return }
+    const timer = window.setTimeout(lockExecutive, remaining)
+    return () => window.clearTimeout(timer)
+  }, [authenticated, executiveExpiresAt, lockExecutive])
 
   useEffect(() => {
     if (!authenticated || !config.schoolHubUrl) return

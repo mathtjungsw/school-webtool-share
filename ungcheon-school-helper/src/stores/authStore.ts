@@ -17,7 +17,9 @@ interface AuthState {
   executiveAccessToken: string
   executiveExpiresAt: string
   bootstrap: () => Promise<void>
-  login: (name: string, executivePassword?: string) => Promise<boolean>
+  login: (name: string) => Promise<boolean>
+  unlockExecutive: (password: string) => Promise<boolean>
+  lockExecutive: () => void
   logout: () => Promise<void>
 }
 
@@ -54,7 +56,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     ])
     const teacherName = String(savedName ?? '').trim()
     const expiresAt = String(savedExpiresAt ?? '')
-    if (teacherName && isFuture(expiresAt) && !executiveRoleForName(teacherName)) {
+    if (teacherName && isFuture(expiresAt)) {
       if (useAppStore.getState().config.teacherName !== teacherName) {
         await useAppStore.getState().saveConfig({ teacherName })
       }
@@ -69,7 +71,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ ready: true, authenticated: false, teacherName: '', expiresAt: '', executiveRole: null, executiveAccessToken: '', executiveExpiresAt: '' })
   },
 
-  login: async (name, executivePassword = '') => {
+  login: async (name) => {
     const teacherName = name.trim()
     if (!teacherName) {
       set({ error: '이름을 입력해 주세요.' })
@@ -82,15 +84,6 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ error: '교직원 명렬에 등록된 이름과 일치하지 않습니다.' })
         return false
       }
-      const expectedRole = executiveRoleForName(teacherName)
-      let executiveSession = null
-      if (expectedRole) {
-        if (!executivePassword) {
-          set({ error: '추가 비밀번호를 입력해 주세요.' })
-          return false
-        }
-        executiveSession = await verifyExecutive(teacherName, executivePassword)
-      }
       const expiresAt = new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000).toISOString()
       await Promise.all([
         window.electron.configSet(SESSION_NAME_KEY, teacherName),
@@ -102,9 +95,9 @@ export const useAuthStore = create<AuthState>((set) => ({
         teacherName,
         expiresAt,
         error: '',
-        executiveRole: executiveSession?.role ?? null,
-        executiveAccessToken: executiveSession?.accessToken ?? '',
-        executiveExpiresAt: executiveSession?.expiresAt ?? '',
+        executiveRole: null,
+        executiveAccessToken: '',
+        executiveExpiresAt: '',
       })
       window.electron?.notifyAuthChanged()
       void preloadSchoolHubCache(teacherName)
@@ -116,6 +109,38 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ loading: false })
     }
   },
+
+  unlockExecutive: async (password) => {
+    const state = useAuthStore.getState()
+    const expectedRole = executiveRoleForName(state.teacherName)
+    if (!state.authenticated || !expectedRole) {
+      set({ error: '교장·교감 계정으로 먼저 로그인해 주세요.' })
+      return false
+    }
+    if (!password) {
+      set({ error: '추가 비밀번호를 입력해 주세요.' })
+      return false
+    }
+    set({ loading: true, error: '' })
+    try {
+      const executiveSession = await verifyExecutive(state.teacherName, password)
+      if (executiveSession.role !== expectedRole) throw new Error('보호 메뉴 권한을 확인하지 못했습니다.')
+      set({
+        executiveRole: executiveSession.role,
+        executiveAccessToken: executiveSession.accessToken,
+        executiveExpiresAt: executiveSession.expiresAt,
+        error: '',
+      })
+      return true
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) })
+      return false
+    } finally {
+      set({ loading: false })
+    }
+  },
+
+  lockExecutive: () => set({ executiveRole: null, executiveAccessToken: '', executiveExpiresAt: '', error: '' }),
 
   logout: async () => {
     clearSchoolHubSessionCache()

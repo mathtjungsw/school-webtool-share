@@ -31,7 +31,7 @@ function lessonParts(lesson: CompositeLesson) {
 function useExecutiveBundle() {
   const teacherName = useAuthStore(state => state.teacherName)
   const token = useAuthStore(state => state.executiveAccessToken)
-  const logout = useAuthStore(state => state.logout)
+  const lockExecutive = useAuthStore(state => state.lockExecutive)
   const [bundle, setBundle] = useState<ExecutiveScheduleBundle | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -41,7 +41,7 @@ function useExecutiveBundle() {
     catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause)
       setError(message)
-      if (message.includes('인증이 만료')) void logout()
+      if (message.includes('인증이 만료')) lockExecutive()
     } finally { setLoading(false) }
   }
   useEffect(() => { void load() }, [teacherName, token])

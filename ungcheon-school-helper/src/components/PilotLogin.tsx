@@ -1,18 +1,17 @@
 import { FormEvent, useState } from 'react'
 import { Clock3, LogIn, ShieldCheck, UserRound } from 'lucide-react'
-import { executiveRoleForName, useAuthStore } from '../stores/authStore'
+import { useAuthStore } from '../stores/authStore'
 import schoolLogo from '../assets/ungcheon-logo.png'
 
 export default function PilotLogin() {
   const [name, setName] = useState('')
-  const [password, setPassword] = useState('')
   const login = useAuthStore(state => state.login)
   const loading = useAuthStore(state => state.loading)
   const error = useAuthStore(state => state.error)
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    await login(name, password)
+    await login(name)
   }
 
   return (
@@ -30,16 +29,11 @@ export default function PilotLogin() {
             <span className="field-label flex items-center gap-1.5"><UserRound size={13} />이름</span>
             <input autoFocus autoComplete="name" value={name} onChange={event => setName(event.target.value)} className="input-field mt-1.5 w-full text-base" placeholder="예: 홍길동" maxLength={20} />
           </label>
-          {executiveRoleForName(name) && <label className="block">
-            <span className="field-label flex items-center gap-1.5"><ShieldCheck size={13} />교장·교감 추가 비밀번호</span>
-            <input autoComplete="current-password" type="password" value={password} onChange={event => setPassword(event.target.value)} className="input-field mt-1.5 w-full text-base" placeholder="추가 비밀번호" maxLength={30} />
-            <span className="mt-1.5 block text-[11px] font-semibold text-slate-500">보호 메뉴를 열기 위한 추가 인증입니다.</span>
-          </label>}
           {error && <p className="rounded-xl border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">{error}</p>}
-          <button disabled={loading || !name.trim() || Boolean(executiveRoleForName(name) && !password)} className="btn-primary flex w-full items-center justify-center gap-2 py-3 disabled:opacity-50"><LogIn size={16} />{loading ? '확인 중...' : '로그인'}</button>
+          <button disabled={loading || !name.trim()} className="btn-primary flex w-full items-center justify-center gap-2 py-3 disabled:opacity-50"><LogIn size={16} />{loading ? '확인 중...' : '로그인'}</button>
         </form>
         <div className="mt-5 space-y-2 rounded-2xl border border-white/5 bg-white/[0.025] p-4 text-[11px] text-slate-400">
-          <p className="flex items-center gap-2 text-amber-700"><ShieldCheck size={14} />교장·교감 계정은 추가 비밀번호로 보호됩니다.</p>
+          <p className="flex items-center gap-2 text-amber-700"><ShieldCheck size={14} />교장·교감 보호 메뉴는 열 때 추가 비밀번호를 확인합니다.</p>
           <p className="flex items-center gap-2"><Clock3 size={14} />한 번 로그인하면 이 PC에서 72시간 동안 유지됩니다.</p>
         </div>
       </section>
