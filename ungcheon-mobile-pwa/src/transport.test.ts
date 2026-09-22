@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MOBILE_REQUEST_TIMEOUT_MS, MobileRequestTimeoutError, MobileSessionExpiredError, SCHOOL_HUB_URL, secureReadAction } from './api'
+import { loadAttendanceRoster, MOBILE_REQUEST_TIMEOUT_MS, MobileRequestTimeoutError, MobileSessionExpiredError, SCHOOL_HUB_URL, secureReadAction } from './api'
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
 describe('모바일 API 전송 계약', () => {
@@ -33,7 +33,7 @@ describe('모바일 API 전송 계약', () => {
     await expect(secureReadAction('getMobileScheduleBundle')).rejects.toBeInstanceOf(TypeError)
   })
 
-  it('모바일 두 액션만 허용하고 고정 Apps Script POST/no-store로만 전송한다', async () => {
+  it('허용된 모바일 조회만 고정 Apps Script POST/no-store로 전송한다', async () => {
     const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, data: { verified: true } }) })
     vi.stubGlobal('fetch', fetcher)
     await secureReadAction('verifyMobileViewer', { action: 'getNeisData' })
@@ -43,5 +43,15 @@ describe('모바일 API 전송 계약', () => {
     expect(JSON.parse(init.body).action).toBe('verifyMobileViewer')
     await expect(secureReadAction('getNeisData')).rejects.toThrow('허용되지 않는 모바일 조회')
     expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('출결 상세는 선택한 날짜·교시와 로그인 교사만 별도 조회한다', async () => {
+    const response = { date: '2026-09-22', period: 2, state: 'complete', flaggedCount: 0, enrolledCount: 1, courseNames: ['기하'], classrooms: ['수학실'], classStatus: [{ className: '1', complete: true }], entries: [{ className: '1', number: '2', name: '가학생', remark: '' }], mismatchCount: 0, sourceDate: '2026-09-22', checkedAt: '2026-09-22T00:00:00Z', rosterBasis: 'course-enrollment' }
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ok: true, data: response }) })
+    vi.stubGlobal('fetch', fetcher)
+    await expect(loadAttendanceRoster('검증교사', 'synthetic-token', '2026-09-22', 2)).resolves.toEqual(response)
+    const body = JSON.parse(fetcher.mock.calls[0][1].body)
+    expect(body).toMatchObject({ action: 'getMobileAttendanceRoster', viewerName: '검증교사', accessToken: 'synthetic-token', date: '2026-09-22', period: 2 })
+    expect(fetcher.mock.calls[0][1].cache).toBe('no-store')
   })
 })

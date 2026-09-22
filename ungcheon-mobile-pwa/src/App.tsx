@@ -4,10 +4,10 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, CloudOff, Download, Eye, EyeOff, Filter, LockKeyhole, LogOut, Moon, RefreshCw, Sun, UserRound, UtensilsCrossed, X, Zap } from 'lucide-react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { friendlyLoginError, isSessionExpiredError, loadDashboard, markDashboardCached, mergeDashboardWithCache, MobileRequestTimeoutError, SESSION_EXPIRED_MESSAGE, verifyViewer } from './api'
+import { friendlyLoginError, isSessionExpiredError, loadAttendanceRoster, loadDashboard, markDashboardCached, mergeDashboardWithCache, MobileRequestTimeoutError, SESSION_EXPIRED_MESSAGE, verifyViewer } from './api'
 import { deleteUserCache, readUserCache, writeUserCache } from './cache'
 import { DAYS, DEFAULT_VISIBILITY, SOURCE_LABELS, buildMobileTimelineRows, collectEvents, eventFingerprint, findTeacher, lessonFocus, newEventFingerprints, parseSlot, rangeForToday, schoolClock, sortMealsByType, timetableForDate, ymd } from './domain'
-import type { DashboardPayload, LessonView, MealInfo, MobileAttendanceSummary, MobileEvent, MobileResourceKey, MobileResourceState, MobileResourceStatus, ScheduleSource } from './types'
+import type { DashboardPayload, LessonView, MealInfo, MobileAttendanceRoster, MobileAttendanceSummary, MobileEvent, MobileResourceKey, MobileResourceState, MobileResourceStatus, ScheduleSource } from './types'
 import { VISUAL_NAME, visualFixture } from './visualFixture'
 
 const SESSION_KEY = 'ungcheon.mobile.session.v1'
@@ -115,34 +115,49 @@ export function DailyTimeline({ lessons, events, teacherFound, attendance = [], 
   </div>
 }
 
-export function AttendanceSheet({ summary, onClose }: { summary: MobileAttendanceSummary; onClose: () => void }) {
+export function AttendanceSheet({ summary, roster, loading = false, error = '', onRetry, onClose }: {
+  summary: MobileAttendanceSummary
+  roster: MobileAttendanceRoster | null
+  loading?: boolean
+  error?: string
+  onRetry?: () => void
+  onClose: () => void
+}) {
+  const [filter, setFilter] = useState<'all' | 'remarks'>('all')
+  const detail = roster ?? summary
   const completeCount = summary.classStatus.filter(item => item.complete).length
-  const orderedEntries = [...summary.entries].sort((left, right) => Number(isSelfStudyEntry(left)) - Number(isSelfStudyEntry(right)))
+  const orderedEntries = [...(roster?.entries ?? [])].sort((left, right) => Number(left.className) - Number(right.className) || Number(left.number) - Number(right.number) || left.name.localeCompare(right.name, 'ko'))
+  const visibleEntries = filter === 'remarks' ? orderedEntries.filter(entry => Boolean(entry.remark.trim())) : orderedEntries
+  const remarkCount = orderedEntries.filter(entry => Boolean(entry.remark.trim())).length
   const statusText = summary.state === 'complete'
     ? `${summary.classStatus.length}개 반 모두 입력 완료`
     : summary.state === 'partial'
       ? `${summary.classStatus.length}개 반 중 ${completeCount}개 반 입력 완료`
       : `${summary.classStatus.length}개 반 모두 입력 전`
-  const checkedAt = safeTime(summary.checkedAt)
+  const checkedAt = safeTime(detail.checkedAt)
   return <div className="attendance-backdrop" role="presentation" onClick={onClose}>
     <section className="attendance-sheet" role="dialog" aria-modal="true" aria-labelledby="attendance-title" onClick={event => event.stopPropagation()}>
       <div className="attendance-handle" aria-hidden="true" />
       <button type="button" className="attendance-close" aria-label="출결 현황 닫기" onClick={onClose}><X size={21} /></button>
       <div className="attendance-heading">
-        <h2 id="attendance-title">{summary.period}교시 · {summary.courseNames.join(' · ') || '3학년 수업'} 수강생 출결</h2>
-        <p>{summary.classrooms.length ? `${summary.classrooms.join(' · ')} · ` : ''}실제 수강생 기준</p>
+        <h2 id="attendance-title">{summary.period}교시 · {detail.courseNames.join(' · ') || '3학년 수업'} 수강생 출결</h2>
+        <p>{detail.classrooms.length ? `${detail.classrooms.join(' · ')} · ` : ''}실제 수강생 기준</p>
         {summary.originalLabel && <p>{summary.changeType === 'pulled' ? '당김수업' : summary.changeType === 'exchange' ? '교체수업' : '변경수업'} · {summary.originalLabel}</p>}
       </div>
       {summary.requiresReview && <p className="attendance-warning"><AlertTriangle size={13} /> 출결 대상을 안전하게 확정하지 못했습니다. 원래 수업 자료를 확인해 주세요.</p>}
       <div className={`attendance-summary attendance-${summary.state}`}><CheckCircle2 size={16} /><strong>{statusText}</strong>{checkedAt && <span>마지막 확인 {checkedAt}</span>}</div>
       <div className="attendance-class-status" aria-label="반별 입력 상태">{summary.classStatus.map(item => <span className={item.complete ? 'complete' : 'pending'} key={item.className}>{item.className}반 {item.complete ? '입력 완료' : '입력 전'}</span>)}</div>
+      <div className="attendance-filter" aria-label="출결 명렬 표시 범위">
+        <button type="button" className={filter === 'all' ? 'active' : ''} aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>전체 명렬 <b>{roster?.enrolledCount ?? summary.enrolledCount}</b></button>
+        <button type="button" className={filter === 'remarks' ? 'active' : ''} aria-pressed={filter === 'remarks'} onClick={() => setFilter('remarks')}>비고만 <b>{remarkCount}</b></button>
+      </div>
       <div className="attendance-columns"><span>반·번호</span><span>이름</span><span>출결 비고</span></div>
-      <div className="attendance-list">{orderedEntries.map((entry, index) => {
+      <div className="attendance-list">{loading && <div className="attendance-empty attendance-loading"><RefreshCw className="spin" size={17} />수강생 명렬을 안전하게 불러오는 중입니다…</div>}{error && !loading && <div className="attendance-empty attendance-error"><AlertTriangle size={17} /><span>{error}</span>{onRetry && <button type="button" onClick={onRetry}>다시 시도</button>}</div>}{!loading && !error && visibleEntries.map((entry, index) => {
         const selfStudy = isSelfStudyEntry(entry)
-        return <div className={`attendance-entry ${selfStudy ? 'self-study' : ''}`} key={`${entry.className}-${entry.number}-${index}`}><b>{entry.className}반 {entry.number}번</b><strong>{entry.name}</strong><span className="attendance-remark">{entry.remark}{selfStudy && <small>자습 · 장소 이동</small>}</span></div>
-      })}{!summary.entries.length && <div className="attendance-empty">현재 입력된 출결 비고가 없습니다.</div>}</div>
-      {summary.mismatchCount > 0 && <p className="attendance-warning"><AlertTriangle size={13} /> 수강생 명단과 출결 시트가 일치하지 않는 항목 {summary.mismatchCount}건은 표시하지 않았습니다.</p>}
-      <p className="attendance-foot">5분마다 자동 확인 · 연결 실패 시 이전 정상 자료 표시</p>
+        return <div className={`attendance-entry ${selfStudy ? 'self-study' : ''}`} key={`${entry.className}-${entry.number}-${index}`}><b>{entry.className}반 {entry.number}번</b><strong>{entry.name}</strong><span className={`attendance-remark ${entry.remark ? '' : 'empty-remark'}`}>{entry.remark || '비고 없음'}{selfStudy && <small>자습 · 장소 이동</small>}</span></div>
+      })}{!loading && !error && roster && !visibleEntries.length && <div className="attendance-empty">{filter === 'remarks' ? '비고가 입력된 학생이 없습니다.' : '확인할 수강생이 없습니다.'}</div>}</div>
+      {detail.mismatchCount > 0 && <p className="attendance-warning"><AlertTriangle size={13} /> 수강생 명렬과 출결 시트가 일치하지 않는 항목 {detail.mismatchCount}건은 비고를 확인하지 못했습니다.</p>}
+      <p className="attendance-foot">5분 이내 서버 조회 캐시 · 팝업을 닫으면 기기 메모리에서 삭제</p>
     </section>
   </div>
 }
@@ -236,6 +251,9 @@ export default function App() {
   const [filterOpen, setFilterOpen] = useState(false)
   const [newKeys, setNewKeys] = useState<string[]>([])
   const [selectedAttendancePeriod, setSelectedAttendancePeriod] = useState<number | null>(null)
+  const [attendanceRoster, setAttendanceRoster] = useState<MobileAttendanceRoster | null>(null)
+  const [attendanceRosterLoading, setAttendanceRosterLoading] = useState(false)
+  const [attendanceRosterError, setAttendanceRosterError] = useState('')
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (typeof window !== 'undefined' && localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light'))
   const [visibility, setVisibility] = useState<Record<ScheduleSource, boolean>>(() => {
     if (typeof window === 'undefined') return DEFAULT_VISIBILITY
@@ -243,6 +261,7 @@ export default function App() {
   })
   const requestSequence = useRef(0)
   const requestController = useRef<AbortController | null>(null)
+  const attendanceRosterController = useRef<AbortController | null>(null)
   const activeRequest = useRef<string | null>(null)
   const lastRequest = useRef({ key: '', at: 0 })
   const sessionRef = useRef(session)
@@ -279,13 +298,14 @@ export default function App() {
     const name = sessionRef.current?.name ?? ''
     ++requestSequence.current
     requestController.current?.abort()
+    attendanceRosterController.current?.abort()
     requestController.current = null
     activeRequest.current = null
     lastRequest.current = { key: '', at: 0 }
     sessionRef.current = null
     dataRef.current = null
     try { localStorage.removeItem(SESSION_KEY) } catch { /* 저장소가 막혀도 화면의 세션은 종료한다. */ }
-    setSession(null); setData(null); setNewKeys([]); setSelectedAttendancePeriod(null); setLoading(false)
+    setSession(null); setData(null); setNewKeys([]); setSelectedAttendancePeriod(null); setAttendanceRoster(null); setAttendanceRosterLoading(false); setAttendanceRosterError(''); setLoading(false)
     setMessage(''); setCacheWarning(''); setSessionNotice(notice)
     if (name) void deleteUserCache(name)
   }, [])
@@ -301,6 +321,7 @@ export default function App() {
   useEffect(() => () => {
     ++requestSequence.current
     requestController.current?.abort()
+    attendanceRosterController.current?.abort()
     activeRequest.current = null
   }, [])
 
@@ -394,6 +415,38 @@ export default function App() {
     } catch (error) { return friendlyLoginError(error) }
   }
   const logout = () => clearSession()
+  const closeAttendance = useCallback(() => {
+    attendanceRosterController.current?.abort()
+    attendanceRosterController.current = null
+    setSelectedAttendancePeriod(null)
+    setAttendanceRoster(null)
+    setAttendanceRosterLoading(false)
+    setAttendanceRosterError('')
+  }, [])
+  const openAttendance = useCallback(async (summary: MobileAttendanceSummary) => {
+    const currentSession = sessionRef.current
+    if (!currentSession) return
+    attendanceRosterController.current?.abort()
+    const controller = new AbortController()
+    attendanceRosterController.current = controller
+    setSelectedAttendancePeriod(summary.period)
+    setAttendanceRoster(null)
+    setAttendanceRosterError('')
+    setAttendanceRosterLoading(true)
+    try {
+      const roster = await loadAttendanceRoster(currentSession.name, currentSession.accessToken, summary.date, summary.period, controller.signal)
+      if (!controller.signal.aborted) setAttendanceRoster(roster)
+    } catch (error) {
+      if (controller.signal.aborted) return
+      if (isSessionExpiredError(error)) { clearSession(SESSION_EXPIRED_MESSAGE); return }
+      setAttendanceRosterError(error instanceof MobileRequestTimeoutError ? error.message : '수강생 명렬을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요.')
+    } finally {
+      if (attendanceRosterController.current === controller) {
+        attendanceRosterController.current = null
+        setAttendanceRosterLoading(false)
+      }
+    }
+  }, [clearSession])
   const toggleSource = (source: ScheduleSource) => setVisibility(current => {
     const next = { ...current, [source]: !current[source] }; localStorage.setItem(FILTER_KEY, JSON.stringify(next)); return next
   })
@@ -434,7 +487,7 @@ export default function App() {
       {data && view === 'today' && <>
         <DateNavigator dates={previewDates} selected={selectedDate} today={today} onSelect={setSelectedDate} />
         {selectedDate === today && <NowNextCard lessons={selectedLessons} events={selectedEvents} minuteOfDay={clock.minutes} />}
-        <section className="panel timetable-primary"><div className="panel-title"><div className="panel-icon"><Clock3 size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘의 교사 시간표' : '선택한 날의 교사 시간표'}</h2></div><StatusBadge status={timetableStatus} /></div><DailyTimeline lessons={selectedLessons} events={selectedEvents} attendance={selectedAttendanceSummaries} onOpenAttendance={summary => setSelectedAttendancePeriod(summary.period)} teacherFound={Boolean(teacher)} isNew={isNew} /></section>
+        <section className="panel timetable-primary"><div className="panel-title"><div className="panel-icon"><Clock3 size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘의 교사 시간표' : '선택한 날의 교사 시간표'}</h2></div><StatusBadge status={timetableStatus} /></div><DailyTimeline lessons={selectedLessons} events={selectedEvents} attendance={selectedAttendanceSummaries} onOpenAttendance={openAttendance} teacherFound={Boolean(teacher)} isNew={isNew} /></section>
         <section className="panel"><div className="panel-title"><div className="panel-icon secondary"><CalendarDays size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘 일정' : '선택한 날의 일정'}</h2></div><StatusBadge status={scheduleStatus} /></div><div className="event-list">{selectedEvents.map(event => <EventCard key={event.id} event={event} isNew={isNew(event)} />)}{!selectedEvents.length && <div className="empty">표시할 일정이 없습니다.</div>}</div></section>
         <MealPanel meals={selectedMeals} status={mealStatus} isToday={selectedDate === today} />
       </>}
@@ -449,6 +502,6 @@ export default function App() {
         })}</div>)}</section>}
       {data?.cachedAt && <p className="updated-at">마지막 앱 조회 {format(new Date(data.cachedAt), 'M.d HH:mm')}</p>}
     </main>
-    {selectedAttendance && <AttendanceSheet summary={selectedAttendance} onClose={() => setSelectedAttendancePeriod(null)} />}
+    {selectedAttendance && <AttendanceSheet key={`${selectedAttendance.date}-${selectedAttendance.period}`} summary={selectedAttendance} roster={attendanceRoster} loading={attendanceRosterLoading} error={attendanceRosterError} onRetry={() => void openAttendance(selectedAttendance)} onClose={closeAttendance} />}
   </div>
 }

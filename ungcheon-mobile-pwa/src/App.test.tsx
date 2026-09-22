@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AttendanceSheet, DailyTimeline, Login } from './App'
-import type { MobileAttendanceSummary } from './types'
+import type { MobileAttendanceRoster, MobileAttendanceSummary } from './types'
 
 const attendance: MobileAttendanceSummary = {
   date: '2026-09-14', period: 2, state: 'partial', flaggedCount: 1, enrolledCount: 2,
@@ -10,6 +10,15 @@ const attendance: MobileAttendanceSummary = {
   classStatus: [{ className: '1', complete: false }, { className: '2', complete: true }],
   entries: [{ className: '2', number: '7', name: '김테스트', remark: '조퇴' }],
   mismatchCount: 0, sourceDate: '2026-09-14', checkedAt: '2026-09-14T00:36:00Z', rosterBasis: 'course-enrollment',
+}
+const roster: MobileAttendanceRoster = {
+  ...attendance,
+  enrolledCount: 3,
+  entries: [
+    { className: '1', number: '2', name: '가학생', remark: '' },
+    { className: '2', number: '7', name: '김테스트', remark: '조퇴' },
+    { className: '2', number: '8', name: '이학생', remark: '' },
+  ],
 }
 
 describe('로그인 화면', () => {
@@ -51,13 +60,18 @@ describe('3학년 수강생 출결', () => {
   })
 
   it('반·번호, 이름, 비고 순으로 실제 수강생 출결만 표시한다', () => {
-    render(<AttendanceSheet summary={attendance} onClose={vi.fn()} />)
+    render(<AttendanceSheet summary={attendance} roster={roster} onClose={vi.fn()} />)
     expect(screen.getByText('2개 반 중 1개 반 입력 완료')).toBeInTheDocument()
     expect(screen.getByText('1반 입력 전')).toBeInTheDocument()
     expect(screen.getByText('2반 7번')).toBeInTheDocument()
     expect(screen.getByText('김테스트')).toBeInTheDocument()
     expect(screen.getByText('조퇴')).toBeInTheDocument()
+    expect(screen.getAllByText('비고 없음')).toHaveLength(2)
     expect(screen.getByText('실제 수강생 기준', { exact: false })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '비고만 1' }))
+    expect(screen.queryByText('가학생')).not.toBeInTheDocument()
+    expect(screen.getByText('김테스트')).toBeInTheDocument()
+    expect(screen.queryByText('이학생')).not.toBeInTheDocument()
   })
 
   it('자습 학생을 장소 이동으로 구분하고 실제 출결 인원과 따로 표시한다', () => {
@@ -76,12 +90,29 @@ describe('3학년 수강생 출결', () => {
     expect(screen.getByRole('button', { name: /2교시 수강생 출결 출결 2명 · 자습 1명/ })).toBeInTheDocument()
     timeline.unmount()
 
-    const sheet = render(<AttendanceSheet summary={selfStudyAttendance} onClose={vi.fn()} />)
+    const fullRoster: MobileAttendanceRoster = {
+      ...selfStudyAttendance,
+      enrolledCount: 4,
+      entries: [
+        { className: '2', number: '9', name: '비고없음', remark: '' },
+        ...selfStudyAttendance.entries,
+      ],
+    }
+    const sheet = render(<AttendanceSheet summary={selfStudyAttendance} roster={fullRoster} onClose={vi.fn()} />)
     const selfStudyRow = screen.getByText('이자습').closest('.attendance-entry')
     const mixedRow = screen.getByText('박혼합').closest('.attendance-entry')
     expect(selfStudyRow).toHaveClass('self-study')
     expect(mixedRow).not.toHaveClass('self-study')
     expect(screen.getByText('자습 · 장소 이동')).toBeInTheDocument()
-    expect([...sheet.container.querySelectorAll('.attendance-entry strong')].map(node => node.textContent)).toEqual(['김출결', '박혼합', '이자습'])
+    expect([...sheet.container.querySelectorAll('.attendance-entry strong')].map(node => node.textContent)).toEqual(['박혼합', '김출결', '이자습', '비고없음'])
+  })
+
+  it('전체 명렬 조회 중과 실패 상태를 구분한다', () => {
+    const loading = render(<AttendanceSheet summary={attendance} roster={null} loading onClose={vi.fn()} />)
+    expect(screen.getByText('수강생 명렬을 안전하게 불러오는 중입니다…')).toBeInTheDocument()
+    loading.unmount()
+    render(<AttendanceSheet summary={attendance} roster={null} error="연결 실패" onRetry={vi.fn()} onClose={vi.fn()} />)
+    expect(screen.getByText('연결 실패')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
   })
 })

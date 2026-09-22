@@ -53,7 +53,7 @@ const sourcePrinter = ts.createPrinter({ removeComments: true, newLine: ts.NewLi
 function canonicalNode(node, ast) { return sourcePrinter.printNode(ts.EmitHint.Unspecified, node, ast).trim() }
 // Integration changes may add mobile helpers, revise routing, and merge notices.
 // Everything else must preserve the desktop definition approved in origin/main.
-function isIntegrationFunction(name) { return name.startsWith('mobile') || name.startsWith('executive') || ['doGet', 'doPost', 'getMobileScheduleBundle_', 'getWidgetAttendanceSummaries_'].includes(name) }
+function isIntegrationFunction(name) { return name.startsWith('mobile') || name.startsWith('executive') || ['doGet', 'doPost', 'getMobileScheduleBundle_', 'getMobileAttendanceRoster_', 'getWidgetAttendanceSummaries_'].includes(name) }
 function isIntegrationConstant(name) { return name.startsWith('MOBILE_') || name.startsWith('EXECUTIVE_') || name === 'RELEASE_NOTES' }
 function literal(node) {
   if (!node) return undefined
@@ -150,10 +150,10 @@ function assertSessionPreservation(info) {
 }
 function validateContract(info) {
   for (const name of info.duplicateFunctions) if (isIntegrationFunction(name)) blocked(`duplicate mobile/widget entry point: ${name}`)
-  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 50) blocked('MOBILE_SERVICE_VERSION must include complete third-grade attendance matching (50 or newer)')
+  if (!Number.isInteger(info.serviceVersion) || info.serviceVersion < 51) blocked('MOBILE_SERVICE_VERSION must include on-demand attendance rosters (51 or newer)')
   if (info.constants.get('MOBILE_SESSION_HOURS') !== 72) blocked('MOBILE_SESSION_HOURS must remain 72')
   if (info.constants.get('MOBILE_SHARED_PASSWORD_HASH_PROPERTY') !== 'UNG_MOBILE_SHARED_PASSWORD_HASH' || info.constants.get('MOBILE_SESSION_PROPERTY_PREFIX') !== 'UNG_MOBILE_SESSION_') blocked('existing mobile credential property names must be preserved')
-  for (const name of ['verifyMobileViewer', 'getMobileScheduleBundle', 'getWidgetAttendanceSummaries']) if (!info.actions.has(name)) blocked(`mobile/widget action missing: ${name}`)
+  for (const name of ['verifyMobileViewer', 'getMobileScheduleBundle', 'getMobileAttendanceRoster', 'getWidgetAttendanceSummaries']) if (!info.actions.has(name)) blocked(`mobile/widget action missing: ${name}`)
   for (const name of ['verifyExecutive', 'getExecutiveScheduleBundle', 'changeExecutivePassword', 'resetExecutivePassword']) if (!info.actions.has(name)) blocked(`executive action missing: ${name}`)
   for (const name of ['getTimetableOverrides', 'saveTimetableOverride', 'deactivateTimetableOverride']) if (!info.actions.has(name)) blocked(`daily timetable override action missing: ${name}`)
   const post = requireFunction(info, 'doPost')
@@ -170,6 +170,11 @@ function validateContract(info) {
   if (!/meals\s*:\s*meals/.test(bundle) || !/todayMeals\s*:\s*todayMeals/.test(bundle) || !/mobileSharedMealsInRange_\([^;\n]*fromDate[^;\n]*toDate/.test(bundle)) blocked('range meals/legacy todayMeals contract missing')
   if (!/todayKey/.test(bundle) || !/cacheKey[^\n]*todayKey/.test(bundle)) blocked('mobile cache key must include the Korea date')
   if (!/attendanceContextVersion/.test(bundle) || !/cacheKey[^\n]*attendanceContextVersion/.test(bundle)) blocked('mobile cache key must include changed-course attendance context')
+  const attendanceRoster = requireFunction(info, 'getMobileAttendanceRoster_')
+  if (!/mobileAssertAccess_\s*\(\s*body\s*\)/.test(attendanceRoster)) blocked('attendance roster must require the existing mobile login session')
+  if (!/mobileAttendanceStudentsForSlot_/.test(attendanceRoster) || !/entries\s*:\s*entries/.test(attendanceRoster)) blocked('attendance roster must use the course-enrollment matcher and return its minimal entries')
+  if (!/CacheService\.getScriptCache\(\)\.put\([^;]*300\)/.test(attendanceRoster)) blocked('attendance roster cache must be limited to five minutes')
+  if (/studentId\s*:|payloadJson\s*:|slots\s*:|selections\s*:/.test(attendanceRoster)) blocked('attendance roster exposes a full student record')
   const widgetAttendance = requireFunction(info, 'getWidgetAttendanceSummaries_')
   if (!/mobileAssertViewer_\s*\(\s*body\.viewerName\s*\)/.test(widgetAttendance) || !/mobileAttendanceSummaries_/.test(widgetAttendance)) blocked('desktop widget attendance route must validate the viewer and reuse the course-enrollment matcher')
   if (!/CacheService\.getScriptCache\(\)\.put\([^;]*300\)/.test(widgetAttendance)) blocked('desktop widget attendance must retain the five-minute server cache')
@@ -186,7 +191,7 @@ function validateContract(info) {
   if (!/rosterBasis\s*:\s*['"]course-enrollment['"]/.test(attendanceSummary) || !/entries\s*:\s*entries/.test(attendanceSummary)) blocked('attendance response must document the course-enrollment basis and return only filtered entries')
   if (/studentId\s*:|payloadJson\s*:|slots\s*:|selections\s*:/.test(attendanceSummary)) blocked('attendance response exposes a full student record')
   for (const [name, body] of info.functions) {
-    if (!name.startsWith('mobile') && name !== 'getMobileScheduleBundle_' && name !== 'getWidgetAttendanceSummaries_') continue
+    if (!name.startsWith('mobile') && name !== 'getMobileScheduleBundle_' && name !== 'getMobileAttendanceRoster_' && name !== 'getWidgetAttendanceSummaries_') continue
     if (/UrlFetchApp|open\.neis\.go\.kr|NEIS_SCHEDULE_SHEET|NEIS_CLASS_TIMETABLE_SHEET|getStudentRoster_|getStudentTimetable_|getNeisSnapshot_/.test(body)) blocked(`forbidden mobile data/API dependency in ${name}`)
   }
   if (/\b(?:studentRoster|studentTimetable|studentTimetables|neisSchedule|neisClassTimetable|classTimetable|students)\s*:/.test(bundle)) blocked('forbidden student/NEIS field in mobile response')

@@ -3,6 +3,7 @@ import type {
   MobileResourceKey,
   MobileResourceStatus,
   MobileResourceStatusMap,
+  MobileAttendanceRoster,
   MobileScheduleBundle,
 } from './types'
 import { PULLED_LESSONS_2026 } from './shared/pulledLessons2026'
@@ -40,7 +41,7 @@ export function friendlyLoginError(error: unknown) {
 }
 
 export async function secureReadAction<T>(action: string, payload: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
-  if (!['verifyMobileViewer', 'getMobileScheduleBundle'].includes(action)) throw new Error('허용되지 않는 모바일 조회입니다.')
+  if (!['verifyMobileViewer', 'getMobileScheduleBundle', 'getMobileAttendanceRoster'].includes(action)) throw new Error('허용되지 않는 모바일 조회입니다.')
   const controller = new AbortController()
   let timedOut = false
   const abort = () => controller.abort()
@@ -57,7 +58,7 @@ export async function secureReadAction<T>(action: string, payload: Record<string
     const result = await response.json() as HubResponse<T>
     if (!result.ok) {
       const expired = result.code === 'MOBILE_SESSION_EXPIRED' || result.errorCode === 'MOBILE_SESSION_EXPIRED'
-        || (action === 'getMobileScheduleBundle' && /로그인.*(만료|유효기간)|세션.*만료/.test(result.error ?? ''))
+        || (action !== 'verifyMobileViewer' && /로그인.*(만료|유효기간)|세션.*만료/.test(result.error ?? ''))
       if (expired) throw new MobileSessionExpiredError()
       throw new Error(result.error || '학교 공유 자료를 불러오지 못했습니다.')
     }
@@ -75,6 +76,25 @@ export function verifyViewer(name: string, password: string) {
   return secureReadAction<{ verified: boolean; accessToken: string; expiresAt: string }>('verifyMobileViewer', {
     viewerName: name, password,
   })
+}
+
+function attendanceContextFor(name: string) {
+  const attendancePulledLessons = PULLED_LESSONS_2026
+    .filter(item => item.teacherName.trim() === name.trim() && item.originalTeacherName.trim() === name.trim())
+    .map(item => ({
+      id: item.id, date: item.date, period: item.period, classLabel: item.classLabel, subject: item.subject,
+      teacherName: item.teacherName, originalTeacherName: item.originalTeacherName,
+      originalSlot: item.originalSlot, originalDate: item.originalDate,
+    }))
+  const attendanceContextVersion = attendancePulledLessons.map(item => [item.id, item.date, item.period, item.originalDate, item.originalSlot].join(':')).join('|')
+  return { attendancePulledLessons, attendanceContextVersion }
+}
+
+export function loadAttendanceRoster(name: string, accessToken: string, date: string, period: number, signal?: AbortSignal) {
+  const context = attendanceContextFor(name)
+  return secureReadAction<MobileAttendanceRoster>('getMobileAttendanceRoster', {
+    viewerName: name, accessToken, date, period, ...context,
+  }, signal)
 }
 
 function countResource(bundle: MobileScheduleBundle, key: MobileResourceKey) {
@@ -115,14 +135,7 @@ function normalizeBundle(bundle: MobileScheduleBundle): MobileScheduleBundle {
 }
 
 export async function loadDashboard(name: string, accessToken: string, fromDate: string, toDate: string, signal?: AbortSignal): Promise<DashboardPayload> {
-  const attendancePulledLessons = PULLED_LESSONS_2026
-    .filter(item => item.teacherName.trim() === name.trim() && item.originalTeacherName.trim() === name.trim())
-    .map(item => ({
-      id: item.id, date: item.date, period: item.period, classLabel: item.classLabel, subject: item.subject,
-      teacherName: item.teacherName, originalTeacherName: item.originalTeacherName,
-      originalSlot: item.originalSlot, originalDate: item.originalDate,
-    }))
-  const attendanceContextVersion = attendancePulledLessons.map(item => [item.id, item.date, item.period, item.originalDate, item.originalSlot].join(':')).join('|')
+  const { attendancePulledLessons, attendanceContextVersion } = attendanceContextFor(name)
   const received = await secureReadAction<MobileScheduleBundle>('getMobileScheduleBundle', {
     viewerName: name, accessToken, fromDate, toDate, attendancePulledLessons, attendanceContextVersion,
   }, signal)

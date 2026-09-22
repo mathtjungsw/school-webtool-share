@@ -42,7 +42,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 50;
+const MOBILE_SERVICE_VERSION = 51;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -396,6 +396,17 @@ const LEGACY_RELEASE_NOTES = [
 
 const RELEASE_NOTES = [
   {
+    key: 'v1.1.35',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.35 · 교장·교감 위젯 자동 로그인과 보호 메뉴 인증 분리',
+    body: [
+      '· 교장·교감 계정도 이름 로그인과 72시간 기본 세션을 유지하여 프로그램을 다시 실행해도 위젯이 같은 사용자로 자동 연결됩니다.',
+      '· 교장메뉴·교감메뉴는 해당 메뉴를 처음 열 때만 추가 비밀번호를 확인하며, 역할·접근 토큰·추가 비밀번호는 위젯에 전달하거나 저장하지 않습니다.',
+      '· 보호 메뉴 인증이 만료되어도 프로그램 전체를 로그아웃하지 않고 보호 메뉴만 다시 잠급니다.',
+      '· 모바일 PWA의 3학년 수업 출결은 해당 교시의 실제 수강생 전체 명렬과 비고만 보기를 지원하며 기존 공개 주소를 유지합니다.'
+    ].join('\n'),
+    date: '2026-09-22'
+  },
+  {
     key: 'v1.1.34',
     title: '[업데이트] 웅천고 업무도우미 v1.1.34 · 위젯 3학년 이동수업 출결과 자습 구분',
     body: [
@@ -405,6 +416,16 @@ const RELEASE_NOTES = [
       '· 기존 모바일 공개 주소, Apps Script 고정 주소, 72시간 로그인, 교장·교감 메뉴와 이전 릴리스 안내를 모두 유지합니다.'
     ].join('\n'),
     date: '2026-09-21'
+  },
+  {
+    key: 'mobile-service-attendance-roster-2026-09-22',
+    title: '[모바일 개선] 3학년 수업 출결 전체 명렬과 비고 필터',
+    body: [
+      '· 출결 버튼을 누른 해당 교시만 별도 인증 조회하여 실제 수강생 전체 명렬과 비고를 확인합니다.',
+      '· 전체 명렬과 비고만 보기를 즉시 전환하고, 자습 학생은 학번순 위치를 유지한 채 연두색으로 구분합니다.',
+      '· 전체 학생 명렬은 기존 일정 응답이나 기기 장기 캐시에 저장하지 않으며 다른 수업의 학생 자료를 함께 반환하지 않습니다.'
+    ].join('\n'),
+    date: '2026-09-22'
   },
   {
     key: 'mobile-service-attendance-match-2026-09-21',
@@ -846,6 +867,7 @@ function doPost(e) {
       return json_({ ok: true, data: mobileCreateSession_(mobileViewer) });
     }
     if (action === 'getMobileScheduleBundle') return json_({ ok: true, data: getMobileScheduleBundle_(body) });
+    if (action === 'getMobileAttendanceRoster') return json_({ ok: true, data: getMobileAttendanceRoster_(body) });
     if (action === 'getWidgetAttendanceSummaries') return json_({ ok: true, data: getWidgetAttendanceSummaries_(body) });
     if (action === 'verifyExecutive') return json_({ ok: true, data: executiveVerify_(body) });
     if (action === 'getExecutiveScheduleBundle') return json_({ ok: true, data: executiveScheduleBundle_(body) });
@@ -3624,6 +3646,82 @@ function getWidgetAttendanceSummaries_(body) {
   const result = {
     attendanceSummaries: mobileAttendanceSummaries_(viewerName, date, date, timetableOverrides, timetableChanges, attendancePulledLessons),
     fetchedAt: new Date().toISOString()
+  };
+  try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 300); } catch (ignore) {}
+  return result;
+}
+
+function getMobileAttendanceRoster_(body) {
+  const viewerName = mobileAssertAccess_(body);
+  const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+  const date = clean_(body.date, 10);
+  const period = Number(body.period);
+  if (date !== today) throw new Error('모바일 출결 명렬은 오늘 수업만 조회할 수 있습니다.');
+  if (!Number.isInteger(period) || period < 1 || period > 7) throw new Error('조회 교시를 확인해 주세요.');
+  const attendancePulledLessons = (Array.isArray(body.attendancePulledLessons) ? body.attendancePulledLessons : []).slice(0, 100);
+  const attendanceContextVersion = clean_(body.attendanceContextVersion, 100);
+  const cacheKey = 'mobile-attendance-roster:v' + MOBILE_SERVICE_VERSION + ':' + sha256_(viewerName).slice(0, 12) + ':' + date.replace(/-/g, '') + ':' + period + ':' + sha256_(attendanceContextVersion).slice(0, 8);
+  try {
+    const cached = CacheService.getScriptCache().get(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch (ignore) {}
+
+  const timetableChanges = listTimetableChanges_({ viewerName: viewerName, fromDate: date, toDate: date, includeSchool: false }).filter(function(change) {
+    if (change.status === 'cancelled' || change.status === 'rejected') return false;
+    return change.status === 'approved' || Boolean(change.requesterAppliedAt && change.requesterName === viewerName);
+  });
+  const timetableOverrides = listTimetableOverrides_({ includeInactive: false }).filter(function(item) {
+    return item.date === date || item.sourceDate === date;
+  });
+  const snapshot = mobileAttendanceSheetSnapshot_(date);
+  if (!snapshot) throw new Error('오늘 출결 자료를 확인하지 못했습니다.');
+  const resolved = mobileAttendanceStudentsForSlot_(viewerName, date, period, readObjects_(STUDENT_TIMETABLE_SHEET), timetableOverrides, timetableChanges, attendancePulledLessons, getTimetable_());
+  const enrolled = resolved.students;
+  const context = resolved.context || {};
+  const relevantClasses = [];
+  const courseNames = [];
+  const classrooms = [];
+  let mismatchCount = 0;
+  const entries = enrolled.map(function(student) {
+    if (relevantClasses.indexOf(student.className) < 0) relevantClasses.push(student.className);
+    if (student.subject && courseNames.indexOf(student.subject) < 0) courseNames.push(student.subject);
+    if (student.classroom && classrooms.indexOf(student.classroom) < 0) classrooms.push(student.classroom);
+    const sourceClass = snapshot.classes[student.className];
+    const record = sourceClass && sourceClass.records[student.number];
+    const matches = Boolean(record && clean_(record.name, 30) === student.name);
+    if (!matches) mismatchCount++;
+    return {
+      className: student.className,
+      number: student.number,
+      name: student.name,
+      remark: matches ? clean_(record.remark, 300) : ''
+    };
+  }).sort(function(a, b) {
+    return Number(a.className) - Number(b.className) || Number(a.number) - Number(b.number) || a.name.localeCompare(b.name);
+  });
+  relevantClasses.sort(function(a, b) { return Number(a) - Number(b); });
+  const classStatus = relevantClasses.map(function(className) {
+    return { className: className, complete: Boolean(snapshot.classes[className] && snapshot.classes[className].complete) };
+  });
+  const completedCount = classStatus.filter(function(item) { return item.complete; }).length;
+  const state = classStatus.length && completedCount === classStatus.length ? 'complete' : completedCount === 0 ? 'pending' : 'partial';
+  const result = {
+    date: date,
+    period: period,
+    state: state,
+    flaggedCount: entries.filter(function(entry) { return Boolean(entry.remark); }).length,
+    enrolledCount: entries.length,
+    courseNames: courseNames.slice(0, 4),
+    classrooms: classrooms.slice(0, 4),
+    classStatus: classStatus,
+    entries: entries,
+    mismatchCount: mismatchCount,
+    sourceDate: snapshot.sourceDate,
+    checkedAt: new Date().toISOString(),
+    rosterBasis: 'course-enrollment',
+    changeType: context.changeType || '',
+    originalLabel: context.originalLabel || '',
+    requiresReview: Boolean(context.review)
   };
   try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 300); } catch (ignore) {}
   return result;

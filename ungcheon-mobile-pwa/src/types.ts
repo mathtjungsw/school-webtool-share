@@ -46,6 +46,9 @@ export interface MobileAttendanceSummary {
   originalLabel?: string
   requiresReview?: boolean
 }
+export interface MobileAttendanceRoster extends Omit<MobileAttendanceSummary, 'entries'> {
+  entries: MobileAttendanceEntry[]
+}
 export type MobileResourceKey = 'weekly' | 'creative' | 'gateDuty' | 'mealDuty' | 'timetable' | 'committee' | 'changes' | 'overrides' | 'meals' | 'attendance'
 export type MobileResourceState = 'fresh' | 'empty' | 'cached' | 'unavailable'
 export interface MobileResourceStatus {

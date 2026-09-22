@@ -107,7 +107,7 @@ function harness(options = {}) {
     }) },
     CacheService: { getScriptCache: () => ({
       get: key => { cacheKeys.push(key); if (failCacheRead) throw new Error('cache read failure'); return cache.get(key) || null; },
-      put: (key, value, ttl) => { assert.equal(ttl, 60); if (failCacheWrite) throw new Error('cache write failure'); cache.set(key, value); },
+      put: (key, value, ttl) => { assert.ok([60, 300].includes(ttl)); if (failCacheWrite) throw new Error('cache write failure'); cache.set(key, value); },
       remove: key => cache.delete(key),
     }) },
     ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: text => ({ setMimeType: () => JSON.parse(text) }) },
@@ -303,6 +303,38 @@ test('attendance uses the actual third-grade course roster and reports partial h
   const text = JSON.stringify(bundle);
   for (const forbidden of ['studentId', 'payloadJson', 'selections', '비수강학생', '다른교사학생']) assert.equal(text.includes(forbidden), false, forbidden);
   assert.ok(h.readNames.includes('학생시간표'));
+});
+
+test('attendance detail returns the whole requested course roster only and keeps student-number order', () => {
+  const makeStudent = (className, number, name, teacher = '테스트교사') => ({ payloadJson: JSON.stringify({
+    student: { studentId: `3${className}${String(number).padStart(2, '0')}`, name, grade: '3', className: String(className), number: String(number) },
+    slots: { 월1: { subject: '기하', teacher, classroom: '수학실' } },
+    selections: [{ courseName: '기하', teacher }],
+  }) });
+  const h = harness({
+    now: '2026-08-31T03:00:00Z',
+    studentTimetableRows: [makeStudent(2, 8, '자습학생'), makeStudent(1, 3, '정상학생'), makeStudent(2, 1, '비고학생'), makeStudent(3, 1, '타교사학생', '다른교사')],
+    attendanceValues: [
+      ['2026-08-31 (월)', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['', '', false, '', '', true, '', '', true, '', '', true, '', '', true, '', '', true, '', '', true],
+      ['1반', '이름', '비고', '2반', '이름', '비고', '3반', '이름', '비고', '4반', '이름', '비고', '5반', '이름', '비고', '6반', '이름', '비고', '7반', '이름', '비고'],
+      [3, '정상학생', '', 1, '비고학생', '조퇴', 1, '타교사학생', '결석', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['', '', '', 8, '자습학생', '도서관 자습', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ],
+  });
+  const result = h.post({ action: 'getMobileAttendanceRoster', viewerName: '테스트교사', accessToken: h.existingToken, date: '2026-08-31', period: 1, attendancePulledLessons: [], attendanceContextVersion: 'detail-v1' });
+  assert.equal(result.ok, true);
+  assert.equal(result.data.enrolledCount, 3);
+  assert.equal(result.data.flaggedCount, 2);
+  assert.deepEqual(result.data.entries.map(entry => [entry.className, entry.number, entry.name, entry.remark]), [
+    ['1', '3', '정상학생', ''],
+    ['2', '1', '비고학생', '조퇴'],
+    ['2', '8', '자습학생', '도서관 자습'],
+  ]);
+  assert.deepEqual(Object.keys(result.data.entries[0]).sort(), ['className', 'name', 'number', 'remark']);
+  const text = JSON.stringify(result.data);
+  for (const forbidden of ['studentId', 'payloadJson', 'selections', '타교사학생', 'accessToken']) assert.equal(text.includes(forbidden), false, forbidden);
+  assert.ok([...h.cache.keys()].some(key => key.startsWith('mobile-attendance-roster:v')));
 });
 
 test('third-grade class and movement lessons accept co-teachers and safely disambiguate abbreviated names', () => {

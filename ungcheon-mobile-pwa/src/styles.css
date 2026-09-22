@@ -300,6 +300,10 @@ input:focus { border-color: #28624e; box-shadow: 0 0 0 3px rgba(40, 98, 78, .12)
 .attendance-class-status span { padding: 4px 7px; border-radius: 999px; font-size: 9px; font-weight: 850; }
 .attendance-class-status .complete { background: #eaf7f0; color: #176047; }
 .attendance-class-status .pending { background: #fff0d0; color: #875512; }
+.attendance-filter { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 10px; padding: 3px; border-radius: 12px; background: var(--surface-soft); }
+.attendance-filter button { min-height: 34px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 900; }
+.attendance-filter button b { display: inline-grid; min-width: 18px; height: 18px; margin-left: 4px; place-items: center; border-radius: 999px; background: color-mix(in srgb, currentColor 11%, transparent); font-size: 9px; }
+.attendance-filter button.active { background: var(--surface); color: #176047; box-shadow: 0 1px 5px rgba(8,35,27,.1); }
 .attendance-columns, .attendance-entry { display: grid; grid-template-columns: 74px minmax(70px, .8fr) minmax(110px, 1.35fr); gap: 8px; align-items: center; }
 .attendance-columns { padding: 7px 8px; border-block: 1px solid var(--line); color: var(--muted); font-size: 9px; font-weight: 850; }
 .attendance-list { max-height: min(34vh, 310px); overflow-y: auto; }
@@ -310,11 +314,15 @@ input:focus { border-color: #28624e; box-shadow: 0 0 0 3px rgba(40, 98, 78, .12)
 .attendance-entry.self-study { border-left: 3px solid #76b98a; background: #effbf2; }
 .attendance-entry.self-study b, .attendance-entry.self-study strong { color: #235e3b; }
 .attendance-remark { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.attendance-remark.empty-remark { color: var(--muted); font-size: 10px; }
 .attendance-remark small { padding: 3px 6px; border-radius: 999px; background: #d9f3df; color: #23623c; font-size: 8.5px; font-weight: 850; }
 :root[data-theme="dark"] .attendance-entry.self-study { background: #193528; }
 :root[data-theme="dark"] .attendance-entry.self-study b, :root[data-theme="dark"] .attendance-entry.self-study strong { color: #b9e8c8; }
 :root[data-theme="dark"] .attendance-remark small { background: #28543a; color: #d5f6df; }
 .attendance-empty { padding: 24px 8px; text-align: center; color: var(--muted); font-size: 11px; }
+.attendance-loading, .attendance-error { min-height: 112px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.attendance-error { flex-direction: column; color: #9a5a0a; }
+.attendance-error button { border: 1px solid #d6a65a; border-radius: 9px; padding: 6px 10px; background: #fff7e4; color: #7b4a08; font-size: 10px; font-weight: 900; }
 .attendance-warning { margin: 10px 0 0; display: flex; align-items: flex-start; gap: 5px; color: #9a5a0a; font-size: 9px; line-height: 1.4; }
 .attendance-foot { margin: 12px 0 0; text-align: center; color: var(--muted); font-size: 9px; }
 .spin { animation: spin 1s linear infinite; }
