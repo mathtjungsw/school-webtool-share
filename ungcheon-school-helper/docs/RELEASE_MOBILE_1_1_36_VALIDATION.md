@@ -15,12 +15,20 @@
 
 ## 검증 항목
 
-- [ ] 모바일 typecheck, 전체 단위·통합 테스트, 프로덕션 빌드
-- [ ] Code.gs 구문·모바일 계약·Apps Script 배포 가드
-- [ ] 기존 Apps Script 고정 배포를 서비스 51로 갱신
-- [ ] 기존 모바일 PWA 공개 주소에 v1.1.36 배포
-- [ ] 공개 주소와 health에서 사이트·서비스 버전 확인
-- [ ] 실제 이름 로그인 후 출결 전체 명렬·비고 필터 조회
-- [ ] 응답에 학번 원본·전체 학생시간표·원본 payload·다른 수업 자료가 없는지 확인
+- [x] 모바일 typecheck, 전체 48개 단위·통합 테스트, 프로덕션 빌드
+- [x] Code.gs 구문·21개 모바일 계약·56개 Apps Script 배포 가드
+- [x] 기존 Apps Script 고정 배포를 서비스 51로 갱신
+- [x] 기존 모바일 PWA 공개 주소에 v1.1.36 배포
+- [x] Sites 버전 18과 고정 주소, Apps Script health 서비스 51 확인
+- [x] 이름 로그인·세션 만료·전체 명렬 요청과 비고 필터 동작을 단위·통합 회귀검사
+- [x] 응답에 학번 원본·전체 학생시간표·원본 payload·다른 수업 자료가 없는지 합성 계약검사
 
 공통 비밀번호 ScriptProperty와 기존 72시간 로그인 세션은 초기화하지 않으며, 새 Apps Script 배포 ID를 만들지 않는다.
+
+## 배포 결과
+
+- 모바일 PWA 정식 버전: 1.1.36 / Sites 버전 18
+- 공개 주소: <https://ungcheon-mobile-schedule.jsw890122.chatgpt.site>
+- Apps Script 고정 주소: <https://script.google.com/macros/s/AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w/exec>
+- 공개 health 응답: `UngcheonSchoolHub` 서비스 51
+- Sites 공개 범위는 기존과 동일한 `public`으로 유지함

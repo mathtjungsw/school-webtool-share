@@ -20,8 +20,16 @@
 - [x] 보호 메뉴 진입 시에만 추가 비밀번호를 확인함
 - [x] 보호 메뉴 인증 만료가 프로그램 전체 로그아웃으로 이어지지 않음
 - [x] 보호 메뉴 오류·비밀번호 입력은 창을 닫을 때 초기화됨
-- [ ] 최신 `main` 전체 타입 검사·프로덕션 빌드
-- [ ] Windows 설치파일·자동 업데이트 릴리스 게시
-- [ ] 공개 `latest.yml`과 설치파일 버전·크기 확인
+- [x] 최신 `main` 전체 타입 검사·프로덕션 빌드
+- [x] Windows 설치파일·자동 업데이트 릴리스 게시
+- [x] 공개 `latest.yml`과 설치파일 버전·크기 확인
 
 모바일 PWA 출결 전체 명렬은 모바일 v1.1.36과 공유 서비스 51의 별도 검증 문서로 관리하되, 같은 최신 `main` 커밋에서 통합 검증·배포한다.
+
+## 배포 결과
+
+- GitHub Actions 실행 `35675617742` 성공
+- 정식 릴리스: <https://github.com/mathtjungsw/school-webtool-share/releases/tag/ungcheon-helper-v1.1.35>
+- 설치파일 `UngcheonSchoolHelper-Setup-1.1.35.exe` 174,258,696바이트
+- blockmap 181,420바이트, `latest.yml` 372바이트
+- 공개 `latest.yml`의 버전·파일명·크기와 릴리스 자산이 일치함
