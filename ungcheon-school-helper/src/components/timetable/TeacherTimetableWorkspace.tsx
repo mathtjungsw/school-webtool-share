@@ -1,3 +1,4 @@
+import { schoolDate } from '../../services/schoolDate'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CalendarDays, ChevronDown, ChevronRight, Download, FileSpreadsheet, List, Printer, RefreshCw, Search, UserCog } from 'lucide-react'
 import clsx from 'clsx'
@@ -38,9 +39,9 @@ const MONTH_LABELS: Record<string, string> = {
 
 export default function TeacherTimetableWorkspace({ mode, timetable, currentTeacherName, configured, staffRoster, overrides = [] }: Props) {
   const [teacherView, setTeacherView] = useState<TeacherView>('month')
-  const [monthKey, setMonthKey] = useState('2026-08')
-  const [selectedDate, setSelectedDate] = useState('2026-08-25')
-  const [weekKey, setWeekKey] = useState('2026-08-24')
+  const [monthKey, setMonthKey] = useState(() => { const key = schoolDate().slice(0, 7); return supportedMonthKeys().includes(key) ? key : supportedMonthKeys().at(-1)! })
+  const [selectedDate, setSelectedDate] = useState(schoolDate)
+  const [weekKey, setWeekKey] = useState(() => weekDates(schoolDate())[0])
   const [changes, setChanges] = useState<TimetableChangeRequest[]>([])
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')

@@ -42,7 +42,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 51;
+const MOBILE_SERVICE_VERSION = 52;
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -395,6 +395,20 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'v1.1.36',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.36 · 시간표·업무·출력 사용성 개선',
+    body: [
+      '· 한국 날짜 기준을 통일하고 교사 시간표·대시보드·학생 위치 찾기에서 출처별 자료 확인 시각과 조회 실패를 구분합니다.',
+      '· 개인 업무의 제목·날짜·시간·우선순위·메모를 수정할 수 있으며 기존 완료 상태와 등록일은 유지합니다.',
+      '· 위젯의 업무·알림을 누르면 관련 업무나 공지·수업 변경 내역으로 바로 이동합니다.',
+      '· 여러 교시의 일일 시간표 예외를 함께 미리 보고 범위 겹침과 당김 원본 충돌을 확인한 뒤 저장할 수 있습니다.',
+      '· A4 출력은 자동 축소 후 크기를 다시 확인하며 글자가 지나치게 작아질 경우 여러 장 출력을 안내합니다.',
+      '· 모바일 PWA v1.1.37은 시간표 행과 여백을 줄이고 지난주·이번 주·다음 주 이동, 자료 출처별 확인 시각, 긴 일정 상세보기를 제공합니다.',
+      '· 기존 모바일 주소, 로그인·출결 팝업 갱신 방식과 이전 릴리스 안내는 유지합니다.'
+    ].join('\n'),
+    date: '2026-09-26'
+  },
   {
     key: 'v1.1.35',
     title: '[업데이트] 웅천고 업무도우미 v1.1.35 · 교장·교감 위젯 자동 로그인과 보호 메뉴 인증 분리',

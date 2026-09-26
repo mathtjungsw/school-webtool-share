@@ -29,7 +29,7 @@ export function schoolClock(date = new Date()) {
 }
 export function rangeForToday(today = new Date()) {
   const monday = startOfWeek(today, { weekStartsOn: 1 })
-  return { from: ymd(monday), to: ymd(addDays(monday, 13)), thisWeek: Array.from({ length: 7 }, (_, index) => ymd(addDays(monday, index))), nextWeek: Array.from({ length: 7 }, (_, index) => ymd(addDays(monday, index + 7))) }
+  return { from: ymd(addDays(monday, -7)), to: ymd(addDays(monday, 13)), thisWeek: Array.from({ length: 7 }, (_, index) => ymd(addDays(monday, index))), nextWeek: Array.from({ length: 7 }, (_, index) => ymd(addDays(monday, index + 7))) }
 }
 
 function minutesOf(value: string) {
@@ -192,7 +192,7 @@ export function timetableForDate(teacher: TeacherTimetable | null, date: string,
 }
 export function collectEvents(data: DashboardPayload, name: string): MobileEvent[] {
   const events: MobileEvent[] = (data.bundle?.events ?? []).map((item, index) => ({ ...item, id: `bundle-${item.source}-${item.date}-${index}` }))
-  data.committees.events.filter(event => event.memberNames.includes(name)).forEach(event => events.push({ id: `committee-${event.id}`, date: event.date, title: event.title, source: 'committee', label: event.committeeName, time: event.startTime, startTime: event.startTime, endTime: event.endTime }))
+  data.committees.events.filter(event => event.memberNames.includes(name)).forEach(event => events.push({ id: `committee-${event.id}`, date: event.date, title: event.title, source: 'committee', label: event.committeeName, location: event.location, time: event.startTime, startTime: event.startTime, endTime: event.endTime }))
   data.changes.filter(item => isApplied(item, name)).forEach(item => {
     const title = item.kind === 'exchange' ? `수업 교환 · ${item.originalClass} ↔ ${item.replacementClass}` : `대강 · ${item.originalClass} ${item.originalSubject}`
     ;[...new Set([item.originalDate, item.replacementDate])].forEach(date => events.push({ id: `change-${item.id}-${date}`, date, title, source: 'timetableChange', label: item.status === 'approved' ? '승인된 수업 변경' : '우선 반영' }))

@@ -1,3 +1,5 @@
+import { useNoticeStore } from '../stores/noticeStore'
+import { acceptChangeNavigation, acceptTaskNavigation } from '../services/taskNavigation'
 import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { KeyRound, ShieldCheck, X } from 'lucide-react'
@@ -122,7 +124,13 @@ export default function Layout() {
   const logErrorCount = logs.filter(log => log.level === 'error').length
   const Page = PAGES[page]
 
-  const navigate = (id: string) => {
+  const navigate = (target: string) => {
+    let id = acceptChangeNavigation(acceptTaskNavigation(target))
+    if (id.startsWith('dashboard?notice=')) {
+      const noticeId = Number(new URLSearchParams(id.slice(id.indexOf('?') + 1)).get('notice'))
+      if (Number.isFinite(noticeId)) useNoticeStore.getState().openNotice(noticeId)
+      id = 'dashboard'
+    }
     if (id === 'admin_center' && !isAdmin) return
     if (id.startsWith('executive_') && !executiveIdentityRole) return
     if (id.startsWith('executive_') && !executiveRole) {

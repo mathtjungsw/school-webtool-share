@@ -6,6 +6,7 @@ export interface MobileEvent {
   title: string
   source: ScheduleSource
   label: string
+  location?: string
   time?: string
   startTime?: string
   endTime?: string

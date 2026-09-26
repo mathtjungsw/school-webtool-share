@@ -1,3 +1,4 @@
+import { schoolDate } from '../services/schoolDate'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle, CheckCircle2, Download, FileSpreadsheet, GraduationCap, Plus, Printer,
@@ -36,7 +37,7 @@ interface CourseRoster {
   studentIds: string[]
 }
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => schoolDate()
 
 function studentLookupKey(student: {
   studentId: string

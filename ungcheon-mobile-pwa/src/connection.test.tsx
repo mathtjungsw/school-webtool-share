@@ -40,6 +40,21 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe('모바일 연결 안정화 통합', () => {
+  it('주간 시간표는 실제 날짜를 표시하며 지난주와 다음 주를 오간다', async () => {
+    render(<App />)
+    await screen.findByText('연결 검증 일정')
+    fireEvent.click(screen.getByRole('tab', { name: '주간 시간표' }))
+    expect(screen.getByText(/^이번 주 ·/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '이전 주 시간표' }))
+    expect(screen.getByText(/^지난주 ·/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '이전 주 시간표' })).toBeDisabled()
+    fireEvent.click(screen.getAllByRole('button', { name: /^이번 주$/ }).at(-1)!)
+    fireEvent.click(screen.getByRole('button', { name: '다음 주 시간표' }))
+    expect(screen.getByText(/^다음 주 ·/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '다음 주 시간표' })).toBeDisabled()
+    expect(loadDashboard).toHaveBeenCalledTimes(1)
+  })
+
   it('IndexedDB 저장 실패에도 최신 자료를 유지하고 네트워크 오류로 표시하지 않는다', async () => {
     vi.mocked(writeUserCache).mockRejectedValue(new Error('synthetic quota failure'))
     render(<App />)

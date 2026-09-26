@@ -1,3 +1,4 @@
+import { schoolDate } from './schoolDate'
 import * as XLSX from 'xlsx'
 import { escapePrintHtml as escapeHtml, printDocument } from './printing'
 import { xlsxWorkbookBytes } from '../utils/binaryBytes'
@@ -281,7 +282,7 @@ export async function downloadStaffRoster(members: StaffMember[]): Promise<boole
   const workbook = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(workbook, sheet, '교원명렬')
   return window.electron.saveFileDialog(
-    `웅천고_교원명렬_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    `웅천고_교원명렬_${schoolDate()}.xlsx`,
     xlsxWorkbookBytes(workbook),
   )
 }

@@ -1,3 +1,4 @@
+import { schoolDate } from '../schoolDate'
 // InsaRecord → 분석 인사이트
 import type { InsaRecord, InsaAnalysis, MandatoryCheck, YearStat, BonusArea, Training } from './types'
 
@@ -33,7 +34,7 @@ function ymToNum(d: string): number {
 }
 
 function checkMandatory(trainings: Training[], baseDate: string): MandatoryCheck[] {
-  const baseNum = ymToNum(baseDate) || ymToNum(new Date().toISOString().slice(0, 10).replace(/-/g, '.'))
+  const baseNum = ymToNum(baseDate) || ymToNum(schoolDate().replace(/-/g, '.'))
   const baseYear = Math.floor(baseNum / 10000)
   return MANDATORY.map((def) => {
     const hits = trainings.filter((t) => def.kw.test(t.course) || def.kw.test(t.num))

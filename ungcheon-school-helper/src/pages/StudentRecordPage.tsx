@@ -1,3 +1,4 @@
+import { schoolDate } from '../services/schoolDate'
 import { useState } from 'react'
 import { Plus, Trash2, Printer, RefreshCw, User, ArrowRight, ArrowLeft, MinusCircle, XCircle } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
@@ -59,7 +60,7 @@ export default function StudentRecordPage() {
   const [activeType, setActiveType] = useState<RecordType>('transfer_in')
 
   const schoolName = config.schoolName ?? '○○학교'
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '. ')
+  const today = schoolDate().replace(/-/g, '. ')
 
   const addRecord = () => {
     const r = makeRecord(activeType)

@@ -121,11 +121,13 @@ interface CacheEntry<T = unknown> {
   signature: string
   loadedAt: number
   request?: Record<string, unknown>
+  checkedAt?: number
 }
 
 type CacheListener = (data: unknown, cacheKey: string) => void
 
 const sessionCache = new Map<string, CacheEntry>()
+const resourceFailures = new Map<string, { resource: HubResource; at: number }>()
 const inflight = new Map<string, Promise<unknown>>()
 const listeners = new Map<HubResource, Set<CacheListener>>()
 const resourceEpoch = new Map<HubResource, number>()
@@ -259,6 +261,7 @@ function persistCacheEntry(cacheKey: string, entry: CacheEntry) {
 export function clearSchoolHubSessionCache() {
   cacheGeneration += 1
   sessionCache.clear()
+  resourceFailures.clear()
   inflight.clear()
   manifest = null
   manifestLoadedAt = 0
@@ -287,14 +290,25 @@ export function invalidateHubResource(resource: HubResource) {
   void window.electron.schoolHubCacheDeleteResource(resource).catch(() => undefined)
 }
 
-export function getSchoolHubCacheStatus() {
-  const entries = [...sessionCache.values()]
+export function getSchoolHubCacheStatus(resources?: readonly HubResource[]) {
+  const entries = [...sessionCache.values()].filter(entry => !resources || resources.includes(entry.resource))
   return {
     count: entries.length,
+    oldestAt: entries.length ? Math.min(...entries.map(entry => entry.loadedAt)) : null,
     newestAt: entries.length ? Math.max(...entries.map(entry => entry.loadedAt)) : null,
     resources: [...new Set(entries.map(entry => entry.resource))],
     persistentCount: persistentEntryCount,
   }
+}
+
+export function getSchoolHubSourceStatus(resources: readonly HubResource[]) {
+  return resources.map(resource => {
+    const entries = [...sessionCache.entries()].filter(([, entry]) => entry.resource === resource)
+    const checkedAt = entries.length ? Math.min(...entries.map(([, entry]) => entry.checkedAt ?? entry.loadedAt)) : null
+    const receivedAt = entries.length ? Math.min(...entries.map(([, entry]) => entry.loadedAt)) : null
+    const failedAt = Math.max(0, ...[...resourceFailures.values()].filter(item => item.resource === resource).map(item => item.at))
+    return { resource, checkedAt, receivedAt, failedAt, state: !checkedAt ? 'unavailable' as const : failedAt > checkedAt || Date.now() - checkedAt > BACKGROUND_INTERVAL_MS[resource] ? 'cached' as const : 'fresh' as const }
+  })
 }
 
 export async function getPersistentSchoolHubCacheStatus() {
@@ -410,12 +424,17 @@ async function fetchAndStore<T>(
       revision,
       signature,
       loadedAt: Date.now(),
+      checkedAt: Date.now(),
       request,
     }
+    resourceFailures.delete(cacheKey)
     sessionCache.set(cacheKey, nextEntry)
     persistCacheEntry(cacheKey, nextEntry)
     if (changed) notifyResource(resource, data, cacheKey)
     return data
+  }).catch(error => {
+    if (cacheGeneration === generation && (resourceEpoch.get(resource) ?? 0) === epoch) resourceFailures.set(cacheKey, { resource, at: Date.now() })
+    throw error
   }).finally(() => {
     if (inflight.get(cacheKey) === requestPromise) inflight.delete(cacheKey)
   })
@@ -433,7 +452,11 @@ async function revalidateCachedResource<T>(
   if (!entry) return
   const nextManifest = await refreshSyncManifest()
   const serverRevision = nextManifest?.resources?.[resource] ?? ''
-  if (serverRevision && entry.revision === serverRevision) return
+  if (serverRevision && entry.revision === serverRevision) {
+    entry.checkedAt = Math.max(entry.checkedAt ?? entry.loadedAt, manifestLoadedAt)
+    if ((resourceFailures.get(cacheKey)?.at ?? 0) <= entry.checkedAt) resourceFailures.delete(cacheKey)
+    return
+  }
   if (!serverRevision && Date.now() - entry.loadedAt < BACKGROUND_INTERVAL_MS[resource]) return
   try { await fetchAndStore<T>(cacheKey, resource, request, serverRevision) }
   catch { /* 캐시가 있으면 네트워크 오류는 화면을 막지 않는다. */ }

@@ -1,3 +1,6 @@
+import { useChangeFocus } from '../services/taskNavigation'
+import SchoolDataStatus from '../components/SchoolDataStatus'
+import { schoolDate } from '../services/schoolDate'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, ArrowLeftRight, CheckCircle2, FileSpreadsheet,
@@ -61,6 +64,8 @@ export default function TimetableSwapPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('exchange')
+  const changeFocus = useChangeFocus()
+  useEffect(() => { if (changeFocus) setViewMode('plan') }, [changeFocus])
   const [commonFreeTeacherIndexes, setCommonFreeTeacherIndexes] = useState<number[]>([])
   const [preview, setPreview] = useState<PreviewSelection | null>(null)
   const previewRegionRef = useRef<HTMLDivElement>(null)
@@ -230,7 +235,7 @@ export default function TimetableSwapPage() {
   }
 
   const saveHwp = async () => {
-    const name = `교환보강_계획서_${planDraft.meta.documentDate || new Date().toISOString().slice(0, 10)}.hwp`
+    const name = `교환보강_계획서_${planDraft.meta.documentDate || schoolDate()}.hwp`
     setError('')
     try {
       const bytes = await window.electron.buildTimetablePlanHwp(planDraft)
@@ -318,6 +323,7 @@ export default function TimetableSwapPage() {
           </button>
         </div>
       </header>
+      <SchoolDataStatus resources={["timetable","timetableChanges","timetableOverrides"]} />
 
       {isAdmin && (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 flex gap-3">
@@ -783,6 +789,13 @@ function CommonFreeTimePanel({
 }
 
 function ChangeRequestHistory({ items, teacherName, onChanged }: { items: TimetableChangeRequest[]; teacherName: string; onChanged: () => Promise<void> }) {
+  const focus = useChangeFocus()
+  const historyRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (!focus) return
+    const target = [...(historyRef.current?.querySelectorAll<HTMLElement>('[data-change-id]') ?? [])].find(node => node.dataset.changeId === focus.id)
+    target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); target?.focus({ preventScroll: true })
+  }, [focus, items.length])
   const applyForMeOnly = async (item: TimetableChangeRequest) => {
     if (!window.confirm(`상대 교사가 승인하기 전까지 ${teacherName} 교사의 캘린더와 날짜별 시간표에만 우선 반영합니다.\n상대 교사의 승인 요청은 그대로 유지되며, 승인하면 상대 교사와 학급에도 반영됩니다.\n\n이 기능은 NEIS와 별개인 업무 편의 기능입니다. 계속하시겠습니까?\n\n${timetableChangeSummary(item)}`)) return
     try {
@@ -797,7 +810,7 @@ function ChangeRequestHistory({ items, teacherName, onChanged }: { items: Timeta
     catch (error) { window.alert(error instanceof Error ? error.message : String(error)) }
   }
   const labels: Record<TimetableChangeRequest['status'], string> = { pending: '승인 대기', approved: '승인·전체 반영', held: '보류', rejected: '보류', cancelled: '취소' }
-  return <section className="card p-4"><h2 className="font-bold text-white">반영 요청·처리 내역</h2><p className="mt-1 text-xs text-slate-500">‘나만 우선 반영’은 상대 승인 전까지 내 캘린더와 날짜별 시간표에만 적용합니다. 상대가 승인하면 상대 교사와 학급에도 반영되고 내게 승인 완료 알림이 옵니다. 학교 공유 원본과 NEIS는 바뀌지 않습니다.</p><div className="mt-3 space-y-2">{items.map(item => <div key={item.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-white/[0.025] p-3"><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-slate-200">{timetableChangeSummary(item)}</p><p className="mt-1 text-[10px] text-slate-500">요청 {item.requesterName} → {item.targetTeacherName}</p></div><span className={clsx('rounded-full px-2 py-1 text-[10px] font-bold', item.status === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : item.requesterAppliedAt ? 'bg-cyan-500/15 text-cyan-300' : ['pending', 'held', 'rejected'].includes(item.status) ? 'bg-amber-500/15 text-amber-300' : 'bg-slate-500/15 text-slate-400')}>{item.status !== 'approved' && item.requesterAppliedAt ? '나만 우선 반영' : labels[item.status]}</span>{item.requesterName === teacherName && ['pending', 'held', 'rejected'].includes(item.status) && !item.requesterAppliedAt && <button onClick={() => void applyForMeOnly(item)} className="btn-secondary text-[10px] text-cyan-200">나만 우선 반영</button>}{item.requesterName === teacherName && ['pending', 'held', 'rejected', 'approved'].includes(item.status) && <button onClick={() => void cancel(item)} className="btn-ghost text-[10px] text-rose-300">취소·반영 해제</button>}</div>)}{!items.length && <p className="py-6 text-center text-xs text-slate-500">반영 요청 내역이 없습니다.</p>}</div></section>
+  return <section ref={historyRef} className="card p-4"><h2 className="font-bold text-white">반영 요청·처리 내역</h2><p className="mt-1 text-xs text-slate-500">‘나만 우선 반영’은 상대 승인 전까지 내 캘린더와 날짜별 시간표에만 적용합니다. 상대가 승인하면 상대 교사와 학급에도 반영되고 내게 승인 완료 알림이 옵니다. 학교 공유 원본과 NEIS는 바뀌지 않습니다.</p><div className="mt-3 space-y-2">{items.map(item => <div key={item.id} tabIndex={-1} data-change-id={item.id} className={clsx("flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-3", focus?.id === item.id && "ring-2 ring-sky-500")}><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-slate-200">{timetableChangeSummary(item)}</p><p className="mt-1 text-[10px] text-slate-500">요청 {item.requesterName} → {item.targetTeacherName}</p></div><span className={clsx('rounded-full px-2 py-1 text-[10px] font-bold', item.status === 'approved' ? 'bg-emerald-500/15 text-emerald-300' : item.requesterAppliedAt ? 'bg-cyan-500/15 text-cyan-300' : ['pending', 'held', 'rejected'].includes(item.status) ? 'bg-amber-500/15 text-amber-300' : 'bg-slate-500/15 text-slate-400')}>{item.status !== 'approved' && item.requesterAppliedAt ? '나만 우선 반영' : labels[item.status]}</span>{item.requesterName === teacherName && ['pending', 'held', 'rejected'].includes(item.status) && !item.requesterAppliedAt && <button onClick={() => void applyForMeOnly(item)} className="btn-secondary text-[10px] text-cyan-200">나만 우선 반영</button>}{item.requesterName === teacherName && ['pending', 'held', 'rejected', 'approved'].includes(item.status) && <button onClick={() => void cancel(item)} className="btn-ghost text-[10px] text-rose-300">취소·반영 해제</button>}</div>)}{!items.length && <p className="py-6 text-center text-xs text-slate-500">반영 요청 내역이 없습니다.</p>}</div></section>
 }
 
 function SlotContent({

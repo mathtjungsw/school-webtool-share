@@ -1,3 +1,7 @@
+import SchoolDataStatus from '../components/SchoolDataStatus'
+import PersonalWorkPanel from '../components/PersonalWorkPanel'
+import { useTaskFocus } from '../services/taskNavigation'
+import { schoolDate } from '../services/schoolDate'
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, ArrowDown, ArrowUp, BellRing, CalendarDays, Check, CheckCircle2, ClipboardCheck,
@@ -37,8 +41,8 @@ import {
   type StaffTaskStatus,
 } from '../services/rosterAttendance'
 import {
-  createPersonalTaskId, loadPersonalTasks, savePersonalTasks, subscribePersonalOrganizer,
-  type PersonalTask, type PersonalTaskPriority,
+  loadPersonalTasks, subscribePersonalOrganizer,
+  type PersonalTask,
 } from '../services/personalOrganizer'
 import {
   classifySharedWorkDeadline, isNewSharedWork, isSharedWorkComplete,
@@ -49,7 +53,7 @@ import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 type Tab = 'checklists' | 'roster' | 'training'
 type StaffPageMode = 'checklists' | 'roster'
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => schoolDate()
 
 export default function StaffTasksPage() {
   return <StaffPage mode="checklists" />
@@ -88,8 +92,8 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
       else failures.push(`교직원 명렬: ${rosterResult.reason instanceof Error ? rosterResult.reason.message : String(rosterResult.reason)}`)
       if (checklistResult.status === 'fulfilled') setChecklists(checklistResult.value)
       else failures.push(`업무 목록: ${checklistResult.reason instanceof Error ? checklistResult.reason.message : String(checklistResult.reason)}`)
-      const cacheStatus = getSchoolHubCacheStatus()
-      setLastCacheAt(cacheStatus.newestAt)
+      const cacheStatus = getSchoolHubCacheStatus(mode === 'checklists' ? ['staffRoster', 'staffChecklists'] : ['staffRoster'])
+      setLastCacheAt(cacheStatus.oldestAt)
       if (failures.length) setError(`일부 자료를 새로 받지 못했습니다. ${failures.join(' / ')}`)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : String(loadError))
@@ -138,6 +142,7 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />새로고침
         </button>
       </header>
+      <SchoolDataStatus resources={mode === 'checklists' ? ["staffRoster","staffChecklists"] : ["staffRoster"]} />
 
       {mode === 'checklists' && (
         <div className="rounded-xl border border-sky-500/20 bg-sky-500/8 px-4 py-3 flex items-start gap-3">
@@ -175,7 +180,7 @@ function StaffPage({ mode }: { mode: StaffPageMode }) {
 
       {error && <Notice tone="error" text={error} />}
       {success && <Notice tone="success" text={success} />}
-      {lastCacheAt && <div className="rounded-xl border border-sky-500/20 bg-sky-500/8 px-4 py-2.5 text-[11px] font-semibold text-sky-800 dark:text-sky-200">마지막 동기화 자료 · {new Date(lastCacheAt).toLocaleString('ko-KR')}{error ? ' · 서버 응답 지연으로 로컬 복사본을 계속 표시합니다.' : ''}</div>}
+      {lastCacheAt && <div className="rounded-xl border border-sky-500/20 bg-sky-500/8 px-4 py-2.5 text-[11px] font-semibold text-sky-800 dark:text-sky-200">사용 자료 중 가장 오래된 수신 · {new Date(lastCacheAt).toLocaleString('ko-KR')}{error ? ' · 서버 응답 지연으로 로컬 복사본을 계속 표시합니다.' : ''}</div>}
 
       {mode === 'checklists' && (
         <ChecklistTab
@@ -276,6 +281,16 @@ function ChecklistTab(props: {
   const [personalTasks, setPersonalTasks] = useState<PersonalTask[]>([])
   const [lastViewedAt, setLastViewedAt] = useState<string | null>(null)
   const notificationInitializedFor = useRef('')
+  const taskFocus = useTaskFocus()
+  const focusedSequence = useRef(0)
+  useEffect(() => {
+    if (!taskFocus || focusedSequence.current === taskFocus.sequence) return
+    if (taskFocus.kind === 'shared' && !checklists.some(task => task.id === taskFocus.id)) return
+    focusedSequence.current = taskFocus.sequence
+    setAssignedFilter('all'); setLayout('list')
+    const target = checklists.find(task => task.id === taskFocus.id)
+    setView(taskFocus.kind === 'personal' ? 'personal' : target?.targetNames.includes(teacherName) ? 'assigned' : 'created')
+  }, [taskFocus, checklists, teacherName])
   const departments = useMemo(
     () => [...new Set(members.map(member => member.department.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')),
     [members],
@@ -289,7 +304,7 @@ function ChecklistTab(props: {
       if (saved?.title || saved?.description || saved?.itemsText) {
         setForm({ ...emptySharedTask(), ...saved, requestId: saved.requestId || crypto.randomUUID() })
         setDraftRecovered(true)
-        setView('create')
+        if (!taskFocus) setView('create')
       }
     } catch { /* 잘못된 임시 초안은 무시한다. */ }
   }, [teacherName])
@@ -470,7 +485,7 @@ function ChecklistTab(props: {
 
           {view !== 'create' && (layout === 'calendar'
             ? <SharedWorkCalendar tasks={visible} month={viewMonth} onMonthChange={setViewMonth} />
-            : <div className="space-y-3">{view === 'assigned' && assignedFilter !== 'all' && <div className="flex items-center justify-between rounded-xl border border-violet-500/15 bg-violet-500/5 px-4 py-2.5 text-xs text-violet-200"><span>자동 분류: {{ new: '새로 배부', today: '오늘 마감', dueSoon: '마감 임박', overdue: '기한 초과' }[assignedFilter]}</span><button onClick={() => setAssignedFilter('all')} className="text-[10px] text-slate-400 hover:text-white">전체 보기</button></div>}{visible.map(task => <SharedTaskCard key={task.id} checklist={task} teacherName={teacherName} isNew={newTaskIds.has(task.id)} isAdmin={isAdmin} adminPassword={adminPassword} onEdit={editTask} onDuplicate={duplicateTask} onChanged={onChanged} onError={onError} onSuccess={onSuccess} />)}{visible.length === 0 && <div className="card py-14 text-center text-sm text-slate-500">해당하는 업무가 없습니다.</div>}</div>)}
+            : <div className="space-y-3">{view === 'assigned' && assignedFilter !== 'all' && <div className="flex items-center justify-between rounded-xl border border-violet-500/15 bg-violet-500/5 px-4 py-2.5 text-xs text-violet-200"><span>자동 분류: {{ new: '새로 배부', today: '오늘 마감', dueSoon: '마감 임박', overdue: '기한 초과' }[assignedFilter]}</span><button onClick={() => setAssignedFilter('all')} className="text-[10px] text-slate-400 hover:text-white">전체 보기</button></div>}{visible.map(task => <SharedTaskCard key={task.id} checklist={task} focusSequence={taskFocus?.kind === 'shared' && taskFocus.id === task.id ? taskFocus.sequence : 0} teacherName={teacherName} isNew={newTaskIds.has(task.id)} isAdmin={isAdmin} adminPassword={adminPassword} onEdit={editTask} onDuplicate={duplicateTask} onChanged={onChanged} onError={onError} onSuccess={onSuccess} />)}{visible.length === 0 && <div className="card py-14 text-center text-sm text-slate-500">해당하는 업무가 없습니다.</div>}</div>)}
         </div>
       )}
     </div>
@@ -483,16 +498,18 @@ function WorkSummary({ label, value, tone, icon: Icon, onClick }: { label: strin
 }
 
 function SharedTaskCard(props: {
-  checklist: StaffChecklist; teacherName: string; isNew: boolean; isAdmin: boolean; adminPassword: string
+  focusSequence?: number; checklist: StaffChecklist; teacherName: string; isNew: boolean; isAdmin: boolean; adminPassword: string
   onEdit: (task: StaffChecklist) => void; onDuplicate: (task: StaffChecklist) => void
   onChanged: () => Promise<void>; onError: (value: string) => void; onSuccess: (value: string) => void
 }) {
-  const { checklist, teacherName, isNew, isAdmin, adminPassword, onEdit, onDuplicate, onChanged, onError, onSuccess } = props
+  const { focusSequence, checklist, teacherName, isNew, isAdmin, adminPassword, onEdit, onDuplicate, onChanged, onError, onSuccess } = props
   const own = checklist.responses.find(response => response.teacherName === teacherName)
   const [checked, setChecked] = useState<string[]>(own?.checkedItemIds ?? [])
   const [memo, setMemo] = useState(own?.memo ?? '')
   const [saving, setSaving] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const cardRef = useRef<HTMLElement>(null)
+  useEffect(() => { if (focusSequence) { setExpanded(true); cardRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); cardRef.current?.focus({ preventScroll: true }) } }, [focusSequence])
   const assigned = checklist.targetNames.includes(teacherName)
   const canManage = checklist.canManage || isAdmin
   const doneCount = checklist.responses.filter(response => checklist.items.every(item => response.checkedItemIds.includes(item.id))).length
@@ -515,7 +532,7 @@ function SharedTaskCard(props: {
     onSuccess(`미완료자 ${incompleteNames.length}명의 이름을 복사했습니다.`)
   }
   return (
-    <article className={clsx('card p-5', checklist.priority === 'high' && checklist.status !== 'completed' && 'border-rose-500/20')}>
+    <article ref={cardRef} tabIndex={-1} className={clsx(focusSequence && 'ring-2 ring-sky-500', 'card p-5', checklist.priority === 'high' && checklist.status !== 'completed' && 'border-rose-500/20')}>
       <div className="flex items-start justify-between gap-3"><button type="button" onClick={() => setExpanded(value => !value)} className="min-w-0 flex-1 text-left"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-white">{checklist.title}</h2>{isNew && <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-bold text-violet-200">새 업무</span>}<span className={clsx('rounded-full px-2 py-0.5 text-[10px]', STATUS_STYLE[checklist.status])}>{STATUS_LABEL[checklist.status]}</span><span className={clsx('rounded-full px-2 py-0.5 text-[10px]', checklist.priority === 'high' ? 'bg-rose-500/12 text-rose-300' : 'bg-white/5 text-slate-500')}>우선순위 {PRIORITY_LABEL[checklist.priority]}</span></div><p className="mt-1 text-[11px] font-semibold text-slate-400">마감 {checklist.deadline || '미지정'} · {checklist.creatorName} 작성{checklist.departmentNames.length ? ` · ${checklist.departmentNames.join(' · ')}` : ''}</p></button><div className="flex flex-shrink-0 gap-1"><button type="button" onClick={() => setExpanded(value => !value)} className="btn-ghost p-2" title={expanded ? '세부 내용 접기' : '세부 내용 보기'}>{expanded ? <ArrowUp size={13} /> : <ArrowDown size={13} />}</button>{canManage && <button onClick={() => onEdit(checklist)} className="btn-ghost p-2" title="수정"><Pencil size={13} /></button>}<button onClick={() => onDuplicate(checklist)} className="btn-ghost p-2" title="복제"><ClipboardCopy size={13} /></button>{canManage && <button onClick={remove} className="btn-ghost p-2 text-rose-400" title="삭제"><Trash2 size={13} /></button>}</div></div>
       {expanded && <>{checklist.startTime && <p className="mt-3 rounded-lg bg-sky-50 px-3 py-2 text-xs font-bold text-sky-900">진행 {checklist.startDate}{checklist.deadline !== checklist.startDate ? ` ~ ${checklist.deadline}` : ''} · {checklist.timeInputMode === 'period' && checklist.startPeriod ? `${checklist.startPeriod}${checklist.endPeriod && checklist.endPeriod !== checklist.startPeriod ? `~${checklist.endPeriod}` : ''}교시 · ` : ''}{checklist.startTime}{checklist.endTime ? `~${checklist.endTime}` : ''}</p>}{checklist.description && <p className="mt-3 whitespace-pre-wrap text-xs text-slate-400">{checklist.description}</p>}{checklist.linkUrl && <a href={checklist.linkUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-[11px] text-sky-300 hover:underline"><ExternalLink size={11} />관련 자료 열기</a>}
       {assigned && <div className="mt-4 space-y-2 rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-3">{checklist.items.map(item => <label key={item.id} className="flex items-start gap-2 text-xs text-slate-300"><input type="checkbox" className="mt-0.5" checked={checked.includes(item.id)} disabled={checklist.closed} onChange={event => setChecked(current => event.target.checked ? [...new Set([...current, item.id])] : current.filter(id => id !== item.id))} /><span className={checked.includes(item.id) ? 'text-slate-500 line-through' : ''}>{item.label}</span></label>)}<div className="flex gap-2 pt-1"><input className="input-field flex-1 text-xs" maxLength={300} placeholder="진행 메모(선택)" value={memo} onChange={event => setMemo(event.target.value)} disabled={checklist.closed} /><button onClick={save} disabled={saving || checklist.closed} className="btn-primary flex items-center gap-1.5 px-4"><Save size={13} />{saving ? '저장 중' : '저장'}</button></div></div>}
@@ -532,12 +549,6 @@ function SharedWorkCalendar({ tasks, month, onMonthChange }: { tasks: StaffCheck
   return <section className="card p-4"><div className="mb-4 flex items-center justify-between"><button className="btn-ghost p-2" onClick={() => onMonthChange(addMonths(month, -1))}>‹</button><h2 className="font-bold text-white">{format(month, 'yyyy년 M월', { locale: ko })} 업무 마감</h2><button className="btn-ghost p-2" onClick={() => onMonthChange(addMonths(month, 1))}>›</button></div><div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl bg-white/5">{['월','화','수','목','금','토','일'].map(day => <div key={day} className="bg-surface-900 py-2 text-center text-[10px] font-bold text-slate-500">{day}</div>)}{days.map(day => { const date = format(day, 'yyyy-MM-dd'); const dayTasks = byDate.get(date) ?? []; return <div key={date} className={clsx('min-h-28 bg-surface-800/95 p-1.5', !isSameMonth(day, month) && 'opacity-35')}><span className={clsx('grid h-5 w-5 place-items-center rounded-full text-[10px]', date === today() ? 'bg-amber-400 font-bold text-slate-950' : 'text-slate-400')}>{format(day, 'd')}</span><div className="mt-1 space-y-1">{dayTasks.slice(0,4).map(task => <div key={task.id} className={clsx('truncate rounded border-l-2 px-1 py-0.5 text-[9px]', task.status === 'completed' ? 'border-emerald-400 bg-emerald-500/10 text-emerald-300 line-through opacity-60' : task.priority === 'high' ? 'border-rose-400 bg-rose-500/10 text-rose-200' : 'border-sky-400 bg-sky-500/10 text-sky-200')} title={task.title}>{task.title}</div>)}{dayTasks.length > 4 && <p className="text-[8px] text-slate-600">+{dayTasks.length-4}개</p>}</div></div>})}</div></section>
 }
 
-function PersonalWorkPanel({ tasks, onTasksChanged, onSuccess }: { tasks: PersonalTask[]; onTasksChanged: (tasks: PersonalTask[]) => void; onSuccess: (text: string) => void }) {
-  const [draft, setDraft] = useState<{ title: string; date: string; time: string; endTime: string; priority: PersonalTaskPriority; memo: string }>({ title: '', date: today(), time: '', endTime: '', priority: 'normal', memo: '' })
-  const persist = async (next: PersonalTask[], message: string) => { const saved = await savePersonalTasks(next); onTasksChanged(saved); onSuccess(message) }
-  const submit = async (event: FormEvent) => { event.preventDefault(); const title = draft.title.trim(); if (!title) return; if (draft.endTime && (!draft.time || draft.endTime <= draft.time)) { onSuccess('종료 시간은 시작 시간보다 늦게 입력해 주세요.'); return } const now = new Date().toISOString(); await persist([...tasks, { id: createPersonalTaskId(), title, date: draft.date, time: draft.time || undefined, endTime: draft.time && draft.endTime ? draft.endTime : undefined, priority: draft.priority, memo: draft.memo.trim(), completed: false, createdAt: now, updatedAt: now }], '개인 업무를 등록했습니다.'); setDraft({ title: '', date: today(), time: '', endTime: '', priority: 'normal', memo: '' }) }
-  return <div className="grid items-start gap-4 xl:grid-cols-[360px_minmax(0,1fr)]"><form onSubmit={submit} className="card sticky top-4 space-y-3"><div><h2 className="font-bold text-white">개인 업무 등록</h2><p className="mt-1 flex items-center gap-1 text-[10px] text-emerald-400"><ShieldCheck size={11} />현재 PC에만 저장되며 관리자도 볼 수 없습니다.</p></div><input required className="input-field" placeholder="업무 제목" value={draft.title} onChange={event => setDraft({ ...draft, title: event.target.value })} /><label className="field-label">마감일<input type="date" required className="input-field mt-1" value={draft.date} onChange={event => setDraft({ ...draft, date: event.target.value })} /></label><div className="grid grid-cols-2 gap-2"><label className="field-label">시작 시간(선택)<input type="time" className="input-field mt-1" value={draft.time} onChange={event => setDraft({ ...draft, time: event.target.value, endTime: event.target.value ? draft.endTime : '' })} /></label><label className="field-label">종료 시간(선택)<input type="time" className="input-field mt-1" value={draft.endTime} min={draft.time || undefined} disabled={!draft.time} onChange={event => setDraft({ ...draft, endTime: event.target.value })} /></label></div><p className="-mt-1 text-[10px] text-slate-500">시작 시간만 입력하면 해당 시각에, 종료 시간까지 입력하면 시간 범위로 표시됩니다.</p><label className="field-label">우선순위<select className="input-field mt-1" value={draft.priority} onChange={event => setDraft({ ...draft, priority: event.target.value as PersonalTaskPriority })}><option value="low">낮음</option><option value="normal">보통</option><option value="high">높음</option></select></label><textarea className="input-field min-h-24" placeholder="개인 메모" value={draft.memo} onChange={event => setDraft({ ...draft, memo: event.target.value })} /><button className="btn-primary flex w-full items-center justify-center gap-1.5"><Plus size={14} />개인 업무 등록</button></form><div className="space-y-2">{[...tasks].sort((a,b) => Number(a.completed)-Number(b.completed) || a.date.localeCompare(b.date)).map(task => <div key={task.id} className={clsx('card flex items-start gap-3 p-4', task.completed && 'opacity-55')}><button onClick={() => void persist(tasks.map(item => item.id === task.id ? { ...item, completed: !item.completed, updatedAt: new Date().toISOString() } : item), task.completed ? '미완료로 되돌렸습니다.' : '개인 업무를 완료했습니다.')} className={clsx('mt-0.5 grid h-5 w-5 place-items-center rounded border', task.completed ? 'border-emerald-400 bg-emerald-400 text-slate-950' : 'border-slate-600')}>{task.completed && <Check size={12} />}</button><div className="min-w-0 flex-1"><p className={clsx('font-semibold text-slate-200', task.completed && 'line-through')}>{task.title}</p><p className={clsx('mt-1 text-[10px]', !task.completed && task.date < today() ? 'text-rose-400' : 'text-slate-500')}>{task.date}{task.time ? ` · ${task.time}${task.endTime ? `~${task.endTime}` : ''}` : ''} · 우선순위 {PRIORITY_LABEL[task.priority]}</p>{task.memo && <p className="mt-2 whitespace-pre-wrap text-xs text-slate-500">{task.memo}</p>}</div><button onClick={() => { if (confirm('이 개인 업무를 삭제할까요?')) void persist(tasks.filter(item => item.id !== task.id), '개인 업무를 삭제했습니다.') }} className="btn-ghost p-2 text-rose-400"><Trash2 size={13} /></button></div>)}{tasks.length === 0 && <div className="card py-14 text-center text-sm text-slate-500">등록된 개인 업무가 없습니다.</div>}</div></div>
-}
 
 function RosterTab({
   roster,

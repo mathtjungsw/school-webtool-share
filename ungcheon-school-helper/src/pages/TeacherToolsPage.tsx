@@ -1,3 +1,4 @@
+import { schoolDate } from '../services/schoolDate'
 import { useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { differenceInCalendarDays, eachDayOfInterval, format, isWeekend, parseISO } from 'date-fns'
@@ -21,7 +22,7 @@ type CompareResult = {
 type DrawMode = 'draw' | 'order' | 'groups'
 type DrawRecord = { id: string; at: string; mode: DrawMode; seed: string; title: string; groups: string[][] }
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => schoolDate()
 const loadJson = <T,>(key: string, fallback: T): T => {
   try { return JSON.parse(localStorage.getItem(key) ?? '') as T } catch { return fallback }
 }

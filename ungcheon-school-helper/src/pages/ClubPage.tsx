@@ -1,3 +1,4 @@
+import { schoolDate } from '../services/schoolDate'
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -1114,7 +1115,7 @@ function SettingsTab({ store, setStore, showToast }: TabProps) {
   const handleBackup = async () => {
     const json = JSON.stringify({ __type: 'club-backup', v: 1, data: store }, null, 2)
     const bytes = Array.from(new TextEncoder().encode(json))
-    const name = `동아리배정_백업_${s.schoolName || '학교'}_${new Date().toISOString().slice(0, 10)}.rca`
+    const name = `동아리배정_백업_${s.schoolName || '학교'}_${schoolDate()}.rca`
     const ok = await window.electron?.saveFileDialog(name, bytes)
     if (ok) showToast('✅ 백업 파일을 저장했습니다.')
   }

@@ -142,7 +142,7 @@ test('teacher, lesson and exchange/substitution tab changes reset stale preview'
 })
 
 test('preview selection scrolls only if the preview is outside the viewport; close and visible previews never scroll', () => {
-  const effects = calls(page, 'useEffect').filter(call => all(call.arguments[0], node => ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'scrollIntoView').length)
+  const effects = calls(page, 'useEffect').filter(call => call.arguments[1]?.getText() === '[preview]' && all(call.arguments[0], node => ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'scrollIntoView').length)
   assert.equal(effects.length, 1)
   const effect = effects[0]
   assert.ok(ts.isArrayLiteralExpression(effect.arguments[1]))

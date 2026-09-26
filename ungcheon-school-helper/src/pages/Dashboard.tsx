@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import SchoolDataStatus from '../components/SchoolDataStatus'
 import {
   RefreshCw, ChevronLeft, ChevronRight, AlertCircle,
   Utensils, CalendarDays, BookOpen, Globe, CloudSun,
@@ -934,6 +935,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
         </div>
       </div>
 
+      <SchoolDataStatus resources={['timetable', 'timetableChanges', 'timetableOverrides', 'staffChecklists', 'committees', 'sharedNeis']} />
       {specialTimetableDay && (
         <div className="mb-2 flex min-h-11 items-center gap-2.5 rounded-xl border-2 border-amber-400 bg-amber-100 px-3 py-1.5 text-slate-950 shadow-sm">
           <BellRing size={16} className="shrink-0 text-amber-700" />

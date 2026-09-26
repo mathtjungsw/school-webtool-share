@@ -1,3 +1,4 @@
+import SchoolDataStatus from '../components/SchoolDataStatus'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { CalendarDays, Clock3, Download, FileSpreadsheet, MapPin, Printer, RefreshCw, Search, ShieldCheck, Upload, UserRoundSearch } from 'lucide-react'
 import clsx from 'clsx'
@@ -273,6 +274,7 @@ export default function StudentLocatorPage() {
         <div><h1 className="page-title flex items-center gap-2"><UserRoundSearch className="text-cyan-700" size={22} />학생 위치 찾기</h1><p className="page-subtitle">한 학생의 현재 위치 또는 여러 학생의 특정 날짜·교시 위치를 확인합니다.</p></div>
         <button onClick={() => void load(true)} className="btn-ghost"><RefreshCw size={14} className={loading ? 'animate-spin' : ''} />새로고침</button>
       </header>
+      <SchoolDataStatus resources={["studentTimetable","studentRoster","timetable","timetableChanges","timetableOverrides"]} />
       {error && <p className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs font-bold text-rose-950">{error}</p>}
       {scheduleWarning && <p className="rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-sm font-black text-amber-950">{scheduleWarning}</p>}
       <nav className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">

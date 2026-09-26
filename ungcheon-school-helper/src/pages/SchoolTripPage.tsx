@@ -1,3 +1,4 @@
+import { schoolDate } from '../services/schoolDate'
 import { useState } from 'react'
 import { Printer, RefreshCw, Plus, Trash2 } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
@@ -43,7 +44,7 @@ export default function SchoolTripPage() {
   const [form, setForm] = useState<TripForm>(defaultForm())
 
   const schoolName = config.schoolName ?? '○○학교'
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '. ')
+  const today = schoolDate().replace(/-/g, '. ')
 
   const set = (patch: Partial<TripForm>) => setForm(f => ({ ...f, ...patch }))
 

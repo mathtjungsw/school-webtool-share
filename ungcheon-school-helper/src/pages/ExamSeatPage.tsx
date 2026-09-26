@@ -1,3 +1,4 @@
+import { schoolDate } from '../services/schoolDate'
 import { useState, useRef } from 'react'
 import { Shuffle, Download, RefreshCw, Plus, Trash2, Settings2, Upload, FileSpreadsheet } from 'lucide-react'
 import * as XLSX from 'xlsx'
@@ -143,7 +144,7 @@ function downloadExcel(classrooms: Classroom[], title: string) {
     XLSX.utils.book_append_sheet(wb, ws, room.name.slice(0, 31))
   })
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = schoolDate()
   XLSX.writeFile(wb, `좌석배치_${title || '시험'}_${today}.xlsx`)
 }
 

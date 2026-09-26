@@ -1,3 +1,4 @@
+import { schoolDate } from './schoolDate'
 import * as XLSX from 'xlsx'
 import { canonicalStudentId, studentIdParts } from './studentId'
 
@@ -208,7 +209,7 @@ export interface VolunteerValidationIssue {
 }
 
 export function emptyVolunteerDraft(teacherName = ''): VolunteerCertificateDraft {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = schoolDate()
   return {
     activityName: '', startDate: today, endDate: today, institution: '웅천고등학교',
     area: 'neighbor', location: '학교 내', activityContent: '', confirmTeacher: teacherName,
@@ -217,7 +218,7 @@ export function emptyVolunteerDraft(teacherName = ''): VolunteerCertificateDraft
 }
 
 export function emptyClassVolunteerDraft(teacherName = ''): ClassVolunteerCertificateDraft {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = schoolDate()
   return {
     ...emptyVolunteerDraft(teacherName),
     activityName: '사제동행 교내 환경정화',
@@ -234,7 +235,7 @@ export function emptyClassVolunteerDraft(teacherName = ''): ClassVolunteerCertif
 }
 
 export function emptyCoordinatorVolunteerDraft(teacherName = ''): CoordinatorVolunteerCertificateDraft {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = schoolDate()
   return {
     documentTitle: '',
     activityContent: '',

@@ -109,7 +109,7 @@ export function buildPrintDocument(options: PrintDocumentOptions): string {
 .print-engine-root[data-page-mode='single-page']{width:${pageWidth};height:${pageHeight};}
 .print-engine-root[data-page-mode='multi-page']{width:${pageWidth};min-height:${pageHeight};}
 `
-  return `<!DOCTYPE html><html lang="${escapePrintHtml(options.lang ?? 'ko')}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapePrintHtml(options.title)}</title><style>${BASE_CSS}${pageCss}${sanitizeStyles(options.styles ?? '')}</style></head><body><main class="print-engine-root" data-page-mode="${pageMode}">${sanitizePrintHtml(options.bodyHtml)}</main></body></html>`
+  return `<!DOCTYPE html><html lang="${escapePrintHtml(options.lang ?? 'ko')}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapePrintHtml(options.title)}</title><style>${BASE_CSS}${pageCss}${sanitizeStyles(options.styles ?? '')}</style></head><body><main class="print-engine-root" data-page-mode="${pageMode}" data-orientation="${orientation}">${sanitizePrintHtml(options.bodyHtml)}</main></body></html>`
 }
 
 async function waitUntilReady(frame: HTMLIFrameElement): Promise<void> {
@@ -140,7 +140,7 @@ export function calculatePrintPreflight(
   const horizontalOverflow = contentWidth > safePageWidth + 2
   const verticalOverflow = contentHeight > safePageHeight + 2
   const estimatedPages = Math.max(1, Math.ceil(contentHeight / safePageHeight))
-  const scaleToFit = Math.max(0.55, Math.min(1, safePageWidth / Math.max(contentWidth, 1), safePageHeight / Math.max(contentHeight, 1)))
+  const scaleToFit = Math.min(1, safePageWidth / Math.max(contentWidth, 1), safePageHeight / Math.max(contentHeight, 1))
   const messages: string[] = []
   const suggestions: string[] = []
   if (horizontalOverflow) {
@@ -162,14 +162,17 @@ function inspectFrame(frame: HTMLIFrameElement): PrintPreflightResult {
   const frameDocument = frame.contentDocument
   const root = frameDocument?.querySelector<HTMLElement>('.print-engine-root')
   if (!root) return calculatePrintPreflight(1, 1, 1, 1)
-  return calculatePrintPreflight(root.scrollWidth, root.scrollHeight, root.clientWidth, root.clientHeight)
+  const landscape = root.dataset.orientation === 'landscape'
+  const pxPerMm = 96 / 25.4
+  const zoom = Number.parseFloat(frame.contentWindow?.getComputedStyle(root).zoom || '1') || 1
+  return calculatePrintPreflight(root.scrollWidth * zoom, root.scrollHeight * zoom, (landscape ? 297 : 210) * pxPerMm, (landscape ? 210 : 297) * pxPerMm)
 }
 
 function showPreflightDialog(
   title: string,
   result: PrintPreflightResult,
   allowAutoFit: boolean,
-): Promise<'fit' | 'print' | 'cancel'> {
+): Promise<'fit' | 'pages' | 'print' | 'cancel'> {
   return new Promise(resolve => {
     const overlay = document.createElement('div')
     overlay.setAttribute('role', 'dialog')
@@ -183,11 +186,14 @@ function showPreflightDialog(
     dialog.innerHTML = `<div style="font-size:12px;font-weight:800;color:#92400e">A4 한 장 출력 사전검사</div><h2 style="margin:4px 0 0;font-size:19px">${escapePrintHtml(title)}</h2><p style="margin:12px 0 0;font-size:13px;font-weight:700;color:#475569">인쇄 전에 잘림 가능성을 발견했습니다.</p><ul style="margin:10px 0 0 18px;font-size:13px;font-weight:700;color:#9f1239">${messages}</ul>${suggestions ? `<div style="margin-top:14px;border-radius:11px;background:#fffbeb;padding:11px"><b style="font-size:12px">권장 보정</b><ul style="margin:5px 0 0 18px;font-size:12px;color:#475569">${suggestions}</ul></div>` : ''}<p style="margin-top:12px;font-size:11px;color:#64748b">자동 맞춤은 내용을 삭제하지 않고 전체 문서를 축소합니다. 축소 후 글자가 너무 작으면 취소하고 원본 화면에서 내용을 조정하세요.</p>`
     const actions = document.createElement('div')
     actions.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:18px;'
-    const finish = (choice: 'fit' | 'print' | 'cancel') => { overlay.remove(); resolve(choice) }
+    const finish = (choice: 'fit' | 'pages' | 'print' | 'cancel') => { overlay.remove(); resolve(choice) }
     const cancel = document.createElement('button'); cancel.textContent = '취소'; cancel.style.cssText = 'border:1px solid #cbd5e1;border-radius:9px;background:#fff;padding:8px 12px;font-weight:800;cursor:pointer;'; cancel.onclick = () => finish('cancel')
     const print = document.createElement('button'); print.textContent = '그대로 인쇄'; print.style.cssText = 'border:1px solid #cbd5e1;border-radius:9px;background:#f8fafc;padding:8px 12px;font-weight:800;cursor:pointer;'; print.onclick = () => finish('print')
     actions.append(cancel, print)
     if (allowAutoFit) {
+      const pages = document.createElement('button'); pages.textContent = '여러 장 출력'; pages.style.cssText = print.style.cssText; pages.onclick = () => finish('pages'); actions.append(pages)
+    }
+    if (allowAutoFit && result.scaleToFit >= 0.55) {
       const fit = document.createElement('button'); fit.textContent = '한 장 자동 맞춤'; fit.style.cssText = 'border:0;border-radius:9px;background:#d9ba00;color:#17212b;padding:8px 12px;font-weight:900;cursor:pointer;'; fit.onclick = () => finish('fit'); actions.append(fit)
     }
     dialog.append(actions); overlay.append(dialog); document.body.appendChild(overlay); cancel.focus()
@@ -229,13 +235,20 @@ export function printDocument(options: PrintDocumentOptions): void {
     if (result.horizontalOverflow || (singlePage && result.verticalOverflow)) {
       const choice = await showPreflightDialog(options.title, result, singlePage)
       if (choice === 'cancel') { cleanup(); return }
-      if (choice === 'fit') {
+      if (choice === 'fit' || choice === 'pages') {
         const fitted: PrintDocumentOptions = {
           ...options,
-          styles: `${options.styles ?? ''}\n@media print{.print-engine-root{transform:scale(${result.scaleToFit.toFixed(4)});transform-origin:top left;}}`,
+          pageMode: choice === 'pages' ? 'multi-page' : 'single-page',
+          styles: `${options.styles ?? ''}\n.print-engine-root{height:auto!important;overflow:visible!important;zoom:${choice === 'fit' ? Math.floor(result.scaleToFit * 1000) / 1000 : 1};}.print-engine-root .sheet{height:auto!important;min-height:0!important;overflow:visible!important;}`,
+
         }
         if (!writeFrame(frame, buildPrintDocument(fitted))) { cleanup(); return }
         await waitUntilReady(frame)
+        const checked = inspectFrame(frame)
+        if (checked.horizontalOverflow || (choice === 'fit' && checked.verticalOverflow)) {
+          window.alert('자동 맞춤 후에도 내용이 넘칩니다. 인쇄를 중단했습니다. 여러 장 출력이나 원본 표 너비를 조정해 주세요.')
+          cleanup(); return
+        }
       }
     }
     try {

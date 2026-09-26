@@ -1,3 +1,4 @@
+import { schoolDate } from '../services/schoolDate'
 import { useRef, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ScrollText, X, Trash2, Download, ChevronDown, Copy, Check as CheckIcon } from 'lucide-react'
@@ -42,7 +43,7 @@ export default function LogPanel({ open, onClose }: { open: boolean; onClose: ()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `app-log-${new Date().toISOString().slice(0, 10)}.txt`
+    a.download = `app-log-${schoolDate()}.txt`
     a.click()
     URL.revokeObjectURL(url)
   }

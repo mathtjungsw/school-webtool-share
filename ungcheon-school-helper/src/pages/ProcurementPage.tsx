@@ -1,3 +1,4 @@
+import { schoolDate } from '../services/schoolDate'
 import { useState, useMemo } from 'react'
 import { Plus, Trash2, RefreshCw, ShoppingCart } from 'lucide-react'
 import clsx from 'clsx'
@@ -42,7 +43,7 @@ function makeProduct(): Product {
 
 export default function ProcurementPage() {
   const [title, setTitle] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(schoolDate())
   const [criteria, setCriteria] = useState<Criterion[]>(DEFAULT_CRITERIA.map(c => ({ ...c })))
   const [products, setProducts] = useState<Product[]>([makeProduct(), makeProduct()])
   const [evaluators, setEvaluators] = useState<Evaluator[]>([

@@ -1,9 +1,12 @@
+import BatchTimetableOverrides from './BatchTimetableOverrides'
+import { overrideScopesOverlap } from '../../services/timetableOverrideBatch'
+import { schoolDate } from '../../services/schoolDate'
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, CalendarRange, Pencil, Plus, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
 import { deactivateTimetableOverride, getTimetableOverrides, saveTimetableOverride } from '../../services/schoolHub'
 import type { DailyTimetableOverride, TimetableOverrideAction } from '../../services/timetableOverrides'
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => schoolDate()
 const emptyForm = (): DailyTimetableOverride => ({
   id: '', date: today(), targetGrade: '', targetClass: '', targetPeriod: 1,
   action: 'copy', sourceDate: today(), sourcePeriod: 1, note: '', active: true,
@@ -17,7 +20,7 @@ export default function TimetableOverrideManager({ adminPassword, updatedBy, onC
   const [message, setMessage] = useState('')
   const load = async (force = false) => { setLoading(true); try { setItems(await getTimetableOverrides(true, force)) } finally { setLoading(false) } }
   useEffect(() => { void load() }, [])
-  const collision = useMemo(() => items.find(item => item.active && item.id !== form.id && item.date === form.date && item.targetGrade === form.targetGrade && item.targetClass === form.targetClass && item.targetPeriod === form.targetPeriod), [form, items])
+  const collision = useMemo(() => items.find(item => overrideScopesOverlap(item, form)), [form, items])
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setMessage('')
     if (collision && !window.confirm('같은 날짜·대상·교시에 이미 예외가 있습니다. 그래도 저장할까요?')) return
@@ -37,7 +40,7 @@ export default function TimetableOverrideManager({ adminPassword, updatedBy, onC
   }
   const scope = (item: DailyTimetableOverride) => item.targetClass ? `${item.targetGrade}-${Number(item.targetClass)}` : item.targetGrade ? `${item.targetGrade}학년` : '전 학년'
   const actionLabel = (item: DailyTimetableOverride) => item.action === 'clear' ? '수업 비우기' : item.action === 'move_pulled' ? `당김수업 이동 · ${item.sourceDate} ${item.sourcePeriod}교시` : `${item.sourceDate} ${item.sourcePeriod}교시 가져오기`
-  return <div className="grid items-start gap-4 xl:grid-cols-[390px_minmax(0,1fr)]">
+  return <><BatchTimetableOverrides adminPassword={adminPassword} updatedBy={updatedBy} onChanged={async () => { await load(true); await onChanged() }} /><div className="grid items-start gap-4 xl:grid-cols-[390px_minmax(0,1fr)]">
     <form onSubmit={submit} className="card space-y-3">
       <div><h2 className="flex items-center gap-2 text-base font-black text-slate-950"><CalendarRange size={18} className="text-violet-600" />일일 시간표 예외</h2><p className="mt-1 text-[11px] font-semibold text-slate-600">저장하면 공유 구글시트와 데스크톱·모바일 시간표에 함께 반영됩니다.</p></div>
       <label className="field-label">적용 날짜<input required type="date" className="input-field mt-1" value={form.date} onChange={event => setForm({ ...form, date: event.target.value })} /></label>
@@ -53,5 +56,5 @@ export default function TimetableOverrideManager({ adminPassword, updatedBy, onC
       <div className="mb-3 flex items-center justify-between"><div><h2 className="font-black text-slate-950">등록된 예외 {items.length}건</h2><p className="mt-1 text-[10px] text-slate-500">비활성 항목도 보존되며 다시 복원할 수 있습니다.</p></div><button onClick={() => void load(true)} disabled={loading} className="btn-ghost flex items-center gap-1"><RefreshCw size={13} className={loading ? 'animate-spin' : ''} />새로고침</button></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-xs"><thead><tr className="border-b border-slate-200 text-left text-slate-600"><th className="p-2">날짜</th><th className="p-2">대상</th><th className="p-2">교시</th><th className="p-2">처리</th><th className="p-2">안내</th><th className="p-2">상태</th><th className="p-2"></th></tr></thead><tbody>{items.map(item => <tr key={item.id} className={`border-b border-slate-100 ${item.active ? 'text-slate-800' : 'bg-slate-50 text-slate-400'}`}><td className="p-2 font-bold">{item.date}</td><td className="p-2">{scope(item)}</td><td className="p-2">{item.targetPeriod}교시</td><td className="p-2">{actionLabel(item)}</td><td className="max-w-64 truncate p-2" title={item.note}>{item.note || '-'}</td><td className="p-2">{item.active ? '사용' : '비활성'}</td><td className="p-2"><div className="flex justify-end gap-1"><button className="btn-ghost p-2" title="수정" onClick={() => setForm(item)}><Pencil size={13} /></button>{item.active ? <button className="btn-ghost p-2 text-rose-600" title="비활성화" onClick={() => void deactivate(item)}><Trash2 size={13} /></button> : <button className="btn-ghost p-2 text-emerald-700" title="복원" onClick={() => void restore(item)}><RotateCcw size={13} /></button>}</div></td></tr>)}{!items.length && <tr><td colSpan={7} className="p-10 text-center text-slate-500">등록된 예외가 없습니다.</td></tr>}</tbody></table></div>
     </section>
-  </div>
+  </div></>
 }

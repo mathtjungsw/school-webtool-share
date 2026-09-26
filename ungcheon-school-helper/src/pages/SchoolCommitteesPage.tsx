@@ -1,3 +1,4 @@
+import { schoolDate } from '../services/schoolDate'
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
@@ -37,7 +38,7 @@ import { useAppStore } from '../stores/appStore'
 type Tab = 'directory' | 'calendar'
 type Filter = '전체' | '법정' | '비법정' | '변경' | '폐지'
 
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => schoolDate()
 
 const emptyEventForm = (committeeId = '') => ({
   committeeId,

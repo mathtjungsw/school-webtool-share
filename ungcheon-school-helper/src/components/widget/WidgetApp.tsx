@@ -1,3 +1,4 @@
+import { taskNavigationTarget } from '../../services/taskNavigation';
 import {
   useCallback,
   useEffect,
@@ -1442,16 +1443,16 @@ export default function WidgetApp() {
               <div className="widget-popover-list">
                 {openPanel === "tasks"
                   ? pendingTaskItems.slice(0, 5).map(item => (
-                    <div className="widget-popover-row" key={item.id}>
+                    <button className="widget-popover-row" key={item.id} style={{ width: '100%', textAlign: 'left' }} onClick={() => window.electron.widgetOpenMain(taskNavigationTarget(item.id.replace(/^(personal|shared)-/, ''), item.source === '개인 업무' ? 'personal' : 'shared'))}>
                       <span className="widget-source">{item.source}</span>
                       <div><b>{item.title}</b><small>{deadlineLabel(item.deadline, today)}</small></div>
-                    </div>
+                    </button>
                   ))
                   : alertItems.slice(0, 5).map(item => (
-                    <div className="widget-popover-row" key={item.id}>
+                    <button className="widget-popover-row" key={item.id} style={{ width: '100%', textAlign: 'left' }} onClick={() => window.electron.widgetOpenMain(item.kind === 'notice' ? `dashboard?notice=${encodeURIComponent(item.id.slice(7))}` : `timetable_swap?change=${encodeURIComponent(item.id.slice(7))}`)}>
                       <span className={`widget-source ${item.kind}`}>{item.kind === "notice" ? "공지" : "수업"}</span>
                       <div><b>{item.title}</b><small>{item.meta}</small></div>
-                    </div>
+                    </button>
                   ))}
                 {(openPanel === "tasks" ? pendingTaskItems.length : alertItems.length) === 0 && <p className="empty">표시할 내용이 없습니다.</p>}
               </div>

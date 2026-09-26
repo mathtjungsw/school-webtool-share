@@ -1,3 +1,4 @@
+import { schoolDate } from './schoolDate'
 import * as XLSX from 'xlsx'
 import {
   activeSplitBoundaries, defaultSplitScores, emptySplitScores,
@@ -357,7 +358,7 @@ export function exportRestoreWorkbook(state: GradePreviewState) {
   state.components.forEach(component => Object.values(component.scores).forEach(score => scores.push([score.classNo, score.studentNo, score.studentName, component.id, score.rawScore, score.status])))
   const results = [['classNo', 'studentNo', 'studentName', 'total', 'integerScore', 'rank', 'tieCount', 'midRank', 'midPct', 'grade', 'achievement', 'notes'], ...state.results.map(row => [row.classNo, row.studentNo, row.studentName, row.total, row.integerScore, row.rank, row.tieCount, row.midRank, row.midPct, row.grade ?? '', row.achievement ?? '', row.notes.join(', ')])]
   ;([['README', readme], ['CONFIG', config], ['COMPONENTS', components], ['SCORES', scores], ['RESULTS', results]] as Array<[string, unknown[][]]>).forEach(([name, data]) => XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), name))
-  XLSX.writeFile(workbook, `추정분할점수_도우미_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  XLSX.writeFile(workbook, `추정분할점수_도우미_${schoolDate()}.xlsx`)
 }
 
 export async function importRestoreWorkbook(file: File): Promise<GradePreviewState> {
