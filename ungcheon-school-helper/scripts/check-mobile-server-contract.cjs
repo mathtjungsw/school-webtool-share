@@ -486,4 +486,46 @@ test('invalid dates, reversed ranges and more than 22 days are rejected', () => 
   ]) assert.equal(h.post(h.request(range)).ok, false);
 });
 
+test('mobile operation weekday map exactly matches the desktop academic exceptions', () => {
+  const h = harness();
+  const desktop = fs.readFileSync(path.resolve(__dirname, '../src/services/specialTimetableDays.ts'), 'utf8');
+  const days = [...desktop.matchAll(/date:\s*'([^']+)'[\s\S]*?sourceDayIndex:\s*(\d+)/g)];
+  assert.equal(days.length, 4);
+  for (const [, date, index] of days) assert.equal(h.context.mobileTimetableDayIndex_(date), Number(index));
+  const keys = vm.runInContext('Object.keys(MOBILE_SPECIAL_TIMETABLE_DAY_INDEX)', h.context);
+  assert.deepEqual(Array.from(keys).sort(), days.map(match => match[1]).sort());
+  assert.equal(h.context.mobileTimetableDayIndex_('2026-10-14'), 2);
+  assert.equal(h.context.mobileTimetableDayIndex_('2026-10-17'), -1);
+});
+
+test('Friday operation on Tuesday queries Friday students but the actual attendance date', () => {
+  const h = harness({
+    now: '2026-10-13T03:00:00Z',
+    studentTimetableRows: [
+      { payloadJson: JSON.stringify({ student: { name: '금요수강생', grade: '3', className: '1', number: '1' }, slots: { 금1: { subject: '국어', teacher: '테스트교사', classroom: '301' } } }) },
+      { payloadJson: JSON.stringify({ student: { name: '화요수강생', grade: '3', className: '1', number: '2' }, slots: { 화1: { subject: '수학', teacher: '테스트교사', classroom: '302' } } }) },
+    ],
+    attendanceValues: [
+      ['2026-10-13 (화)', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['', '', true, '', '', true, '', '', true, '', '', true, '', '', true, '', '', true, '', '', true],
+      ['1반', '이름', '비고', '2반', '이름', '비고', '3반', '이름', '비고', '4반', '이름', '비고', '5반', '이름', '비고', '6반', '이름', '비고', '7반', '이름', '비고'],
+      [1, '금요수강생', '지각'], [2, '화요수강생', '결석'],
+    ],
+  });
+  h.rows.교환대강반영 = [];
+  h.rows.일일시간표예외 = [];
+  h.rows.시간표[0].slot8 = '302\n수학';
+  h.rows.시간표[0].slot29 = '301\n국어';
+  const result = h.post(h.request({ fromDate: '2026-10-12', toDate: '2026-10-23' }));
+  assert.equal(result.ok, true);
+  const summary = result.data.attendanceSummaries.find(item => item.period === 1);
+  assert.equal(summary.entries.length, 1);
+  assert.equal(summary.entries[0].name, '금요수강생');
+  const detail = h.post({ action: 'getMobileAttendanceRoster', viewerName: '테스트교사', accessToken: h.existingToken, date: '2026-10-13', period: 1 });
+  assert.equal(detail.ok, true);
+  assert.equal(detail.data.date, '2026-10-13');
+  assert.equal(detail.data.entries.length, 1);
+  assert.equal(detail.data.entries[0].name, '금요수강생');
+});
+
 console.log(`Mobile Apps Script contract: ${passed} tests passed. No live services or secrets used.`);

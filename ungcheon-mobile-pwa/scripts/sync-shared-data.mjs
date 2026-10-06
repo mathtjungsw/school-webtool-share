@@ -10,6 +10,7 @@ const manifestPath = path.join(output, 'source-manifest.json')
 const files = [
   ['src/data/pulledLessons2026.ts', 'pulledLessons2026.ts'],
   ['src/services/ungcheonSchedule.ts', 'ungcheonSchedule.ts'],
+  ['src/services/specialTimetableDays.ts', 'specialTimetableDays.ts'],
 ]
 // Git uses LF in its source repository while Windows checkouts may use CRLF.
 // Validate content, not checkout-specific newline bytes, on both build hosts.

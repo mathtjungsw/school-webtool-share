@@ -2,6 +2,7 @@ import { addDays, format, startOfWeek } from 'date-fns'
 import type { DailyTimetableOverride, DashboardPayload, LessonView, MealInfo, MobileEvent, ScheduleSource, TeacherTimetable, TimetableChange } from './types'
 import { PULLED_LESSONS_2026 } from './shared/pulledLessons2026'
 import { UNGCHEON_PERIOD_PLAN } from './shared/ungcheonSchedule'
+import { getTimetableDayIndex } from './shared/specialTimetableDays'
 import { applyTeacherOverrides, effectiveMobilePulledLessons } from './timetableOverrides'
 
 export const DAYS = ['월', '화', '수', '목', '금']
@@ -164,7 +165,7 @@ export function isApplied(change: TimetableChange, name: string) {
   return change.status === 'approved' || Boolean(change.requesterAppliedAt && change.requesterName === name)
 }
 export function timetableForDate(teacher: TeacherTimetable | null, date: string, changes: TimetableChange[], teacherName: string, overrides: DailyTimetableOverride[] = []): LessonView[] {
-  const dayIndex = new Date(`${date}T12:00:00`).getDay() - 1
+  const dayIndex = getTimetableDayIndex(date)
   if (!teacher || dayIndex < 0 || dayIndex > 4) return []
   const pulledLessons = effectiveMobilePulledLessons(PULLED_LESSONS_2026, overrides)
   const hasEighth = pulledLessons.some(item => item.date === date && item.teacherName.trim() === teacherName.trim() && item.period === 8)

@@ -10,6 +10,7 @@ import { DAYS, DEFAULT_VISIBILITY, SOURCE_LABELS, buildMobileTimelineRows, colle
 import type { DashboardPayload, LessonView, MealInfo, MobileAttendanceRoster, MobileAttendanceSummary, MobileEvent, MobileResourceKey, ScheduleSource } from './types'
 import { formatCheckedAt, RESOURCE_LABELS, resourceStatus, summarizeStatus, type StatusSummary } from './dataStatus'
 import { VISUAL_NAME, visualFixture } from './visualFixture'
+import { getSpecialTimetableDay } from './shared/specialTimetableDays'
 
 const SESSION_KEY = 'ungcheon.mobile.session.v1'
 const FILTER_KEY = 'ungcheon.mobile.filters.v1'
@@ -475,6 +476,7 @@ export default function App() {
   const teacher = data ? findTeacher(data.timetable, session.name) : null
   const selectedLessons = data ? timetableForDate(teacher, selectedDate, data.changes, session.name, data.bundle?.timetableOverrides ?? []) : []
   const selectedClassCount = selectedLessons.filter(lesson => Boolean(lesson.value)).length
+  const selectedSpecialDay = getSpecialTimetableDay(selectedDate)
   const dateSet = view === 'today' ? [selectedDate] : view === 'week' ? range.thisWeek : range.nextWeek
   const heading = view === 'today' ? format(new Date(`${selectedDate}T12:00:00`), 'M월 d일 EEEE', { locale: ko }) : view === 'week' ? '이번 주 일정' : view === 'next' ? '다음 주 일정' : '주간 교사 시간표'
   const timetableStatus = summarizeStatus(data, ['timetable', 'changes', 'overrides'])
@@ -505,7 +507,7 @@ export default function App() {
       {data && view === 'today' && <>
         <DateNavigator dates={previewDates} selected={selectedDate} today={today} onSelect={setSelectedDate} />
         {selectedDate === today && <details className="focus-disclosure"><summary>현재·다음 수업 요약</summary><NowNextCard lessons={selectedLessons} events={selectedEvents} minuteOfDay={clock.minutes} /></details>}
-        <section className="panel timetable-primary"><div className="panel-title"><div className="panel-icon"><Clock3 size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘의 교사 시간표' : '선택한 날의 교사 시간표'}</h2></div><StatusBadge status={timetableStatus} /></div><DailyTimeline lessons={selectedLessons} events={selectedEvents} attendance={selectedAttendanceSummaries} onOpenAttendance={openAttendance} onOpenEvent={setEventDetail} teacherFound={Boolean(teacher)} isNew={isNew} /></section>
+        <section className="panel timetable-primary"><div className="panel-title"><div className="panel-icon"><Clock3 size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘의 교사 시간표' : '선택한 날의 교사 시간표'}</h2></div><StatusBadge status={timetableStatus} /></div>{selectedSpecialDay && <p className="special-timetable-note" role="note">{selectedSpecialDay.message}</p>}<DailyTimeline lessons={selectedLessons} events={selectedEvents} attendance={selectedAttendanceSummaries} onOpenAttendance={openAttendance} onOpenEvent={setEventDetail} teacherFound={Boolean(teacher)} isNew={isNew} /></section>
         <section className="panel"><div className="panel-title"><div className="panel-icon secondary"><CalendarDays size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘 일정' : '선택한 날의 일정'}</h2></div><StatusBadge status={scheduleStatus} /></div><div className="event-list">{selectedEvents.map(event => <EventCard key={event.id} event={event} onOpen={setEventDetail} isNew={isNew(event)} />)}{!selectedEvents.length && <div className="empty">표시할 일정이 없습니다.</div>}</div></section>
         <MealPanel meals={selectedMeals} status={mealStatus} isToday={selectedDate === today} />
       </>}
@@ -513,7 +515,7 @@ export default function App() {
         const dayEvents = allEvents.filter(event => event.date === date)
         return <section className={`day-panel ${date === today ? 'today' : ''}`} key={date}><div className="day-heading"><strong>{format(new Date(`${date}T12:00:00`), 'M.d')}</strong><span>{format(new Date(`${date}T12:00:00`), 'EEE', { locale: ko })}</span><i>{dayEvents.length}</i></div><div className="event-list">{dayEvents.map(event => <EventCard key={event.id} event={event} onOpen={setEventDetail} isNew={isNew(event)} />)}{!dayEvents.length && <div className="empty compact">일정 없음</div>}</div></section>
       })}</div>}
-      {data && view === 'timetable' && <section className="weekly-table"><div className="week-navigation"><button aria-label="이전 주 시간표" disabled={weekOffset <= -1} onClick={() => setWeekOffset(value => value - 1)}><ChevronLeft size={17} /></button><strong>{weekOffset === -1 ? '지난주' : weekOffset === 1 ? '다음 주' : '이번 주'} · {displayedWeek[0].slice(5)}~{displayedWeek[4].slice(5)}</strong><button aria-label="다음 주 시간표" disabled={weekOffset >= 1} onClick={() => setWeekOffset(value => value + 1)}><ChevronRight size={17} /></button><button onClick={() => setWeekOffset(0)}>이번 주</button></div><div className="week-grid header"><span>교시</span>{displayedWeek.map((date, index) => <strong key={date}>{DAYS[index]}<small>{date.slice(5)}</small></strong>)}</div>{Array.from({ length: weeklyPeriodCount }, (_, periodIndex) => <div className="week-grid" key={periodIndex}><span>{periodIndex + 1}</span>{displayedWeek.map(date => {
+      {data && view === 'timetable' && <section className="weekly-table"><div className="week-navigation"><button aria-label="이전 주 시간표" disabled={weekOffset <= -1} onClick={() => setWeekOffset(value => value - 1)}><ChevronLeft size={17} /></button><strong>{weekOffset === -1 ? '지난주' : weekOffset === 1 ? '다음 주' : '이번 주'} · {displayedWeek[0].slice(5)}~{displayedWeek[4].slice(5)}</strong><button aria-label="다음 주 시간표" disabled={weekOffset >= 1} onClick={() => setWeekOffset(value => value + 1)}><ChevronRight size={17} /></button><button onClick={() => setWeekOffset(0)}>이번 주</button></div><div className="week-grid header"><span>교시</span>{displayedWeek.map((date, index) => <strong key={date}>{DAYS[index]}<small>{date.slice(5)}</small>{getSpecialTimetableDay(date) && <small className="special-weekday">{getSpecialTimetableDay(date)!.sourceWeekday} 시간표</small>}</strong>)}</div>{Array.from({ length: weeklyPeriodCount }, (_, periodIndex) => <div className="week-grid" key={periodIndex}><span>{periodIndex + 1}</span>{displayedWeek.map(date => {
           const lesson = timetableForDate(teacher, date, data.changes, session.name, data.bundle?.timetableOverrides ?? [])[periodIndex]
           const parsed = parseSlot(lesson?.value ?? '')
           return <div key={date} className={lesson?.changed ? 'changed' : ''}><strong>{parsed.subject || (lesson?.value ? parsed.className : '—')}</strong>{parsed.subject && <small>{parsed.className}</small>}{lesson?.note && <em>{lesson.note}</em>}</div>

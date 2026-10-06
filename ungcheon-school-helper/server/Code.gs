@@ -42,7 +42,14 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 52;
+const MOBILE_SERVICE_VERSION = 53;
+// Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
+const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
+  '2026-08-11': 0,
+  '2026-10-13': 4,
+  '2026-11-09': 4,
+  '2026-11-17': 4
+};
 const MOBILE_WEEKLY_PLAN_ID = '1Bn2hJ8vehxRCgWJmF2CJzaUiiZM6iRxdYLPS4iadB_k';
 const MOBILE_CREATIVE_SCHEDULE_ID = '1ku5VufC7Pv_dIS0h7lbYMaWSeKzMnyAoBU0QPq5uR00';
 const MOBILE_GATE_DUTY_ID = '1YhgrTJOuWKqCFRkFVPLQ__cARt17GOvsC633k10dBFU';
@@ -408,6 +415,16 @@ const RELEASE_NOTES = [
       '· 기존 모바일 주소, 로그인·출결 팝업 갱신 방식과 이전 릴리스 안내는 유지합니다.'
     ].join('\n'),
     date: '2026-09-26'
+  },
+  {
+    key: 'mobile-v1.1.38',
+    title: '[모바일 업데이트] v1.1.38 · 특정 요일 시간표 운영 반영',
+    body: [
+      '· 10월 13일·11월 9일·11월 17일의 금요일 시간표 운영과 8월 11일의 월요일 운영을 PC와 동일하게 반영합니다.',
+      '· 날짜별·주간 시간표에 운영 요일을 표시하고 3학년 출결도 실제 운영 요일의 수강생을 조회합니다.',
+      '· 교체·대강·당김수업·일일 예외, 기존 로그인과 공개 주소 및 데스크톱 안내는 유지합니다. PC 재설치는 필요하지 않습니다.'
+    ].join('\n'),
+    date: '2026-10-06'
   },
   {
     key: 'v1.1.35',
@@ -3494,9 +3511,15 @@ function mobileAttendanceClassKey_(value) {
   return /^[1-3]\d{2}$/.test(digits) ? digits : '';
 }
 
+function mobileTimetableDayIndex_(date) {
+  const key = clean_(date, 10);
+  if (Object.prototype.hasOwnProperty.call(MOBILE_SPECIAL_TIMETABLE_DAY_INDEX, key)) return MOBILE_SPECIAL_TIMETABLE_DAY_INDEX[key];
+  const day = new Date(key + 'T12:00:00+09:00').getDay();
+  return day >= 1 && day <= 5 ? day - 1 : -1;
+}
+
 function mobileAttendanceLessonAt_(timetable, teacherName, date, period) {
-  const targetDate = new Date(date + 'T12:00:00+09:00');
-  const dayIndex = targetDate.getDay() - 1;
+  const dayIndex = mobileTimetableDayIndex_(date);
   if (!timetable || !Array.isArray(timetable.teachers) || dayIndex < 0 || dayIndex > 4) return null;
   const teacher = timetable.teachers.find(function(item) { return clean_(item && item.name, 30) === teacherName; });
   const slot = teacher && Array.isArray(teacher.slots) ? teacher.slots[dayIndex * 7 + Number(period) - 1] : null;
@@ -3543,9 +3566,8 @@ function mobileAttendanceTeacherMatches_(slotTeacher, viewerName, studentSlot, e
 function mobileAttendanceStudentsForSlot_(viewerName, date, period, personalRows, timetableOverrides, timetableChanges, pulledLessons, timetable) {
   const sourceSlot = mobileAttendanceContext_(viewerName, date, period, timetableOverrides, timetableChanges, pulledLessons);
   if (!sourceSlot || sourceSlot.review) return { students: [], context: sourceSlot };
-  const sourceDate = new Date(sourceSlot.date + 'T12:00:00+09:00');
-  const day = ['일', '월', '화', '수', '목', '금', '토'][sourceDate.getDay()];
-  if (!day || day === '일' || day === '토') return { students: [], context: sourceSlot };
+  const day = ['월', '화', '수', '목', '금'][mobileTimetableDayIndex_(sourceSlot.date)];
+  if (!day) return { students: [], context: sourceSlot };
   const key = day + sourceSlot.period;
   const rows = Array.isArray(personalRows) ? personalRows : readObjects_(STUDENT_TIMETABLE_SHEET);
   const resolvedTimetable = timetable || getTimetable_();

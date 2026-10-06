@@ -1,5 +1,6 @@
 import type { PulledLesson } from './shared/pulledLessons2026'
 import type { DailyTimetableOverride, TeacherTimetable } from './types'
+import { getTimetableDayIndex } from './shared/specialTimetableDays'
 
 const compact = (value: unknown) => String(value ?? '').replace(/\s+/g, '').trim()
 function classCode(value: string) {
@@ -12,7 +13,6 @@ function matches(value: string, rule: DailyTimetableOverride) {
   if (rule.targetClass) return code === `${rule.targetGrade}-${Number(rule.targetClass)}`
   return !rule.targetGrade || code.startsWith(`${rule.targetGrade}-`)
 }
-function dayIndex(date: string) { return new Date(`${date}T12:00:00`).getDay() - 1 }
 
 export function applyTeacherOverrides(teacher: TeacherTimetable, date: string, base: string[], overrides: DailyTimetableOverride[]) {
   const lessons = [...base]
@@ -25,7 +25,7 @@ export function applyTeacherOverrides(teacher: TeacherTimetable, date: string, b
         if ((!rule.targetGrade && !rule.targetClass) || matches(lessons[index] ?? '', rule)) lessons[index] = ''
         return
       }
-      const sourceDay = dayIndex(rule.sourceDate)
+      const sourceDay = getTimetableDayIndex(rule.sourceDate)
       const source = sourceDay >= 0 && sourceDay <= 4 && rule.sourcePeriod >= 1 && rule.sourcePeriod <= 7
         ? teacher.slots[sourceDay * 7 + rule.sourcePeriod - 1]?.value ?? '' : ''
       if ((!rule.targetGrade && !rule.targetClass) || matches(source, rule) || matches(lessons[index] ?? '', rule)) lessons[index] = source

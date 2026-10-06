@@ -5,6 +5,22 @@ import { describe, expect, it } from 'vitest'
 const teacher: TeacherTimetable = { name: '홍길동', label: '홍길동', load: '', slots: Array.from({ length: 35 }, (_, index) => ({ value: index === 0 ? '101\n국어' : '', locked: false })) }
 
 describe('모바일 일정 도메인', () => {
+  it.each([
+    ['2026-08-11', 0], ['2026-10-13', 4], ['2026-11-09', 4], ['2026-11-17', 4],
+    ['2026-10-14', 2],
+  ])('%s는 PC와 같은 운영 요일의 시간표를 사용한다', (date, day) => {
+    const source = { ...teacher, slots: Array.from({ length: 35 }, (_, index) => ({ value: `요일${Math.floor(index / 7)} 교시${index % 7 + 1}`, locked: false })) }
+    expect(timetableForDate(source, date, [], source.name).map(lesson => lesson.value))
+      .toEqual(Array.from({ length: 7 }, (_, index) => `요일${day} 교시${index + 1}`))
+  })
+
+  it('일일 예외의 원본 날짜도 실제 운영 요일로 조회하고 주말은 비운다', () => {
+    const source = { ...teacher, slots: Array.from({ length: 35 }, (_, index) => ({ value: `기존${index + 1}`, locked: false })) }
+    const copy: DailyTimetableOverride = { id:'special-copy', date:'2026-10-14', targetGrade:'', targetClass:'', targetPeriod:1, action:'copy', sourceDate:'2026-10-13', sourcePeriod:2, note:'', active:true, createdBy:'관리자', createdAt:'', updatedAt:'' }
+    expect(timetableForDate(source, copy.date, [], source.name, [copy])[0].value).toBe('기존30')
+    expect(timetableForDate(source, '2026-10-17', [], source.name)).toEqual([])
+  })
+
   it('이번 주와 다음 주를 월요일부터 7일씩 만든다', () => {
     const result = rangeForToday(new Date('2026-08-20T12:00:00+09:00'))
     expect(result.thisWeek).toEqual(['2026-08-17','2026-08-18','2026-08-19','2026-08-20','2026-08-21','2026-08-22','2026-08-23'])

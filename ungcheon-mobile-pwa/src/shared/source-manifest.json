@@ -1,5 +1,5 @@
 {
-  "desktopVersion": "1.1.34",
+  "desktopVersion": "1.1.36",
   "files": {
     "pulledLessons2026.ts": {
       "source": "src/data/pulledLessons2026.ts",
@@ -8,6 +8,10 @@
     "ungcheonSchedule.ts": {
       "source": "src/services/ungcheonSchedule.ts",
       "sha256": "59f1687257f38b3aaa868ff0d818e35f8c524fee6224e17d51f4a9546319d50d"
+    },
+    "specialTimetableDays.ts": {
+      "source": "src/services/specialTimetableDays.ts",
+      "sha256": "ca3cbcf4a4ccb5147540f76e236e791c2880b7256ca0b008c92a0558528449a7"
     }
   }
 }

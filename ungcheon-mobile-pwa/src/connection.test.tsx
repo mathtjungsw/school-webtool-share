@@ -40,6 +40,22 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe('모바일 연결 안정화 통합', () => {
+  it('10월 13일 날짜별·주간 화면은 금요일 수업과 운영 안내를 표시한다', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-13T03:00:00Z'))
+    seedSession()
+    const data = fixture()
+    data.timetable = { version: 1, title: '검증 시간표', uploadedAt: new Date().toISOString(), teachers: [{ name: NAME, label: NAME, load: '', slots: Array.from({ length: 35 }, (_, index) => ({ value: index === 28 ? '301\n금요국어' : index === 7 ? '302\n화요수학' : '', locked: false })) }] }
+    vi.mocked(loadDashboard).mockResolvedValue(data)
+    render(<App />)
+    expect(await screen.findByText('금요국어')).toBeInTheDocument()
+    expect(screen.queryByText('화요수학')).not.toBeInTheDocument()
+    expect(screen.getByRole('note')).toHaveTextContent('10월 13일(화)은 금요일 시간표로 운영합니다.')
+    fireEvent.click(screen.getByRole('tab', { name: '주간 시간표' }))
+    expect(screen.getByText('금 시간표')).toBeInTheDocument()
+    expect(screen.getByText('10-13')).toBeInTheDocument()
+  })
+
   it('주간 시간표는 실제 날짜를 표시하며 지난주와 다음 주를 오간다', async () => {
     render(<App />)
     await screen.findByText('연결 검증 일정')
