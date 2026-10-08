@@ -24,6 +24,20 @@ vm.runInNewContext(result.outputFiles[0].text, { module: moduleState, exports: m
   require: name => name === './printing' ? { escapePrintHtml: value => String(value), printDocument: options => { printed = options } } : localRequire(name), crypto, Intl, Date, TextEncoder,
   window: { electron: { saveFileDialog: (_name, bytes) => { downloaded = bytes; return Promise.resolve(true) } } } })
 const service = moduleState.exports
+test('Desktop read activates only the one-time roster migration', () => {
+  const route = server.functions.get('doPost').match(/if \(action === 'getStaffRoster'\) \{[\s\S]*?\n    \}/)[0]
+  let migrations = 0
+  let applied = false
+  const sandbox = { action: 'getStaffRoster', STAFF_ROSTER_FILE_ORDER_1_1_37_KEY: 'sequence-applied',
+    PropertiesService: { getScriptProperties: () => ({ getProperty: () => applied ? 'true' : null }) },
+    SpreadsheetApp: { getActiveSpreadsheet: () => ({}) },
+    migrateStaffRosterFileOrder1_1_37_: () => { migrations++; applied = true },
+    getStaffRoster_: () => ({ members: [] }), json_: value => value }
+  const run = () => vm.runInNewContext('(function() {' + route + '})()', sandbox)
+  run(); run()
+  assert.equal(migrations, 1)
+  assert.ok(!route.includes('ensureSheets_('))
+})
 const member = (name, displayOrder, position = '교사') => ({ id: name, name, position, department: '부서', subject: '교과', homeroom: '3-1', displayOrder })
 const bytes = matrix => {
   const wb = XLSX.utils.book_new()

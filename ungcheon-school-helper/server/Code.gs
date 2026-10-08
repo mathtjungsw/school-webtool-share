@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 54;
+const MOBILE_SERVICE_VERSION = 55;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -994,7 +994,14 @@ function doPost(e) {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: replaceStudentTimetable_(body) });
     }
-    if (action === 'getStaffRoster') return json_({ ok: true, data: getStaffRoster_() });
+    if (action === 'getStaffRoster') {
+      // Read routes skip global initialization. Activate only this approved,
+      // one-time roster migration so deployment does not wait for an admin write.
+      if (PropertiesService.getScriptProperties().getProperty(STAFF_ROSTER_FILE_ORDER_1_1_37_KEY) !== 'true') {
+        migrateStaffRosterFileOrder1_1_37_(SpreadsheetApp.getActiveSpreadsheet());
+      }
+      return json_({ ok: true, data: getStaffRoster_() });
+    }
     if (action === 'replaceStaffRoster') {
       requireAdmin_(body.adminPassword);
       return json_({ ok: true, data: replaceStaffRoster_(body) });
