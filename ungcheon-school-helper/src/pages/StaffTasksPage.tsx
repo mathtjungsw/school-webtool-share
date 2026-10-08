@@ -601,7 +601,7 @@ function RosterTab({
     setSaving(true)
     onError('')
     try {
-      const sortedDraft = sortStaffMembers(draft)
+      const sortedDraft = sortStaffMembers(draft).map((member, index) => ({ ...member, displayOrder: index + 1 }))
       const result = await replaceSharedStaffRoster(sortedDraft, adminPassword, uploadedBy, sourceFileName || roster?.sourceFileName)
       setDraft(sortedDraft)
       onSuccess(`교직원 명렬 ${result.version}차 저장을 완료했습니다.`)
@@ -689,7 +689,7 @@ function RosterTab({
 
       {!isAdmin && (
         <div className="rounded-xl border border-slate-500/15 bg-white/[0.02] px-4 py-3 text-xs text-slate-400">
-          일반 사용자는 가나다순 명렬을 조회하고 내려받을 수 있습니다. 수정은 관리자 모드에서만 가능합니다.
+          명렬은 등록된 엑셀 순번대로 표시됩니다. 일반 사용자는 조회·다운로드할 수 있으며 수정은 관리자 모드에서만 가능합니다.
         </div>
       )}
 

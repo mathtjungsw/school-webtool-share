@@ -7,12 +7,12 @@ const vm = require('node:vm')
 const ts = require('typescript')
 const crypto = require('node:crypto')
 
-// Exact canonical definitions reviewed for the v1.1.31 desktop/server release.
+// Exact canonical definitions reviewed for the v1.1.31 and v1.1.37 desktop/server releases.
 // A later edit to one of these functions/constants must update this digest in a
 // separately reviewed release instead of silently bypassing main comparison.
 const APPROVED_RELEASE_FUNCTIONS = new Map([
   ['getSyncManifest_', 'ad3c4cf9d48e2ff3534f898def4cf1bfc64490abe06af34b652a4b647fc73b5d'],
-  ['ensureSheets_', '1065c0a0cbeb157ecf8e448cc7f873ebfe23cfe04950e435ec01a5cf91ce6c5d'],
+  ['ensureSheets_', 'a641bb55fce9687b1dd47bd8820d3ca2551eff96d0c374bdc57bd25812a53de0'],
   ['ensureStaffChecklistSheets_', '9754956e3fd8fb24ad7620e73fd5e23e574f96821e3916334a3c3bd6cfae09f5'],
   ['ensureTimetableOverrideSheets_', 'ebd9db1c563e4881a0e41c2e88e2e832f0e52fa54b54d0ab09509e5322d1cecc'],
   ['timetableOverrideRevision_', '503ad9030ecd87f0bc04e60311d39cb7ed8b4b7877f366788fd0ebd63ff876ed'],
@@ -22,8 +22,10 @@ const APPROVED_RELEASE_FUNCTIONS = new Map([
   ['appendTimetableOverrideHistory_', 'f6b7d80086075eac9d40ce2e89c9de5b46bfecd01662a4d070560e494a258be1'],
   ['saveTimetableOverride_', '41762f925cd071882c7275bb4704f69eaa109b013879caa183955b4cf824bbeb'],
   ['deactivateTimetableOverride_', 'd77722eec5b153b9ed0f1706e71fedad163bf03bc7b8fbefbce5caff0a422fa9'],
-  ['getStaffRoster_', '9a548f8b6b0a69c401f1a52b023ca96747f7cd9d74a9c14e9840b3c494b7fd73'],
-  ['compareStaffMembers_', 'dd4420cccfd60b31d851b02b6e5f1cc28fae9372067b3beba067ba373da098c2'],
+  ['getStaffRoster_', 'a9ced411c7a426b4c082e26c5adca69552b5e2a3c40a7a0112bf3dea98afadcb'],
+  ['replaceStaffRoster_', '13ef8adf7bbeeebd81a1e04fb0b61dc2ceb9221f5aa59a22dc2826e5361884a7'],
+  ['compareStaffMembers_', '4fbaf01726c660c252346f77f1d4dfdcea50cd743543666a8eeb3d5ff7798b92'],
+  ['migrateStaffRosterFileOrder1_1_37_', '54fa9652934363430091a204916d7c51fe1efe0ba77f1e2e5d0a99eb9c830fad'],
   ['migrateStaffRoster1_1_31_', 'df75a529c16fc6a6952cb5a30199a0a88ca783725fe5c9a196555cfabaf21afc'],
   ['listStaffChecklists_', 'df440585cd2a49f60930b88fe03adab9ece289b33e29701aca3664155bc19447'],
   ['addStaffChecklist_', 'c4792bf0fcc2177a36578c266782b6b2438ff76db4603a3e102063972eae3f95'],
@@ -31,6 +33,8 @@ const APPROVED_RELEASE_FUNCTIONS = new Map([
   ['migrateStaffName1_1_30_', '88d49fc9ec576eaba90238b85c25d6beb242561cd39acad0bad4bdd22bed05c6'],
 ])
 const APPROVED_RELEASE_CONSTANTS = new Map([
+  ['STAFF_ROSTER_FILE_ORDER_1_1_37_KEY', '200f7799f6423132f87081c774ca96da8f32077b94e0a3d559496c2bd5defb1a'],
+  ['STAFF_ROSTER_FILE_ORDER_20261008', '89d43baa8c87c4c6c03b72a0053f8a80b844dffc9cd6207d56e5dd670fbe32b2'],
   ['STAFF_NAME_MIGRATION_1_1_30_KEY', 'f12ca58e4a42dbe9223711be35c2062c4efbf37b1f65e52526c1de94fccbbbb9'],
   ['STAFF_ASSIGNMENTS_2026', 'de5d7c481216a980c3215a6b2f17bb5aeaa6d12fd112afac2ef19238fef91850'],
   ['TIMETABLE_OVERRIDES_SHEET', '8effda14c7665cfa3b3a8c8658f16412e953d724ed01f13e1eb4705be46f69a0'],

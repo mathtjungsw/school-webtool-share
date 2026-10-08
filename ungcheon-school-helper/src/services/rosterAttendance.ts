@@ -9,6 +9,8 @@ type Matrix = Cell[][]
 
 export interface StaffMember {
   id: string
+  /** Shared Excel sequence. Never replace this with position/name sorting. */
+  displayOrder?: number
   name: string
   position: string
   department: string
@@ -132,20 +134,10 @@ const rowsOf = (sheet: XLSX.WorkSheet): Matrix =>
   }) as Matrix
 
 export function sortStaffMembers(members: StaffMember[]): StaffMember[] {
-  const positionRank = (position: string) => {
-    const normalized = compact(position)
-    if (normalized === '교장') return 0
-    if (normalized === '교감') return 1
-    if (normalized === '행정실장') return 2
-    if (normalized.includes('교사')) return 3
-    const order = ['행정과장', '행정주임', '시설관리', '사무행정', '교무행정', '영양사', '조리사', '조리실무사', '청소', '당직']
-    const index = order.indexOf(normalized)
-    return index >= 0 ? index + 4 : 99
-  }
-  return [...members].sort((a, b) => {
-    const rank = positionRank(a.position) - positionRank(b.position)
-    return rank || a.name.localeCompare(b.name, 'ko')
-  })
+  const order = (member: StaffMember) => Number.isInteger(member.displayOrder) && member.displayOrder! > 0
+    ? member.displayOrder! : Number.MAX_SAFE_INTEGER
+  // Stable sorting keeps legacy records and newly added rows in their input order.
+  return [...members].sort((a, b) => order(a) - order(b))
 }
 
 export function parseStaffRosterWorkbook(bytes: number[]): StaffMember[] {
@@ -172,6 +164,7 @@ export function parseStaffRosterWorkbook(bytes: number[]): StaffMember[] {
           ['교과', '과목', '담당교과'].includes(compact(header[column])),
         )
         const homeroomColumn = nearbyColumns.find(column => compact(header[column]) === '담임')
+        const orderColumn = nearbyColumns.find(column => compact(header[column]) === '순번')
 
         for (let rowIndex = headerIndex + 1; rowIndex < rows.length; rowIndex += 1) {
           const rawName = clean(rows[rowIndex]?.[nameColumn])
@@ -185,8 +178,10 @@ export function parseStaffRosterWorkbook(bytes: number[]): StaffMember[] {
           if (!name || !position || name === '성명' || position === '직책') continue
           if (!/^[가-힣A-Za-z][가-힣A-Za-z·.\s]{1,29}$/.test(name)) continue
           const existing = byName.get(name)
+          const serial = orderColumn === undefined ? NaN : Number(clean(rows[rowIndex]?.[orderColumn]))
           byName.set(name, {
             id: existing?.id ?? crypto.randomUUID(),
+            displayOrder: existing?.displayOrder ?? (Number.isInteger(serial) && serial > 0 ? serial : byName.size + 1),
             name,
             position,
             department: department || existing?.department || '',
@@ -292,7 +287,9 @@ export function printTrainingRoster(
   title: string,
   date: string,
 ): void {
-  const sorted = sortStaffMembers(members)
+  // The training page already uses the shared order and supports local moves.
+  // Print exactly its preview rather than silently undoing those moves.
+  const sorted = [...members]
   const splitAt = Math.max(33, Math.ceil(sorted.length / 2))
   const left = sorted.slice(0, splitAt)
   const right = sorted.slice(splitAt)

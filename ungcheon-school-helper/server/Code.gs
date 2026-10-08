@@ -32,6 +32,7 @@ const ADMIN_HASH_KEY = 'UNG_ADMIN_PASSWORD_SHA256';
 const STAFF_ASSIGNMENTS_2026_APPLIED_KEY = 'UNG_STAFF_ASSIGNMENTS_2026_APPLIED';
 const STAFF_NAME_MIGRATION_1_1_30_KEY = 'UNG_STAFF_NAME_MIGRATION_1_1_30';
 const STAFF_ROSTER_MIGRATION_1_1_31_KEY = 'UNG_STAFF_ROSTER_MIGRATION_1_1_31';
+const STAFF_ROSTER_FILE_ORDER_1_1_37_KEY = 'UNG_STAFF_ROSTER_FILE_ORDER_1_1_37';
 const TIMETABLE_OVERRIDE_SEED_KEY = 'UNG_TIMETABLE_OVERRIDE_SEED_1_1_31';
 const OFFICIAL_RELEASE_NOTICE_RESET_KEY = 'UNG_OFFICIAL_RELEASE_NOTICE_RESET_1_1_2';
 const NEIS_API_KEY_PROPERTY = 'UNG_NEIS_API_KEY';
@@ -42,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 53;
+const MOBILE_SERVICE_VERSION = 54;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -112,6 +113,28 @@ const OFFICIAL_NON_TEACHING_STAFF_2026 = [
   ['이문원', '시설관리'], ['문소영', '사무행정'], ['오지윤', '교무행정'], ['이선경', '영양사'],
   ['홍인숙', '조리사'], ['강해선', '조리실무사'], ['고윤경', '조리실무사'], ['김미령', '조리실무사'],
   ['윤외희', '조리실무사'], ['윤하영', '조리실무사'], ['정현선', '조리실무사'], ['조경염', '조리실무사'],
+  ['최혜진', '조리실무사'], ['전영애', '청소'], ['이정우', '당직']
+];
+// User-approved 순번 in 26년 전교직원명렬.xlsx (2026-10-08).
+// Left block 1–33, then right block 34–66. 최대식 remains 전종택.
+const STAFF_ROSTER_FILE_ORDER_20261008 = [
+  ['류희열', '교장'], ['이승훈', '교감'], ['김우열', '행정실장'],
+  ['강수경', '교사'], ['공혜진', '교사'], ['김미주', '교사'], ['김민우', '교사'],
+  ['김성혜', '교사'], ['김소영', '교사'], ['김윤미', '교사'], ['김중오', '교사'],
+  ['김진영', '교사'], ['김해주', '교사'], ['김혜경', '교사'], ['민진호', '교사'],
+  ['박민자', '교사'], ['박선욱', '교사'], ['박은실', '교사'], ['박진우', '교사'],
+  ['배병희', '교사'], ['변수옥', '교사'], ['신숙자', '교사'], ['안소정', '교사'],
+  ['안효정', '교사'], ['이경민', '교사'], ['이기성', '교사'], ['이미경', '교사'],
+  ['이송은', '교사'], ['이승언', '교사'], ['이승현', '교사'], ['이영재', '교사'],
+  ['이원철', '교사'], ['이정용', '교사'], ['이찬희', '교사'], ['이혜원', '교사'],
+  ['이환필', '교사'], ['장규빈', '교사'], ['전영희', '교사'], ['전우석', '교사'],
+  ['정승원', '교사'], ['정유현', '교사'], ['조승현', '교사'], ['최경희', '교사'],
+  ['전종택', '교사'], ['최희경', '교사'], ['표명준', '교사'], ['황수란', '교사'],
+  ['황혜진', '교사'], ['문은희', '행정과장'], ['박정희', '주무관'], ['우가희', '주무관'],
+  ['이문원', '시설관리'], ['문소영', '사무행정'], ['오지윤', '교무행정'],
+  ['이선경', '영양사'], ['홍인숙', '조리사'], ['조경염', '조리실무사'],
+  ['윤외희', '조리실무사'], ['김미령', '조리실무사'], ['강해선', '조리실무사'],
+  ['고윤경', '조리실무사'], ['정현선', '조리실무사'], ['윤하영', '조리실무사'],
   ['최혜진', '조리실무사'], ['전영애', '청소'], ['이정우', '당직']
 ];
 // 시험 운영 중의 변경 기록은 소스 이력으로만 보관하고 공지에는 다시 게시하지 않습니다.
@@ -402,6 +425,18 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'v1.1.37',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.37 · 교직원 명렬 엑셀 순서 고정',
+    body: [
+      '· 26년 전교직원명렬.xlsx의 순번 1~66번과 직책을 공유 명렬에 반영합니다. 최대식은 전종택으로 유지합니다.',
+      '· 명렬 화면·엑셀 다운로드·연수등록부 출력은 직책·가나다순 재정렬 없이 등록된 순번을 사용합니다.',
+      '· 연수등록부 출력은 미리보기와 같은 순서로 인쇄하며 출력용 로컬 재정렬도 그대로 유지합니다.',
+      '· 이전 명렬은 공유 시트에 별도 보관하고 기존 교직원의 ID·부서·교과·담임 정보는 유지합니다.',
+      '· 기존 모바일 v1.1.38 기능·주소·로그인·수업 변경·출결과 이전 릴리스 안내는 유지합니다.'
+    ].join('\n'),
+    date: '2026-10-08'
+  },
   {
     key: 'v1.1.36',
     title: '[업데이트] 웅천고 업무도우미 v1.1.36 · 시간표·업무·출력 사용성 개선',
@@ -1278,6 +1313,7 @@ function ensureSheets_() {
   ensureStaffAssignments2026_(book);
   migrateStaffName1_1_30_(book);
   migrateStaffRoster1_1_31_(book);
+  migrateStaffRosterFileOrder1_1_37_(book);
   ensureDataSheet_(book, STUDENT_ROSTER_META_SHEET, [
     'version', 'sourceFileName', 'uploadedBy', 'uploadedAt', 'studentCount'
   ]);
@@ -2091,9 +2127,10 @@ function getStaffRoster_() {
   const meta = metaRows[0];
   const byName = {};
   readObjects_(STAFF_ROSTER_SHEET)
-    .map(function(row) {
+    .map(function(row, index) {
       return {
         id: String(row.id || ''),
+        displayOrder: Number(row.displayOrder) > 0 ? Number(row.displayOrder) : index + 1,
         name: String(row.name || '') === '최대식' ? '전종택' : String(row.name || ''),
         position: String(row.position || ''),
         department: String(row.department || ''),
@@ -2103,9 +2140,6 @@ function getStaffRoster_() {
     })
     .filter(function(member) { return member.id && member.name; })
     .forEach(function(member) { if (!byName[member.name]) byName[member.name] = member; });
-  OFFICIAL_NON_TEACHING_STAFF_2026.forEach(function(item) {
-    if (!byName[item[0]]) byName[item[0]] = { id: 'official-' + sha256_(item[0]).slice(0, 12), name: item[0], position: item[1], department: '', subject: '', homeroom: '' };
-  });
   const members = Object.keys(byName).map(function(name) { return byName[name]; }).sort(compareStaffMembers_);
   return {
     version: Number(meta.version) || 1,
@@ -2121,7 +2155,11 @@ function replaceStaffRoster_(body) {
   if (!source.length) throw new Error('저장할 교원 명렬이 없습니다.');
   if (source.length > 200) throw new Error('교원 명렬은 200명을 초과할 수 없습니다.');
   const seenNames = {};
-  const rows = source.map(function(member) {
+  const savedOrder = {};
+  readObjects_(STAFF_ROSTER_SHEET).forEach(function(row, index) {
+    savedOrder[String(row.name || '')] = Number(row.displayOrder) > 0 ? Number(row.displayOrder) : index + 1;
+  });
+  const rows = source.map(function(member, index) {
     const name = clean_(member && member.name, 30);
     const position = clean_(member && member.position, 30) || '교사';
     const department = clean_(member && member.department, 50);
@@ -2136,15 +2174,18 @@ function replaceStaffRoster_(body) {
       position,
       department,
       subject,
-      homeroom
+      homeroom,
+      Number.isInteger(Number(member.displayOrder)) && Number(member.displayOrder) > 0
+        ? Number(member.displayOrder) : (savedOrder[name] || source.length + index + 1)
     ];
   });
   rows.sort(function(a, b) {
     return compareStaffMembers_(
-      { name: a[1], position: a[2] },
-      { name: b[1], position: b[2] }
+      { displayOrder: a[6] },
+      { displayOrder: b[6] }
     );
   });
+  rows.forEach(function(row, index) { row[6] = index + 1; });
 
   const existing = readObjects_(STAFF_ROSTER_META_SHEET);
   const version = (existing.length ? Number(existing[0].version) || 0 : 0) + 1;
@@ -2168,6 +2209,11 @@ function replaceStaffRoster_(body) {
 }
 
 function compareStaffMembers_(a, b) {
+  const orderA = Number(a.displayOrder);
+  const orderB = Number(b.displayOrder);
+  if (orderA > 0 || orderB > 0) {
+    return (orderA > 0 ? orderA : Number.MAX_SAFE_INTEGER) - (orderB > 0 ? orderB : Number.MAX_SAFE_INTEGER);
+  }
   function rank_(position) {
     const value = String(position || '').replace(/\s/g, '');
     if (value === '교장') return 0;
@@ -2222,6 +2268,49 @@ function migrateStaffRoster1_1_31_(book) {
   ]]);
   properties.setProperty(STAFF_ROSTER_MIGRATION_1_1_31_KEY, 'true');
   touchSyncResource_('staffRoster');
+}
+
+function migrateStaffRosterFileOrder1_1_37_(book) {
+  const properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty(STAFF_ROSTER_FILE_ORDER_1_1_37_KEY) === 'true') {
+    ensureDataSheet_(book, STAFF_ROSTER_SHEET, ['id', 'name', 'position', 'department', 'subject', 'homeroom', 'displayOrder']);
+    return;
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (properties.getProperty(STAFF_ROSTER_FILE_ORDER_1_1_37_KEY) === 'true') return;
+    const sheet = book.getSheetByName(STAFF_ROSTER_SHEET);
+    if (!sheet) return;
+    // Keep the complete pre-migration sheet (including removed staff) recoverable.
+    const backupName = '교원명렬_20261008_보관';
+    if (sheet.getLastRow() > 1 && !book.getSheetByName(backupName)) sheet.copyTo(book).setName(backupName);
+    const byName = {};
+    readObjects_(STAFF_ROSTER_SHEET).forEach(function(member) {
+      const rawName = clean_(member.name, 30);
+      const name = rawName === '최대식' ? '전종택' : rawName;
+      if (!name) return;
+      if (!byName[name]) byName[name] = member;
+      else ['id', 'department', 'subject', 'homeroom'].forEach(function(field) {
+        if (!byName[name][field] && member[field]) byName[name][field] = member[field];
+      });
+    });
+    const rows = STAFF_ROSTER_FILE_ORDER_20261008.map(function(item, index) {
+      const previous = byName[item[0]] || {};
+      return [String(previous.id || Utilities.getUuid()), item[0], item[1],
+        String(previous.department || ''), String(previous.subject || ''),
+        normalizeStaffHomeroom_(previous.homeroom), index + 1];
+    });
+    const meta = readObjects_(STAFF_ROSTER_META_SHEET)[0] || {};
+    ensureDataSheet_(book, STAFF_ROSTER_SHEET, ['id', 'name', 'position', 'department', 'subject', 'homeroom', 'displayOrder']);
+    sheet.getRange('F:F').setNumberFormat('@');
+    replaceSheetRows_(STAFF_ROSTER_SHEET, rows);
+    replaceSheetRows_(STAFF_ROSTER_META_SHEET, [[
+      (Number(meta.version) || 0) + 1, '26년 전교직원명렬.xlsx', '엑셀 순번 고정 반영', new Date().toISOString(), rows.length
+    ]]);
+    touchSyncResource_('staffRoster');
+    properties.setProperty(STAFF_ROSTER_FILE_ORDER_1_1_37_KEY, 'true');
+  } finally { lock.releaseLock(); }
 }
 
 function getStudentRoster_() {
