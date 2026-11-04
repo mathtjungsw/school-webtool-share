@@ -55,6 +55,10 @@ export const WORK_ASSISTANT_SUGGESTIONS = [
 ]
 
 const DETAILED_WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
+  {id:'average-grade-student-search',title:'평균내신등급 학생 검색·PDF 원문 대조',page:'average_grade_calculator',category:'진학·대입',summary:'학생부 PDF 또는 나이스 DATA를 PC에서 읽고 학번(4·5자리)·이름·학년·반·번호로 학생을 찾아 평균등급을 확인합니다.',steps:['파일을 가져오고 학생 정보를 확인합니다.','학번(4·5자리)·이름을 검색하거나 재학 학년·반·번호를 선택합니다.','학생을 선택하고 전교과/국영수과사, 성적 이수 학년·학기와 등급 체계를 확인합니다.','과목별 원문을 대조하고 수정 내용 저장을 누릅니다.'],keywords:['평균내신','학번 검색','이름 검색','학생부 PDF','여러 줄 과목','과목 누락','원문 대조']},
+  {id:'admission-cases-pdf-first',title:'수시모집 우수사례 PDF·지원현황 정리 보기',page:'admission_success_cases',category:'진학·대입',summary:'원문 PDF를 기본으로 열고 지원현황 표·항목별 본문으로 전환합니다.',steps:['로그인 후 추가 비밀번호를 입력합니다.','기본 원문을 보거나 사례를 선택해 해당 쪽으로 이동합니다.','정리 보기에서 지원현황 표와 문단·표를 읽고 원문 쪽으로 이동합니다.'],keywords:['우수사례','수시','PDF 원문','지원현황','정리 보기','표','항목별 본문']},
+
+
   {
     id: 'mandatory-training-certificates', title: '법정의무연수 이수증 제출·엑셀 내려받기', page: 'mandatory_training', category: '학교운영',
     summary: '법정의무연수 메뉴에서 이수증 제출 웹앱과 이수증 엑셀 내려받기 웹앱을 바로 열고 전환합니다.',

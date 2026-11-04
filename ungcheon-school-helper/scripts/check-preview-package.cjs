@@ -8,7 +8,11 @@ if(sampleDirectory)for(const name of fs.readdirSync(sampleDirectory)){
  if(/\.(?:pdf|xlsx)$/i.test(name))sourcePaths.push(path.join(sampleDirectory,name))
 }
 const forbiddenNames=sourcePaths.map(file=>path.basename(file))
-const hashes=new Set(sourcePaths.map(file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')))
+const hashes=new Set(sourcePaths.filter(file=>fs.existsSync(file)).map(file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')))
+if(process.env.UNGCHEON_PRIVATE_HASH_RECEIPT){
+ const receipt=JSON.parse(fs.readFileSync(process.env.UNGCHEON_PRIVATE_HASH_RECEIPT,'utf8'))
+ for(const item of receipt.documents){assert.match(item.revision,/^[a-f0-9]{64}$/);hashes.add(item.revision)}
+}
 let count=0
 const check=(name,buffer)=>{
  assert.ok(!forbiddenNames.includes(path.basename(name)),'Private source filename found in package')

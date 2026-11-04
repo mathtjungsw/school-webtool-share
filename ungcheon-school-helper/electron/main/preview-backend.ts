@@ -4,13 +4,21 @@ import { readFileSync, existsSync, writeFileSync, statSync } from 'fs'
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'crypto'
 
 export async function startPreviewBackend(configPath: string) {
-  const cfg = existsSync(configPath) ? JSON.parse(readFileSync(configPath, 'utf8')) : null
+  let cfg: any = null
   const sessions = new Map<string, { name: string; expiresAt: string }>()
   const failures = new Map<string, { count: number; until: number }>()
   const sha = (v: string) => createHash('sha256').update(v).digest('hex')
   const sessionFile = configPath + '.sessions'
-  const fingerprint = cfg ? sha(cfg.salt + cfg.verifier) : ''
-  try { const saved = JSON.parse(readFileSync(sessionFile,'utf8')); if(saved.fingerprint===fingerprint) for(const [key,value] of saved.sessions) sessions.set(key,value) } catch {}
+  let fingerprint = ''
+  const refreshConfiguration = () => {
+    let next: any = null
+    try { if(existsSync(configPath))next=JSON.parse(readFileSync(configPath,'utf8')) } catch {}
+    if(!next || typeof next.salt!=='string' || !/^[a-f0-9]{64}$/.test(next.verifier||'') || !Array.isArray(next.names)){cfg=null;sessions.clear();return}
+    const nextFingerprint=sha(next.salt+next.verifier)
+    if(nextFingerprint!==fingerprint){sessions.clear();failures.clear();try{const saved=JSON.parse(readFileSync(sessionFile,'utf8'));if(saved.fingerprint===nextFingerprint)for(const [key,value] of saved.sessions)sessions.set(key,value)}catch{}fingerprint=nextFingerprint}
+    cfg=next
+  }
+  refreshConfiguration()
   const persist = () => { if(cfg) writeFileSync(sessionFile,JSON.stringify({fingerprint,sessions:[...sessions].filter(([,value])=>Date.parse(value.expiresAt)>Date.now())})) }
   const revision = (d: any) => { const info=statSync(d.path);return info.size+':'+info.mtimeMs }
 
@@ -22,6 +30,7 @@ export async function startPreviewBackend(configPath: string) {
     try {
       for await (const chunk of req) { raw += chunk; if (raw.length > 100000) throw new Error('request-too-large') }
       const body = JSON.parse(raw)
+      refreshConfiguration()
       const ok = (data: unknown) => res.end(JSON.stringify({ ok: true, data }))
       const fail = (code: string) => { res.statusCode = 403; res.end(JSON.stringify({ ok: false, code, error: code === 'AUTH_FAILED' ? '이름 또는 비밀번호를 확인해 주세요.' : '로그인이 필요합니다.' })) }
       if (body.action === 'staffLogin') {

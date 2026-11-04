@@ -1,7 +1,7 @@
 import { app, BrowserWindow, WebContentsView, session, ipcMain, dialog, shell, safeStorage } from 'electron'
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, readdirSync, unlinkSync, realpathSync, lstatSync } from 'fs'
 import { join, basename, resolve } from 'path'
-import { randomBytes, createCipheriv, createDecipheriv } from 'crypto'
+import { randomBytes, createCipheriv, createDecipheriv, createHash } from 'crypto'
 import { Worker } from 'worker_threads'
 export const TOOL_SITES: Record<string, string> = {
   mandatory_training_submit: 'https://script.google.com/macros/s/AKfycbxG52rulCO1jtpxtkus-YMkZrhxaTB4bXpP-2TxDtv37MTb9rAJWzspakNIK8U7GdFIWA/exec',
@@ -40,7 +40,7 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
   const closePrivate = () => { terminate(); caseUnlocked=false; if(privateView){ const v=privateView; privateView=null; main()?.contentView.removeChildView(v); v.webContents.close() } }
   const parse = (bytes: Uint8Array,kind: string,title: string) => new Promise<any>((resolveResult,reject)=> {
     const generation=epoch; const target=privateView
-    const worker=new Worker(join(__dirname,'privacyParser.js'),{workerData:{bytes,kind,title}}); workers.add(worker)
+    const worker=new Worker(join(__dirname,'privacyParser.js'),{workerData:{bytes,kind,title,fileId:createHash('sha256').update(bytes).digest('hex')}}); workers.add(worker)
     worker.on('message',(m:any)=>{
       if(epoch!==generation){reject(new Error('작업이 취소되었습니다.'));return}
       if(m.progress!==undefined){target?.webContents.send('private:progress',m.progress);return}
@@ -105,10 +105,15 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
     if(action==='unlock'){if(!isCases || args.password!=='0000')throw new Error('비밀번호를 확인해 주세요.');caseUnlocked=true;return true}
     if(isCases && !caseUnlocked)throw new Error('우수사례 비밀번호를 입력해 주세요.')
     if(action==='load')return { ...(load(scope,'data') || { rows: [] }), epoch }
+    if(action==='gradeSource'){
+      if(isCases||!/^[a-f0-9]{64}$/.test(String(args.id)))throw new Error('원문 ID를 확인해 주세요.')
+      return load(scope,'source-'+args.id)
+    }
     if(action==='save'){
       if(isCases || args.epoch !== epoch)throw new Error('취소되었거나 오래된 저장 요청입니다.')
       if(!Array.isArray(args.rows) || args.rows.length>100000)throw new Error('저장 자료 범위를 확인해 주세요.')
-      save(scope,'data',args);return true
+      const previous=load(scope,'data');if(previous&&previous.schemaVersion!==2)save(scope,'migration-backup',previous)
+      save(scope,'data',{...args,schemaVersion:2});return true
     }
     if(action==='wipe'){
       terminate()
@@ -122,18 +127,18 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
       if(choice.canceled)return { rows: [], epoch }
       if(choice.filePaths.length>10)throw new Error('한 번에 10개까지 선택해 주세요.')
       const result:any[]=[]
-      for(const path of choice.filePaths){const b=readFileSync(path);if(b.length>100*1024*1024)throw new Error('파일이 너무 큽니다.');result.push(...await parse(new Uint8Array(b),args.format==='pdf'?'grade':'xlsx',basename(path)))}
+      for(const path of choice.filePaths){const b=readFileSync(path);if(b.length>100*1024*1024)throw new Error('파일이 너무 큽니다.');const parsed=await parse(new Uint8Array(b),args.format==='pdf'?'grade':'xlsx',basename(path));if(epoch!==generation)throw new Error('작업이 취소되었습니다.');if(args.format==='pdf'&&parsed.length)save(scope,'source-'+createHash('sha256').update(b).digest('hex'),{id:createHash('sha256').update(b).digest('hex'),bytes:b.toString('base64'),title:basename(path)});result.push(...parsed)}
       if(epoch!==generation)throw new Error('작업이 취소되었습니다.');return { rows: result, epoch }
     }
     if(action==='casePrefs'){
       if(!isCases || args.epoch!==epoch || !Array.isArray(args.favorites) || args.favorites.length>1000 || args.favorites.some((id:unknown)=>typeof id!=='string'||!/[a-z0-9_-]+:\d+$/.test(id)))throw new Error('관심 자료 저장을 확인해 주세요.')
-      save(scope,'data',{favorites:args.favorites});return true
+      save(scope,'data',{favorites:args.favorites,lastBook:String(args.lastBook||''),lastPage:Number(args.lastPage)||1});return true
     }
     if(action==='library')return auth.request({action:'caseLibrary'})
     if(action==='getCaseBook'){
       const id=String(args.id||'');if(!/^[a-z0-9_-]{1,60}$/.test(id))throw new Error('자료 ID 오류')
       const name='book-'+id; const cached=load(scope,name)
-      if(cached && cached.revision===args.revision)return cached
+      if(cached && cached.revision===args.revision){if(cached.parserVersion===2)return cached;const parsed=await parse(new Uint8Array(Buffer.from(cached.bytes,'base64')),'cases',cached.title);if(epoch!==generation)throw new Error('작업이 취소되었습니다.');const data={...cached,...parsed};save(scope,name,data);return data}
       const response=await auth.request({action:'caseDocument',id})
       if(epoch!==generation)throw new Error('작업이 취소되었습니다.')
       const bytes=Buffer.from(response.data,'base64');const parsed=await parse(new Uint8Array(bytes),'cases',response.title)

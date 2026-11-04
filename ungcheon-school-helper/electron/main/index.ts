@@ -72,12 +72,12 @@ const IS_PREVIEW = app.getVersion().includes('-preview.')
 const IS_VALIDATION = process.argv.includes('--ungcheon-validation')
 if (IS_VALIDATION) {
   app.setName('웅천고 업무도우미 검증')
-  app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'Codex', 'ungcheon-validation-1.1.38'))
+  app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'Codex', 'ungcheon-validation-1.1.39'))
 }
 if (IS_PREVIEW) {
-  app.setName('웅천고 업무도우미 테스트')
-  app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'UngcheonSchoolHelper-Preview-20261103'))
-  app.setAppUserModelId('kr.hs.ungcheon.schoolhelper.preview20261103')
+  app.setName('웅천고 업무도우미 시험판')
+  app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'UngcheonSchoolHelper-Preview-20261104'))
+  app.setAppUserModelId('kr.hs.ungcheon.schoolhelper.preview20261104')
 } else app.setAppUserModelId(IS_VALIDATION ? 'kr.hs.ungcheon.schoolhelper.validation' : 'kr.hs.ungcheon.schoolhelper')
 const store = new Store()
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
@@ -196,7 +196,10 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   if (IS_PREVIEW) {
-    const server = await startPreviewBackend(join(process.env.LOCALAPPDATA || app.getPath('userData'), 'Codex', 'ungcheon-preview', 'server-config.json'))
+    const profileConfig=join(app.getPath('userData'),'preview-server.json')
+    const sharedConfig=join(process.env.LOCALAPPDATA || app.getPath('userData'), 'Codex', 'ungcheon-preview', 'server-config.json')
+    if(!existsSync(profileConfig)&&existsSync(sharedConfig))copyFileSync(sharedConfig,profileConfig)
+    const server = await startPreviewBackend(existsSync(profileConfig)?profileConfig:sharedConfig)
     previewEndpoint = server.url
     app.on('will-quit', () => server.close())
   }

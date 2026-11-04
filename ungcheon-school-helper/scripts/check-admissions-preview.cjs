@@ -1,6 +1,7 @@
 const assert=require('node:assert/strict')
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),Module=require('node:module')
 const {Worker}=require('node:worker_threads'),ts=require('typescript')
+require.extensions['.ts']=(m,file)=>m._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,file)
 function loadTs(file){const m=new Module(path.resolve(file),module);m.filename=path.resolve(file);m.paths=module.paths;m._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,m.filename);return m.exports}
 const {gradeResult,matchingApplication}=loadTs('src/features/private/domain.ts')
 const row=(credit,rank,group='국어')=>({credit,rank,group,subject:'합성 과목'})
