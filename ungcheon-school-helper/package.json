@@ -106,5 +106,8 @@
       "owner": "mathtjungsw",
       "repo": "school-webtool-share"
     }
+  },
+  "overrides": {
+    "canvas": "npm:@napi-rs/canvas@1.0.5"
   }
 }
