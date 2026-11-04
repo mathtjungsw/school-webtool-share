@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 56;
+const MOBILE_SERVICE_VERSION = 57;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -425,6 +425,19 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'v1.1.39',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.39 · 내신 판독·학번 검색·우수사례 가독성 개선',
+    body: [
+      '· 학생부 PDF를 표의 셀과 테두리로 판독하여 여러 줄 과목명·병합 학기·교과 누락을 줄입니다. 원문 위치 대조와 판독 확인을 지원합니다.',
+      '· 2022 개정 교육과정 안내로 교과와 과목을 연결하며, 한국사1·2를 사회 교과에 포함합니다. 직접 교과 수정도 가능합니다.',
+      '· 학번·재학 학년·반·번호·이름으로 학생을 검색합니다. 10102와 1102 등 5자리·4자리 학번을 함께 인식합니다.',
+      '· 수시모집 우수사례는 PDF 원문을 기본으로 열고, 지원현황과 본문을 표·제목·문단으로 정리하여 보여 줍니다.',
+      '· 성적·학생부 원문은 PC에 암호화 저장하며 산출기 저장자료 비우기로 함께 삭제합니다. 기존 판독 자료는 원본 재등록을 권장합니다.',
+      '· 기존 PC 120시간 로그인·위젯 업데이트 알림·모바일 기능과 세션을 유지합니다.'
+    ].join('\n'),
+    date: '2026-11-04'
+  },
   {
     key: 'v1.1.38',
     title: '[업데이트] 웅천고 업무도우미 v1.1.38 · 진학·독서·연수 도구와 로그인 개선',
