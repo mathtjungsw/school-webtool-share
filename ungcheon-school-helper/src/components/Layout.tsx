@@ -57,7 +57,17 @@ const ExecutiveTeacherSchedulePage = lazy(() => import('../pages/ExecutiveSchedu
 // 시험 기능은 번들에 포함해 검증하되 사이드바·검색 메뉴에는 노출하지 않습니다.
 const FutureOperationsPage = lazy(() => import('../features/futureOperations/FutureOperationsPage'))
 
+const ExternalTool = lazy(() => import('../pages/ExternalToolPage'))
+const PrivateSurface = lazy(() => import('../pages/ExternalToolPage').then(m => ({ default: m.FeatureSurface })))
+const RecommendedBooks = lazy(() => import('../pages/RecommendedBooksPage'))
 const PAGES: Record<string, React.ComponentType> = {
+  mandatory_training: () => <ExternalTool kind="mandatory_training" />,
+  saenggibu_generator: () => <ExternalTool kind="saenggibu_generator" />,
+  ungcheon_library: () => <ExternalTool kind="ungcheon_library" />,
+  university_webzines: () => <ExternalTool kind="university_webzines" />,
+  average_grade_calculator: () => <div className="flex h-full flex-col"><PrivateSurface id="average_grade_calculator" /></div>,
+  admission_success_cases: () => <div className="flex h-full flex-col"><PrivateSurface id="admission_success_cases" /></div>,
+  university_recommended_books: RecommendedBooks,
   neis: NeisPage,
   calendar: CalendarPage,
   settings: SettingsPage,
@@ -139,7 +149,7 @@ export default function Layout() {
       setExecutivePassword('')
       return
     }
-    if (id === page) return
+    if (id === page) { if (id === 'admission_success_cases') void window.preview.view({ action: 'leave' }).then(() => window.dispatchEvent(new Event('feature:refresh'))); return }
     const next = [...history.slice(0, historyIndex + 1), id].slice(-MAX_HISTORY)
     setHistory(next)
     setHistoryIndex(next.length - 1)

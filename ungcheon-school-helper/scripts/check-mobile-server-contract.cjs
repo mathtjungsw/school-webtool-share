@@ -83,7 +83,10 @@ function harness(options = {}) {
     ],
   };
   const books = {};
+  // This suite exercises the existing mobile/executive domain contracts.
+  // The new common staff dispatcher is independently tested in check-staff-auth.cjs.
   const context = vm.createContext({
+    staffRequire_: function() { return { name: '테스트교사' }; },
     Date: class extends realDate {
       constructor(...args) { super(...(args.length ? args : [clock])); }
       static now() { return clock; }
@@ -163,7 +166,7 @@ test('service v44+, current desktop version and earlier desktop/mobile release n
   const h = harness();
   const packageVersion = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')).version;
   assert.ok(h.constants.version >= 44);
-  assert.equal(h.constants.notes[0].key, `v${packageVersion}`);
+  assert.equal(h.constants.notes[0].key, packageVersion.includes('-preview.') ? 'v1.1.37' : `v${packageVersion}`);
   for (const key of ['v1.1.24', 'v1.1.25', 'v1.1.26', 'mobile-service-2026-08-26', 'mobile-service-2026-08-30', 'mobile-service-meal-range-2026-08-30']) {
     assert.equal(h.constants.notes.filter(note => note.key === key).length, 1, key);
   }

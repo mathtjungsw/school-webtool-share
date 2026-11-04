@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 55;
+const MOBILE_SERVICE_VERSION = 56;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -425,6 +425,21 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'v1.1.38',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.38 · 진학·독서·연수 도구와 로그인 개선',
+    body: [
+      '· 교직원 이름과 공통 비밀번호로 로그인하며 PC 로그인은 120시간(5일) 유지됩니다.',
+      '· 진학·대입에 생기부 생성 도우미·대학 웹진·평균내신등급 산출기·수시모집 우수사례를 모으고 대학 권장과목을 옮깁니다.',
+      '· 평균내신등급은 PDF/XLSX를 PC에서 판독하고 학점 가중평균을 계산합니다. 암호화 저장·수정·자료 비우기를 지원합니다.',
+      '· 수시 우수사례는 로그인과 추가 잠금 후 중앙 자료집을 받아 검색·원문 열람합니다. 원문은 공개 배포물에 포함하지 않습니다.',
+      '· 독서교육에 웅천 서가와 대학 추천도서를 추가합니다. 도서·판독 결과의 검토 상태를 확인해 활용해 주세요.',
+      '· 업무·학교운영에 법정의무연수를 추가하고 이수증 제출·엑셀 내려받기 웹앱을 바로 전환합니다.',
+      '· 본창·로그인 화면·미니 위젯·트레이에서 업데이트 발견·다운로드·설치 준비 상태를 확인합니다.',
+      '· 기존 모바일 기능·공개 주소·로그인 세션과 이전 릴리스 안내를 유지합니다.'
+    ].join('\n'),
+    date: '2026-11-04'
+  },
   {
     key: 'v1.1.37',
     title: '[업데이트] 웅천고 업무도우미 v1.1.37 · 교직원 명렬 엑셀 순서 고정',
@@ -924,6 +939,11 @@ function doPost(e) {
   try {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
+
+    // Staff authentication is mandatory for all non-mobile protected actions.
+    // Mobile endpoints retain their existing independent password/session checks.
+    if (['staffLogin','staffSession','staffLogout','caseLibrary','caseDocument'].indexOf(action) >= 0) return json_({ ok: true, data: staffAuthAction_(body) });
+    if (['health','verifyMobileViewer','getMobileScheduleBundle','getMobileAttendanceRoster'].indexOf(action) < 0) staffRequire_(body);
 
     // 읽기 전용 모바일 요청은 전체 시트 초기화 및 잠금을 거치지 않습니다.
     if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: MOBILE_SERVICE_VERSION } });

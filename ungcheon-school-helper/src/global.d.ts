@@ -2,6 +2,9 @@ export {}
 
 declare global {
   interface Window {
+    preview: { auth: (action: string, args?: unknown) => Promise<any>; view: (p: any) => Promise<any>; update: (action: string) => Promise<any>; onUpdate: (cb: (s: any) => void) => () => void }
+    privateTool: { call: (action: string, args?: unknown) => Promise<any>; progress: (cb: (p: number) => void) => () => void }
+
     electron: {
       minimize: () => void
       maximize: () => void

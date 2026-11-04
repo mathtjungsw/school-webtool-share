@@ -20,6 +20,13 @@ export interface NavigationItem {
 }
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
+  { id: 'mandatory_training', label: '법정의무연수', icon: ClipboardCheck, assistantCategory: '학교운영', searchAliases: ['법정 의무 연수', '이수증 제출', '이수증 엑셀 내려받기', '의무연수'] },
+  { id: 'saenggibu_generator', label: '웅천고 생기부 생성 도우미', icon: FilePenLine, assistantCategory: '진학·대입', searchAliases: ['생기부 생성', '학생부 생성'] },
+  { id: 'university_webzines', label: '대학 웹진(아로리)', icon: BookOpen, assistantCategory: '진학·대입', searchAliases: ['아로리', '대학 웹진'] },
+  { id: 'average_grade_calculator', label: '평균내신등급 산출기', icon: Calculator, assistantCategory: '진학·대입', searchAliases: ['평균 내신', '내신 계산', '교과학습발달상황'] },
+  { id: 'admission_success_cases', label: '수시모집 우수사례', icon: FileLock2, assistantCategory: '진학·대입', searchAliases: ['수시 우수사례', '합격사례'] },
+  { id: 'ungcheon_library', label: '웅천 서가', icon: BookOpen, assistantCategory: '독서교육', searchAliases: ['웅천서가', '독서교육'] },
+  { id: 'university_recommended_books', label: '대학 추천도서', icon: BookOpen, assistantCategory: '독서교육', searchAliases: ['서울대 100선', '추천도서'] },
   { id: 'help', label: '사용 매뉴얼', icon: HelpCircle, assistantCategory: '설정·도움말', searchAliases: ['설명서', '사용법', '도움말'] },
   { id: 'notifier', label: '업무알리미', icon: Bell, assistantCategory: '알림', searchAliases: ['일정 알림', '공지 알림'] },
   { id: 'operations_notifications', label: '통합 알림·변경센터', icon: Bell, assistantCategory: '알림', searchAliases: ['통합 알림', '변경 알림', '수업 변경 알림', '위원회 알림'] },

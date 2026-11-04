@@ -7,8 +7,13 @@
     "jsx": "react-jsx",
     "target": "ESNext",
     "baseUrl": ".",
-    "paths": { "@/*": ["./src/*"] },
-    "skipLibCheck": true
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    },
+    "skipLibCheck": true,
+    "resolveJsonModule": true
   },
   "include": [
     "src/main.tsx",
@@ -124,6 +129,9 @@
     "src/services/workReducer/**/*",
     "src/services/photoLedger.ts",
     "src/services/printing/**/*",
-    "src/services/fileParser/**/*"
+    "src/services/fileParser/**/*",
+    "src/pages/ExternalToolPage.tsx",
+    "src/pages/RecommendedBooksPage.tsx",
+    "src/data/recommendedBooks.json"
   ]
 }

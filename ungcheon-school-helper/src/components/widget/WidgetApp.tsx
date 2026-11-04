@@ -52,6 +52,7 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import QRCode from "qrcode";
 import { useAppStore } from "../../stores/appStore";
+import UpdateStatus from '../UpdateStatus';
 import { useAuthStore } from "../../stores/authStore";
 import { useNoticeStore } from "../../stores/noticeStore";
 import {
@@ -1130,7 +1131,7 @@ export default function WidgetApp() {
   if (!auth.authenticated) {
     return (
       <div className="widget-shell widget-login">
-        <strong>로그인이 필요합니다</strong>
+        <UpdateStatus compact /><strong>로그인이 필요합니다</strong>
         <span>개인 시간표와 업무는 로그인 후 표시됩니다.</span>
         <button onClick={() => window.electron.widgetOpenMain("dashboard")}>
           업무도우미에서 로그인
@@ -1326,7 +1327,7 @@ export default function WidgetApp() {
         <span className="widget-grip"><GripHorizontal size={16} /></span>
         <div className="widget-identity">
           <i className={offline ? "offline" : "online"} />
-          <b>{auth.teacherName} 선생님</b>
+          <b>{auth.teacherName} 선생님</b><UpdateStatus compact />
           <small>· {format(now, "M월 d일(EEE) HH:mm", { locale: ko })}</small>
         </div>
         <nav className="no-drag">

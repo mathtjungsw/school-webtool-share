@@ -131,6 +131,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     // electron-store의 dot-notation은 중첩 객체로 저장됨:
     // store.set('config.grade', '1') → { config: { grade: '1' } }
     // 따라서 store.store를 flat하게 순회하면 'config' 키 하나만 나옴 → 직접 꺼내야 함
+    // Do not migrate/write default settings before server authentication.
+    if (window.preview && !(await window.preview.auth('snapshot')).authenticated) {
+      set({ isConfigLoaded: true })
+      return
+    }
     const all = (await window.electron.configGetAll()) as Record<string, unknown>
     const nested = ((all as Record<string, unknown>).config ?? {}) as Record<string, unknown>
     // dashboard.*는 메인 프로세스의 허용된 설정 영역이다.

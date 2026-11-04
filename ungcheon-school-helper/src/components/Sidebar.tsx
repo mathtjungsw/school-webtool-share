@@ -37,9 +37,11 @@ const EXECUTIVE_MENU_IDS = ['executive_live_classes', 'executive_teacher_schedul
 
 const MENU_GROUPS = [
   { id: 'start', label: '시작·설정', items: ['help', 'notifier', 'operations_notifications', 'calendar', 'settings', 'admin_center'] },
-  { id: 'school', label: '업무·학교운영', items: ['staff_tasks', 'audit_evidence', 'school_hub', 'timetable_swap', 'staff_roster', 'committees', 'feature_requests', 'form_center'] },
+  { id: 'school', label: '업무·학교운영', items: ['staff_tasks', 'mandatory_training', 'audit_evidence', 'school_hub', 'timetable_swap', 'staff_roster', 'committees', 'feature_requests', 'form_center'] },
   { id: 'student', label: '학생·학사', items: ['student_timetable', 'attendance_print', 'volunteer_work', 'student_locator', 'student_identity_audit', 'subject_remarks_print', 'record_privacy_blind'] },
-  { id: 'curriculum', label: '평가·교육과정·진로', items: ['schoolinfo_evaluation', 'grade_preview', 'estimated_split_score', 'curriculum', 'recommended_subjects'] },
+  { id: 'curriculum', label: '평가·교육과정·진로', items: ['schoolinfo_evaluation', 'grade_preview', 'estimated_split_score', 'curriculum'] },
+  { id: 'admissions', label: '진학·대입', items: ['recommended_subjects', 'saenggibu_generator', 'university_webzines', 'average_grade_calculator', 'admission_success_cases'] },
+  { id: 'reading_education', label: '독서교육', items: ['ungcheon_library', 'university_recommended_books'] },
   { id: 'tools', label: '인사·교사용 도구', items: ['transfer_score', 'teacher_tools', 'excel_processor', 'payroll', 'insa_analysis', 'pdf_extractor', 'file_parser'] },
 ] as const
 

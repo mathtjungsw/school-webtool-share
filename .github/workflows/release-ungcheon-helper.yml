@@ -28,6 +28,11 @@ on:
         description: "선택: 교직원에게 보여 줄 변경 내용"
         required: false
         type: string
+      stage_release:
+        description: "서버 전환 전 설치본을 비공개 초안으로 준비"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -71,6 +76,7 @@ jobs:
     env:
       REQUESTED_VERSION: ${{ inputs.version }}
       REQUESTED_NOTES: ${{ inputs.release_notes }}
+      STAGE_RELEASE: ${{ inputs.stage_release }}
       GH_TOKEN: ${{ github.token }}
 
     steps:
@@ -160,12 +166,16 @@ jobs:
       - name: GitHub Release 게시
         shell: pwsh
         run: |
+          node scripts/check-preview-package.cjs
+          if ($LASTEXITCODE -ne 0) { throw "설치파일 개인정보 검사 실패" }
           $version = $env:RELEASE_VERSION
           $tag = "ungcheon-helper-v$version"
           if (gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null) {
             throw "$tag 릴리스가 이미 존재합니다."
           }
 
+          $releaseFlags = @('--latest')
+          if ($env:STAGE_RELEASE -eq 'true') { $releaseFlags = @('--draft') }
           gh release create $tag `
             "release/UngcheonSchoolHelper-Setup-$version.exe" `
             "release/UngcheonSchoolHelper-Setup-$version.exe.blockmap" `
@@ -174,4 +184,4 @@ jobs:
             --target $env:GITHUB_SHA `
             --title "웅천고 업무도우미 $version" `
             --notes-file $env:RELEASE_NOTES_PATH `
-            --latest
+            @releaseFlags

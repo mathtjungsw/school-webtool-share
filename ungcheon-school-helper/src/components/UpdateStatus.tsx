@@ -1,0 +1,16 @@
+import {useEffect,useState} from 'react'
+const labels:Record<string,string>={idle:'업데이트 확인 전',checking:'업데이트 확인 중',current:'최신 버전',available:'새 업데이트 발견',downloading:'새 버전 다운로드 중',ready:'업데이트 설치 준비 완료',installing:'설치를 시작합니다',error:'업데이트 확인 실패',preview:'테스트버전 · 정식 자동업데이트 제외'}
+export default function UpdateStatus({compact=false}:{compact?:boolean}){
+ const [state,setState]=useState<any>(null),[open,setOpen]=useState(false)
+ useEffect(()=>{let revision=-1;const update=(s:any)=>{if(s.revision<revision)return;revision=s.revision;setState(s)};void window.preview?.update('snapshot').then(update);const off=window.preview?.onUpdate(update);const handler=()=>setOpen(true);window.addEventListener('update:open',handler);return()=>{off?.();window.removeEventListener('update:open',handler)}},[])
+ useEffect(()=>{
+  if(compact||state?.phase!=='ready')return
+  const key='update.reminded.'+state.targetVersion,runKey='update.run.'+state.targetVersion
+  const remind=()=>{const last=+(localStorage.getItem(key)||0);if(!sessionStorage.getItem(runKey)||Date.now()-last>=24*3600000){setOpen(true);sessionStorage.setItem(runKey,'1');localStorage.setItem(key,String(Date.now()))}}
+  remind();const timer=setInterval(remind,60000);return()=>clearInterval(timer)
+ },[compact,state?.phase,state?.targetVersion])
+ if(!state)return null
+ const show=state.phase!=='current'&&state.phase!=='idle'
+ const onInstall=async()=>{if(state.simulated){alert('업데이트 알림 시험입니다. 정식 프로그램의 설치·재시작은 실행하지 않습니다.');return}if(!confirm('업데이트를 위해 프로그램과 위젯을 종료합니다. 모든 작업과 외부 사이트 내용을 저장하셨나요?'))return;try{await window.preview.update('install')}catch{alert('현재 설치할 수 없습니다. 업데이트 상태를 다시 확인해 주세요.')}}
+ return <><div className={compact?'m-2 rounded-xl border border-amber-300 bg-amber-50 p-2 text-xs text-amber-950':'border-b border-amber-200 bg-amber-50 px-5 py-2 text-sm text-amber-950'}><div className="flex items-center justify-between gap-2"><button onClick={()=>{if(compact)void window.preview.update('open');else setOpen(!open)}} className="font-bold text-left">{show?'● ':''}{state.simulated?'[시험 알림] ':''}{labels[state.phase]}{state.phase==='downloading'&&state.progress!==null?` · ${Math.round(state.progress)}%`:''}{state.targetVersion?` · v${state.targetVersion}`:''}</button>{state.phase==='ready'&&<button className="rounded-lg bg-emerald-700 px-3 py-1 text-white" onClick={()=>compact?void window.preview.update('open'):void onInstall()}>지금 설치</button>}</div>{open&&!compact&&<div role="dialog" aria-modal="true" aria-label="업데이트 안내" className="mt-3 rounded-xl border border-amber-200 bg-white p-4"><p>현재 v{state.currentVersion}{state.targetVersion?` → v${state.targetVersion}`:''}</p><p className="my-2">{state.error||'다운로드가 끝난 뒤 지금 설치를 눌러야 새 버전이 적용됩니다.'}</p>{state.phase==='preview'&&<p className="my-2">이 시험판은 정식판을 변경하지 않습니다. 본창·위젯의 표시와 메뉴를 확인할 수 있습니다.</p>}<div className="flex gap-2"><button className="btn-secondary" onClick={()=>void window.preview.update('check')}>업데이트 확인</button>{state.phase==='ready'&&<button className="btn-primary" onClick={()=>void onInstall()}>지금 설치</button>}{state.phase==='preview'&&<button className="btn-secondary" onClick={()=>void window.preview.update('simulate')}>업데이트 알림 시험</button>}<button className="btn-secondary" onClick={()=>setOpen(false)}>나중에</button></div></div>}</div></>
+}

@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { WidgetSettingsPatch } from '../../src/services/widgetSettings'
 
+contextBridge.exposeInMainWorld('preview', {
+  auth: (action: string, args?: unknown) => ipcRenderer.invoke('staff:auth', action, args),
+  view: (payload: unknown) => ipcRenderer.invoke('feature:view', payload),
+  update: (action: string) => ipcRenderer.invoke('preview:update', action),
+  onUpdate: (cb: (state: any) => void) => { const fn = (_: unknown, state: any) => cb(state); ipcRenderer.on('preview:update', fn); return () => ipcRenderer.removeListener('preview:update', fn) },
+})
 contextBridge.exposeInMainWorld('electron', {
   // Window controls
   minimize: () => ipcRenderer.send('window:minimize'),

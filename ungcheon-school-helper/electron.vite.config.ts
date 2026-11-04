@@ -50,8 +50,9 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin(), makeHashPathResolverPlugin()],
     build: {
       rollupOptions: {
+        external: ['pdfjs-dist-v3/legacy/build/pdf.js'],
         input: {
-          index: resolve(__dirname, 'electron/main/index.ts')
+          index: resolve(__dirname, 'electron/main/index.ts'), privacyParser: resolve(__dirname, 'electron/main/privacy-parser.ts')
         }
       }
     }
@@ -61,7 +62,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'electron/preload/index.ts')
+          index: resolve(__dirname, 'electron/preload/index.ts'), private: resolve(__dirname, 'electron/preload/private.ts')
         }
       }
     }
@@ -75,7 +76,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          index: resolve(__dirname, 'src/index.html')
+          index: resolve(__dirname, 'src/index.html'), private: resolve(__dirname, 'src/private.html')
         }
       }
     },

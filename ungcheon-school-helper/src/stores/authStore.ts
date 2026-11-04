@@ -4,7 +4,7 @@ import { useAppStore } from './appStore'
 
 const SESSION_NAME_KEY = 'pilotLogin.teacherName'
 const SESSION_EXPIRES_KEY = 'pilotLogin.expiresAt'
-const SESSION_HOURS = 72
+const SESSION_HOURS = 120
 
 interface AuthState {
   ready: boolean
@@ -17,7 +17,7 @@ interface AuthState {
   executiveAccessToken: string
   executiveExpiresAt: string
   bootstrap: () => Promise<void>
-  login: (name: string) => Promise<boolean>
+  login: (name: string, password: string) => Promise<boolean>
   unlockExecutive: (password: string) => Promise<boolean>
   lockExecutive: () => void
   logout: () => Promise<void>
@@ -46,68 +46,19 @@ export const useAuthStore = create<AuthState>((set) => ({
   executiveExpiresAt: '',
 
   bootstrap: async () => {
-    if (!window.electron) {
-      set({ ready: true })
-      return
-    }
-    const [savedName, savedExpiresAt] = await Promise.all([
-      window.electron.configGet(SESSION_NAME_KEY),
-      window.electron.configGet(SESSION_EXPIRES_KEY),
-    ])
-    const teacherName = String(savedName ?? '').trim()
-    const expiresAt = String(savedExpiresAt ?? '')
-    if (teacherName && isFuture(expiresAt)) {
-      if (useAppStore.getState().config.teacherName !== teacherName) {
-        await useAppStore.getState().saveConfig({ teacherName })
-      }
-      set({ ready: true, authenticated: true, teacherName, expiresAt })
-      void preloadSchoolHubCache(teacherName)
-      return
-    }
-    await Promise.allSettled([
-      window.electron.configDelete(SESSION_NAME_KEY),
-      window.electron.configDelete(SESSION_EXPIRES_KEY),
-    ])
-    set({ ready: true, authenticated: false, teacherName: '', expiresAt: '', executiveRole: null, executiveAccessToken: '', executiveExpiresAt: '' })
+    try { const result = await window.preview.auth('restore'); if (result.authenticated) await useAppStore.getState().loadConfig(); set({ ready: true, authenticated: result.authenticated, teacherName: result.teacherName, expiresAt: result.expiresAt }) }
+    catch { set({ ready: true, authenticated: false, teacherName: '', expiresAt: '' }) }
   },
-
-  login: async (name) => {
-    const teacherName = name.trim()
-    if (!teacherName) {
-      set({ error: '이름을 입력해 주세요.' })
-      return false
-    }
+  login: async (name, password) => {
     set({ loading: true, error: '' })
     try {
-      const roster = await getSharedStaffRoster(true)
-      if (!roster?.members.some(member => member.name.trim() === teacherName)) {
-        set({ error: '교직원 명렬에 등록된 이름과 일치하지 않습니다.' })
-        return false
-      }
-      const expiresAt = new Date(Date.now() + SESSION_HOURS * 60 * 60 * 1000).toISOString()
-      await Promise.all([
-        window.electron.configSet(SESSION_NAME_KEY, teacherName),
-        window.electron.configSet(SESSION_EXPIRES_KEY, expiresAt),
-        useAppStore.getState().saveConfig({ teacherName }),
-      ])
-      set({
-        authenticated: true,
-        teacherName,
-        expiresAt,
-        error: '',
-        executiveRole: null,
-        executiveAccessToken: '',
-        executiveExpiresAt: '',
-      })
-      window.electron?.notifyAuthChanged()
-      void preloadSchoolHubCache(teacherName)
-      return true
-    } catch (error) {
-      set({ error: error instanceof Error ? error.message : String(error) })
-      return false
-    } finally {
-      set({ loading: false })
-    }
+      const result = await window.preview.auth('login', { name, password })
+      await useAppStore.getState().loadConfig()
+      await useAppStore.getState().saveConfig({ teacherName: result.teacherName })
+      set({ ready: true, authenticated: result.authenticated, teacherName: result.teacherName, expiresAt: result.expiresAt, executiveRole: null, executiveAccessToken: '', executiveExpiresAt: '' })
+      return result.authenticated
+    } catch (error) { set({ error: error instanceof Error ? error.message : '로그인할 수 없습니다.' }); return false }
+    finally { set({ loading: false }) }
   },
 
   unlockExecutive: async (password) => {
@@ -144,6 +95,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: async () => {
     clearSchoolHubSessionCache()
+    await window.preview.auth('logout')
     await Promise.allSettled([
       window.electron?.configDelete(SESSION_NAME_KEY),
       window.electron?.configDelete(SESSION_EXPIRES_KEY),

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useAppStore } from './stores/appStore'
 import { useNoticeStore } from './stores/noticeStore'
 import Layout from './components/Layout'
-import UpdateModal from './components/UpdateModal'
+import UpdateStatus from './components/UpdateStatus'
 import NoticeModal from './components/NoticeModal'
 import { clearSchoolHubSessionCache, preloadSchoolHubCache, startSchoolHubBackgroundSync } from './services/schoolHub'
 import { useAuthStore } from './stores/authStore'
@@ -26,18 +26,19 @@ export default function App() {
       if (loadedConfig.schoolHubUrl && useAuthStore.getState().authenticated) {
         void preloadSchoolHubCache(useAuthStore.getState().teacherName)
       }
-      await fetchNotices()   // 설정 로드 후 공지 자동 확인 → 새 공지 있으면 팝업
+      if (useAuthStore.getState().authenticated) await fetchNotices()   // 설정 로드 후 공지 자동 확인 → 새 공지 있으면 팝업
     })()
     if (!window.electron) return
     const clearSessionCache = () => clearSchoolHubSessionCache()
     window.addEventListener('beforeunload', clearSessionCache)
+    const offAuth = window.electron.onAuthChanged(() => void bootstrapAuth())
     const unsub1 = window.electron.onUpdateAvailable(() => setUpdateAvailable())
     const unsub2 = window.electron.onUpdateDownloaded(() => setUpdateDownloaded())
     const unsub3 = window.electron.onUpdateNone(() => setUpdateNone())
     const unsub4 = window.electron.onUpdateError((msg) => setUpdateError(msg))
     return () => {
       window.removeEventListener('beforeunload', clearSessionCache)
-      unsub1(); unsub2(); unsub3(); unsub4()
+      offAuth(); unsub1(); unsub2(); unsub3(); unsub4()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -81,12 +82,12 @@ export default function App() {
   if (!useAppStore.getState().isConfigLoaded || !authReady) {
     return <div className="min-h-screen bg-surface-950 grid place-items-center text-sm text-slate-400">시작 준비 중...</div>
   }
-  if (!authenticated) return <PilotLogin />
+  if (!authenticated) return <><UpdateStatus /><PilotLogin /></>
 
   return (
     <>
       <Layout />
-      <UpdateModal />
+      <div className="fixed top-9 right-4 z-[95] max-w-xl"><UpdateStatus /></div>
       <NoticeModal />
     </>
   )

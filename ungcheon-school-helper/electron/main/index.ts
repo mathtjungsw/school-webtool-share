@@ -7,6 +7,10 @@ import { execFile, spawn } from 'child_process'
 import { get as httpGet } from 'http'
 import { promisify } from 'util'
 import { autoUpdater } from 'electron-updater'
+import { startPreviewBackend } from './preview-backend'
+import { createStaffAuth } from './staff-auth'
+import { registerFeatureViews } from './feature-views'
+import { registerUpdateManager } from './update-manager'
 import Store from 'electron-store'
 import { fitWidgetBounds } from './widgetGeometry'
 import { startMonitoring, stopMonitoring, isMonitoringActive } from './notifier'
@@ -64,6 +68,17 @@ import {
 
 const execFileAsync = promisify(execFile)
 
+const IS_PREVIEW = app.getVersion().includes('-preview.')
+const IS_VALIDATION = process.argv.includes('--ungcheon-validation')
+if (IS_VALIDATION) {
+  app.setName('웅천고 업무도우미 검증')
+  app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'Codex', 'ungcheon-validation-1.1.38'))
+}
+if (IS_PREVIEW) {
+  app.setName('웅천고 업무도우미 테스트')
+  app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'UngcheonSchoolHelper-Preview-20261103'))
+  app.setAppUserModelId('kr.hs.ungcheon.schoolhelper.preview20261103')
+}
 const store = new Store()
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) app.quit()
@@ -77,6 +92,11 @@ let widgetWindow: BrowserWindow | null = null
 let widgetRequestedHeight = 0
 let tray: Tray | null = null
 let isQuitting = false
+let previewEndpoint = ''
+const trustedApp = (event: Electron.IpcMainInvokeEvent) => [mainWindow?.webContents, widgetWindow?.webContents].includes(event.sender) && event.senderFrame === event.sender.mainFrame
+const staffAuth = createStaffAuth(() => previewEndpoint || UNGCHEON_SCHOOL_HUB_URL, trustedApp)
+const featureViews = registerFeatureViews(() => mainWindow, staffAuth)
+const updateManager = registerUpdateManager(autoUpdater, () => { showMainWindow(); mainWindow?.webContents.send('navigate:request', 'help'); mainWindow?.webContents.executeJavaScript("window.dispatchEvent(new Event('update:open'))").catch(() => undefined) }, trustedApp)
 
 type WidgetPreset = 'glass-light' | 'solid-light' | 'dark-glass' | 'school-yellow' | 'minimal'
 interface WidgetSettings extends WidgetProductivitySettings {
@@ -174,7 +194,12 @@ function createWindow() {
   })
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  if (IS_PREVIEW) {
+    const server = await startPreviewBackend(join(process.env.LOCALAPPDATA || app.getPath('userData'), 'Codex', 'ungcheon-preview', 'server-config.json'))
+    previewEndpoint = server.url
+    app.on('will-quit', () => server.close())
+  }
   // X-Frame-Options 제거 — 구글 캘린더 embed 전용 (.google.com 도메인만, C-3)
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     let isGoogleDomain = false
@@ -195,7 +220,7 @@ app.whenReady().then(() => {
   if (!process.argv.includes('--widget')) createWindow()
   createWidgetWindow()
   createTray()
-  if (store.get('widget.autoLaunchInitialized') !== true) {
+  if (!IS_PREVIEW && !IS_VALIDATION && store.get('widget.autoLaunchInitialized') !== true) {
     store.set('widget.autoLaunchInitialized', true)
     setWidgetAutoLaunch(true)
   }
@@ -208,7 +233,7 @@ app.whenReady().then(() => {
       owner: 'mathtjungsw',
       repo: 'school-webtool-share',
     })
-    autoUpdater.checkForUpdatesAndNotify()
+    void updateManager.check().catch(() => undefined)
   }
 
   app.on('activate', () => {
@@ -220,7 +245,7 @@ app.on('window-all-closed', () => {
   if (process.platform === 'darwin' && isQuitting) app.quit()
 })
 
-app.on('before-quit', () => { isQuitting = true })
+app.on('before-quit', () => { isQuitting = true; featureViews.close() })
 app.on('second-instance', (_, argv) => {
   if (argv.includes('--widget')) createWidgetWindow()
   else showMainWindow()
@@ -267,6 +292,23 @@ ipcMain.handle('widget:fitHeight', (_, requestedHeight: number) => {
 })
 ipcMain.handle('widget:openMain', (_, page = '') => { showMainWindow(String(page)); return true })
 ipcMain.on('auth:changed', () => BrowserWindow.getAllWindows().forEach(window => window.webContents.send('auth:changed')))
+
+// Gate local data IPC independently of renderer login state.
+const originalHandle = ipcMain.handle.bind(ipcMain)
+const PUBLIC_CHANNELS = new Set(['staff:auth','preview:update','feature:view','private:call','app:getVersion','app:getAutoLaunch','app:resourcesPath','widget:getSettings','widget:fitHeight','widget:openMain','update:check','config:get','config:getAll','config:set','config:setMany','config:delete','apiKey:getAll'])
+ipcMain.handle = ((channel: string, listener: any) => originalHandle(channel, async (event: Electron.IpcMainInvokeEvent, ...args: any[]) => {
+  if (!['staff:auth','feature:view','private:call','preview:update'].includes(channel) && !trustedApp(event)) throw new Error('허용되지 않은 화면입니다.')
+  const loggedIn = staffAuth.snapshot().authenticated
+  if (!loggedIn) {
+    if (!PUBLIC_CHANNELS.has(channel)) throw new Error('로그인이 필요합니다.')
+    if (channel === 'config:getAll') return { config: {}, dashboard: { neisScheduleDefaultOffV1: true, period7TimeCorrectionV1: true } }
+    if (channel === 'apiKey:getAll') return {}
+    if (channel === 'config:get' && !['widget.settings.v1','sidebar.expandedPinned'].includes(String(args[0]))) return undefined
+    if (['config:set','config:delete'].includes(channel)) throw new Error('로그인이 필요합니다.')
+    if (channel === 'config:setMany' && Object.keys(args[0] || {}).some(key => !key.startsWith('config.') && !key.startsWith('dashboard.'))) throw new Error('로그인이 필요합니다.')
+  }
+  return listener(event, ...args)
+})) as typeof ipcMain.handle
 
 // Config IPC
 // C-1: 허용 키 접두어 화이트리스트 — 렌더러가 임의 키를 주입하는 것을 방지
@@ -1069,7 +1111,7 @@ async function fetchSchoolHub(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    if (HUB_READ_ACTIONS.has(action) && !forcePost) {
+    if (HUB_READ_ACTIONS.has(action) && !forcePost && !payload.staffToken) {
       const url = new URL(endpoint)
       url.searchParams.set('action', action)
       url.searchParams.set('payload', JSON.stringify(payload))
@@ -1105,6 +1147,14 @@ async function fetchSchoolHub(
 }
 
 async function requestSchoolHub(payload: Record<string, unknown>) {
+  if (IS_PREVIEW) {
+    try { return { ok: true, data: await staffAuth.request(payload) } }
+    catch { return { ok: false, code: 'AUTH_REQUIRED', error: '시험 환경의 로그인을 확인해 주세요.' } }
+  }
+  if (!staffAuth.snapshot().authenticated) return { ok: false, code: 'AUTH_REQUIRED', error: '로그인이 필요합니다.' }
+
+  payload = staffAuth.authorizePayload(payload)
+  const requestIdentity = staffAuth.snapshot()
   const configuredEndpoint = store.get('config.schoolHubUrl', '')
   const endpointCandidates = getSchoolHubEndpointCandidates(configuredEndpoint)
   const action = String(payload.action ?? '')
@@ -1143,6 +1193,9 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
         }
         if (res.ok) {
           const result = await res.json() as Record<string, unknown>
+          const currentIdentity = staffAuth.snapshot()
+          if (!currentIdentity.authenticated || currentIdentity.teacherName !== requestIdentity.teacherName || currentIdentity.expiresAt !== requestIdentity.expiresAt) return { ok: false, code: 'AUTH_REQUIRED', error: '이전 로그인에서 시작한 요청이 취소되었습니다.' }
+          if (!result.ok && String(result.error || '').startsWith('AUTH_REQUIRED')) { staffAuth.clear(); return { ...result, code: 'AUTH_REQUIRED' } }
           if (endpointIndex > 0 && endpoint === UNGCHEON_SCHOOL_HUB_URL) {
             store.set('config.schoolHubUrl', UNGCHEON_SCHOOL_HUB_URL)
           }
@@ -1247,6 +1300,7 @@ function createTray() {
   tray = new Tray(process.env['ELECTRON_RENDERER_URL'] ? join(__dirname, '../../resources/icon.png') : join(process.resourcesPath, 'icon.png'))
   tray.setToolTip('웅천고 업무도우미')
   const refresh = () => tray?.setContextMenu(Menu.buildFromTemplate([
+    { label: updateManager.snapshot().phase === 'ready' ? '새 업데이트 설치 준비 완료' : updateManager.snapshot().phase === 'downloading' ? '새 업데이트 다운로드 중' : updateManager.snapshot().phase === 'available' ? '새 업데이트 발견' : '업데이트 확인·설치 안내', click: () => { showMainWindow(); void mainWindow?.webContents.executeJavaScript("window.dispatchEvent(new Event('update:open'))").catch(() => undefined) } },
     { label: '미니 위젯 열기', click: () => createWidgetWindow() },
     { label: '업무도우미 열기', click: () => showMainWindow() },
     { type: 'separator' },
@@ -1255,6 +1309,9 @@ function createTray() {
     { label: '완전 종료', click: () => { isQuitting = true; app.quit() } },
   ]))
   refresh()
+  let lastUpdateRevision = -1
+  const statusTimer = setInterval(() => { const s=updateManager.snapshot(); if(s.revision===lastUpdateRevision)return; lastUpdateRevision=s.revision; refresh(); tray?.setToolTip('웅천고 업무도우미'+(s.phase==='ready'?' · 새 업데이트 설치 준비':s.phase==='downloading'?' · 다운로드 중':s.phase==='available'?' · 새 업데이트 발견':'')) }, 1000)
+  statusTimer.unref()
   tray.on('double-click', () => createWidgetWindow())
 }
 
