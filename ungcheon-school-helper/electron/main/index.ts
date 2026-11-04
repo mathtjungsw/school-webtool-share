@@ -78,7 +78,7 @@ if (IS_PREVIEW) {
   app.setName('웅천고 업무도우미 테스트')
   app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'UngcheonSchoolHelper-Preview-20261103'))
   app.setAppUserModelId('kr.hs.ungcheon.schoolhelper.preview20261103')
-}
+} else app.setAppUserModelId(IS_VALIDATION ? 'kr.hs.ungcheon.schoolhelper.validation' : 'kr.hs.ungcheon.schoolhelper')
 const store = new Store()
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) app.quit()
@@ -487,7 +487,7 @@ ipcMain.handle('update:check', async () => {
     mainWindow?.webContents.send('update:none')
     return false
   }
-  await autoUpdater.checkForUpdatesAndNotify()
+  await updateManager.check()
   return true
 })
 

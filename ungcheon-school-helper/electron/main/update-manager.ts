@@ -12,7 +12,7 @@ export function registerUpdateManager(updater: AppUpdater, open:()=>void, truste
   updater.on('update-downloaded',info=>{send({phase:'ready',targetVersion:info.version,progress:100});toast(info.version+':ready','설치 준비가 완료되었습니다. 지금 설치를 눌러 주세요.')})
   updater.on('update-not-available',()=>send({phase:'current',checkedAt:Date.now()}))
   updater.on('error',()=>send({phase:'error',error:'업데이트를 확인하거나 내려받지 못했습니다. 연결을 확인하고 다시 시도하세요.'}))
-  const check=async()=>{if(preview)return state;if(checking)return state;checking=true;try{lastCheck=Date.now();await updater.checkForUpdatesAndNotify()}finally{checking=false}return state}
+  const check=async()=>{if(preview)return state;if(checking)return state;checking=true;try{lastCheck=Date.now();await updater.checkForUpdates()}finally{checking=false}return state}
   const timer=setInterval(()=>{if(!preview&&Date.now()-lastCheck>=6*3600000)void check().catch(()=>undefined)},60000);timer.unref()
   ipcMain.handle('preview:update',async(e,action:string)=>{
     if(!trusted(e))throw new Error('허용되지 않은 화면입니다.')
