@@ -1,6 +1,7 @@
 import { app, ipcMain, safeStorage, BrowserWindow } from 'electron'
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
+import { fetchStaffJson } from './staff-transport'
 export function createStaffAuth(endpoint: () => string, trusted: (event: Electron.IpcMainInvokeEvent) => boolean) {
   let state: { name: string; expiresAt: string; token: string } | null = null
   let generation = 0
@@ -8,8 +9,7 @@ export function createStaffAuth(endpoint: () => string, trusted: (event: Electro
   const snapshot = () => ({ authenticated: !!state && Date.parse(state.expiresAt) > Date.now(), teacherName: state?.name || '', expiresAt: state?.expiresAt || '' })
   const broadcast = () => BrowserWindow.getAllWindows().forEach(w => w.webContents.send('auth:changed'))
   const call = async (payload: Record<string, unknown>) => {
-    const response = await fetch(endpoint(), { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(payload.action==='caseDocument'?90000:35000) })
-    const result = await response.json() as any
+    const result = await fetchStaffJson(endpoint(), payload)
     if (!result.ok) { if (result.code === 'AUTH_REQUIRED' || String(result.error || '').startsWith('AUTH_REQUIRED')) clear(); throw new Error(result.error || '인증을 확인할 수 없습니다.') }
     return result.data
   }

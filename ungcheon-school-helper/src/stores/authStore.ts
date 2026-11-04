@@ -57,7 +57,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       await useAppStore.getState().saveConfig({ teacherName: result.teacherName })
       set({ ready: true, authenticated: result.authenticated, teacherName: result.teacherName, expiresAt: result.expiresAt, executiveRole: null, executiveAccessToken: '', executiveExpiresAt: '' })
       return result.authenticated
-    } catch (error) { set({ error: error instanceof Error ? error.message : '로그인할 수 없습니다.' }); return false }
+    } catch (error) { set({ error: error instanceof Error ? error.message.replace(/^Error invoking remote method ['"]staff:auth['"]: (?:Error: )?/, '') : '로그인할 수 없습니다.' }); return false }
     finally { set({ loading: false }) }
   },
 

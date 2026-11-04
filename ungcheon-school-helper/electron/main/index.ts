@@ -72,7 +72,7 @@ const IS_PREVIEW = app.getVersion().includes('-preview.')
 const IS_VALIDATION = process.argv.includes('--ungcheon-validation')
 if (IS_VALIDATION) {
   app.setName('웅천고 업무도우미 검증')
-  app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'Codex', 'ungcheon-validation-1.1.39'))
+  app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'Codex', `ungcheon-validation-${app.getVersion()}`))
 }
 if (IS_PREVIEW) {
   app.setName('웅천고 업무도우미 시험판')
