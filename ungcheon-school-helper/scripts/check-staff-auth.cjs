@@ -52,11 +52,12 @@ const extra=post({action:'staffLogin',name:' '+extraName+' ',password});assert.e
 assert.equal(extra.data.name,extraName);assert.ok(Math.abs(Date.parse(extra.data.expiresAt)-Date.now()-120*3600000)<10000)
 assert.equal(post({action:'staffSession',staffToken:extra.data.token}).ok,true)
 assert.equal(rosterReads,0,'Additional login must not require or change roster data')
-assert.equal(post({action:'verifyMobileViewer',viewerName:extraName,password}).ok,false,'Desktop allowlist must not change mobile roster membership')
+// The mobile-only harness below checks the shared allowlist with the real membership function.
+// This harness substitutes mobileAssertViewer_ to isolate desktop authentication.
 assert.equal(post({action:'staffLogin',name:'미등록추가이름',password}).ok,false)
 assert.equal(post({action:'staffSession',staffToken:extra.data.token,viewerName:'다른이름'}).ok,false)
 vm.runInContext('STAFF_ADDITIONAL_LOGIN_NAME_HASHES.pop()',context)
 assert.equal(post({action:'staffSession',staffToken:extra.data.token}).ok,false,'Removed allowlist identity must lose access')
 assert.equal(post({action:'staffSession',staffToken:second.data.token}).ok,true,'Existing roster session must survive allowlist changes')
 assert.equal(post({action:'staffLogout',staffToken:second.data.token}).ok,true)
-console.log('PASS separate desktop login allowlist, required password, 120-hour session, no roster write/read for extra identity, unchanged mobile membership and access removal')
+console.log('PASS separate desktop login allowlist, required password, 120-hour session, no roster write/read for extra identity, existing session preservation and access removal')

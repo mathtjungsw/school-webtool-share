@@ -531,4 +531,31 @@ test('Friday operation on Tuesday queries Friday students but the actual attenda
   assert.equal(detail.data.entries[0].name, '금요수강생');
 });
 
+
+
+
+test('additional login identity can use mobile schedules without a staff roster entry', () => {
+  const h = harness();
+  const extraName = '추가로그인시험';
+  const roster = JSON.stringify(h.rows.교원명렬);
+  h.context.__additionalHash = digest(extraName);
+  vm.runInContext('const STAFF_ADDITIONAL_LOGIN_NAME_HASHES = [__additionalHash];', h.context);
+  const login = h.login({ viewerName: extraName });
+  assert.equal(login.ok, true);
+  assert.ok(Math.abs(Date.parse(login.data.expiresAt) - h.now() - 72 * 3600000) < 10000);
+  assert.equal(h.login({ viewerName: extraName, password: 'synthetic-wrong-input' }).ok, false);
+  assert.equal(h.login({ viewerName: '미등록추가이름' }).ok, false);
+  const request = h.request({ viewerName: extraName, accessToken: login.data.accessToken });
+  const bundle = h.post(request);
+  assert.equal(bundle.ok, true);
+  assert.equal(bundle.data.contractVersion, 3);
+  assert.equal(bundle.data.teacherTimetable, null);
+  assert.equal(bundle.data.committeeEvents.length, 0);
+  assert.equal(JSON.stringify(h.rows.교원명렬), roster);
+  assert.equal(h.post(h.request({ viewerName: '다른교사', accessToken: login.data.accessToken })).ok, false);
+  assert.equal(h.post(h.request()).ok, true);
+  vm.runInContext('STAFF_ADDITIONAL_LOGIN_NAME_HASHES.length = 0;', h.context);
+  assert.equal(h.post(request).ok, false);
+});
+
 console.log(`Mobile Apps Script contract: ${passed} tests passed. No live services or secrets used.`);

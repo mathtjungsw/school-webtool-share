@@ -1,7 +1,7 @@
 // Reuse the established common-password verifier. Never reset mobile properties.
 // The storage identifier is a server-side pointer, not an access credential.
 const STAFF_CASE_STORAGE_SPREADSHEET = '1EMa0EINCAnTCm7e8UAsJ6Yjul_O6G_C-X25EN3oC0Dk';
-// Additional desktop login identities are independent of the staff roster.
+// Additional desktop and mobile login identities are independent of the staff roster.
 // Store normalized-name hashes, not plaintext names. The common password is still required.
 const STAFF_ADDITIONAL_LOGIN_NAME_HASHES = ['DTgN0r0RmaYOQnwA8vfqpyyPXtyoisPPWFOfObVsMwk='];
 function staffAssertViewer_(viewerName) {
