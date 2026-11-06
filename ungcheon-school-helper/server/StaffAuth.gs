@@ -1,6 +1,14 @@
 // Reuse the established common-password verifier. Never reset mobile properties.
 // The storage identifier is a server-side pointer, not an access credential.
 const STAFF_CASE_STORAGE_SPREADSHEET = '1EMa0EINCAnTCm7e8UAsJ6Yjul_O6G_C-X25EN3oC0Dk';
+// Additional desktop login identities are independent of the staff roster.
+// Store normalized-name hashes, not plaintext names. The common password is still required.
+const STAFF_ADDITIONAL_LOGIN_NAME_HASHES = ['DTgN0r0RmaYOQnwA8vfqpyyPXtyoisPPWFOfObVsMwk='];
+function staffAssertViewer_(viewerName) {
+  var name = clean_(viewerName, 30);
+  if (name && STAFF_ADDITIONAL_LOGIN_NAME_HASHES.indexOf(sha256_(name)) >= 0) return name;
+  return mobileAssertViewer_(name);
+}
 function staffAuthVersion_() { return sha256_(mobileSharedPasswordHash_() + ':' + (PropertiesService.getScriptProperties().getProperty('UNG_STAFF_AUTH_VERSION') || '1')); }
 function staffSessionKey_(token) { return 'UNG_STAFF_SESSION_' + sha256_(String(token || '')).replace(/[^A-Za-z0-9]/g, '').slice(0, 40); }
 function staffRequire_(body) {
@@ -9,7 +17,7 @@ function staffRequire_(body) {
   var session;
   try { session = JSON.parse(saved || '{}'); } catch (_) { session = {}; }
   if (!body.staffToken || !session.name || session.version !== staffAuthVersion_() || !Number.isFinite(Number(session.expiresAt)) || Number(session.expiresAt) <= Date.now()) throw new Error('AUTH_REQUIRED: 로그인 후 이용해 주세요.');
-  mobileAssertViewer_(session.name);
+  staffAssertViewer_(session.name);
   if (body.viewerName && String(body.viewerName).trim() !== session.name) throw new Error('AUTH_FORBIDDEN: 요청 사용자와 세션이 다릅니다.');
   return session;
 }
@@ -22,7 +30,7 @@ function staffAuthAction_(body) {
     var cache = CacheService.getScriptCache();
     var failures = Number(cache.get(failureKey) || 0);
     if (failures >= 5) throw new Error('잠시 뒤 다시 로그인해 주세요.');
-    try { if (sha256_(String(body.password || '')) !== mobileSharedPasswordHash_()) throw new Error('invalid'); mobileAssertViewer_(name); }
+    try { if (sha256_(String(body.password || '')) !== mobileSharedPasswordHash_()) throw new Error('invalid'); staffAssertViewer_(name); }
     catch (_) { cache.put(failureKey, String(failures + 1), 60); throw new Error('이름 또는 비밀번호를 확인해 주세요.'); }
     cache.remove(failureKey);
     var savedProperties = properties.getProperties();

@@ -38,3 +38,25 @@ assert.equal(post({action:'staffSession',staffToken:second.data.token}).ok,false
 assert.equal(props.get('UNG_MOBILE_SHARED_PASSWORD_HASH'),digest('rotated-synthetic-secret'))
 console.log('PASS 120-hour expiry contract, protected central documents, private pointer omission, byte-integrity rejection and password-change session invalidation')
 console.log('PASS real Apps Script dispatcher: protected action rejection, credential checks, issued sessions, subject binding, hashed tokens and revocation')
+// Use a synthetic identity; never copy operational login names into fixtures.
+const extraName='추가로그인시험',extraHash=digest(extraName)
+const originals=vm.runInContext('STAFF_ADDITIONAL_LOGIN_NAME_HASHES.slice()',context)
+assert.ok(originals.every(v=>/^[A-Za-z0-9+/]{43}=$/.test(v)))
+context.__extraHash=extraHash
+vm.runInContext('STAFF_ADDITIONAL_LOGIN_NAME_HASHES.push(__extraHash)',context)
+props.set('UNG_MOBILE_SHARED_PASSWORD_HASH',digest(password))
+let rosterReads=0
+context.mobileAssertViewer_=name=>{rosterReads++;if(name!=='테스트교사')throw new Error('Not in roster');return name}
+assert.equal(post({action:'staffLogin',name:extraName,password:'wrong'}).ok,false)
+const extra=post({action:'staffLogin',name:' '+extraName+' ',password});assert.equal(extra.ok,true)
+assert.equal(extra.data.name,extraName);assert.ok(Math.abs(Date.parse(extra.data.expiresAt)-Date.now()-120*3600000)<10000)
+assert.equal(post({action:'staffSession',staffToken:extra.data.token}).ok,true)
+assert.equal(rosterReads,0,'Additional login must not require or change roster data')
+assert.equal(post({action:'verifyMobileViewer',viewerName:extraName,password}).ok,false,'Desktop allowlist must not change mobile roster membership')
+assert.equal(post({action:'staffLogin',name:'미등록추가이름',password}).ok,false)
+assert.equal(post({action:'staffSession',staffToken:extra.data.token,viewerName:'다른이름'}).ok,false)
+vm.runInContext('STAFF_ADDITIONAL_LOGIN_NAME_HASHES.pop()',context)
+assert.equal(post({action:'staffSession',staffToken:extra.data.token}).ok,false,'Removed allowlist identity must lose access')
+assert.equal(post({action:'staffSession',staffToken:second.data.token}).ok,true,'Existing roster session must survive allowlist changes')
+assert.equal(post({action:'staffLogout',staffToken:second.data.token}).ok,true)
+console.log('PASS separate desktop login allowlist, required password, 120-hour session, no roster write/read for extra identity, unchanged mobile membership and access removal')

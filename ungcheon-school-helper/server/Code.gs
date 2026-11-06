@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 58;
+const MOBILE_SERVICE_VERSION = 59;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -431,6 +431,7 @@ const RELEASE_NOTES = [
     body: [
       '· 로그인·세션 확인·우수사례 통신에 Windows 시스템 프록시와 인증서 설정을 따르는 기존 앱 통신 방식을 적용합니다.',
       '· 연결 실패·응답 지연·잘못된 서버 응답을 구분해 안내합니다. 비밀번호 불일치 안내와 120시간 로그인 정책은 유지합니다.',
+      '· 교직원 명렬과 별개로 허용한 이름의 PC 로그인을 지원합니다. 기존 공통 비밀번호와 세션 조건은 유지합니다.',
       '· 기존 내신 산출기·교과목 매칭·4/5자리 학번·우수사례 보기와 모바일 기능을 유지합니다.'
     ].join('\n'),
     date: '2026-11-04'
