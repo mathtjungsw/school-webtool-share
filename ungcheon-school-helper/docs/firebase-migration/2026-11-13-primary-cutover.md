@@ -26,6 +26,10 @@
 - 추가 Google 문자 시험에서 `setValues`가 문자열 맨 앞 작은따옴표 하나를 제거하는 것을 발견했다. 자료 대조가 실패를 검출했으며 운영 전환/원본 교체는 수행하지 않았다.
 - service70은 `=`뿐 아니라 `'`로 시작하는 문자열도 한 번 escape한다. 19:02:15 합성 Google 시험에서 작은따옴표1/2개, 수식형 문자열, 0으로 시작하는 숫자형 문자열, 날짜형 문자열, boolean형 문자열, 한글 보존 통과. `out/native-return-literals-before.txt`와 `out/native-return-literals-after.txt`.
 - 서비스70 전체 typecheck exit0, 전환11그룹·모바일24·배포가드56 통과. 준비 중 코드 변경은 새 배포 증거를 확인하고 10분 장벽/검증 epoch를 갱신하도록 제한했다. DRAINING 이후 또는 주 저장소 생성 후에는 준비 증거를 바꾸지 못한다.
+- service70 main `b45e67dd`, 고정 @96/HEAD/health70·20모듈 일치, 배포 증거 확인. 19:06:16 구조 준비70 완료. 일반 조회·저장은 여전히 SHEETS이며 source freeze/primary 활성화는 하지 않았다.
+- service71은 저장 결과 기록도 전환 경계를 넘겨 보존한다. 최종 source 대조 후 Sheets 저널의 업무 요청 영수증을 새 epoch에 복제하고 확인한다. 주 저장소의 각 commit 영수증은 시트 백업의 private blob/index에 보존한다. 복귀 이후 같은 요청을 재시도할 때 Firestore 연결 없이 원래 응답을 돌려준다. 불확실한 과거 작업은 재실행하지 않고 확인 필요로 거절한다.
+- service71 로컬 전환12그룹 및 전체 typecheck exit0. 양방향 전환 후 동일 요청 재전송, 다른 payload 거절, 잘못된 세션 거절, 복귀 후 Firestore를 강제로 사용할 수 없게 한 상태의 영수증 재조회가 통과했다.
+- 19:10:23~19:13:42 실제 Google 합성 service71 왕복 시험 통과. 기존11개 검증 항목에 Sheets 저장 요청의 전환 후 재전송과 Firebase 저장 요청의 시트 복귀 후 재전송을 추가했다. 두 경우 모두 기존 응답을 반환하고 중복 저장하지 않았다. `out/native-primary-service71-roundtrip.txt`, 합성 조회1,048ms/474ms.
 
 아직 이 문서 작성 시점에는 SHEETS가 운영 원본이다. main 반영 → 고정 배포 → service69 구조 준비/복제 → 새 코드 10분 장벽 → 저장 제한 → 22종 최신 전수 대조 → FIRESTORE 활성화 → 운영 조회와 백업 확인 순서로 이어간다.
 

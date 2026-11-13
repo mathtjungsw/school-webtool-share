@@ -82,6 +82,7 @@ function migrationPrimaryWrite_(repo,c,body,callback) {
   if(previous){
     if(migrationHash_(previous.data.intent)!==migrationHash_(intent))throw migrationError_('MIGRATION_OPERATION_CONFLICT');
     migrationAuthorizeWrite_(body,previous.data);
+    if(previous.data.blocked||typeof previous.data.responseText!=='string')throw migrationError_('MIGRATION_SOURCE_REVIEW_REQUIRED');
     return ContentService.createTextOutput(previous.data.responseText).setMimeType(ContentService.MimeType.JSON);
   }
   var output=migrationWithBackend_(reader,c.sourceBookId,true,callback),text=output.response.getContent(),response=JSON.parse(text);
@@ -135,7 +136,9 @@ function migrationVerifyPrimaryStep_() {
     var book=migrationOperationsBook_(c),store=migrationSheetsStore_(book),status=store.status(),repo=migrationPrimaryRepository_(c),reader=migrationServingReader_(repo,c.baselineRef);
     if(status.pendingCount||status.reviewCount||status.highWater!==reader.revision)throw migrationError_('MIGRATION_VERIFICATION_WAIT_FOR_REPLICA');
     var props=PropertiesService.getScriptProperties(),key='UNG_MIGRATION_CUTOVER_CHECK_V1',text=props.getProperty(key),job=text?JSON.parse(text):null;
-    var signature=migrationHash_([c.epoch,reader.revision]);if(!job||job.signature!==signature)job={signature:signature,revision:reader.revision,checked:[]};
+    var signature=migrationHash_([c.epoch,reader.revision]);if(!job||job.signature!==signature)job={signature:signature,revision:reader.revision,checked:[],receiptsThrough:0};
+    if(job.receiptsThrough===undefined)job.receiptsThrough=0;
+    if(!Number.isSafeInteger(job.receiptsThrough)||job.receiptsThrough<0||job.receiptsThrough>status.highWater)throw migrationError_('MIGRATION_VERIFICATION_STATE_CORRUPT');
     var item=migrationCatalog_()[job.checked.length];
     if(item){
       var source=migrationCaptureResource_(book,store,item.resource),mirror=reader.resource(item.resource);
@@ -143,7 +146,26 @@ function migrationVerifyPrimaryStep_() {
       source.records.forEach(function(row){if(migrationDecode_(row.payload).formulas.some(Boolean))throw migrationError_('MIGRATION_PRIMARY_FORMULA_UNSUPPORTED');});
       job.checked.push(item.resource);props.setProperty(key,JSON.stringify(job));
     }
-    return {status:job.checked.length===migrationCatalog_().length?'COMPLETE':'PROGRESS',checked:job.checked.length,revision:job.revision};
+    if(!item){
+      // A client can retry a Sheets write after the cutover. Import its existing
+      // receipt before activation so the same operation cannot execute twice.
+      var end=Math.min(status.highWater,(job.receiptsThrough||0)+10);
+      for(var r=(job.receiptsThrough||0)+1;r<=end;r++){
+        var record=store.readRevision(r);
+        if(record&&migrationPreviewActionAllowed_(record.intent.action,true)){
+          var value=record.phase==='APPLIED'&&record.replayable&&record.receiptRef?store.readBlob(record.receiptRef):null;
+          var receipt={schemaVersion:1,intent:record.intent,accessMode:record.accessMode,revision:0,sourceRevision:r,blocked:!value,responseText:value?value.responseText:null};
+          if(value){migrationAssertReceipt_(JSON.parse(value.responseText),0);if(Utilities.newBlob(value.responseText).getBytes().length>200000)throw migrationError_('MIGRATION_RECEIPT_TOO_LARGE');}
+          var receiptPath=migrationPrimaryPath_(c)+'/primaryReceipts/'+record.intent.operationKey,prior=repo.get(receiptPath);
+          if(prior){if(migrationHash_(prior.data)!==migrationHash_(receipt))throw migrationError_('MIGRATION_OPERATION_CONFLICT');}
+          else repo.commit([{path:receiptPath,data:receipt,createOnly:true}]);
+          var confirmed=repo.get(receiptPath);if(!confirmed||migrationHash_(confirmed.data)!==migrationHash_(receipt))throw migrationError_('MIGRATION_RECEIPT_NOT_CONFIRMED');
+        }
+        job.receiptsThrough=r;
+      }
+      props.setProperty(key,JSON.stringify(job));
+    }
+    return {status:job.checked.length===migrationCatalog_().length&&job.receiptsThrough===status.highWater?'COMPLETE':'PROGRESS',checked:job.checked.length,revision:job.revision,receiptsThrough:job.receiptsThrough};
   });
 }
 function migrationActivatePrimary_() {

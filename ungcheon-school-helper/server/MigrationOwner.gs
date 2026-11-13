@@ -8,7 +8,7 @@ function migrationProductionIdentity_() {
 }
 // Rotated with each production migration release. The guarded deployment tool
 // records this ID only after checking main, exact immutable source, HEAD and URL.
-function migrationOwnerReleaseId_() {return 'migration-service70-literals-v1';}
+function migrationOwnerReleaseId_() {return 'migration-service71-receipts-v1';}
 function migrationOwnerEvidence_(identity) {
   var doc=migrationOperationsRepository_({projectId:'ungcheon-school-helper',schoolId:'ungcheon'}).get('migrationChecks/deployment');
   var record=doc && doc.data;

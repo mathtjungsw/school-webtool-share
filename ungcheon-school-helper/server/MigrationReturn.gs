@@ -37,9 +37,22 @@ function migrationBackupStep_(forceVerify) {
   return migrationWithSourceLock_(function(){
     var c=migrationPrimaryConfig_();if(!migrationPrimaryServing_(c))return {status:'NOT_PRIMARY'};
     var repo=migrationPrimaryRepository_(c),document=migrationPrimaryRoot_(repo,c),root=document.data,book=migrationOperationsBook_(c),store=migrationSheetsStore_(book);
-    var path=migrationPrimaryPath_(c)+'/sheetBackups/current',saved=repo.get(path),state=saved?saved.data:{schemaVersion:1,resources:{},verifiedRevision:null};
+    var path=migrationPrimaryPath_(c)+'/sheetBackups/current',saved=repo.get(path),state=saved?saved.data:{schemaVersion:1,resources:{},receiptRevision:0,verifiedRevision:null};
     var next=root.resources.filter(function(h){var previous=state.resources[h.resource];return !previous||previous.digest!==h.digest||(forceVerify&&(previous.verifiedRevision!==root.revision||previous.verifiedPhase!==root.phase));})[0];
     if(!next){
+      // Materialize each primary receipt in the private Sheets blob/index store.
+      // After return, duplicate detection works even if Firestore is unavailable.
+      if((state.receiptRevision||0)<root.revision){
+        var revision=(state.receiptRevision||0)+1,commit=repo.get(migrationPrimaryPath_(c)+'/primaryCommits/'+revision);
+        if(!commit||commit.data.revision!==revision||!/^[a-f0-9]{64}$/.test(commit.data.operationKey||''))throw migrationError_('MIGRATION_RETURN_RECEIPT_MISSING');
+        var receipt=repo.get(migrationPrimaryPath_(c)+'/primaryReceipts/'+commit.data.operationKey);
+        if(!receipt||receipt.data.revision!==revision||receipt.data.intent.operationKey!==commit.data.operationKey)throw migrationError_('MIGRATION_RETURN_RECEIPT_MISSING');
+        migrationAssertReceipt_(JSON.parse(receipt.data.responseText),0);
+        var ref=store.putBlob(receipt.data),key=migrationHash_(['primary-receipt',commit.data.operationKey]);store.remember(key,ref);
+        if(store.cachedRef(key)!==ref||migrationHash_(store.readBlob(ref))!==migrationHash_(receipt.data))throw migrationError_('MIGRATION_RETURN_RECEIPT_MISMATCH');
+        state.receiptRevision=revision;state.verifiedRevision=null;repo.commit([{path:path,data:state,updateTime:saved.updateTime}]);
+        return {status:'PROGRESS',receiptsThrough:revision,revision:root.revision};
+      }
       if(state.verifiedRevision!==root.revision){state.verifiedRevision=root.revision;state.verifiedAt=new Date().toISOString();repo.commit([{path:path,data:state,updateTime:saved.updateTime}]);}
       return {status:'COMPLETE',revision:root.revision,resources:root.resources.length};
     }
@@ -58,6 +71,18 @@ function migrationBackupStep_(forceVerify) {
     repo.commit([{path:path,data:state,updateTime:saved?saved.updateTime:undefined,createOnly:!saved}]);
     return {status:'PROGRESS',resource:next.resource,revision:root.revision,changed:migrationContentDigest_(before)!==expected,checkedResources:Object.keys(state.resources).length};
   });
+}
+function migrationReplayReturnedReceipt_(body,session) {
+  var id=body.operationId||(body.action==='addStaffChecklist'?body.requestId:'');
+  if(!id||!migrationPreviewActionAllowed_(body.action,true))return null;
+  if(!session||!session.name)throw migrationError_('MIGRATION_AUTH_REQUIRED');
+  var intent=migrationOperationIntent_({actorHash:migrationHash_(session.name),action:body.action,operationId:id,requestHash:migrationHash_(migrationBusinessRequest_(body)),resources:migrationCatalog_().map(function(x){return x.resource;})});
+  var c=migrationPrimaryConfig_(),store=migrationSheetsStore_(migrationOperationsBook_(c)),ref=store.cachedRef(migrationHash_(['primary-receipt',intent.operationKey]));
+  if(!ref)return null;
+  var receipt=store.readBlob(ref);migrationAuthorizeWrite_(body,receipt);
+  if(!receipt||migrationHash_(receipt.intent)!==migrationHash_(intent))throw migrationError_('MIGRATION_OPERATION_CONFLICT');
+  if(typeof receipt.responseText!=='string'||receipt.blocked)throw migrationError_('MIGRATION_SOURCE_REVIEW_REQUIRED');
+  return ContentService.createTextOutput(receipt.responseText).setMimeType(ContentService.MimeType.JSON);
 }
 function migrationBeginReturn_() {
   return migrationWithSourceLock_(function(){

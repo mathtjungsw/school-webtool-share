@@ -95,6 +95,7 @@ function migrationGatedRoute_(body, session, callback) {
       var primary=migrationPrimaryConfig_();
       if(primary&&primary.phase==='DRAINING')throw migrationPrimaryMaintenance_();
       if(migrationPrimaryServing_(primary))return migrationPrimaryDispatch_(body,callback);
+      if(primary&&primary.phase==='SHEETS_RETURNED'){var replay=migrationReplayReturnedReceipt_(body,session);if(replay)return replay;}
     }
     // Re-read activation INSIDE the common lock: a request queued before activation
     // must not use its earlier disabled decision after activation has completed.

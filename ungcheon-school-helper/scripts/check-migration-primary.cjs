@@ -51,6 +51,16 @@ test('lost atomic commit acknowledgement is resolved from receipt; precommit fai
   assert.equal(f.post({...create,operationId:'synthetic-precommit-fail',title:'Different'}).ok,false);f.repo.setFault(null)
   assert.equal(f.root().revision,1);assert.equal(f.post({action:'listLinks'}).data.length,1)
 })
+test('idempotency survives both backend boundaries and Sheets retries no longer depend on Firestore',()=>{
+  const old={action:'addFeatureRequest',operationId:'synthetic-before-cutover',requestType:'improvement',title:'Before',content:'Synthetic',author:'Synthetic Teacher'};let first
+  const f=setup(g=>{g.enable();first=g.post(old);assert.equal(first.ok,true,first.error)})
+  f.activate();assert.deepEqual(f.post(old),first);assert.equal(f.root().revision,0)
+  assert.equal(f.post({...old,title:'Conflict'}).ok,false)
+  const request={...old,operationId:'synthetic-after-cutover',title:'After'},created=f.post(request);assert.equal(created.ok,true,created.error)
+  assert.equal(f.root().revision,1);f.returnToSheets();f.repo.setFault(()=>{throw Error('Firestore deliberately offline after return')})
+  assert.deepEqual(f.post(request),created);assert.deepEqual(f.post(old),first);assert.equal(f.post({action:'listFeatureRequests'}).data.length,2)
+  assert.equal(f.post({...request,content:'Conflict'}).ok,false);assert.equal(f.post({...request,staffToken:'bad'}).ok,false)
+})
 test('cached immutable payload avoids document reads, notices changed heads and survives eviction/corruption',()=>{
   const f=setup();f.activate();f.post(create);f.post({action:'listLinks'});let before=f.repo.metrics.gets
   assert.equal(f.post({action:'listLinks'}).data.length,1);assert.equal(f.repo.metrics.gets-before,1,'only current root is read')

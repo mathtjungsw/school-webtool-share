@@ -13,6 +13,9 @@ function probeNativeFirebasePrimary() {
     keys.forEach(function(k){props.deleteProperty(k);});migrationProbeNativeApp_.initialize(book);
     migrationOperationsBook_=function(c){if(c.sourceBookId!==id||c.schoolId!=='migration-probe-primary-v1')throw new Error('PROBE_TARGET_MISMATCH');return book;};
     var tracking={schemaVersion:1,enabled:true,sourceBookId:id};props.setProperty('UNG_MIGRATION_TRACKING_V1',JSON.stringify(tracking));
+    var previousRequest={action:'addLink',operationId:'native-before-switch-'+Utilities.getUuid(),staffToken:'SYNTHETIC_NATIVE_SESSION',title:'Synthetic before switch',department:'Test',url:'https://example.com/before-switch/'+Utilities.getUuid()};
+    var previousResponse=migrationTrackedRoute_(previousRequest,{name:'Synthetic Native Teacher'},function(){return migrationProbeNativeApp_.request(book,previousRequest);},tracking,book).getContent();
+    if(!JSON.parse(previousResponse).ok)throw new Error('PROBE_SOURCE_RECEIPT_SETUP_FAILED');
     // This row deliberately mixes types that ordinary setValues can coerce.
     var sheet=book.getSheetByName('공유링크'),typedId='native-primary-types-v1',rows=sheet.getDataRange().getValues(),typedRow=0;
     for(var ri=1;ri<rows.length;ri++)if(rows[ri][0]===typedId)typedRow=ri+1;
@@ -33,6 +36,7 @@ function probeNativeFirebasePrimary() {
     while(migrationVerifyPrimaryStep_().status!=='COMPLETE'){}
     if(migrationActivatePrimary_().activeBackend!=='FIRESTORE')throw new Error('PROBE_ACTIVATION_FAILED');
     function post(body){var result=JSON.parse(migrationProbeNativeApp_.request(book,Object.assign({staffToken:'SYNTHETIC_NATIVE_SESSION'},body)).getContent());if(!result.ok)throw new Error('PROBE_BUSINESS_REQUEST_FAILED:'+String(result.error));return result;}
+    if(migrationHash_(post(previousRequest))!==migrationHash_(JSON.parse(previousResponse)))throw new Error('PROBE_CUTOVER_RECEIPT_MISSING');
     var request={action:'addLink',operationId:'native-primary-create-'+primary.epoch,title:'Synthetic primary acceptance',department:'Test',url:'https://example.com/primary/'+primary.epoch};
     var before=sheet.getLastRow(),created=post(request);if(migrationHash_(created)!==migrationHash_(post(request))||sheet.getLastRow()!==before)throw new Error('PROBE_WRITE_RETRY_OR_ISOLATION_FAILED');
     var cold=Date.now();post({action:'listLinks'});cold=Date.now()-cold;var requests=repo.metrics.requests,warm=Date.now();post({action:'listLinks'});warm=Date.now()-warm;
@@ -45,9 +49,10 @@ function probeNativeFirebasePrimary() {
     if(denied.ok)throw new Error('PROBE_FROZEN_WRITE_ALLOWED');
     var returned;do{returned=migrationCompleteReturn_();}while(returned.status==='PROGRESS');
     if(returned.activeBackend!=='SHEETS'||migrationHash_(post({action:'listLinks'}))!==expected||sheet.getLastRow()!==before)throw new Error('PROBE_RETURN_MISMATCH');
+    if(migrationHash_(post(request))!==migrationHash_(created)||sheet.getLastRow()!==before)throw new Error('PROBE_RETURN_RECEIPT_MISSING');
     var actual=sheet.getDataRange().getValues().filter(function(r){return r[0]===typedId;});
     if(actual.length!==1||migrationHash_(actual[0])!==migrationHash_(typed[0]))throw new Error('PROBE_TYPED_RETURN_MISMATCH');
-    output={ok:true,dataset:'SYNTHETIC_ONLY',checks:['earlyDrainRejected','all22ResourcesVerified','primaryCreate','receiptReplay','sourceUnchangedUntilBackup','cachedRead','changedResourceBackup','primaryDelete','frozenWriteRejected','verifiedSheetsReturn','leadingZerosBooleanNumberDatePreserved'],productionChanged:false,realDrainWaitPerformed:false,elapsedMillis:Date.now()-start,coldMillis:cold,warmMillis:warm};
+    output={ok:true,dataset:'SYNTHETIC_ONLY',checks:['earlyDrainRejected','all22ResourcesVerified','primaryCreate','receiptReplay','sourceUnchangedUntilBackup','cachedRead','changedResourceBackup','primaryDelete','frozenWriteRejected','verifiedSheetsReturn','leadingZerosBooleanNumberDatePreserved','sheetsReceiptAfterCutover','primaryReceiptAfterReturn'],productionChanged:false,realDrainWaitPerformed:false,elapsedMillis:Date.now()-start,coldMillis:cold,warmMillis:warm};
   }finally{migrationOperationsBook_=originalBook;restore(saved);keys.forEach(function(k){if(props.getProperty(k)!==saved[k])throw new Error('PROBE_CONFIG_RESTORE_FAILED');});props.deleteProperty(restoreKey);}
   console.log(JSON.stringify(output));return output;
 }
