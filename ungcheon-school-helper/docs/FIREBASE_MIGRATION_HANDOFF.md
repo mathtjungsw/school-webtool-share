@@ -1,8 +1,15 @@
-## 2026-11-13 17:25 진행 상태 — 현재 작업을 계속한다
+## 2026-11-13 18:01 최종 상태 — 승인된 1~5단계 완료
 
-- 아래 16:41 이전 기록은 이력이다. 현재 운영은 **@93/service67**, main `33323b13`, 추적 활성화/5분 트리거 유지, 원본 **SHEETS**다.17:08:24 service67 구조 준비 완료. 실제 R0 ref `519621bd016fddeab1069535c22f61514b76c780e366f52a27936e81200c5a75`의75페이지와 이후 변경2건 모두 Firestore 저장·검증·게시 완료.17:24:35 조회용22자료 R0도 게시했고 revision2까지 조회용 변경을 반영 중이다.22자료/13응답 전수 대조는 이어서 진행한다.
-- 후보67은 별도 시험 저장의 변경 알림 속성을 root와 함께 원자적으로 보존하고, 해당 요청에서 기존 시트 잠금을 점유하지 않도록 개선했다. 실제 Google 합성 셀은 참·거짓을 `TRUE`/`FALSE`로 표시함을16:58:00 확인해 조회 facade/fixture에 반영했다. 날짜 표시 형식은 명시적 미지원 오류이며 실제 자료 대조에서 영향을 확인한다.
-- service67 backend9개 시험 그룹과 전체 typecheck exit0. `rehearsalEpochs.properties`를 포함한11개 필드 인덱스 제외 적용/읽기 확인. 기존 배포 명령의 모든 가드와 증거발행을 통과했다. 읽기 전용 metadata 도구는 `scripts/inspect-migration-mirror.cjs`, 최신 세부 기록은 `docs/firebase-migration/2026-11-13-production-rollout.md`.
+- **기본 원본/일반 PC·모바일 조회·저장은 계속 SHEETS**다. 1~5는 운영 준비, 추적·자동동기화, 실제 자료 복제, 공용 Firestore 시험 조회·분리 저장, 자료/응답 대조·복구 시험까지다. **최종 주 저장소 전환(6)은 별도 지시 전 하지 않는다.** 모바일 일반 요청이 이미 Firebase로 바뀌었다고 설명하지 않는다.
+- 운영 고정 배포 **@94 / service68**, 소스 main `a892e47c`. 18개 모듈 local=HEAD=live, health68, 기존 배포 가드·RecordEvidenceOnly 통과. URL·세션·비밀번호·공개 규칙·과금 설정을 변경하지 않았다. 이후 문서만 갱신한다.
+- 추적 활성화16:19, **5분 자동 동기화 트리거1개 유지**. 실제 R0 ref `519621bd016fddeab1069535c22f61514b76c780e366f52a27936e81200c5a75`의75페이지와 revision1~3 변경분 모두 저장·재검증·게시. 조회용 serving도 revision3/SHADOW.
+- **22종 2,425행 전수 typed 해시 일치(17:54:42), 13개 실제 업무 조회 응답 일치(18:00:20)**. 날짜형108셀 보존, 수식0셀.18:01:20 상태: 원본3/복제3, pending0/error0/blocked없음/pausedfalse, 자동 작업 최근17:57:56 IDLE. 이는 해당 시점의 확인 결과다.
+- 실제 날짜 셀의 표시값 의존으로 발생한 변경 감지 오류를 합성/실제 시험에서 재현했고, service68에서 실제 값의 JSON 기준으로 보완해 getSyncManifest까지 통과했다. 일반적인 날짜 표시 형식 재현을 구현한 것은 아니며 업무 경로의 해당 의존을 제거했다.
+- 공용 인증을 거치는 관리자 `previewMigrationRequest`의 READ/REHEARSAL/REHEARSAL_READ와 요청별 원본 복귀가 구현됐다. 별도 합성 Google 시험에서 실제 업무 분기 생성·삭제·재조회·중복응답·원본 불변 확인. 경쟁 CAS/응답 유실/권한 거절/모바일 계약은 합성 회귀 검사, 복제 중단·재개/불확실 작업 복구·복귀 무효화는 앞선 실제 합성 시험에서 검증했다. **실제 사용자로 로그인한 PC·휴대폰 HTTP/화면 시험은 수행하지 않았다.** 소유자 응답 대조 결과는 authenticatedTransportTest=false다.
+- 전체 typecheck exit0(backend10그룹, 모바일24, 배포가드56 포함). 캐시 없는 Firestore 함수 조회가 시트보다 느린 항목이 있다. 최종 학생시간표1,086ms/2,071ms, 공유NEIS2,090ms/4,615ms(Sheets/Firestore). 앱 캐시·로그인 HTTP 왕복·실기기 체감 측정은 아니다. 즉시 속도 향상이나 무중단을 보장하지 않는다. 다음 실제 전환 작업에서는 필요한 조회의 성능/캐시와 실기기 인증 경로를 함께 확인한다.
+- 원본이 계속 쓰기 기준인 단계이므로 별도 저장 리허설 결과를 운영 원본으로 승격하지 않는다. 최종 전환은 단순 설정 변경만 남았다는 의미가 아니다. 운영 쓰기 기준 전환·복귀 경계를 구현/적용하고 재검증해야 한다. 추적 없는 구버전 복귀 전에는 복제 기준 무효화가 필요하며 이력/원본은 삭제하지 않는다.
+- 자세한 결과·한계·성능 표: [운영 적용 기록](firebase-migration/2026-11-13-production-rollout.md). 원문 행 없는 증거는 worktree `out/production-verification-summary.json`, `out/production-final-status.txt`, `out/production-*-verification.txt`. 읽기 전용 상태 조회 `node scripts/inspect-migration-mirror.cjs`. 새 OAuth 승인이나 복제 기준 재생성은 필요 없다.
+- 작업트리 `C:/Users/codex/.codex/worktrees/ungcheon-firebase-migration-20261113/ungcheon-school-helper`, 브랜치 `codex/firebase-migration-20261113`. 원래 사용자 프로젝트의 코드 변경은 보존하고 인계·검증 문서만 전달했다.
 
 ### 16:41 이전 기록
 
