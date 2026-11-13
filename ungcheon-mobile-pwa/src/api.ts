@@ -27,7 +27,7 @@ export function isSessionExpiredError(error: unknown): error is MobileSessionExp
   return error instanceof MobileSessionExpiredError
 }
 
-export const MOBILE_RESOURCE_KEYS: MobileResourceKey[] = ['weekly', 'creative', 'gateDuty', 'mealDuty', 'timetable', 'committee', 'changes', 'meals', 'attendance']
+export const MOBILE_RESOURCE_KEYS: MobileResourceKey[] = ['weekly', 'creative', 'gateDuty', 'mealDuty', 'timetable', 'committee', 'changes', 'overrides', 'meals', 'attendance']
 
 export function friendlyLoginError(error: unknown) {
   const message = error instanceof Error ? error.message : ''
@@ -105,6 +105,7 @@ function countResource(bundle: MobileScheduleBundle, key: MobileResourceKey) {
   if (key === 'timetable') return bundle.teacherTimetable ? 1 : 0
   if (key === 'committee') return bundle.committeeEvents.length
   if (key === 'changes') return bundle.timetableChanges.length
+  if (key === 'overrides') return bundle.timetableOverrides?.length ?? 0
   if (key === 'attendance') return bundle.attendanceSummaries?.length ?? 0
   return bundle.meals !== undefined ? bundle.meals.length : bundle.todayMeals.length
 }
@@ -126,6 +127,7 @@ function normalizeBundle(bundle: MobileScheduleBundle): MobileScheduleBundle {
     events: bundle.events ?? [],
     committeeEvents: bundle.committeeEvents ?? [],
     timetableChanges: bundle.timetableChanges ?? [],
+    timetableOverrides: bundle.timetableOverrides ?? [],
     attendanceSummaries: bundle.attendanceSummaries ?? [],
     todayMeals: bundle.todayMeals ?? [],
     meals: bundle.meals ?? bundle.todayMeals ?? [],
@@ -210,6 +212,7 @@ export function mergeDashboardWithCache(freshPayload: DashboardPayload, previous
       fresh.changes = previous.changes
       freshBundle.timetableChanges = previousBundle.timetableChanges
     }
+    if (key === 'overrides') freshBundle.timetableOverrides = previousBundle.timetableOverrides
     if (key === 'attendance') freshBundle.attendanceSummaries = previousBundle.attendanceSummaries
     if (key === 'meals') {
       freshBundle.meals = previousBundle.meals ?? previousBundle.todayMeals

@@ -49,6 +49,20 @@ describe('로그인 오류 안내', () => {
   it('오프라인 캐시는 모든 출처를 이전 자료로 표시한다', () => {
     const cached = markDashboardCached(payload({ events:[], teacherTimetable:null, committeeEvents:[], timetableChanges:[], todayMeals:[], fetchedAt:'2026-08-30T00:00:00Z' }))
     expect(Object.values(cached.bundle?.sourceStatus ?? {}).every(status => status.state === 'cached')).toBe(true)
+    expect(cached.bundle?.sourceStatus?.overrides?.state).toBe('cached')
+  })
+
+  it('일일 시간표 예외의 실제 조회 상태와 실패 시 이전 자료를 보존한다', () => {
+    const override = { id:'test-override', date:'2026-11-13', targetGrade:'3', targetClass:'', targetPeriod:1, action:'clear' as const, sourceDate:'', sourcePeriod:0, note:'합성 시험', active:true, createdBy:'시험', createdAt:'2026-11-12T00:00:00Z', updatedAt:'2026-11-12T00:00:00Z' }
+    const status = { state:'fresh' as const, mode:'live' as const, lastAttemptAt:'2026-11-13T10:00:00Z', lastSuccessAt:'2026-11-13T10:00:00Z', itemCount:1 }
+    const previous = payload({ events:[], teacherTimetable:null, committeeEvents:[], timetableChanges:[], timetableOverrides:[override], todayMeals:[], fetchedAt:status.lastAttemptAt, sourceStatus:{ overrides:status } })
+    expect(mergeDashboardWithCache(previous, null).bundle?.sourceStatus?.overrides).toEqual(status)
+    const failed = payload({ events:[], teacherTimetable:null, committeeEvents:[], timetableChanges:[], timetableOverrides:[], todayMeals:[], fetchedAt:'2026-11-13T10:05:00Z', sourceStatus:{ overrides:{ state:'unavailable', mode:'live', lastAttemptAt:'2026-11-13T10:05:00Z', itemCount:0, errorCode:'READ_FAILED' } } })
+    const merged = mergeDashboardWithCache(failed, previous)
+    expect(merged.bundle?.timetableOverrides).toEqual([override])
+    expect(merged.bundle?.sourceStatus?.overrides).toMatchObject({ state:'cached', lastSuccessAt:status.lastSuccessAt, lastAttemptAt:failed.bundle?.fetchedAt })
+    const empty = payload({ ...failed.bundle!, sourceStatus:{ overrides:{ ...status, state:'empty', itemCount:0 } } })
+    expect(mergeDashboardWithCache(empty, previous).bundle?.timetableOverrides).toEqual([])
   })
 
   it('출결 출처만 실패하면 이전 수강생 출결을 유지한다', () => {
