@@ -55,6 +55,11 @@ test('native TRUE/FALSE display preserves timetable override change-detection ha
   const reader=f.ctx.migrationServingReader_(f.repo,f.ref),facade=f.ctx.migrationSnapshotBook_(reader,f.book.getId(),false)
   assert.equal(facade.book.getSheetByName('일일시간표예외').getRange(2,10).getDisplayValues()[0][0],'TRUE')
 })
+test('native date cells preserve timetable override change detection without display formatting',()=>{
+  const f=setup(g=>{const date=vm.runInContext("new Date('2026-11-12T15:00:00.000Z')",g.ctx);g.book.getSheetByName('일일시간표예외').appendRow(['synthetic-date-override',date,'3','',1,'clear','',0,'Synthetic',true,'Synthetic',date,date])})
+  const expected=f.post({action:'getSyncManifest'}),actual=JSON.parse(f.read({action:'getSyncManifest'}).response.getContent())
+  assert.equal(actual.ok,true,actual.error);assert.deepEqual(normalize(actual),normalize(expected))
+})
 test('real create/update/delete rehearsal commits atomically without touching Sheets, properties or journal',()=>{
   const f=setup(),events=f.book.events.length,properties=JSON.stringify([...f.properties])
   const first=f.write({action:'addFeatureRequest',operationId:'rehearsal-create',requestType:'improvement',title:'Synthetic request',content:'Synthetic content',author:'Synthetic Teacher'})

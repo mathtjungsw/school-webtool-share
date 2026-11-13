@@ -87,3 +87,24 @@
 - 실제 Google 합성 셀 표시 검증16:58:00 성공: TRUE/FALSE/0/12.5/12. 입력 문자열00012는 Google에서 숫자12로 변환됐다. boolean 표시 보정과 변경 manifest 대조 시험을 추가했다. 날짜 표시 형식은 추정하지 않고 오류로 처리하며 실제 운영 조회 대조가 필요하다.
 - 16:49:41 R0는12/22자료·36페이지,16:56:08은13/22자료·50페이지.16:58:03 수동 호출은 BUSY_OR_PAUSED로 중복 작업 없이 종료했다. 실제 R0완료를 의미하지 않는다.
 - 11번째 인덱스 제외 `rehearsalEpochs.properties` 적용/읽기 확인. 기존10개는 추가 변경 없이 유지됐다.
+
+## 17:10 서비스67 운영 배포 / R0 준비 완료
+
+- main `33323b13` 반영 후 기존 배포 명령이 모든 가드를 통과하여 **@93/service67** 배포와 비공개 증거 발행을 완료했다. URL·세션·속성을 초기화하지 않았다. 전체 typecheck exit0, backend9그룹/모바일24/배포가드56 통과.
+- `primeMigrationSchema`가17:07:54~17:08:24 완료됐다. 운영 변경 기록 경유, sourceOfTruth=SHEETS 유지.
+- 실제 학교 R0 기준 사본 생성 **17:09:18 완료**. 기준 revision0, ref `519621bd016fddeab1069535c22f61514b76c780e366f52a27936e81200c5a75`. 이는 원본 내 불변 사본 준비 완료이며 Firestore 전체 복제/대조 완료를 뜻하지 않는다. 이어서 archive 저장/읽기 검증을 시작했다.
+- `inspect-migration-mirror.cjs`는 고정 학교 namespace의 진행 메타데이터만 field mask로 조회한다. 행 payload·로그인 속성은 읽지 않으며 Firestore에 쓰지 않는다.
+
+## 17:24 실제 Firestore 복제 완료 / 조회용 사본 구성 중
+
+- 실제 R0의75페이지 모두 STAGING→읽기 검증→PUBLISHED 완료. 이후 revision1·2 각1페이지의 변경분도 저장/검증/게시 완료했다.17:23:51 메타데이터 조회에서 archive appliedRevision2/MIRRORING 확인.
+- 운영 실행 로그는 원문 행 없이 `out/production-execution-evidence.txt`, 고정경로 읽기 전용 메타데이터는 `out/migration-mirror-status.json`에 보존한다.
+- 현재 조회용 serving 사본의 최초 구성을 실행 중이며 아직 전체22자료/13응답 전수 대조 전이다. 일반 PC·모바일은 SHEETS를 계속 사용한다.
+
+## 17:40 실제 자료 전수 일치 / 날짜 변경 감지 보완
+
+-17:24:35 조회용22자료의 R0 게시 완료,17:25:28 조회용 revision2 게시 완료. archive와 serving 모두 revision2/SHEETS.
+-17:33:20 실제 운영22자료의 전체 typed capture 해시·건수 대조 완료. 학생시간표412행, 학생명렬624행, 교원명렬66행, 학급시간표1,164행을 포함한다. 수식 셀은0개이며 날짜형 셀도 원형 그대로 일치했다.
+- 날짜 셀이 있는 시간표 예외의 getSyncManifest가 display-format 미지원 오류를 내는 사례를 합성 회귀 검사로 재현했다. 후보68은 해당 변경 감지 해시만 `getDisplayValues()`에서 `getValues()`의 JSON으로 변경한다. Date는 ISO로 직렬화되므로 시트 지역/표시 형식에 의존하지 않는다. 화면 표시 자체는 변경하지 않으며 변경 토큰이 한 번 갱신될 수 있다. 클라이언트는 토큰을 불투명 문자열로 비교한다.
+- 보호된 데스크톱 함수 변경을 명시적으로 검토했다. 배포 가드나 business 비교 예외는 수정하지 않았다. 후보 backend10그룹/모바일24/시간표변경allowlist 검사 통과. main 반영 후 전체 typecheck와 고정배포 검사를 수행한다.
+- 실제 업무 응답은 순서대로 대조 중. 최초 캐시 없는 서버 함수 측정 예: 학생시간표 Sheets1,234ms/Firestore4,943ms, 교사시간표1,871ms/1,513ms. 네트워크 왕복·사용자 화면·기존 앱 캐시를 포함하는 체감 속도 수치가 아니며 모든 조회가 빨라졌다고 주장하지 않는다. 최종 기본 저장소 전환은 아직 수행하지 않는다.
