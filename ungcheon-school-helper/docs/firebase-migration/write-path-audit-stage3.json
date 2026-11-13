@@ -1,0 +1,902 @@
+{
+  "baseline": "80f12b0179e55d1b46106d3e3c7ebca18a2afc1b",
+  "sourceOnly": true,
+  "files": [
+    "server/Code.gs",
+    "server/StaffAuth.gs"
+  ],
+  "internalWriterDeclaration": {
+    "source": "user",
+    "date": "2026-11-13",
+    "value": "업무도우미에서만 수정",
+    "externalInputSheetsExcluded": true
+  },
+  "duplicateDefinitions": [
+    {
+      "name": "replaceSheetRows_",
+      "definitions": [
+        {
+          "file": "Code.gs",
+          "line": 2908
+        },
+        {
+          "file": "Code.gs",
+          "line": 3052
+        }
+      ],
+      "effectiveLine": 3052
+    }
+  ],
+  "directSheetWriters": [
+    {
+      "name": "ensureSheets_",
+      "file": "Code.gs",
+      "line": 1292,
+      "sheetWrites": [
+        "insertSheet",
+        "appendRow",
+        "insertColumnsAfter",
+        "setValues"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "LINKS_SHEET",
+        "NOTICES_SHEET",
+        "FEATURE_REQUESTS_SHEET",
+        "TIMETABLE_META_SHEET",
+        "TIMETABLE_SHEET",
+        "STUDENT_TIMETABLE_META_SHEET",
+        "STUDENT_TIMETABLE_SHEET",
+        "STAFF_ROSTER_META_SHEET",
+        "STAFF_ROSTER_SHEET",
+        "STUDENT_ROSTER_META_SHEET",
+        "STUDENT_ROSTER_SHEET",
+        "STAFF_CHECKLISTS_SHEET",
+        "STAFF_CHECKLIST_RESPONSES_SHEET",
+        "COMMITTEE_MEMBERS_SHEET",
+        "COMMITTEE_EVENTS_SHEET",
+        "TIMETABLE_CHANGES_SHEET",
+        "NEIS_SYNC_META_SHEET",
+        "NEIS_MEALS_SHEET",
+        "NEIS_SCHEDULE_SHEET",
+        "NEIS_CLASS_TIMETABLE_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": [
+        "migrateStaffRosterFileOrder1_1_37_",
+        "sourceLock_",
+        "ensureReleaseNotices_"
+      ]
+    },
+    {
+      "name": "ensureDataSheet_",
+      "file": "Code.gs",
+      "line": 1450,
+      "sheetWrites": [
+        "insertSheet",
+        "insertColumnsAfter",
+        "setValues"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "ensureTimetableOverrideSheets_",
+      "file": "Code.gs",
+      "line": 1462,
+      "sheetWrites": [
+        "setValues"
+      ],
+      "propertyWrites": [
+        "setProperty"
+      ],
+      "candidateSheetConstants": [
+        "TIMETABLE_OVERRIDES_SHEET",
+        "TIMETABLE_OVERRIDE_HISTORY_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "appendTimetableOverrideHistory_",
+      "file": "Code.gs",
+      "line": 1533,
+      "sheetWrites": [
+        "appendRow"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "TIMETABLE_OVERRIDE_HISTORY_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "saveTimetableOverride_",
+      "file": "Code.gs",
+      "line": 1539,
+      "sheetWrites": [
+        "setValues",
+        "appendRow"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "TIMETABLE_OVERRIDES_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "deactivateTimetableOverride_",
+      "file": "Code.gs",
+      "line": 1570,
+      "sheetWrites": [
+        "setValue"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "TIMETABLE_OVERRIDES_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "ensureStaffAssignments2026_",
+      "file": "Code.gs",
+      "line": 1589,
+      "sheetWrites": [
+        "setNumberFormat",
+        "setValues"
+      ],
+      "propertyWrites": [
+        "setProperty"
+      ],
+      "candidateSheetConstants": [
+        "STAFF_ROSTER_SHEET",
+        "STAFF_ROSTER_META_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "migrateStaffName1_1_30_",
+      "file": "Code.gs",
+      "line": 1625,
+      "sheetWrites": [
+        "setValues"
+      ],
+      "propertyWrites": [
+        "setProperty"
+      ],
+      "candidateSheetConstants": [
+        "STAFF_ROSTER_SHEET",
+        "TIMETABLE_SHEET",
+        "STAFF_ROSTER_META_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "repairStaffHomeroomCells_",
+      "file": "Code.gs",
+      "line": 1678,
+      "sheetWrites": [
+        "setNumberFormat",
+        "setValues"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "STAFF_ROSTER_SHEET",
+        "STAFF_ROSTER_META_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "repairTimetableChangeClassCells_",
+      "file": "Code.gs",
+      "line": 1714,
+      "sheetWrites": [
+        "setNumberFormat",
+        "setValues"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "TIMETABLE_CHANGES_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "ensureReleaseNotices_",
+      "file": "Code.gs",
+      "line": 1734,
+      "sheetWrites": [
+        "clearContent",
+        "deleteRow",
+        "appendRow"
+      ],
+      "propertyWrites": [
+        "setProperty"
+      ],
+      "candidateSheetConstants": [
+        "NOTICES_SHEET"
+      ],
+      "acquiresScriptLock": true,
+      "flushesSheets": false,
+      "reachableLockFunctions": [
+        "ensureReleaseNotices_",
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "addLink_",
+      "file": "Code.gs",
+      "line": 1832,
+      "sheetWrites": [
+        "appendRow"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "LINKS_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "addNotice_",
+      "file": "Code.gs",
+      "line": 1870,
+      "sheetWrites": [
+        "appendRow"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "NOTICES_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "addFeatureRequest_",
+      "file": "Code.gs",
+      "line": 1910,
+      "sheetWrites": [
+        "appendRow"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "FEATURE_REQUESTS_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "updateFeatureRequest_",
+      "file": "Code.gs",
+      "line": 1926,
+      "sheetWrites": [
+        "setValue"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "FEATURE_REQUESTS_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "replaceTimetable_",
+      "file": "Code.gs",
+      "line": 1984,
+      "sheetWrites": [
+        "clearContent",
+        "setValues"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "TIMETABLE_META_SHEET",
+        "TIMETABLE_SHEET"
+      ],
+      "acquiresScriptLock": true,
+      "flushesSheets": false,
+      "reachableLockFunctions": [
+        "replaceTimetable_",
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "replaceStudentTimetable_",
+      "file": "Code.gs",
+      "line": 2061,
+      "sheetWrites": [
+        "clearContent",
+        "setValues"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "STUDENT_TIMETABLE_META_SHEET",
+        "STUDENT_TIMETABLE_SHEET"
+      ],
+      "acquiresScriptLock": true,
+      "flushesSheets": false,
+      "reachableLockFunctions": [
+        "replaceStudentTimetable_",
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "replaceStaffRoster_",
+      "file": "Code.gs",
+      "line": 2214,
+      "sheetWrites": [
+        "setNumberFormat"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "STAFF_ROSTER_SHEET",
+        "STAFF_ROSTER_META_SHEET"
+      ],
+      "acquiresScriptLock": true,
+      "flushesSheets": false,
+      "reachableLockFunctions": [
+        "replaceStaffRoster_",
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "migrateStaffRoster1_1_31_",
+      "file": "Code.gs",
+      "line": 2292,
+      "sheetWrites": [
+        "setNumberFormat"
+      ],
+      "propertyWrites": [
+        "setProperty"
+      ],
+      "candidateSheetConstants": [
+        "STAFF_ROSTER_SHEET",
+        "STAFF_ROSTER_META_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "migrateStaffRosterFileOrder1_1_37_",
+      "file": "Code.gs",
+      "line": 2334,
+      "sheetWrites": [
+        "setName",
+        "copyTo",
+        "setNumberFormat"
+      ],
+      "propertyWrites": [
+        "setProperty"
+      ],
+      "candidateSheetConstants": [
+        "STAFF_ROSTER_SHEET",
+        "STAFF_ROSTER_META_SHEET"
+      ],
+      "acquiresScriptLock": true,
+      "flushesSheets": false,
+      "reachableLockFunctions": [
+        "migrateStaffRosterFileOrder1_1_37_",
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "addStaffChecklist_",
+      "file": "Code.gs",
+      "line": 2518,
+      "sheetWrites": [
+        "appendRow"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "STAFF_CHECKLISTS_SHEET"
+      ],
+      "acquiresScriptLock": true,
+      "flushesSheets": false,
+      "reachableLockFunctions": [
+        "addStaffChecklist_",
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "updateStaffChecklist_",
+      "file": "Code.gs",
+      "line": 2590,
+      "sheetWrites": [
+        "setValues"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "STAFF_CHECKLISTS_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "submitStaffChecklist_",
+      "file": "Code.gs",
+      "line": 2662,
+      "sheetWrites": [
+        "setValues",
+        "appendRow"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "STAFF_CHECKLISTS_SHEET",
+        "STAFF_CHECKLIST_RESPONSES_SHEET"
+      ],
+      "acquiresScriptLock": true,
+      "flushesSheets": false,
+      "reachableLockFunctions": [
+        "submitStaffChecklist_",
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "repairCommitteeTimeCells_",
+      "file": "Code.gs",
+      "line": 2749,
+      "sheetWrites": [
+        "setNumberFormat",
+        "setValues"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "COMMITTEE_EVENTS_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "saveCommitteeMembers_",
+      "file": "Code.gs",
+      "line": 2811,
+      "sheetWrites": [
+        "setValues",
+        "appendRow"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "COMMITTEE_MEMBERS_SHEET"
+      ],
+      "acquiresScriptLock": true,
+      "flushesSheets": false,
+      "reachableLockFunctions": [
+        "saveCommitteeMembers_",
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "addCommitteeEvent_",
+      "file": "Code.gs",
+      "line": 2843,
+      "sheetWrites": [
+        "setNumberFormat",
+        "appendRow"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "COMMITTEE_EVENTS_SHEET"
+      ],
+      "acquiresScriptLock": true,
+      "flushesSheets": false,
+      "reachableLockFunctions": [
+        "addCommitteeEvent_",
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "replaceSheetRows_",
+      "file": "Code.gs",
+      "line": 3052,
+      "sheetWrites": [
+        "clearContent",
+        "setValues"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "deleteRowsByValue_",
+      "file": "Code.gs",
+      "line": 2945,
+      "sheetWrites": [
+        "deleteRow"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "deleteRowById_",
+      "file": "Code.gs",
+      "line": 3132,
+      "sheetWrites": [
+        "deleteRow"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "createTimetableChange_",
+      "file": "Code.gs",
+      "line": 3179,
+      "sheetWrites": [
+        "setNumberFormat",
+        "appendRow"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "TIMETABLE_CHANGES_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "respondTimetableChange_",
+      "file": "Code.gs",
+      "line": 3213,
+      "sheetWrites": [
+        "setValue"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "TIMETABLE_CHANGES_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "applyTimetableChangeForRequester_",
+      "file": "Code.gs",
+      "line": 3263,
+      "sheetWrites": [
+        "setValue"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "TIMETABLE_CHANGES_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    },
+    {
+      "name": "cancelTimetableChange_",
+      "file": "Code.gs",
+      "line": 3296,
+      "sheetWrites": [
+        "setValue"
+      ],
+      "propertyWrites": [],
+      "candidateSheetConstants": [
+        "TIMETABLE_CHANGES_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false,
+      "reachableLockFunctions": []
+    }
+  ],
+  "propertyOnlyWriters": [
+    {
+      "name": "executiveAudit_",
+      "file": "Code.gs",
+      "line": 1151,
+      "sheetWrites": [],
+      "propertyWrites": [
+        "setProperty"
+      ],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false
+    },
+    {
+      "name": "executiveInvalidateSessions_",
+      "file": "Code.gs",
+      "line": 1157,
+      "sheetWrites": [],
+      "propertyWrites": [
+        "deleteProperty"
+      ],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false
+    },
+    {
+      "name": "executiveVerify_",
+      "file": "Code.gs",
+      "line": 1175,
+      "sheetWrites": [],
+      "propertyWrites": [
+        "setProperty"
+      ],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false
+    },
+    {
+      "name": "executiveChangePassword_",
+      "file": "Code.gs",
+      "line": 1219,
+      "sheetWrites": [],
+      "propertyWrites": [
+        "setProperty"
+      ],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false
+    },
+    {
+      "name": "executiveResetPassword_",
+      "file": "Code.gs",
+      "line": 1230,
+      "sheetWrites": [],
+      "propertyWrites": [
+        "deleteProperty"
+      ],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false
+    },
+    {
+      "name": "getSyncManifest_",
+      "file": "Code.gs",
+      "line": 1238,
+      "sheetWrites": [],
+      "propertyWrites": [
+        "setProperty"
+      ],
+      "candidateSheetConstants": [
+        "TIMETABLE_META_SHEET",
+        "STUDENT_TIMETABLE_META_SHEET",
+        "STAFF_ROSTER_META_SHEET",
+        "STUDENT_ROSTER_META_SHEET",
+        "NEIS_SYNC_META_SHEET",
+        "STAFF_CHECKLISTS_SHEET",
+        "STAFF_CHECKLIST_RESPONSES_SHEET",
+        "TIMETABLE_CHANGES_SHEET"
+      ],
+      "acquiresScriptLock": false,
+      "flushesSheets": false
+    },
+    {
+      "name": "initialSetup",
+      "file": "Code.gs",
+      "line": 1280,
+      "sheetWrites": [],
+      "propertyWrites": [
+        "setProperty"
+      ],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false
+    },
+    {
+      "name": "touchSyncResource_",
+      "file": "Code.gs",
+      "line": 1441,
+      "sheetWrites": [],
+      "propertyWrites": [
+        "setProperty"
+      ],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false
+    },
+    {
+      "name": "registerNeisSyncDevice_",
+      "file": "Code.gs",
+      "line": 2979,
+      "sheetWrites": [],
+      "propertyWrites": [
+        "setProperty",
+        "deleteProperty"
+      ],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false
+    },
+    {
+      "name": "revokeNeisSyncDevice_",
+      "file": "Code.gs",
+      "line": 2994,
+      "sheetWrites": [],
+      "propertyWrites": [
+        "deleteProperty"
+      ],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false
+    },
+    {
+      "name": "mobileCreateSession_",
+      "file": "Code.gs",
+      "line": 3357,
+      "sheetWrites": [],
+      "propertyWrites": [
+        "deleteProperty",
+        "setProperty"
+      ],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false
+    },
+    {
+      "name": "staffAuthAction_",
+      "file": "StaffAuth.gs",
+      "line": 24,
+      "sheetWrites": [],
+      "propertyWrites": [
+        "deleteProperty",
+        "setProperty"
+      ],
+      "candidateSheetConstants": [],
+      "acquiresScriptLock": false,
+      "flushesSheets": false
+    }
+  ],
+  "lockFunctions": [
+    {
+      "name": "ensureReleaseNotices_",
+      "file": "Code.gs",
+      "line": 1734,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "replaceTimetable_",
+      "file": "Code.gs",
+      "line": 1984,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "replaceStudentTimetable_",
+      "file": "Code.gs",
+      "line": 2061,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "replaceStaffRoster_",
+      "file": "Code.gs",
+      "line": 2214,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "migrateStaffRosterFileOrder1_1_37_",
+      "file": "Code.gs",
+      "line": 2334,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "replaceStudentRoster_",
+      "file": "Code.gs",
+      "line": 2407,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "addStaffChecklist_",
+      "file": "Code.gs",
+      "line": 2518,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "submitStaffChecklist_",
+      "file": "Code.gs",
+      "line": 2662,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "deleteStaffChecklist_",
+      "file": "Code.gs",
+      "line": 2705,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "saveCommitteeMembers_",
+      "file": "Code.gs",
+      "line": 2811,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "addCommitteeEvent_",
+      "file": "Code.gs",
+      "line": 2843,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "getNeisSnapshot_",
+      "file": "Code.gs",
+      "line": 3015,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "replaceNeisSnapshot_",
+      "file": "Code.gs",
+      "line": 3062,
+      "nestedLockCandidates": [
+        "sourceLock_"
+      ]
+    },
+    {
+      "name": "sourceLock_",
+      "file": "Code.gs",
+      "line": 4093,
+      "nestedLockCandidates": []
+    }
+  ],
+  "readRouteMutationCandidates": [
+    "getStaffRoster",
+    "getSyncManifest"
+  ],
+  "integrationRequirements": [
+    "Authenticate and validate before preparing a journal entry; retain all existing authorization checks.",
+    "Track schema/notice/roster repair writes, not just explicitly named save actions.",
+    "Replace every participating legacy script lock with one execution-aware common lock; do not wrap existing locks blindly.",
+    "Keep credential/session property writes outside migration payloads; do not export or reset them.",
+    "Persist intent before source writes; uncertain source outcomes require inspection, never automatic source replay.",
+    "Capture bounded affected resources or row IDs; no full-workbook download per save.",
+    "Inventory live triggers separately; static reachability and user declaration do not prove trigger absence."
+  ],
+  "limitations": [
+    "Potential writes are conservative static matches, not a proof of runtime execution.",
+    "Candidate sheet constants may include reads; aliases and dynamic dispatch require manual review.",
+    "The last duplicate definition is reported; duplicate declarations are not rewritten.",
+    "No live tracking, source mutation, trigger installation or backend switch is performed."
+  ]
+}

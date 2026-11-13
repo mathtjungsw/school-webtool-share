@@ -31,6 +31,7 @@ test('Desktop read activates only the one-time roster migration', () => {
   const sandbox = { action: 'getStaffRoster', STAFF_ROSTER_FILE_ORDER_1_1_37_KEY: 'sequence-applied',
     PropertiesService: { getScriptProperties: () => ({ getProperty: () => applied ? 'true' : null }) },
     SpreadsheetApp: { getActiveSpreadsheet: () => ({}) },
+    sourceBook_: () => ({}),
     migrateStaffRosterFileOrder1_1_37_: () => { migrations++; applied = true },
     getStaffRoster_: () => ({ members: [] }), json_: value => value }
   const run = () => vm.runInNewContext('(function() {' + route + '})()', sandbox)
@@ -100,7 +101,7 @@ const context = vm.createContext({ console: undefined, Number, Date, Object,
 for (const name of ['STAFF_ROSTER_SHEET', 'STAFF_ROSTER_META_SHEET', 'STAFF_ROSTER_FILE_ORDER_1_1_37_KEY', 'STAFF_ROSTER_FILE_ORDER_20261008']) {
   vm.runInContext(`const ${name}=${JSON.stringify(server.constants.get(name))};`, context)
 }
-for (const name of ['normalizeStaffHomeroom_', 'ensureDataSheet_', 'replaceSheetRows_', 'migrateStaffRosterFileOrder1_1_37_', 'compareStaffMembers_', 'getStaffRoster_', 'replaceStaffRoster_']) vm.runInContext(server.functions.get(name), context)
+for (const name of ['sourceBook_', 'sourceLock_', 'normalizeStaffHomeroom_', 'ensureDataSheet_', 'replaceSheetRows_', 'migrateStaffRosterFileOrder1_1_37_', 'compareStaffMembers_', 'getStaffRoster_', 'replaceStaffRoster_']) vm.runInContext(server.functions.get(name), context)
 const call = (name, ...args) => context[name](...args)
 const initialRows = reference.map(([name, position], index) => [`keep-${index}`, name, position, `부서-${index}`, `교과-${index}`, '3-1']).reverse()
 initialRows.find(row => row[1] === '전종택')[1] = '최대식'
@@ -149,7 +150,9 @@ test('Explicit new Excel order persists through server save/read, duplicate name
 test('Exact approval cannot authorize a corrupted roster function or seed', () => {
   const { execFileSync } = require('node:child_process')
   const main = execFileSync('git', ['show', 'origin/main:ungcheon-school-helper/server/Code.gs'], { cwd: root, encoding: 'utf8', maxBuffer: 1024 * 1024 })
-  const baselines = [{ label: 'origin/main', role: 'origin-main', source: main }]
+  require('./migration-source-boundary.cjs').assertBusinessAndDeploymentBoundary(source, main)
+  // Corruption must still be rejected after the candidate itself is reviewed.
+  const baselines = [{ label: 'candidate-regression-fixture', role: 'origin-main', source }]
   assert.equal(validate({ localSource: source, baselines }).ok, true)
   assert.throws(() => validate({ localSource: source.replace(server.functions.get('getStaffRoster_'), 'function getStaffRoster_() { return null; }'), baselines }), /protected desktop function/)
   assert.throws(() => validate({ localSource: source.replace("['류희열', '교장']", "['잘못된이름', '교장']"), baselines }), /desktop constant/)

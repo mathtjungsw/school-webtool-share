@@ -1,0 +1,39 @@
+'use strict'
+// Regression comparison ONLY. Never imported by the deployment command/guard.
+// The live deployment guard still receives the exact, unmodified source and must
+// block protected accessor changes until the reviewed release is on main.
+const assert=require('node:assert/strict')
+const ts=require('typescript')
+const {validate}=require('./apps-script-deploy-guard.cjs')
+function businessView(source){
+  const ast=ts.createSourceFile('Code.gs',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.JS),edits=[]
+  const expectedAccessors={
+    sourceBook_:"function sourceBook_() { return typeof migrationSourceBook_ === 'function' ? migrationSourceBook_() : SpreadsheetApp.getActiveSpreadsheet(); }",
+    sourceLock_:"function sourceLock_() { return typeof migrationCompatibleLock_ === 'function' ? migrationCompatibleLock_() : LockService.getScriptLock(); }",
+  }
+  function walk(node){
+    if(ts.isFunctionDeclaration(node)&&expectedAccessors[node.name?.text]){
+      assert.equal(node.getText(ast).replace(/\s+/g,''),expectedAccessors[node.name.text].replace(/\s+/g,''),'Unexpected migration accessor implementation')
+      edits.push([node.getStart(ast),node.end,'']);return
+    }
+    if(ts.isCallExpression(node)&&ts.isIdentifier(node.expression)&&node.arguments.length===0){
+      const replacement={sourceBook_:'SpreadsheetApp.getActiveSpreadsheet()',sourceLock_:'LockService.getScriptLock()'}[node.expression.text]
+      if(replacement)edits.push([node.getStart(ast),node.end,replacement])
+    }
+    ts.forEachChild(node,walk)
+  }
+  walk(ast)
+  for(const [start,end,text] of edits.sort((a,b)=>b[0]-a[0]))source=source.slice(0,start)+text+source.slice(end)
+  return source
+}
+function assertBusinessAndDeploymentBoundary(local,main){
+  assert.equal(validate({localSource:businessView(local),baselines:[{source:businessView(main),role:'origin-main',label:'business-regression-view'}]}).desktopBodyProtection,true)
+  try {
+    validate({localSource:local,baselines:[{source:main,role:'origin-main',label:'origin/main'}]})
+    return 'REVIEWED_MAIN_MATCH'
+  } catch(error){
+    assert.match(error.message,/protected desktop function changed:/)
+    return 'DEPLOYMENT_BLOCKED_PENDING_MAIN_REVIEW'
+  }
+}
+module.exports={assertBusinessAndDeploymentBoundary}

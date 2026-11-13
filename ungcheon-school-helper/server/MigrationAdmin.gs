@@ -17,13 +17,22 @@ function migrationCatalog_() {
 
 function migrationAdminStatus_(body) {
   requireAdmin_(body.adminPassword);
+  var config = typeof migrationTrackingConfig_ === 'function' ? migrationTrackingConfig_() : null;
+  var measured = null;
+  if (config) measured = migrationWithSourceLock_(function() {
+    var book = SpreadsheetApp.getActiveSpreadsheet();
+    if (!book || book.getId() !== config.sourceBookId) throw migrationError_('MIGRATION_SOURCE_MISMATCH');
+    return migrationSheetsStore_(book).status();
+  });
   // Unknown counters stay null. A prepared tool is not a running replication job.
   return {
-    schemaVersion: 1, phase: 'PREPARING', mode: 'SHEETS_PRIMARY', activeBackend: 'SHEETS',
-    replicaConnected: false, liveTrackingEnabled: false, cutoverReady: false,
-    pendingCount: null, errorCount: null, verifiedRevision: null,
+    schemaVersion: 1, phase: measured ? 'TRACKING' : 'PREPARING', mode: 'SHEETS_PRIMARY', activeBackend: 'SHEETS',
+    replicaConnected: false, liveTrackingEnabled: !!measured, cutoverReady: false,
+    pendingCount: measured ? measured.appliedCount + measured.pendingCount + measured.reviewCount : null,
+    errorCount: measured ? measured.pendingCount + measured.reviewCount : null, verifiedRevision: null,
+    recordedRevision: measured ? measured.highWater : null,
     resources: migrationCatalog_().map(function(item) {
-      return { resource: item.resource, sheetName: item.sheetName, identity: item.identity, status: 'NOT_INSPECTED' };
+      return { resource: item.resource, sheetName: item.sheetName, identity: item.identity, status: measured ? 'TRACKING_PRE_COPY' : 'NOT_INSPECTED' };
     })
   };
 }
@@ -46,7 +55,7 @@ function migrationAdminInventory_(body) {
   return {
     inspectedAt: new Date().toISOString(), source: 'SHEETS', consistentSnapshot: false,
     resources: resources,
-    unclassifiedSheetCount: book.getSheets().filter(function(sheet) { return knownNames.indexOf(sheet.getName()) < 0; }).length,
+    unclassifiedSheetCount: book.getSheets().filter(function(sheet) { return knownNames.indexOf(sheet.getName()) < 0 && sheet.getName().indexOf('_UNG_MIG_') !== 0; }).length,
     externalSourcesInspected: false, rowValuesRead: false
   };
 }

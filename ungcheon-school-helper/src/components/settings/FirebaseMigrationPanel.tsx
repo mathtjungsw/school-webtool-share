@@ -50,8 +50,10 @@ export default function FirebaseMigrationPanel() {
       {error && <p role="alert" className="mt-3 text-sm text-rose-800">{error}</p>}
       {status && inventory && <div className="mt-4 space-y-3" aria-live="polite">
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950">
-          준비 단계 · 현재 저장소: 구글시트 · 실제 자료 복제 전
-          <p className="mt-1">동기화 대기·오류 건수와 검증 기준은 아직 측정하지 않았습니다. 운영 전환은 동기화 검증을 마친 뒤 진행합니다.</p>
+          {status.liveTrackingEnabled ? '변경 기록 중' : '준비 단계'} · 현재 저장소: 구글시트 · 실제 자료 복제 전
+          {status.liveTrackingEnabled
+            ? <p className="mt-1">복제 전 변경 기록 {status.pendingCount?.toLocaleString('ko-KR') ?? '미확인'}건 · 원본 확인 필요 {status.errorCount?.toLocaleString('ko-KR') ?? '미확인'}건. 기록 번호는 동기화 완료를 뜻하지 않습니다.</p>
+            : <p className="mt-1">동기화 대기·오류 건수와 검증 기준은 아직 측정하지 않았습니다. 운영 전환은 동기화 검증을 마친 뒤 진행합니다.</p>}
         </div>
         <p className="text-xs leading-relaxed text-slate-600">조회: {new Date(inventory.inspectedAt).toLocaleString('ko-KR')} · 사용 행은 빈 행을 포함할 수 있는 상한입니다. 실제 자료 수와 일치 여부는 별도 검증합니다.</p>
         <div className="overflow-x-auto">

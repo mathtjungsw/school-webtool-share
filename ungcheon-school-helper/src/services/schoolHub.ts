@@ -316,7 +316,13 @@ export async function getPersistentSchoolHubCacheStatus() {
 }
 
 export async function hubRequest<T>(request: Record<string, unknown>): Promise<T> {
-  const response = await window.electron.schoolHubRequest(request) as HubResponse<T>
+  // One identifier per transport attempt; callers retaining an operationId can
+  // retry that same operation. Preserve the checklist's existing retry identity.
+  const action = String(request.action ?? '')
+  const outgoing = MUTATION_RESOURCE[action] && !request.operationId
+    ? { ...request, operationId: action === 'addStaffChecklist' && request.requestId ? request.requestId : crypto.randomUUID() }
+    : request
+  const response = await window.electron.schoolHubRequest(outgoing) as HubResponse<T>
   if (!response?.ok) {
     const message = response?.error || '학교 공유 서비스 요청에 실패했습니다.'
     if (response?.code === 'LOCAL_ACTION_BLOCKED') throw new Error(message)

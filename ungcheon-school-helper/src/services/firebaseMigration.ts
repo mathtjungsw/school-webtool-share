@@ -11,7 +11,7 @@ export interface MigrationResource {
 }
 
 export interface MigrationStatus {
-  phase: 'PREPARING'
+  phase: 'PREPARING' | 'TRACKING'
   mode: 'SHEETS_PRIMARY'
   activeBackend: 'SHEETS'
   replicaConnected: boolean
@@ -20,6 +20,7 @@ export interface MigrationStatus {
   pendingCount: number | null
   errorCount: number | null
   verifiedRevision: number | null
+  recordedRevision?: number | null
   resources: MigrationResource[]
 }
 

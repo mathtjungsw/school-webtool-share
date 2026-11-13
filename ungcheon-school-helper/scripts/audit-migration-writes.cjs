@@ -17,7 +17,10 @@ for (const file of ['Code.gs','StaffAuth.gs']) {
     function visit(n) {
       if (ts.isIdentifier(n) && /_SHEET$/.test(n.text)) candidateSheetConstants.add(n.text)
       if (ts.isCallExpression(n)) {
-        if (ts.isIdentifier(n.expression)) calls.add(n.expression.text)
+        if (ts.isIdentifier(n.expression)) {
+          calls.add(n.expression.text)
+          if (n.expression.text === 'sourceLock_') acquiresScriptLock = true
+        }
         if (ts.isPropertyAccessExpression(n.expression)) {
           const method = n.expression.name.text
           if (sheetMethods.has(method)) sheetWrites.add(method)

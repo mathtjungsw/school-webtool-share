@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 61;
+const MOBILE_SERVICE_VERSION = 62;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -968,7 +968,7 @@ function doPost(e) {
     // Staff authentication is mandatory for all non-mobile protected actions.
     // Mobile endpoints retain their existing independent password/session checks.
     if (['staffLogin','staffSession','staffLogout','caseLibrary','caseDocument'].indexOf(action) >= 0) return json_({ ok: true, data: staffAuthAction_(body) });
-    if (['health','verifyMobileViewer','getMobileScheduleBundle','getMobileAttendanceRoster'].indexOf(action) < 0) staffRequire_(body);
+    const staffSession = ['health','verifyMobileViewer','getMobileScheduleBundle','getMobileAttendanceRoster'].indexOf(action) < 0 ? staffRequire_(body) : null;
 
     // Administrator-only metadata inspection; never runs sheet initialization.
     if (action === 'getMigrationStatus') return json_({ ok: true, data: migrationAdminStatus_(body) });
@@ -992,6 +992,11 @@ function doPost(e) {
       return json_({ ok: true, data: executiveResetPassword_(body) });
     }
 
+    // Track only authenticated write/repair routes. Disabled mode preserves the legacy path.
+    if (typeof migrationTrackingConfig_ === 'function' && !migrationRouteActive_ && migrationShouldTrack_(action)) {
+      const migrationConfig = migrationTrackingConfig_();
+      if (migrationConfig) return migrationTrackedRoute_(body, staffSession, function() { return doPost(e); }, migrationConfig);
+    }
     // 일반 조회에서 전체 시트 생성·보정을 매번 실행하지 않는다.
     // 쓰기 요청은 버전 변경에 필요한 스키마만 보정한다.
     if (['addStaffChecklist', 'updateStaffChecklist', 'submitStaffChecklist', 'deleteStaffChecklist'].indexOf(action) >= 0) {
@@ -1047,7 +1052,7 @@ function doPost(e) {
       // Read routes skip global initialization. Activate only this approved,
       // one-time roster migration so deployment does not wait for an admin write.
       if (PropertiesService.getScriptProperties().getProperty(STAFF_ROSTER_FILE_ORDER_1_1_37_KEY) !== 'true') {
-        migrateStaffRosterFileOrder1_1_37_(SpreadsheetApp.getActiveSpreadsheet());
+        migrateStaffRosterFileOrder1_1_37_(sourceBook_());
       }
       return json_({ ok: true, data: getStaffRoster_() });
     }
@@ -1285,7 +1290,7 @@ function initialSetup() {
 }
 
 function ensureSheets_() {
-  const book = SpreadsheetApp.getActiveSpreadsheet();
+  const book = sourceBook_();
   if (!book) throw new Error('이 스크립트를 Google 스프레드시트에 연결하세요.');
 
   let links = book.getSheetByName(LINKS_SHEET);
@@ -1420,7 +1425,7 @@ function ensureSheets_() {
 }
 
 function ensureStaffChecklistSheets_() {
-  const book = SpreadsheetApp.getActiveSpreadsheet();
+  const book = sourceBook_();
   if (!book) throw new Error('이 스크립트를 Google 스프레드시트에 연결하세요.');
   ensureDataSheet_(book, STAFF_CHECKLISTS_SHEET, [
     'id', 'title', 'description', 'deadline', 'creatorName', 'createdAt',
@@ -1478,7 +1483,7 @@ function ensureTimetableOverrideSheets_(book) {
 }
 
 function timetableOverrideRevision_() {
-  const book = SpreadsheetApp.getActiveSpreadsheet();
+  const book = sourceBook_();
   const sheet = book && book.getSheetByName(TIMETABLE_OVERRIDES_SHEET);
   if (!sheet) return 'o:missing';
   const values = sheet.getDataRange().getDisplayValues();
@@ -1504,7 +1509,7 @@ function normalizeTimetableOverride_(row) {
 }
 
 function listTimetableOverrides_(body) {
-  const book = SpreadsheetApp.getActiveSpreadsheet();
+  const book = sourceBook_();
   ensureTimetableOverrideSheets_(book);
   const includeInactive = toBooleanValue_(body && body.includeInactive);
   return readObjects_(TIMETABLE_OVERRIDES_SHEET).map(normalizeTimetableOverride_)
@@ -1526,13 +1531,13 @@ function validateTimetableOverride_(source) {
 }
 
 function appendTimetableOverrideHistory_(item, operation, updatedBy) {
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_OVERRIDE_HISTORY_SHEET).appendRow([
+  sourceBook_().getSheetByName(TIMETABLE_OVERRIDE_HISTORY_SHEET).appendRow([
     Utilities.getUuid(), item.id, operation, JSON.stringify(item), updatedBy, new Date().toISOString()
   ]);
 }
 
 function saveTimetableOverride_(body) {
-  const book = SpreadsheetApp.getActiveSpreadsheet();
+  const book = sourceBook_();
   ensureTimetableOverrideSheets_(book);
   const rawInput = body.override || {};
   if (rawInput.active === undefined || rawInput.active === null || rawInput.active === '') rawInput.active = true;
@@ -1565,7 +1570,7 @@ function saveTimetableOverride_(body) {
 function deactivateTimetableOverride_(body) {
   const id = clean_(body.id, 100);
   const updatedBy = clean_(body.updatedBy, 30) || '관리자';
-  const book = SpreadsheetApp.getActiveSpreadsheet();
+  const book = sourceBook_();
   ensureTimetableOverrideSheets_(book);
   const sheet = book.getSheetByName(TIMETABLE_OVERRIDES_SHEET);
   const values = sheet.getDataRange().getValues();
@@ -1727,10 +1732,10 @@ function repairTimetableChangeClassCells_(book) {
 }
 
 function ensureReleaseNotices_() {
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(30000);
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTICES_SHEET);
+    const sheet = sourceBook_().getSheetByName(NOTICES_SHEET);
     const properties = PropertiesService.getScriptProperties();
     const shouldReset = properties.getProperty(OFFICIAL_RELEASE_NOTICE_RESET_KEY) !== 'true';
     if (shouldReset && sheet.getLastRow() > 1) {
@@ -1841,7 +1846,7 @@ function addLink_(body) {
 
   const id = Utilities.getUuid();
   const createdAt = new Date().toISOString();
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(LINKS_SHEET)
+  sourceBook_().getSheetByName(LINKS_SHEET)
     .appendRow([id, department, title, url, description, registeredBy, createdAt]);
   return { id: id };
 }
@@ -1874,7 +1879,7 @@ function addNotice_(body) {
   const notices = listNotices_();
   const id = notices.reduce(function(max, notice) { return Math.max(max, notice.id); }, 0) + 1;
   const date = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTICES_SHEET)
+  sourceBook_().getSheetByName(NOTICES_SHEET)
     .appendRow([id, title, content, level, date, expiresAt]);
   return { id: id };
 }
@@ -1913,7 +1918,7 @@ function addFeatureRequest_(body) {
 
   const id = Utilities.getUuid();
   const createdAt = new Date().toISOString();
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(FEATURE_REQUESTS_SHEET)
+  sourceBook_().getSheetByName(FEATURE_REQUESTS_SHEET)
     .appendRow([id, requestType, title, content, author, createdAt, 'submitted', '', '']);
   return { id: id };
 }
@@ -1926,7 +1931,7 @@ function updateFeatureRequest_(body) {
   if (!id) throw new Error('처리할 요청 ID가 없습니다.');
   if (allowedStatuses.indexOf(status) < 0) throw new Error('처리 상태가 올바르지 않습니다.');
 
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(FEATURE_REQUESTS_SHEET);
+  const sheet = sourceBook_().getSheetByName(FEATURE_REQUESTS_SHEET);
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(String);
   const idIndex = headers.indexOf('id');
@@ -2002,10 +2007,10 @@ function replaceTimetable_(body) {
     return row;
   });
 
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(10000);
   try {
-    const book = SpreadsheetApp.getActiveSpreadsheet();
+    const book = sourceBook_();
     const dataSheet = book.getSheetByName(TIMETABLE_SHEET);
     const metaSheet = book.getSheetByName(TIMETABLE_META_SHEET);
     if (dataSheet.getLastRow() > 1) {
@@ -2086,10 +2091,10 @@ function replaceStudentTimetable_(body) {
     ];
   });
 
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(30000);
   try {
-    const book = SpreadsheetApp.getActiveSpreadsheet();
+    const book = sourceBook_();
     const dataSheet = book.getSheetByName(STUDENT_TIMETABLE_SHEET);
     const metaSheet = book.getSheetByName(STUDENT_TIMETABLE_META_SHEET);
     if (dataSheet.getLastRow() > 1) {
@@ -2249,10 +2254,10 @@ function replaceStaffRoster_(body) {
   const uploadedBy = clean_(body.uploadedBy, 30) || '관리자';
   const uploadedAt = new Date().toISOString();
 
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(30000);
   try {
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_ROSTER_SHEET)
+    sourceBook_().getSheetByName(STAFF_ROSTER_SHEET)
       .getRange('F:F').setNumberFormat('@');
     replaceSheetRows_(STAFF_ROSTER_SHEET, rows);
     replaceSheetRows_(STAFF_ROSTER_META_SHEET, [[
@@ -2332,7 +2337,7 @@ function migrateStaffRosterFileOrder1_1_37_(book) {
     ensureDataSheet_(book, STAFF_ROSTER_SHEET, ['id', 'name', 'position', 'department', 'subject', 'homeroom', 'displayOrder']);
     return;
   }
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(30000);
   try {
     if (properties.getProperty(STAFF_ROSTER_FILE_ORDER_1_1_37_KEY) === 'true') return;
@@ -2436,7 +2441,7 @@ function replaceStudentRoster_(body) {
   const uploadedBy = clean_(body.uploadedBy, 30) || '관리자';
   const uploadedAt = new Date().toISOString();
 
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(30000);
   try {
     replaceSheetRows_(STUDENT_ROSTER_SHEET, rows);
@@ -2560,7 +2565,7 @@ function addStaffChecklist_(body) {
   const items = itemLabels.map(function(label) {
     return { id: Utilities.getUuid(), label: label };
   });
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(30000);
   try {
     if (requestId) {
@@ -2569,7 +2574,7 @@ function addStaffChecklist_(body) {
     }
     const id = Utilities.getUuid();
     const createdAt = new Date().toISOString();
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_CHECKLISTS_SHEET).appendRow([
+    sourceBook_().getSheetByName(STAFF_CHECKLISTS_SHEET).appendRow([
       id, title, description, deadline, creatorName, createdAt, status === 'completed',
       JSON.stringify(items), JSON.stringify(targetNames), startDate, priority, status,
       linkUrl, JSON.stringify(departmentNames), createdAt, requestId,
@@ -2638,7 +2643,7 @@ function updateStaffChecklist_(body) {
   );
   const updatedAt = new Date().toISOString();
 
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_CHECKLISTS_SHEET);
+  const sheet = sourceBook_().getSheetByName(STAFF_CHECKLISTS_SHEET);
   const values = sheet.getDataRange().getValues();
   for (let row = 1; row < values.length; row++) {
     if (String(values[row][0]) !== checklistId) continue;
@@ -2675,10 +2680,10 @@ function submitStaffChecklist_(body) {
   ).filter(function(id) { return itemIds[id]; });
   const updatedAt = new Date().toISOString();
 
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(10000);
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(STAFF_CHECKLIST_RESPONSES_SHEET);
+    const sheet = sourceBook_().getSheetByName(STAFF_CHECKLIST_RESPONSES_SHEET);
     const values = sheet.getDataRange().getValues();
     for (let row = 1; row < values.length; row++) {
       if (String(values[row][0]) === checklistId && String(values[row][1]) === teacherName) {
@@ -2705,7 +2710,7 @@ function deleteStaffChecklist_(body) {
   if (String(checklist.creatorName || '') !== viewerName && !isAdminPassword_(body.adminPassword)) {
     throw new Error('작성자 또는 관리자만 삭제할 수 있습니다.');
   }
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(10000);
   try {
     deleteRowsByValue_(STAFF_CHECKLIST_RESPONSES_SHEET, 'checklistId', checklistId);
@@ -2810,10 +2815,10 @@ function saveCommitteeMembers_(body) {
   const updatedBy = clean_(body.updatedBy, 30) || '사용자';
   if (!committeeId || !committeeName) throw new Error('위원회 정보를 확인해 주세요.');
 
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(COMMITTEE_MEMBERS_SHEET);
+  const sheet = sourceBook_().getSheetByName(COMMITTEE_MEMBERS_SHEET);
   const updatedAt = new Date().toISOString();
   const rowValues = [committeeId, committeeName, JSON.stringify(members), updatedBy, updatedAt];
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(30000);
   try {
     const lastRow = sheet.getLastRow();
@@ -2854,7 +2859,7 @@ function addCommitteeEvent_(body) {
   }
   if (!memberNames.length) throw new Error('위원회 명단을 먼저 등록해 주세요.');
 
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(30000);
   try {
     const conflicts = listCommitteeState_().events.filter(function(event) {
@@ -2874,10 +2879,10 @@ function addCommitteeEvent_(body) {
     }
 
     const id = Utilities.getUuid();
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(COMMITTEE_EVENTS_SHEET)
+    sourceBook_().getSheetByName(COMMITTEE_EVENTS_SHEET)
       .getRange('F:G').setNumberFormat('@');
     const createdAt = new Date().toISOString();
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName(COMMITTEE_EVENTS_SHEET).appendRow([
+    sourceBook_().getSheetByName(COMMITTEE_EVENTS_SHEET).appendRow([
       id, committeeId, committeeName, title, date, startTime, endTime,
       location, agenda, JSON.stringify(memberNames), createdBy, createdAt
     ]);
@@ -2901,7 +2906,7 @@ function addCommitteeEvent_(body) {
 }
 
 function replaceSheetRows_(sheetName, rows) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const sheet = sourceBook_().getSheetByName(sheetName);
   if (sheet.getLastRow() > 1) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
   }
@@ -2938,7 +2943,7 @@ function findObjectByValue_(sheetName, header, value) {
 }
 
 function deleteRowsByValue_(sheetName, header, value) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const sheet = sourceBook_().getSheetByName(sheetName);
   const values = sheet.getDataRange().getValues();
   if (!values.length) return;
   const column = values[0].map(String).indexOf(header);
@@ -3008,7 +3013,7 @@ function requireNeisSyncDevice_(body) {
 }
 
 function getNeisSnapshot_() {
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(30000);
   try {
     const meta = readObjects_(NEIS_SYNC_META_SHEET)[0];
@@ -3045,7 +3050,7 @@ function getNeisSnapshot_() {
 }
 
 function replaceSheetRows_(sheetName, rows) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const sheet = sourceBook_().getSheetByName(sheetName);
   const columnCount = sheet.getLastColumn();
   const oldCount = Math.max(0, sheet.getLastRow() - 1);
   if (oldCount) sheet.getRange(2, 1, oldCount, columnCount).clearContent();
@@ -3083,7 +3088,7 @@ function replaceNeisSnapshot_(body) {
     return [clean_(item.date, 8), clean_(item.grade, 2), clean_(item.classNm, 10), Number(item.period) || 0, clean_(item.subject, 200), clean_(item.teacher, 100), clean_(item.classroom, 100)];
   });
 
-  const lock = LockService.getScriptLock();
+  const lock = sourceLock_();
   lock.waitLock(30000);
   try {
     const previous = readObjects_(NEIS_SYNC_META_SHEET)[0] || {};
@@ -3126,7 +3131,7 @@ function getNeisSnapshotWithoutLock_() {
 
 function deleteRowById_(sheetName, id) {
   if (!id) throw new Error('삭제할 항목 ID가 없습니다.');
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const sheet = sourceBook_().getSheetByName(sheetName);
   const values = sheet.getDataRange().getValues();
   for (let row = values.length - 1; row >= 1; row--) {
     if (String(values[row][0]) === id) {
@@ -3193,7 +3198,7 @@ function createTimetableChange_(body) {
     clean_(entry.originalSubject, 100), clean_(entry.replacementSubject, 100),
     clean_(entry.note, 200), now, '', '', now, ''
   ];
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_CHANGES_SHEET);
+  const sheet = sourceBook_().getSheetByName(TIMETABLE_CHANGES_SHEET);
   sheet.getRange('L:M').setNumberFormat('@');
   sheet.appendRow(row);
   touchSyncResource_('timetableChanges');
@@ -3212,7 +3217,7 @@ function respondTimetableChange_(body) {
   // v1.0.39 이하 앱의 rejected 요청도 보류로 처리해 이전 버전과 호환한다.
   const decision = requestedDecision === 'rejected' ? 'held' : requestedDecision;
   if (decision !== 'approved' && decision !== 'held') throw new Error('승인 또는 보류를 선택해 주세요.');
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_CHANGES_SHEET);
+  const sheet = sourceBook_().getSheetByName(TIMETABLE_CHANGES_SHEET);
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(String);
   const idColumn = headers.indexOf('id');
@@ -3259,7 +3264,7 @@ function applyTimetableChangeForRequester_(body) {
   const id = clean_(body.id, 100);
   const requester = clean_(body.requesterName, 30);
   if (!id || !requester) throw new Error('나만 우선 반영할 요청과 교사 이름을 확인해 주세요.');
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_CHANGES_SHEET);
+  const sheet = sourceBook_().getSheetByName(TIMETABLE_CHANGES_SHEET);
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(String);
   const idColumn = headers.indexOf('id');
@@ -3291,7 +3296,7 @@ function applyTimetableChangeForRequester_(body) {
 function cancelTimetableChange_(body) {
   const id = clean_(body.id, 100);
   const requester = clean_(body.requesterName, 30);
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMETABLE_CHANGES_SHEET);
+  const sheet = sourceBook_().getSheetByName(TIMETABLE_CHANGES_SHEET);
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(String);
   for (let index = 1; index < values.length; index++) {
@@ -4040,7 +4045,7 @@ function getMobileScheduleBundle_(body) {
 }
 
 function readObjects_(sheetName) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  const sheet = sourceBook_().getSheetByName(sheetName);
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
   const headers = values[0].map(String);
@@ -4079,4 +4084,12 @@ function json_(payload) {
   return ContentService
     .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Explicit adapters keep the existing business functions testable with tracking disabled.
+function sourceBook_() {
+  return typeof migrationSourceBook_ === 'function' ? migrationSourceBook_() : SpreadsheetApp.getActiveSpreadsheet();
+}
+function sourceLock_() {
+  return typeof migrationCompatibleLock_ === 'function' ? migrationCompatibleLock_() : LockService.getScriptLock();
 }

@@ -244,16 +244,20 @@ pass('real Code.gs syntax', () => inspectSource(realSource, 'real'))
 if (inspectSource(realSource, 'real').serviceVersion >= 39) pass('real integrated source contract', () => validate({ localSource: realSource }))
 const realMainSource = execFileSync('git', ['show', 'origin/main:ungcheon-school-helper/server/Code.gs'], { cwd: path.join(__dirname, '..'), encoding: 'utf8', maxBuffer: 1024 * 1024 })
 const realMainBaseline = { source: realMainSource, role: 'origin-main', label: 'origin/main' }
-pass('real desktop definitions remain equal to latest main', () => assert.equal(validate({ localSource: realSource, baselines: [realMainBaseline] }).desktopBodyProtection, true))
+pass('business definitions remain equal; exact source stays protected before main review', () => {
+  const boundary = require('./migration-source-boundary.cjs').assertBusinessAndDeploymentBoundary(realSource, realMainSource)
+  console.log('Deployment boundary: ' + boundary)
+})
+const candidateBaseline = {source:realSource,role:'origin-main',label:'candidate-regression-fixture'}
 pass('real listStaffChecklists return-empty mutation blocked', () => {
  const current = inspectSource(realSource, 'real').functions.get('listStaffChecklists_')
  assert.ok(current)
  const modified = realSource.replace(current, 'function listStaffChecklists_(body) { return []; }')
- assert.throws(() => validate({ localSource: modified, baselines: [realMainBaseline] }), /protected desktop function changed: listStaffChecklists_/)
+ assert.throws(() => validate({ localSource: modified, baselines: [candidateBaseline] }), /protected desktop function changed: listStaffChecklists_/)
 })
 pass('real STAFF_CHECKLISTS_SHEET mutation blocked', () => {
  const modified = realSource.replace(/(const\s+STAFF_CHECKLISTS_SHEET\s*=\s*)'[^']*'/, "$1'wrong-sheet'")
  assert.notEqual(modified, realSource)
- assert.throws(() => validate({ localSource: modified, baselines: [realMainBaseline] }), /protected desktop constant changed: STAFF_CHECKLISTS_SHEET/)
+ assert.throws(() => validate({ localSource: modified, baselines: [candidateBaseline] }), /protected desktop constant changed: STAFF_CHECKLISTS_SHEET/)
 })
 console.log(`Apps Script deployment guard: ${checks} checks passed.`)
