@@ -70,17 +70,20 @@ function migrationActivatePreparedTracking_() {
     return {activated:true,duplicate:false};
   });
 }
-// Owner-only baseline freeze; no app button starts a potentially long full capture.
-// Benchmark and choose the capture window before using this with school data.
+// Owner-only, resumable: one bounded capture/page per invocation.
 function migrationFreezeConfiguredBaseline_() {
   return migrationWithSourceLock_(function() {
     if (migrationOperationsState_().invalidated) throw migrationError_('MIGRATION_REPLICA_REBASE_REQUIRED');
     var config=migrationOperationsConfig_();
     if (!config) throw migrationError_('MIGRATION_SETUP_REQUIRED');
     var book=migrationOperationsBook_(config); migrationAssertTrackedSource_(book);
-    if (!config.baselineRef) {config.baselineRef=migrationFreezeBaseline_(book);migrationOperationsSaveConfig_(config);}
+    if (!config.baselineRef) {
+      var progress=migrationBaselineStep_(book,'UNG_MIGRATION_BASELINE_JOB_V1');
+      if (progress.status!=='COMPLETE') return progress;
+      config.baselineRef=progress.baselineRef;migrationOperationsSaveConfig_(config);
+    }
     var base=migrationReplicaSource_(book,config.baselineRef).baseline();
-    return {baselineRef:config.baselineRef,baseRevision:base.descriptor.revision};
+    return {status:'COMPLETE',baselineRef:config.baselineRef,baseRevision:base.descriptor.revision};
   });
 }
 function migrationWriteGateEnabled_() {
@@ -146,6 +149,9 @@ function migrationOperationsStatus_() {
 }
 function migrationAdminRunReplica_(body) {
   requireAdmin_(body.adminPassword);
+  return migrationRunConfiguredReplica_(2,8000);
+}
+function migrationRunConfiguredReplica_(maxSteps,maxMillis) {
   var lease=migrationWithSourceLock_(function(){
     var ctx=migrationOperationsContext_(), state=migrationOperationsState_();
     if (!ctx.config.baselineRef) throw migrationError_('MIGRATION_BASELINE_REQUIRED');
@@ -165,7 +171,7 @@ function migrationAdminRunReplica_(body) {
       return baseline();
     };
     // Fixed server budget. Client-supplied project, paths, time and step limits ignored.
-    result=migrationRunReplica_(migrationOperationsRepository_(lease.ctx.config),source,lease.ctx.config.baselineRef,{maxSteps:2,maxMillis:8000});
+    result=migrationRunReplica_(migrationOperationsRepository_(lease.ctx.config),source,lease.ctx.config.baselineRef,{maxSteps:maxSteps,maxMillis:maxMillis});
   } catch(error) {
     result={status:error && error.code==='MIGRATION_REPLICA_PAUSED'?'PAUSED':'ERROR',steps:0,
       code:error && /^MIGRATION_[A-Z0-9_]+$/.test(error.code || '')?error.code:'MIGRATION_OPERATION_FAILED'};

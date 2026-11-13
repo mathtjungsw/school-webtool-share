@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 63;
+const MOBILE_SERVICE_VERSION = 64;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -425,6 +425,16 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'server-v64',
+    title: '[서버 개선] Firebase 이전 준비 및 저장 변경 기록',
+    body: [
+      '· 기존 시트를 원본으로 유지하면서 저장 변경 기록과 Firebase 복제 검증을 단계적으로 적용합니다.',
+      '· 초기 자료 복사를 나눠 진행하고, 중단 후 이어 처리하도록 개선합니다.',
+      '· PC·모바일의 기존 주소와 로그인 세션을 유지합니다. 실제 조회·저장 원본 전환은 별도 검증 후 진행합니다.'
+    ].join('\n'),
+    date: '2026-11-13'
+  },
   {
     key: 'v1.1.40',
     title: '[업데이트] 웅천고 업무도우미 v1.1.40 · 학교망 로그인 연결 개선',

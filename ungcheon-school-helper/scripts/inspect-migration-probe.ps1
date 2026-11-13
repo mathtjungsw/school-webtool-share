@@ -6,8 +6,8 @@ param(
 $ErrorActionPreference='Stop'
 $probeId='16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9'
 $forbidden=@('12HhlpO5xjhp0JlKNlf6UVd1Dlz8ZgThFYJ9j4jM0nf4','1OBt8XHMYH8uNAfuozbjc8iON954FjBSmojf4y2c74GQ')
-$allowedTitles=@('웅천고 이전 시험 - 합성 변경 기록 전용','웅천고 이전 시험 - 합성 변경 기록 전용 v2')
-if (!$WorkbookIds.Count -or $WorkbookIds.Count -gt 2) { throw 'Specify only the two synthetic probe workbooks.' }
+$allowedTitles=@('웅천고 이전 시험 - 합성 변경 기록 전용','웅천고 이전 시험 - 합성 변경 기록 전용 v2','웅천고 이전 시험 - 합성 초기복사 성능 v1')
+if (!$WorkbookIds.Count -or $WorkbookIds.Count -gt 3) { throw 'Specify only the synthetic probe workbooks.' }
 foreach($id in $WorkbookIds) { if($id -notmatch '^[A-Za-z0-9_-]{20,100}$' -or $id -in $forbidden) { throw 'Invalid synthetic workbook identity.' } }
 function SourceHash([string]$Source) {
   $sha=[Security.Cryptography.SHA256]::Create()
@@ -27,7 +27,7 @@ try {
   $project=Invoke-RestMethod -Uri "https://script.googleapis.com/v1/projects/$probeId" -Headers $headers -TimeoutSec 30
   if($project.title -ne '웅천고 Firestore 연결 시험 (운영 분리)') { throw 'Probe project identity mismatch.' }
   $remote=Invoke-RestMethod -Uri "https://script.googleapis.com/v1/projects/$probeId/content" -Headers $headers -TimeoutSec 30
-  $names=@('Code','FirestoreRepository','MigrationSync','MigrationAdmin','MigrationJournal','MigrationStore','MigrationCapture','MigrationTracking','MigrationReplication','MigrationRecovery','MigrationOperations')
+  $names=@('Code','FirestoreRepository','MigrationSync','MigrationAdmin','MigrationJournal','MigrationStore','MigrationCapture','MigrationTracking','MigrationReplication','MigrationRecovery','MigrationOperations','MigrationBaseline')
   if($remote.files.Count -ne $names.Count+1) { throw 'Unexpected probe file count.' }
   $modules=foreach($name in $names) {
     $matches=@($remote.files | Where-Object name -eq $name)

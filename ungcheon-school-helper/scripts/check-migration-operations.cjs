@@ -11,7 +11,7 @@ function setup(activate=true,freeze=true){
   f.ctx.migrationOperationsRepository_=()=>{connections++;return repo}
   f.ctx.migrationPrepareOperations_(f.book,deployment)
   if(activate){f.ctx.__clock+=600000;f.ctx.migrationActivatePreparedTracking_()}
-  if(activate&&freeze)f.ctx.migrationFreezeConfiguredBaseline_()
+  if(activate&&freeze){let result;for(let i=0;i<100;i++){result=f.ctx.migrationFreezeConfiguredBaseline_();if(result.status==='COMPLETE')break}assert.equal(result.status,'COMPLETE')}
   connections=0
   const call=(action,body={})=>f.post({action,...admin,...body})
   const drain=()=>{for(let i=0;i<100;i++){const r=call('runMigrationReplica');assert.equal(r.ok,true);if(r.data.status!=='BUDGET_EXHAUSTED')return r.data}throw Error('did not converge')}

@@ -1,4 +1,42 @@
 /** Run only in a separate standalone Apps Script project, never in the live app. */
+function probeIncrementalBaseline() {
+  if (ScriptApp.getScriptId()!=='16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9') throw new Error('PROBE_PROJECT_MISMATCH');
+  var props=PropertiesService.getScriptProperties(), key='SYNTHETIC_BASELINE_BOOK_V1', id=props.getProperty(key), title='웅천고 이전 시험 - 합성 초기복사 성능 v1';
+  if (id==='12HhlpO5xjhp0JlKNlf6UVd1Dlz8ZgThFYJ9j4jM0nf4' || id==='1OBt8XHMYH8uNAfuozbjc8iON954FjBSmojf4y2c74GQ') throw new Error('PROBE_SOURCE_FORBIDDEN');
+  var book=id?SpreadsheetApp.openById(id):SpreadsheetApp.create(title);
+  if (book.getName()!==title) throw new Error('PROBE_BOOK_MISMATCH');
+  if (!id) {id=book.getId();props.setProperty(key,id);}
+  var specs=[['공유링크',7,['id','department','title','url','description','registeredBy','createdAt']],
+    ['교원명렬',66,['id','name','department','subject']],['학생명렬',624,['studentId','name','grade','classNm','number']],
+    ['시간표',44,['teacherName','teacherLabel','load']],['학생시간표',412,['studentId','name']],
+    ['NEIS학급시간표',1164,['date','grade','classNm','period','subject','teacher','classroom']]];
+  specs.forEach(function(spec){
+    var sheet=book.getSheetByName(spec[0]);if (!sheet) sheet=book.insertSheet(spec[0]);
+    if (sheet.getLastRow()) return;
+    var headers=spec[2].slice();if (spec[0]==='시간표' || spec[0]==='학생시간표') for(var s=0;s<35;s++) headers.push('slot'+s);
+    var rows=[headers];for(var i=0;i<spec[1];i++) rows.push(headers.map(function(h,c){return h==='load'?35:h.indexOf('slot')===0?JSON.stringify({subject:'합성 과목',className:'합성반',classroom:'합성교실'}):'synthetic-'+i+'-'+c;}));
+    if (sheet.getMaxRows()<rows.length) sheet.insertRowsAfter(sheet.getMaxRows(),rows.length-sheet.getMaxRows());
+    if (sheet.getMaxColumns()<headers.length) sheet.insertColumnsAfter(sheet.getMaxColumns(),headers.length-sheet.getMaxColumns());
+    sheet.getRange(1,1,rows.length,headers.length).setValues(rows);
+  });
+  migrationInitializeStore_(book);
+  var trackingKey='UNG_MIGRATION_TRACKING_V1',restoreKey='SYNTHETIC_BASELINE_TRACKING_RESTORE_V1';
+  if (!props.getProperty(restoreKey)) props.setProperty(restoreKey,JSON.stringify({original:props.getProperty(trackingKey)}));
+  var restore=JSON.parse(props.getProperty(restoreKey)),start=Date.now(),steps=0,maxStepMillis=0,progress;
+  try {
+    props.setProperty(trackingKey,JSON.stringify({schemaVersion:1,enabled:true,sourceBookId:id}));
+    do {
+      var tick=Date.now();progress=migrationBaselineStep_(book,'SYNTHETIC_INCREMENTAL_BASELINE_JOB_V1');
+      maxStepMillis=Math.max(maxStepMillis,Date.now()-tick);steps++;
+    } while(progress.status!=='COMPLETE' && Date.now()-start<40000 && steps<12);
+  } finally {
+    if (restore.original===null) props.deleteProperty(trackingKey);else props.setProperty(trackingKey,restore.original);
+    props.deleteProperty(restoreKey);
+  }
+  var result={ok:true,dataset:'SYNTHETIC_ONLY',spreadsheetId:id,rows:2317,steps:steps,maxStepMillis:maxStepMillis,elapsedMillis:Date.now()-start,progress:progress,productionScriptChanged:false};
+  console.log(JSON.stringify(result));return result;
+}
+
 function probeFirestoreConnection() {
   var root = 'projects/ungcheon-school-helper/databases/(default)/documents';
   var name = root + '/migrationChecks/appsScriptOAuth';

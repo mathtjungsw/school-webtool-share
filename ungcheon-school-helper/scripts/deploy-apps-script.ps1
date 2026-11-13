@@ -3,14 +3,15 @@ param(
   [Parameter(Position = 0)]
   [string]$Description = "Ungcheon School Helper desktop and mobile service update",
   [switch]$ValidateOnly,
-  [switch]$PreflightOnly
+  [switch]$PreflightOnly,
+  [switch]$StageOnly
 )
 
 $ErrorActionPreference = 'Stop'
 $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 Set-StrictMode -Version Latest
-if ($ValidateOnly -and $PreflightOnly) { throw 'Choose ValidateOnly or PreflightOnly, not both.' }
+if (@($ValidateOnly,$PreflightOnly,$StageOnly | Where-Object { $_ }).Count -gt 1) { throw 'Choose at most one of ValidateOnly, PreflightOnly or StageOnly.' }
 
 # Existing public identities: no override/new-deployment/property-reset path.
 $scriptId = '1rLmGrYBAeMUHxGr9CSeT1DUtTUoDbmNpydp1rGe5DL-RzDlyoZCleLnb'
@@ -218,6 +219,13 @@ try {
   if ((Get-ContentFingerprint -Content $uploaded) -ne $localHash) { throw 'Upload verification failed or another writer changed remote HEAD. The fixed deployment was not changed.' }
   $unchangedDeployment = Invoke-AppsScriptApi -Method Get -Path "/deployments/$deploymentId"
   if ([int]$unchangedDeployment.deploymentConfig.versionNumber -ne $before.version) { throw 'The fixed deployment changed after upload. Deployment stopped; do not overwrite the concurrent update.' }
+
+  if ($StageOnly) {
+    Write-Host "Validated source staged in HEAD: service v$expectedServiceVersion; fixed deployment remains @$($before.version)."
+    Write-Host "Source fingerprint: $localHash"
+    Write-Host 'Complete owner authorization in the editor before running this deployment command without StageOnly. No immutable version or fixed deployment was changed.'
+    return
+  }
 
   Write-Host '[4/6] Creating and checking an immutable project version'
   $version = Invoke-AppsScriptApi -Method Post -Path '/versions' -Body @{ description = $Description }

@@ -35,7 +35,7 @@ try {
     @{name='Code';type='SERVER_JS';source=[IO.File]::ReadAllText((Join-Path $probeDir 'Code.gs'))},
     @{name='appsscript';type='JSON';source=[IO.File]::ReadAllText((Join-Path $probeDir 'appsscript.json'))}
   )
-  foreach ($module in @('FirestoreRepository','MigrationSync','MigrationAdmin','MigrationJournal','MigrationStore','MigrationCapture','MigrationTracking','MigrationReplication','MigrationRecovery','MigrationOperations')) {
+  foreach ($module in @('FirestoreRepository','MigrationSync','MigrationAdmin','MigrationJournal','MigrationStore','MigrationCapture','MigrationTracking','MigrationReplication','MigrationRecovery','MigrationOperations','MigrationBaseline')) {
     $files += @{name=$module;type='SERVER_JS';source=[IO.File]::ReadAllText((Join-Path $PSScriptRoot "../server/$module.gs"))}
   }
   $payload = [Text.Encoding]::UTF8.GetBytes((@{files=$files} | ConvertTo-Json -Depth 10 -Compress))
