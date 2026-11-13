@@ -4,14 +4,15 @@ param(
   [string]$Description = "Ungcheon School Helper desktop and mobile service update",
   [switch]$ValidateOnly,
   [switch]$PreflightOnly,
-  [switch]$StageOnly
+  [switch]$StageOnly,
+  [switch]$RecordEvidenceOnly
 )
 
 $ErrorActionPreference = 'Stop'
 $VerbosePreference = 'SilentlyContinue'
 $DebugPreference = 'SilentlyContinue'
 Set-StrictMode -Version Latest
-if (@($ValidateOnly,$PreflightOnly,$StageOnly | Where-Object { $_ }).Count -gt 1) { throw 'Choose at most one of ValidateOnly, PreflightOnly or StageOnly.' }
+if (@($ValidateOnly,$PreflightOnly,$StageOnly,$RecordEvidenceOnly | Where-Object { $_ }).Count -gt 1) { throw 'Choose at most one deployment mode.' }
 
 # Existing public identities: no override/new-deployment/property-reset path.
 $scriptId = '1rLmGrYBAeMUHxGr9CSeT1DUtTUoDbmNpydp1rGe5DL-RzDlyoZCleLnb'
@@ -243,6 +244,17 @@ try {
     Write-Host "Online preflight passed: origin/main $mainCommit; fixed deployment @$($before.version); target service v$expectedServiceVersion. Nothing was uploaded or deployed."
     return
   }
+  if ($RecordEvidenceOnly) {
+    if ($before.deployedHash -ne $localHash -or $before.headHash -ne $localHash) { throw 'Evidence blocked: deployed source and HEAD must exactly match the reviewed local source.' }
+    $health = Invoke-RestMethod -Uri $webAppUrl -TimeoutSec 35
+    if (-not $health.ok -or $health.data.service -ne 'UngcheonSchoolHub' -or [int]$health.data.version -ne $expectedServiceVersion) { throw 'Evidence blocked: live health does not match.' }
+    if ((Get-OriginMainCommit) -ne $mainCommit -or (Get-ContentFingerprint -Content (Get-LocalContent)) -ne $localHash) { throw 'Evidence blocked: main or local source changed.' }
+    $rechecked = Get-RemoteSnapshot
+    Assert-SameSnapshot -Before $before -After $rechecked
+    Write-MigrationDeploymentEvidence -Local $localContent -Fingerprint $localHash -VersionNumber $before.version -ServiceVersion $expectedServiceVersion -MainCommit $mainCommit
+    Write-Host "Evidence recorded for existing fixed deployment @$($before.version). No project source, version, deployment, or login property was changed."
+    return
+  }
 
   Write-Host '[3/6] Rechecking concurrent main/remote changes immediately before upload'
   if ((Get-OriginMainCommit) -ne $mainCommit) { throw 'Deployment blocked: origin/main advanced during preflight. Merge it before deployment.' }
@@ -288,7 +300,10 @@ try {
   $unknownActionError = ConvertFrom-Json '"\ud5c8\uc6a9\ub418\uc9c0 \uc54a\ub294 \uc694\uccad\uc785\ub2c8\ub2e4."'
   if ($probe.ok -or [string]$probe.error -eq $unknownActionError -or -not [string]$probe.error) { throw 'The mobile route failed to reject the unauthenticated probe correctly.' }
   $finalSnapshot = Get-RemoteSnapshot
-  if ($finalSnapshot.version -ne $versionNumber -or $finalSnapshot.deployedHash -ne $localHash -or $finalSnapshot.headHash -ne $localHash) { throw 'Deployment evidence blocked: fixed version or HEAD changed after verification.' }
+  if ($finalSnapshot.version -ne $versionNumber -or $finalSnapshot.deployedHash -ne $localHash -or $finalSnapshot.headHash -ne $localHash) {
+    Write-Host "Expected version @$versionNumber, observed @$($finalSnapshot.version); live hash matches: $($finalSnapshot.deployedHash -eq $localHash); HEAD hash matches: $($finalSnapshot.headHash -eq $localHash)."
+    throw 'Deployment evidence blocked: fixed version or HEAD changed after verification. Inspect independently, then use RecordEvidenceOnly once the exact deployed source is confirmed.'
+  }
   Write-MigrationDeploymentEvidence -Local $localContent -Fingerprint $localHash -VersionNumber $versionNumber -ServiceVersion $expectedServiceVersion -MainCommit $mainCommit
   Write-Host "Apps Script fixed deployment updated: service v$expectedServiceVersion, project version @$versionNumber"
   Write-Host "URL preserved: $webAppUrl"

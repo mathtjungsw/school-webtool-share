@@ -123,6 +123,18 @@ function migrationRepository_(config, transport) {
       var result = request('get', '/' + documentName(path).slice(root.length + 1), null, true);
       return result ? decodeDocument(result) : null;
     },
+    batchGet: function(paths) {
+      if (!Array.isArray(paths) || !paths.length || paths.length>100 || paths.some(function(path,i){return paths.indexOf(path)!==i;})) throw migrationError_('MIGRATION_BATCH_LIMIT');
+      var names=paths.map(function(path){return documentName(path);}),result=request('post',':batchGet',{documents:names}),found=Object.create(null);
+      if (!Array.isArray(result)) throw migrationError_('MIGRATION_INVALID_RESPONSE');
+      result.forEach(function(item){
+        var name=item.found && item.found.name || item.missing;
+        if (names.indexOf(name)<0 || Object.prototype.hasOwnProperty.call(found,name) || (!!item.found===!!item.missing)) throw migrationError_('MIGRATION_INVALID_RESPONSE');
+        found[name]=item.found?decodeDocument(item.found):null;
+      });
+      if (Object.keys(found).length!==names.length) throw migrationError_('MIGRATION_INVALID_RESPONSE');
+      return names.map(function(name){return found[name];});
+    },
     list: function(path, pageToken) {
       var suffix = '/' + documentName(path, true).slice(root.length + 1) + '?pageSize=100';
       if (pageToken) suffix += '&pageToken=' + encodeURIComponent(pageToken);

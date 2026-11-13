@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 64;
+const MOBILE_SERVICE_VERSION = 65;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -425,6 +425,12 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'server-v65',
+    title: '[서버 개선] 저장 준비 작업 재사용',
+    body: '· 완료한 시트 구조 확인을 서버 버전별로 재사용하여 저장 요청의 반복 작업을 줄입니다. 기존 시트 원본·PC와 모바일 주소·로그인 세션은 유지합니다.',
+    date: '2026-11-13'
+  },
   {
     key: 'server-v64',
     title: '[서버 개선] Firebase 이전 준비 및 저장 변경 기록',
@@ -1305,6 +1311,7 @@ function initialSetup() {
 function ensureSheets_() {
   const book = sourceBook_();
   if (!book) throw new Error('이 스크립트를 Google 스프레드시트에 연결하세요.');
+  if (typeof migrationSchemaReady_ === 'function' && migrationSchemaReady_(book, MOBILE_SERVICE_VERSION, 'ALL')) return;
 
   let links = book.getSheetByName(LINKS_SHEET);
   if (!links) {
@@ -1435,11 +1442,13 @@ function ensureSheets_() {
   ]);
   repairCommitteeTimeCells_(book);
   ensureReleaseNotices_();
+  if (typeof migrationRememberSchema_ === 'function') migrationRememberSchema_(book, MOBILE_SERVICE_VERSION, 'ALL');
 }
 
 function ensureStaffChecklistSheets_() {
   const book = sourceBook_();
   if (!book) throw new Error('이 스크립트를 Google 스프레드시트에 연결하세요.');
+  if (typeof migrationSchemaReady_ === 'function' && migrationSchemaReady_(book, MOBILE_SERVICE_VERSION, 'CHECKLISTS')) return;
   ensureDataSheet_(book, STAFF_CHECKLISTS_SHEET, [
     'id', 'title', 'description', 'deadline', 'creatorName', 'createdAt',
     'closed', 'itemsJson', 'targetNamesJson', 'startDate', 'priority', 'status',
@@ -1449,6 +1458,7 @@ function ensureStaffChecklistSheets_() {
   ensureDataSheet_(book, STAFF_CHECKLIST_RESPONSES_SHEET, [
     'checklistId', 'teacherName', 'checkedItemIdsJson', 'memo', 'updatedAt'
   ]);
+  if (typeof migrationRememberSchema_ === 'function') migrationRememberSchema_(book, MOBILE_SERVICE_VERSION, 'CHECKLISTS');
 }
 
 function touchSyncResource_(resource) {

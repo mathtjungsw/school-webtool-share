@@ -27,4 +27,12 @@ f.ctx.migrationOperationsContext_=()=>({config:{baselineRef:null}})
 f.ctx.installMigrationReplicationTrigger();f.ctx.installMigrationReplicationTrigger();assert.equal(triggers.length,1)
 f.ctx.migrationOperationsState_=()=>({paused:true});f.ctx.migrationFreezeConfiguredBaseline_=()=>{throw Error('paused worker must not capture')}
 f.ctx.migrationReplicationTick()
+const g=fixture();new vm.Script(fs.readFileSync(path.join(__dirname,'../server/MigrationOwner.gs'),'utf8')).runInContext(g.ctx)
+const old={projectId:'ungcheon-school-helper',schoolId:'ungcheon',deploymentVersion:999,sourceFingerprint:'1'.repeat(64)}
+g.ctx.migrationProductionIdentity_=()=>({book:g.book});g.ctx.migrationOperationsRepository_=()=>({get:()=>null})
+g.ctx.migrationPrepareOperations_(g.book,old);const original=g.ctx.migrationOperationsConfig_()
+g.ctx.migrationOwnerEvidence_=()=>({...old,deploymentVersion:1000,sourceFingerprint:'2'.repeat(64)})
+g.ctx.refreshMigrationPreparedDeployment();const refreshed=g.ctx.migrationOperationsConfig_()
+assert.equal(refreshed.deploymentVersion,1000);assert.ok(refreshed.notBefore>=original.notBefore);assert.equal(refreshed.baselineRef,null)
+g.enable();assert.throws(()=>g.ctx.refreshMigrationPreparedDeployment(),e=>e.code==='MIGRATION_REFRESH_NOT_ALLOWED')
 console.log('Migration owner: read-only authorization, deployment mismatch barriers, idempotent trigger and paused worker passed.')

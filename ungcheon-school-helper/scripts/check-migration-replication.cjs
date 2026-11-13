@@ -21,6 +21,7 @@ test('baseline and deltas publish only after page readback; the idle worker writ
 })
 test('deletions and a multi-resource operation are reconstructed with exact order and metadata',()=>{
   const f=setup(['links','notices']);f.drain();const added=add(f);assert.equal(added.ok,true)
+  f.properties.delete('UNG_MIGRATION_SCHEMA_ALL_V1')
   f.ctx.ensureReleaseNotices_=()=>f.ctx.sourceBook_().getSheetByName('공지').appendRow(['synthetic-notice','Synthetic','Notice','info','2026-11-13',''])
   const row=f.book.getSheetByName('공유링크').getRange(2,1).getValues()[0][0]
   assert.equal(f.post({action:'deleteLink',id:row,adminPassword:'synthetic-admin',operationId:'synthetic-worker-delete'}).ok,true)

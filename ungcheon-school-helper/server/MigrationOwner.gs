@@ -8,7 +8,7 @@ function migrationProductionIdentity_() {
 }
 // Rotated with each production migration release. The guarded deployment tool
 // records this ID only after checking main, exact immutable source, HEAD and URL.
-function migrationOwnerReleaseId_() {return 'migration-service64-rollout-v2';}
+function migrationOwnerReleaseId_() {return 'migration-service65-rollout-v3';}
 function migrationOwnerEvidence_(identity) {
   var doc=migrationOperationsRepository_({projectId:'ungcheon-school-helper',schoolId:'ungcheon'}).get('migrationChecks/deployment');
   var record=doc && doc.data;
@@ -33,6 +33,27 @@ function prepareMigrationProduction() {
   var identity=migrationProductionIdentity_(),evidence=migrationOwnerEvidence_(identity);
   var result=migrationPrepareOperations_(identity.book,evidence);
   console.log(JSON.stringify({ok:true,phase:'DRAINING',notBefore:new Date(result.notBefore).toISOString(),deploymentVersion:evidence.deploymentVersion,sourceOfTruth:'SHEETS'}));return result;
+}
+function refreshMigrationPreparedDeployment() {
+  var identity=migrationProductionIdentity_(),evidence=migrationOwnerEvidence_(identity);
+  return migrationWithSourceLock_(function(){
+    var config=migrationOperationsConfig_();
+    if(!config || migrationTrackingConfig_() || config.baselineRef || config.sourceBookId!==identity.book.getId() || config.projectId!==evidence.projectId || config.schoolId!==evidence.schoolId || migrationOperationsState_().invalidated)throw migrationError_('MIGRATION_REFRESH_NOT_ALLOWED');
+    if(config.deploymentVersion!==evidence.deploymentVersion || config.sourceFingerprint!==evidence.sourceFingerprint){
+      config.deploymentVersion=evidence.deploymentVersion;config.sourceFingerprint=evidence.sourceFingerprint;config.preparedAt=Date.now();config.notBefore=config.preparedAt+600000;migrationOperationsSaveConfig_(config);
+    }
+    var result={ok:true,phase:'DRAINING',notBefore:new Date(config.notBefore).toISOString(),deploymentVersion:config.deploymentVersion,sourceOfTruth:'SHEETS'};
+    console.log(JSON.stringify(result));return result;
+  });
+}
+function primeMigrationSchema() {
+  var identity=migrationProductionIdentity_(),tracking=migrationTrackingConfig_();
+  function initialize(){ensureSheets_();return json_({ok:true,data:{schemaPrepared:true}});}
+  var result=migrationWithSourceLock_(function(){
+    return tracking?migrationTrackedRoute_({action:'migrationPrimeSchema',operationId:'owner-schema-service-'+MOBILE_SERVICE_VERSION},{name:'owner:migration-schema'},initialize,tracking,identity.book):initialize();
+  });
+  if(!JSON.parse(result.getContent()).ok)throw migrationError_('MIGRATION_SCHEMA_PREPARATION_FAILED');
+  console.log(JSON.stringify({ok:true,schemaPrepared:true,serviceVersion:MOBILE_SERVICE_VERSION,sourceOfTruth:'SHEETS'}));
 }
 function activateMigrationProduction() {
   var identity=migrationProductionIdentity_(),evidence=migrationOwnerEvidence_(identity),config=migrationOperationsConfig_();

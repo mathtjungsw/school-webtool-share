@@ -12,7 +12,7 @@ function fixture(){
     ContentService:{MimeType:{JSON:'json'},createTextOutput:text=>({getContent:()=>text,setMimeType(){return this}})},
     CacheService:{getScriptCache:()=>({get:()=>null,put(){},remove(){}})},
   })
-  for(const f of ['Code.gs','FirestoreRepository.gs','MigrationSync.gs','MigrationAdmin.gs','MigrationJournal.gs','MigrationStore.gs','MigrationCapture.gs','MigrationTracking.gs','MigrationReplication.gs','MigrationRecovery.gs','MigrationOperations.gs','MigrationBaseline.gs'])new vm.Script(fs.readFileSync(path.join(root,'server',f),'utf8'),{filename:f}).runInContext(ctx)
+  for(const f of ['Code.gs','FirestoreRepository.gs','MigrationSync.gs','MigrationAdmin.gs','MigrationJournal.gs','MigrationStore.gs','MigrationCapture.gs','MigrationTracking.gs','MigrationReplication.gs','MigrationRecovery.gs','MigrationOperations.gs','MigrationBaseline.gs','MigrationSchema.gs'])new vm.Script(fs.readFileSync(path.join(root,'server',f),'utf8'),{filename:f}).runInContext(ctx)
   // Keep initialization synthetic; mark historical one-off seed migrations complete.
   for(const name of ['STAFF_ASSIGNMENTS_2026_APPLIED_KEY','STAFF_NAME_MIGRATION_1_1_30_KEY','STAFF_ROSTER_MIGRATION_1_1_31_KEY','STAFF_ROSTER_FILE_ORDER_1_1_37_KEY','TIMETABLE_OVERRIDE_SEED_KEY','OFFICIAL_RELEASE_NOTICE_RESET_KEY'])properties.set(vm.runInContext(name,ctx),'true')
   ctx.ensureSheets_()

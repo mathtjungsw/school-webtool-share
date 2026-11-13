@@ -36,7 +36,15 @@ try {
   if(!$health.ok -or $health.data.service -ne 'UngcheonSchoolHub') {throw 'Health not confirmed.'}
   $manifest=($live.files | Where-Object name -eq 'appsscript').source | ConvertFrom-Json
   $liveScopes=@($manifest.oauthScopes | Where-Object {$_})
+  $comparisons=@($head.files | ForEach-Object {
+    $file=$_;$deployed=@($live.files | Where-Object { $_.name -eq $file.name -and $_.type -eq $file.type })
+    $extension=if($file.type -eq 'SERVER_JS'){'.gs'}elseif($file.type -eq 'JSON'){'.json'}else{'.html'}
+    $localPath=Join-Path $PSScriptRoot ('../server/'+$file.name+$extension)
+    $localText=if(Test-Path -LiteralPath $localPath){[IO.File]::ReadAllText($localPath).Replace("`r`n","`n").TrimEnd()}else{''}
+    [ordered]@{name=$file.name;headMatchesLive=($deployed.Count -eq 1 -and $file.source.Replace("`r`n","`n").TrimEnd() -ceq $deployed[0].source.Replace("`r`n","`n").TrimEnd());headMatchesLocal=($file.source.Replace("`r`n","`n").TrimEnd() -ceq $localText)}
+  })
   $report=[ordered]@{schemaVersion=1;inspectedAt=[DateTime]::UtcNow.ToString('o');readOnly=$true;scriptId=$scriptId;deploymentId=$deploymentId;deploymentVersion=$version;liveServiceVersion=(ServiceVersion $live);headServiceVersion=(ServiceVersion $head);liveFingerprint=(Fingerprint $live);headFingerprint=(Fingerprint $head);liveModuleNames=@($live.files.name);healthServiceVersion=$health.data.version;healthOk=$true;explicitLiveOAuthScopes=$liveScopes;propertiesRead=$false;sourceRowsRead=$false;productionChanged=$false}
+  $report.moduleComparisons=$comparisons
   [IO.File]::WriteAllText([IO.Path]::GetFullPath($ReportPath),($report | ConvertTo-Json -Depth 8)+"`n",[Text.UTF8Encoding]::new($false))
   Write-Output "Verified fixed deployment @$version, live service $($report.liveServiceVersion), HEAD service $($report.headServiceVersion), health $($report.healthServiceVersion). Read-only."
 } catch {throw 'Production inspection failed; credentials and remote bodies omitted.'}

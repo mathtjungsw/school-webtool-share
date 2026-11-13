@@ -12,6 +12,17 @@ function businessView(source){
     sourceLock_:"function sourceLock_() { return typeof migrationCompatibleLock_ === 'function' ? migrationCompatibleLock_() : LockService.getScriptLock(); }",
   }
   function walk(node){
+    if(ts.isFunctionDeclaration(node)&&['ensureSheets_','ensureStaffChecklistSheets_'].includes(node.name?.text)){
+      const kind=node.name.text==='ensureSheets_'?'ALL':'CHECKLISTS',statements=node.body.statements
+      const expected=[`if (typeof migrationSchemaReady_ === 'function' && migrationSchemaReady_(book, MOBILE_SERVICE_VERSION, '${kind}')) return;`,
+        `if (typeof migrationRememberSchema_ === 'function') migrationRememberSchema_(book, MOBILE_SERVICE_VERSION, '${kind}');`].map(x=>x.replace(/\s+/g,''))
+      const cacheStatements=[...statements].filter(s=>/migrationSchemaReady_|migrationRememberSchema_/.test(s.getText(ast)))
+      assert.ok(cacheStatements.length===0||cacheStatements.length===2,'Partial schema cache wrapper')
+      if(cacheStatements.length){
+        assert.equal(cacheStatements[0],statements[2]);assert.equal(cacheStatements[1],statements[statements.length-1])
+        cacheStatements.forEach((s,i)=>{assert.equal(s.getText(ast).replace(/\s+/g,''),expected[i]);edits.push([s.getStart(ast),s.end,''])})
+      }
+    }
     if(ts.isFunctionDeclaration(node)&&expectedAccessors[node.name?.text]){
       assert.equal(node.getText(ast).replace(/\s+/g,''),expectedAccessors[node.name.text].replace(/\s+/g,''),'Unexpected migration accessor implementation')
       edits.push([node.getStart(ast),node.end,'']);return

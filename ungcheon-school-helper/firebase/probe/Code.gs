@@ -63,6 +63,29 @@ function probeFirestoreConnection() {
   return result;
 }
 
+function probeNativeBusinessLatency() {
+  if (ScriptApp.getScriptId()!=='16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9') throw new Error('PROBE_PROJECT_MISMATCH');
+  var props=PropertiesService.getScriptProperties(),key='SYNTHETIC_NATIVE_ROUTE_BOOK_V1',id=props.getProperty(key),title='웅천고 이전 시험 - 합성 업무 요청 v1';
+  if (id==='12HhlpO5xjhp0JlKNlf6UVd1Dlz8ZgThFYJ9j4jM0nf4' || id==='1OBt8XHMYH8uNAfuozbjc8iON954FjBSmojf4y2c74GQ') throw new Error('PROBE_SOURCE_FORBIDDEN');
+  var book=id?SpreadsheetApp.openById(id):SpreadsheetApp.create(title);
+  if (book.getName()!==title) throw new Error('PROBE_BOOK_MISMATCH');
+  if (!id) {id=book.getId();props.setProperty(key,id);}
+  migrationProbeNativeApp_.initialize(book);migrationInitializeStore_(book);
+  var config={schemaVersion:1,enabled:true,sourceBookId:id},timings=[],rowId;
+  ['addLink','deleteLink'].forEach(function(action){
+    var body={action:action,operationId:'synthetic-native-business-v2-'+action,staffToken:'SYNTHETIC_NATIVE_SESSION',adminPassword:'SYNTHETIC_ADMIN_ONLY',
+      department:'Test',title:'Synthetic native business',url:'https://example.com',id:rowId || ''};
+    var start=Date.now(),response=migrationTrackedRoute_(body,{name:'Synthetic Native Teacher'},function(){return migrationProbeNativeApp_.request(book,body);},config,book);
+    var result=JSON.parse(response.getContent());if(!result.ok)throw new Error('PROBE_NATIVE_ROUTE_FAILED');
+    if(action==='addLink')rowId=result.data.id;
+    timings.push({action:action,elapsedMillis:Date.now()-start});
+  });
+  var status=migrationSheetsStore_(book).status();
+  if (status.pendingCount || status.reviewCount) throw new Error('PROBE_NATIVE_JOURNAL_INCOMPLETE');
+  var output={ok:true,dataset:'SYNTHETIC_ONLY',dispatcher:'ACTUAL_CODE_WITH_SYNTHETIC_AUTH',spreadsheetId:id,timings:timings,recordedRevision:status.highWater,pendingCount:status.pendingCount,productionScriptChanged:false};
+  console.log(JSON.stringify(output));return output;
+}
+
 function probeTrackedWriteLatency() {
   if (ScriptApp.getScriptId()!=='16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9') throw new Error('PROBE_PROJECT_MISMATCH');
   var id=PropertiesService.getScriptProperties().getProperty('SYNTHETIC_BASELINE_BOOK_V1');

@@ -166,7 +166,7 @@ test('service v44+, current desktop version and earlier desktop/mobile release n
   const h = harness();
   const packageVersion = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')).version;
   assert.ok(h.constants.version >= 44);
-  assert.equal(h.constants.notes[0].key, 'server-v64');
+  assert.equal(h.constants.notes[0].key, `server-v${h.constants.version}`);
   assert.equal(h.constants.notes.find(note => /^v\d+\.\d+\.\d+$/.test(note.key)).key, packageVersion.includes('-preview.') ? 'v1.1.38' : `v${packageVersion}`);
   for (const key of ['v1.1.24', 'v1.1.25', 'v1.1.26', 'mobile-service-2026-08-26', 'mobile-service-2026-08-30', 'mobile-service-meal-range-2026-08-30']) {
     assert.equal(h.constants.notes.filter(note => note.key === key).length, 1, key);

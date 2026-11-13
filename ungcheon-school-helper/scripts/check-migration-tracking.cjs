@@ -93,6 +93,7 @@ test('real bulk roster route captures both rows and metadata in one revision',()
 })
 test('legacy maintenance on a credential route journals only source data, never credentials',()=>{
   const f=fixture();f.enable()
+  f.properties.delete('UNG_MIGRATION_SCHEMA_ALL_V1')
   f.ctx.ensureReleaseNotices_=()=>f.ctx.sourceBook_().getSheetByName('공지').appendRow(['synthetic-maintenance','Synthetic','Maintenance','info','2026-11-13',''])
   const response=f.post({action:'registerNeisSyncDevice',operationId:'synthetic-device-register',adminPassword:'synthetic-admin',deviceId:'synthetic-device-id-1234567890',registeredBy:'Synthetic'})
   assert.equal(response.ok,true);assert.ok(response.data.token)
