@@ -9,6 +9,11 @@ function migrationBackendProperties_() {
     deleteProperty:function(){throw migrationError_('MIGRATION_REHEARSAL_PROPERTY_FORBIDDEN');},
     getProperties:function(){throw migrationError_('MIGRATION_REHEARSAL_PROPERTY_ENUMERATION_FORBIDDEN');}};
 }
+function migrationBackendVersionProperties_(value) {
+  var result=Object.create(null);
+  Object.keys(value||{}).forEach(function(key){if(!/^UNG_SYNC_RESOURCE_[A-Za-z0-9]+$/.test(key)||typeof value[key]!=='string'||value[key].length>500)throw migrationError_('MIGRATION_REHEARSAL_PROPERTY_FORBIDDEN');result[key]=value[key];});
+  return result;
+}
 function migrationSnapshotBook_(reader,bookId,writable) {
   var catalog=migrationCatalog_(),states=Object.create(null),dirty=Object.create(null);
   function clone(value){return migrationDecode_(migrationEncode_(value));}
@@ -37,7 +42,7 @@ function migrationSnapshotBook_(reader,bookId,writable) {
       if([row,column,rows,columns].some(function(n){return !Number.isSafeInteger(n)||n<1;})||row+rows>100002||column+columns>257)throw migrationError_('MIGRATION_RANGE_UNSUPPORTED');
       function matrix(data){return Array.from({length:rows},function(_,r){return Array.from({length:columns},function(_,c){return clone(cell(data,row+r,column+c));});});}
       var range={getRow:function(){return row;},getColumn:function(){return column;},getNumRows:function(){return rows;},getNumColumns:function(){return columns;},getValues:function(){return matrix(s.values);},getFormulas:function(){return matrix(s.formulas);},
-        getDisplayValues:function(){return matrix(s.values).map(function(r){return r.map(function(v){if(v instanceof Date)throw migrationError_('MIGRATION_DISPLAY_DATE_REQUIRES_FORMAT');return String(v);});});},
+        getDisplayValues:function(){return matrix(s.values).map(function(r){return r.map(function(v){if(v instanceof Date)throw migrationError_('MIGRATION_DISPLAY_DATE_REQUIRES_FORMAT');return typeof v==='boolean'?(v?'TRUE':'FALSE'):String(v);});});},
         getNumberFormats:function(){return Array.from({length:rows},function(){return Array(columns).fill('General');});},
         setValues:function(data){
           if(!Array.isArray(data)||data.length!==rows||data.some(function(r){return !Array.isArray(r)||r.length!==columns;}))throw migrationError_('MIGRATION_RANGE_SHAPE');
@@ -73,8 +78,8 @@ function migrationWithBackend_(reader,bookId,writable,callback) {
   if(migrationBackendContext_ || migrationTrackingContext_)throw migrationError_('MIGRATION_BACKEND_NESTED');
   if(reader.root && reader.root.sourceBookHash!==migrationHash_(bookId))throw migrationError_('MIGRATION_SOURCE_MISMATCH');
   var facade=migrationSnapshotBook_(reader,bookId,writable),previousRoute=migrationRouteActive_;
-  migrationBackendContext_={book:facade.book,properties:Object.create(null)};migrationRouteActive_=true;
-  try{return {response:callback(),captures:facade.changed(),loaded:facade.loaded()};}
+  migrationBackendContext_={book:facade.book,properties:migrationBackendVersionProperties_(reader.root && reader.root.properties)};migrationRouteActive_=true;
+  try{return {response:callback(),captures:facade.changed(),loaded:facade.loaded(),properties:migrationBackendVersionProperties_(migrationBackendContext_.properties)};}
   finally{migrationBackendContext_=null;migrationRouteActive_=previousRoute;}
 }
 function migrationPreviewActionAllowed_(action,write) {
@@ -90,12 +95,12 @@ function migrationRehearsal_(repo,baselineRef,bookId,body,session,callback,label
   var intent=migrationOperationIntent_({actorHash:migrationHash_(session.name),action:body.action,requestHash:migrationHash_(migrationBusinessRequest_(body)),operationId:body.operationId,resources:migrationCatalog_().map(function(x){return x.resource;})});
   var receiptPath=rootPath+'/rehearsalReceipts/'+intent.operationKey,receipt=repo.get(receiptPath);
   if(receipt){if(migrationHash_(receipt.data.intent)!==migrationHash_(intent))throw migrationError_('MIGRATION_OPERATION_CONFLICT');return {response:receipt.data.responseText,replayed:true,revision:receipt.data.revision};}
-  var reader={resource:function(name){var head=root.data.resources.filter(function(x){return x.resource===name;});if(head.length!==1)throw migrationError_('MIGRATION_RESOURCE_OUTSIDE_BASELINE');return migrationReadServingResource_(repo,head[0]);}};
+  var reader={root:root.data,revision:root.data.revision,resource:function(name){var head=root.data.resources.filter(function(x){return x.resource===name;});if(head.length!==1)throw migrationError_('MIGRATION_RESOURCE_OUTSIDE_BASELINE');return migrationReadServingResource_(repo,head[0]);}};
   var output=migrationWithBackend_(reader,bookId,true,callback),text=output.response.getContent(),response=JSON.parse(text);
   if(response.ok!==true)return {response:text,replayed:false,revision:root.data.revision,committed:false};
   if(Utilities.newBlob(text).getBytes().length>200000)throw migrationError_('MIGRATION_REHEARSAL_RECEIPT_TOO_LARGE');
   var heads=root.data.resources.slice();output.captures.forEach(function(capture){var digest=migrationStageServing_(repo,capture);heads=heads.map(function(head){return head.resource===capture.resource?{resource:head.resource,digest:digest,count:capture.records.length,present:capture.present,headers:capture.headers,revision:root.data.revision+1}:head;});});
-  var next=Object.assign({},root.data,{revision:root.data.revision+1,resources:heads});
+  var next=Object.assign({},root.data,{revision:root.data.revision+1,resources:heads,properties:output.properties});
   repo.commit([{path:rootPath,data:next,updateTime:root.updateTime},{path:receiptPath,data:{schemaVersion:1,intent:intent,revision:next.revision,responseText:text},createOnly:true}]);
   return {response:text,replayed:false,revision:next.revision,committed:true,loaded:output.loaded};
 }

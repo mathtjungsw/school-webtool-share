@@ -1,4 +1,16 @@
 /** Run only in a separate standalone Apps Script project, never in the live app. */
+function probeNativeBooleanDisplay() {
+  if(ScriptApp.getScriptId()!=='16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9')throw new Error('PROBE_PROJECT_MISMATCH');
+  var id=PropertiesService.getScriptProperties().getProperty('SYNTHETIC_NATIVE_ROUTE_BOOK_V1');
+  if(id!=='1n4PZxxSP8rqp-n59V3mU2-gBBC3sqLaJLu2WY0ZGAPM')throw new Error('PROBE_BOOK_MISMATCH');
+  var book=SpreadsheetApp.openById(id),name='_SYNTH_DISPLAY_V1',sheet=book.getSheetByName(name)||book.insertSheet(name);
+  var values=[[true,false,0,12.5,'00012']];
+  if(!sheet.getLastRow())sheet.getRange(1,1,1,5).setValues(values);
+  var actual=sheet.getRange(1,1,1,5).getValues(),display=sheet.getRange(1,1,1,5).getDisplayValues();
+  if(actual[0][0]!==true||actual[0][1]!==false||display[0].some(function(v){return !/^(TRUE|FALSE|true|false|0|12\.5|0*12)$/.test(v);}))throw new Error('PROBE_DISPLAY_FIXTURE_CHANGED');
+  console.log(JSON.stringify({ok:true,dataset:'SYNTHETIC_ONLY',types:actual[0].map(function(v){return typeof v;}),display:display,productionChanged:false}));
+}
+
 function probeNativeFirestoreBackend() {
   if(ScriptApp.getScriptId()!=='16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9')throw new Error('PROBE_PROJECT_MISMATCH');
   var props=PropertiesService.getScriptProperties(),id=props.getProperty('SYNTHETIC_NATIVE_ROUTE_BOOK_V1');
@@ -21,15 +33,21 @@ function probeNativeFirestoreBackend() {
   }
   var timings=[],rowId;
   ['addLink','deleteLink'].forEach(function(action){
-    var body={action:action,operationId:'native-firestore-v1-'+action,staffToken:'SYNTHETIC_NATIVE_SESSION',adminPassword:'SYNTHETIC_ADMIN_ONLY',department:'Test',title:'Synthetic Firestore',url:'https://example.com',id:rowId||''};
-    var start=Date.now(),write=migrationRehearsal_(repo,ref,id,body,{name:'Synthetic Native Teacher'},function(){return migrationProbeNativeApp_.request(book,body);},'native-v1');
+    var body={action:action,operationId:'native-firestore-v2-'+action,staffToken:'SYNTHETIC_NATIVE_SESSION',adminPassword:'SYNTHETIC_ADMIN_ONLY',department:'Test',title:'Synthetic Firestore',url:'https://example.com',id:rowId||''};
+    var start=Date.now(),write=migrationRehearsal_(repo,ref,id,body,{name:'Synthetic Native Teacher'},function(){return migrationProbeNativeApp_.request(book,body);},'native-v2');
     var parsed=JSON.parse(write.response);if(!parsed.ok)throw new Error('PROBE_REHEARSAL_FAILED');if(action==='addLink')rowId=parsed.data.id;
     timings.push({action:action,elapsedMillis:Date.now()-start,replayed:write.replayed});
-    var replay=migrationRehearsal_(repo,ref,id,body,{name:'Synthetic Native Teacher'},function(){throw new Error('PROBE_DUPLICATE_EXECUTED');},'native-v1');
+    if(!write.replayed || action==='deleteLink'){
+      var stagedReader=migrationRehearsalReader_(repo,ref,id,'native-v2');
+      var stagedRead=migrationWithBackend_(stagedReader,id,false,function(){return migrationProbeNativeApp_.request(book,request);});
+      var stagedRows=JSON.parse(stagedRead.response.getContent()).data;
+      if(!Array.isArray(stagedRows)||stagedRows.length!==JSON.parse(original).data.length+(action==='addLink'?1:0)||stagedRows.some(function(row){return row.id===rowId;})!==(action==='addLink'))throw new Error('PROBE_WRITE_READBACK_FAILED');
+    }
+    var replay=migrationRehearsal_(repo,ref,id,body,{name:'Synthetic Native Teacher'},function(){throw new Error('PROBE_DUPLICATE_EXECUTED');},'native-v2');
     if(!replay.replayed||replay.response!==write.response)throw new Error('PROBE_RECEIPT_FAILED');
   });
   if(migrationSheetsStore_(book).status().highWater!==before||migrationProbeNativeApp_.request(book,request).getContent()!==original)throw new Error('PROBE_SOURCE_CHANGED');
-  console.log(JSON.stringify({ok:true,phase:'COMPLETE',dataset:'SYNTHETIC_ONLY',checks:['actualDispatcher','nativeFirestoreBatchGet','readParity','atomicWriteRehearsal','duplicateReceipt','sourceUnchanged'],sourceRevision:before,baselineRef:ref,timings:timings,productionScriptChanged:false}));
+  console.log(JSON.stringify({ok:true,phase:'COMPLETE',dataset:'SYNTHETIC_ONLY',checks:['actualDispatcher','nativeFirestoreBatchGet','readParity','atomicWriteRehearsal','writeReadback','duplicateReceipt','sourceUnchanged'],sourceRevision:before,baselineRef:ref,timings:timings,productionScriptChanged:false}));
 }
 
 function probeIncrementalBaseline() {

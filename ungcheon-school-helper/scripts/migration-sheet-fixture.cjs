@@ -21,7 +21,7 @@ function makeBook(id='synthetic-book') {
       const matrix=(data,empty='')=>Array.from({length:nr},(_,i)=>Array.from({length:nc},(_,j)=>copy(cell(data,r+i,c+j,empty))))
       const target={
         getRow:()=>r,getColumn:()=>c,getNumRows:()=>nr,getNumColumns:()=>nc,
-        getValues(){point('read-values',name);Object.assign(events[events.length-1],{row:r,rows:nr,columns:nc});return matrix(values)},getDisplayValues:()=>matrix(values).map(row=>row.map(String)),
+        getValues(){point('read-values',name);Object.assign(events[events.length-1],{row:r,rows:nr,columns:nc});return matrix(values)},getDisplayValues:()=>matrix(values).map(row=>row.map(v=>typeof v==='boolean'?(v?'TRUE':'FALSE'):String(v))),
         getFormulas:()=>matrix(formulas),getNumberFormats:()=>matrix(formats,'General'),
         setValues(data){if(data.length!==nr||data.some(row=>row.length!==nc))throw Error('shape mismatch');point('before-write',name);for(let i=0;i<nr;i++)for(let j=0;j<nc;j++){assign(values,r+i,c+j,data[i][j]);assign(formulas,r+i,c+j,typeof data[i][j]==='string'&&data[i][j].startsWith('=')?data[i][j]:'')}point('after-write',name);return target},
         setValue(v){return target.setValues(Array.from({length:nr},()=>Array(nc).fill(v)))},

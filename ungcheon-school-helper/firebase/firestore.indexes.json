@@ -10,6 +10,7 @@
     { "collectionGroup": "servingResources", "fieldPath": "chunkRefs", "indexes": [] },
     { "collectionGroup": "servingEpochs", "fieldPath": "resources", "indexes": [] },
     { "collectionGroup": "rehearsalEpochs", "fieldPath": "resources", "indexes": [] },
+    { "collectionGroup": "rehearsalEpochs", "fieldPath": "properties", "indexes": [] },
     { "collectionGroup": "rehearsalReceipts", "fieldPath": "responseText", "indexes": [] }
   ]
 }

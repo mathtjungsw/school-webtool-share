@@ -37,6 +37,24 @@ test('actual PC read responses match Sheets and fetch only the requested resourc
   }
   assert.equal(f.ctx.migrationBackendContext_,null);assert.equal(f.journal().length,0)
 })
+test('checklist writes persist their change notification version only inside the rehearsal root',()=>{
+  const f=setup(g=>{g.book.getSheetByName('교원명렬').appendRow(['teacher-1','Synthetic Teacher','교사','Test','Math','']);g.book.getSheetByName('교원명렬정보').appendRow([1,'Synthetic','Synthetic','2026-11-13',1])})
+  f.properties.set('UNG_SYNC_RESOURCE_staffChecklists','v:9:synthetic-existing')
+  const before=JSON.stringify([...f.properties]),locks=f.locks()
+  const result=f.write({action:'addStaffChecklist',operationId:'rehearsal-checklist-1',creatorName:'Synthetic Teacher',title:'Synthetic checklist',startDate:'2026-11-13',targetNames:['Synthetic Teacher'],items:['Synthetic item']})
+  assert.equal(JSON.parse(result.response).ok,true,result.response)
+  const reader=f.ctx.migrationRehearsalReader_(f.repo,f.ref,f.book.getId(),'fixture')
+  const manifest=f.ctx.migrationWithBackend_(reader,f.book.getId(),false,()=>f.ctx.getSyncManifest_()).response
+  assert.match(manifest.resources.staffChecklists,/^v:10:/)
+  assert.equal(JSON.stringify([...f.properties]),before);assert.equal(f.locks(),locks)
+  assert.equal(f.ctx.migrationServingReader_(f.repo,f.ref).resource('checklists').records.length,0)
+})
+test('native TRUE/FALSE display preserves timetable override change-detection hashes',()=>{
+  const f=setup(g=>g.book.getSheetByName('일일시간표예외').appendRow(['synthetic-override','2026-11-13','3','',1,'clear','',0,'Synthetic',true,'Synthetic','2026-11-13','2026-11-13']))
+  assert.deepEqual(normalize(JSON.parse(f.read({action:'getSyncManifest'}).response.getContent())),normalize(f.post({action:'getSyncManifest'})))
+  const reader=f.ctx.migrationServingReader_(f.repo,f.ref),facade=f.ctx.migrationSnapshotBook_(reader,f.book.getId(),false)
+  assert.equal(facade.book.getSheetByName('일일시간표예외').getRange(2,10).getDisplayValues()[0][0],'TRUE')
+})
 test('real create/update/delete rehearsal commits atomically without touching Sheets, properties or journal',()=>{
   const f=setup(),events=f.book.events.length,properties=JSON.stringify([...f.properties])
   const first=f.write({action:'addFeatureRequest',operationId:'rehearsal-create',requestType:'improvement',title:'Synthetic request',content:'Synthetic content',author:'Synthetic Teacher'})
@@ -60,6 +78,14 @@ test('lost commit response retries exactly once; bad authorization and changed p
   assert.throws(()=>f.write({...body,adminPassword:'bad'}),/ADMIN_REQUIRED/)
   assert.throws(()=>f.write({...body,title:'Changed'}),e=>e.code==='MIGRATION_OPERATION_CONFLICT')
   assert.equal(f.journal().length,0)
+})
+test('concurrent atomic writer wins without lost data; the conflicted operation retries against the new root',()=>{
+  const f=setup(),body={action:'addLink',operationId:'rehearsal-concurrent-a',title:'Synthetic A',url:'https://example.com/a',department:'Test'};let raced=false
+  f.repo.setFault((when,writes)=>{if(!raced&&when==='before'&&writes.some(x=>x.path.includes('/rehearsalReceipts/'))){raced=true;f.repo.setFault(null);const other=f.write({...body,operationId:'rehearsal-concurrent-b',title:'Synthetic B',url:'https://example.com/b'});assert.equal(other.committed,true)}})
+  assert.throws(()=>f.write(body),e=>e.code==='MIGRATION_FIRESTORE_CONFLICT')
+  const reader=()=>f.ctx.migrationRehearsalReader_(f.repo,f.ref,f.book.getId(),'fixture')
+  assert.equal(reader().resource('links').records.length,1);assert.equal(f.write(body).revision,2);assert.equal(reader().resource('links').records.length,2)
+  assert.equal(f.write(body).replayed,true);assert.equal(f.ctx.migrationServingReader_(f.repo,f.ref).resource('links').records.length,0)
 })
 test('failed business request discards partial overlay and cannot escape to credentials or live caches',()=>{
   const f=setup(),properties=JSON.stringify([...f.properties]),reader=f.ctx.migrationServingReader_(f.repo,f.ref)

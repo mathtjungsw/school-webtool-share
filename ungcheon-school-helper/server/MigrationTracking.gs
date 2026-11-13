@@ -15,7 +15,9 @@ function migrationCompatibleLock_() {
   return {
     waitLock: function(timeout) {
       if (opened) throw migrationError_('MIGRATION_LOCK_REUSE');
-      if (migrationSourceLockDepth_ === 0) { nativeLock = LockService.getScriptLock(); nativeLock.waitLock(timeout); owns = true; migrationSourceLockGeneration_++; }
+      // Isolated Firestore requests commit with a root precondition. Their local
+      // business locks must not make an interactive Sheets writer wait on HTTP.
+      if (migrationSourceLockDepth_ === 0 && !(typeof migrationBackendContext_ !== 'undefined' && migrationBackendContext_)) { nativeLock = LockService.getScriptLock(); nativeLock.waitLock(timeout); owns = true; migrationSourceLockGeneration_++; }
       migrationSourceLockDepth_++; opened = true;
     },
     releaseLock: function() {
