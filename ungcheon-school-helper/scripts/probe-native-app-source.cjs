@@ -3,8 +3,13 @@
 // production source is included unchanged; only its environment/auth boundary
 // is supplied by this test harness. No production workbook can be passed in.
 const fs=require('node:fs'),path=require('node:path')
-function source(){return 'var migrationProbeNativeApp_ = (function(){\nvar nativeBook=null;\n'+fs.readFileSync(path.join(__dirname,'../server/Code.gs'),'utf8')+`
-function sourceBook_(){return migrationTrackingContext_ ? migrationTrackingContext_.facade : nativeBook;}
+function source(){
+const tracking=fs.readFileSync(path.join(__dirname,'../server/MigrationTracking.gs'),'utf8')
+const shouldTrack=tracking.match(/function migrationShouldTrack_\(action\) \{[\s\S]*?\n\}/)
+if(!shouldTrack)throw Error('Shared tracking classifier missing')
+// Bind the unchanged classifier to the real Code.gs constants in this namespace.
+return 'var migrationProbeNativeApp_ = (function(){\nvar nativeBook=null;\n'+fs.readFileSync(path.join(__dirname,'../server/Code.gs'),'utf8')+'\n'+shouldTrack[0]+'\n'+`
+function sourceBook_(){return typeof migrationBackendContext_!=='undefined'&&migrationBackendContext_?migrationBackendContext_.book:migrationTrackingContext_ ? migrationTrackingContext_.facade : nativeBook;}
 function staffRequire_(body){if(body.staffToken!=='SYNTHETIC_NATIVE_SESSION')throw new Error('PROBE_AUTH_REQUIRED');return {name:'Synthetic Native Teacher'};}
 function requireAdmin_(password){if(password!=='SYNTHETIC_ADMIN_ONLY')throw new Error('PROBE_ADMIN_REQUIRED');}
 function assertBook(book){

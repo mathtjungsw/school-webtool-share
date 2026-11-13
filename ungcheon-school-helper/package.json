@@ -6,7 +6,7 @@
   "author": "웅천고등학교",
   "license": "MIT",
   "scripts": {
-    "check:migration": "node scripts/check-firebase-migration.cjs && node scripts/check-migration-journal.cjs && node scripts/check-migration-tracking.cjs && node scripts/check-migration-replication.cjs && node scripts/check-migration-operations.cjs && node scripts/check-migration-baseline.cjs && node scripts/check-migration-owner.cjs && node scripts/check-deployment-evidence.cjs && node scripts/check-migration-schema.cjs && node scripts/check-migration-serving.cjs && node scripts/check-hub-operation-id.cjs",
+    "check:migration": "node scripts/check-firebase-migration.cjs && node scripts/check-migration-journal.cjs && node scripts/check-migration-tracking.cjs && node scripts/check-migration-replication.cjs && node scripts/check-migration-operations.cjs && node scripts/check-migration-baseline.cjs && node scripts/check-migration-owner.cjs && node scripts/check-deployment-evidence.cjs && node scripts/check-migration-schema.cjs && node scripts/check-migration-serving.cjs && node scripts/check-migration-backend.cjs && node scripts/check-hub-operation-id.cjs",
     "check:migration:journal": "node scripts/check-migration-journal.cjs",
     "check:migration:emulator": "node scripts/check-firebase-migration.cjs --emulator",
     "dev": "electron-vite dev",

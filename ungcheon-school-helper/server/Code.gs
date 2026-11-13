@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 65;
+const MOBILE_SERVICE_VERSION = 66;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -425,6 +425,7 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  { key: 'server-v66', title: '서버 이전 조회·저장 검증', body: '기존 자료와 로그인을 유지하면서 새 서버의 조회와 저장을 분리된 시험 경로에서 검증합니다.', date: '2026-11-13' },
   {
     key: 'server-v65',
     title: '[서버 개선] 저장 준비 작업 재사용',
@@ -987,6 +988,7 @@ function doPost(e) {
     const staffSession = ['health','verifyMobileViewer','getMobileScheduleBundle','getMobileAttendanceRoster'].indexOf(action) < 0 ? staffRequire_(body) : null;
 
     // Administrator-only metadata inspection; never runs sheet initialization.
+    if (action === 'previewMigrationRequest') return json_({ ok: true, data: migrationPreviewRequest_(body, staffSession) });
     if (action === 'getMigrationStatus') return json_({ ok: true, data: migrationAdminStatus_(body) });
     if (action === 'getMigrationInventory') return json_({ ok: true, data: migrationAdminInventory_(body) });
     if (action === 'runMigrationReplica') return json_({ ok: true, data: migrationAdminRunReplica_(body) });
@@ -1260,7 +1262,7 @@ function getSyncManifest_() {
     return 'v:' + String(rows.length ? Number(rows[0].version) || 0 : 0);
   }
   function activityOf_(resource, sheetNames) {
-    const stored = PropertiesService.getScriptProperties().getProperty('UNG_SYNC_RESOURCE_' + resource);
+    const stored = sourceProperties_().getProperty('UNG_SYNC_RESOURCE_' + resource);
     if (stored) return stored;
     // 기존 배포 자료의 최초 1회만 기초 버전을 만든다.
     let count = 0;
@@ -1273,7 +1275,7 @@ function getSyncManifest_() {
       });
     });
     const version = 'a:' + String(count) + ':' + latest;
-    PropertiesService.getScriptProperties().setProperty('UNG_SYNC_RESOURCE_' + resource, version);
+    sourceProperties_().setProperty('UNG_SYNC_RESOURCE_' + resource, version);
     return version;
   }
   return {
@@ -1462,7 +1464,7 @@ function ensureStaffChecklistSheets_() {
 }
 
 function touchSyncResource_(resource) {
-  const properties = PropertiesService.getScriptProperties();
+  const properties = sourceProperties_();
   const key = 'UNG_SYNC_RESOURCE_' + resource;
   const previous = String(properties.getProperty(key) || 'v:0');
   const match = previous.match(/^v:(\d+)/);
@@ -3846,7 +3848,7 @@ function getWidgetAttendanceSummaries_(body) {
   const cacheKey = 'widget-attendance:v' + MOBILE_SERVICE_VERSION + ':' + sha256_(viewerName).slice(0, 12) + ':' + date.replace(/-/g, '') + ':' + sha256_(attendanceContextVersion).slice(0, 8);
   if (!body.force) {
     try {
-      const cached = CacheService.getScriptCache().get(cacheKey);
+      const cached = (sourceCacheEnabled_() && CacheService.getScriptCache().get(cacheKey));
       if (cached) return JSON.parse(cached);
     } catch (ignore) {}
   }
@@ -3861,7 +3863,7 @@ function getWidgetAttendanceSummaries_(body) {
     attendanceSummaries: mobileAttendanceSummaries_(viewerName, date, date, timetableOverrides, timetableChanges, attendancePulledLessons),
     fetchedAt: new Date().toISOString()
   };
-  try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 300); } catch (ignore) {}
+  try { if (sourceCacheEnabled_()) CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 300); } catch (ignore) {}
   return result;
 }
 
@@ -3876,7 +3878,7 @@ function getMobileAttendanceRoster_(body) {
   const attendanceContextVersion = clean_(body.attendanceContextVersion, 100);
   const cacheKey = 'mobile-attendance-roster:v' + MOBILE_SERVICE_VERSION + ':' + sha256_(viewerName).slice(0, 12) + ':' + date.replace(/-/g, '') + ':' + period + ':' + sha256_(attendanceContextVersion).slice(0, 8);
   try {
-    const cached = CacheService.getScriptCache().get(cacheKey);
+    const cached = (sourceCacheEnabled_() && CacheService.getScriptCache().get(cacheKey));
     if (cached) return JSON.parse(cached);
   } catch (ignore) {}
 
@@ -3937,7 +3939,7 @@ function getMobileAttendanceRoster_(body) {
     originalLabel: context.originalLabel || '',
     requiresReview: Boolean(context.review)
   };
-  try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 300); } catch (ignore) {}
+  try { if (sourceCacheEnabled_()) CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 300); } catch (ignore) {}
   return result;
 }
 
@@ -3984,7 +3986,7 @@ function getMobileScheduleBundle_(body) {
   const attendanceContextVersion = clean_(body.attendanceContextVersion, 100);
   const cacheKey = 'mobile:v' + MOBILE_SERVICE_VERSION + ':' + sha256_(viewerName).slice(0, 12) + ':' + todayKey + ':' + fromDate + ':' + toDate + ':' + sha256_(attendanceContextVersion).slice(0, 8);
   let cached = null;
-  try { cached = CacheService.getScriptCache().get(cacheKey); } catch (ignore) {}
+  try { cached = (sourceCacheEnabled_() && CacheService.getScriptCache().get(cacheKey)); } catch (ignore) {}
   if (cached) {
     try {
       const cachedResult = JSON.parse(cached);
@@ -4062,7 +4064,7 @@ function getMobileScheduleBundle_(body) {
     servedAt: new Date().toISOString() };
   const allSourcesAvailable = Object.keys(sourceStatus).every(function(key) { return sourceStatus[key].state !== 'unavailable'; });
   if (allSourcesAvailable) {
-    try { CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 60); } catch (ignore) {}
+    try { if (sourceCacheEnabled_()) CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 60); } catch (ignore) {}
   }
   return result;
 }
@@ -4116,3 +4118,6 @@ function sourceBook_() {
 function sourceLock_() {
   return typeof migrationCompatibleLock_ === 'function' ? migrationCompatibleLock_() : LockService.getScriptLock();
 }
+
+function sourceProperties_() { return typeof migrationBackendProperties_ === 'function' ? migrationBackendProperties_() : PropertiesService.getScriptProperties(); }
+function sourceCacheEnabled_() { return typeof migrationBackendContext_ === 'undefined' || !migrationBackendContext_; }

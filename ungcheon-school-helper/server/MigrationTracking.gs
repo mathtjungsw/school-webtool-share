@@ -26,6 +26,7 @@ function migrationCompatibleLock_() {
   };
 }
 function migrationSourceBook_() {
+  if (typeof migrationBackendContext_ !== 'undefined' && migrationBackendContext_) return migrationBackendContext_.book;
   if (migrationTrackingContext_) return migrationTrackingContext_.facade;
   var book = SpreadsheetApp.getActiveSpreadsheet();
   // Direct editor calls and accidental future routes cannot silently bypass the

@@ -8,7 +8,7 @@ function migrationProductionIdentity_() {
 }
 // Rotated with each production migration release. The guarded deployment tool
 // records this ID only after checking main, exact immutable source, HEAD and URL.
-function migrationOwnerReleaseId_() {return 'migration-service65-rollout-v3';}
+function migrationOwnerReleaseId_() {return 'migration-service66-backend-v1';}
 function migrationOwnerEvidence_(identity) {
   var doc=migrationOperationsRepository_({projectId:'ungcheon-school-helper',schoolId:'ungcheon'}).get('migrationChecks/deployment');
   var record=doc && doc.data;
@@ -72,13 +72,73 @@ function migrationReplicationTick() {
   var ctx=migrationOperationsContext_(),state=migrationOperationsState_(),start=Date.now(),result;
   if (state.paused) {console.log(JSON.stringify({status:'PAUSED'}));return;}
   if (!ctx.config.baselineRef) {
-    var steps=0;
-    do {result=migrationFreezeConfiguredBaseline_();steps++;} while(result.status!=='COMPLETE' && Date.now()-start<40000 && steps<8);
-    console.log(JSON.stringify({phase:'BASELINE',steps:steps,elapsedMillis:Date.now()-start,progress:result}));return result;
+    return migrationBaselineBatch_();
   }
   result=migrationRunConfiguredReplica_(16,40000);
+  if(result.status==='IDLE')result.serving=migrationServingStep_(migrationOperationsRepository_(ctx.config),ctx.config.baselineRef);
   console.log(JSON.stringify({phase:'REPLICATION',elapsedMillis:Date.now()-start,result:result}));return result;
+}
+function migrationBaselineBatch_() {
+  var lease=migrationWithSourceLock_(function(){
+    var state=migrationOperationsState_();
+    if(state.paused || state.invalidated)return null;
+    if(state.lease && state.lease.expiresAt>Date.now())return null;
+    state.lease={id:Utilities.getUuid(),expiresAt:Date.now()+600000};migrationOperationsSaveState_(state);return state.lease.id;
+  });
+  if(!lease){console.log(JSON.stringify({phase:'BASELINE',status:'BUSY_OR_PAUSED'}));return {status:'BUSY_OR_PAUSED'};}
+  var start=Date.now(),steps=0,result;
+  try{
+    do{
+      result=migrationFreezeConfiguredBaseline_();steps++;
+      // Let an already waiting interactive writer acquire the source lock.
+      if(result.status!=='COMPLETE' && typeof Utilities.sleep==='function')Utilities.sleep(200);
+    }while(result.status!=='COMPLETE' && Date.now()-start<40000 && steps<8);
+    console.log(JSON.stringify({phase:'BASELINE',steps:steps,elapsedMillis:Date.now()-start,progress:result}));return result;
+  }finally{
+    migrationWithSourceLock_(function(){var state=migrationOperationsState_();if(state.lease && state.lease.id===lease){state.lease=null;migrationOperationsSaveState_(state);}});
+  }
 }
 function inspectMigrationProduction() {
   migrationProductionIdentity_();var status=migrationOperationsStatus_();console.log(JSON.stringify(status));return status;
+}
+function verifyMigrationProductionResource() {
+  migrationProductionIdentity_();
+  var ctx=migrationOperationsContext_(),repo=migrationOperationsRepository_(ctx.config),reader=migrationServingReader_(repo,ctx.config.baselineRef);
+  var props=PropertiesService.getScriptProperties(),key='UNG_MIGRATION_VERIFICATION_V1',signature=migrationHash_([ctx.config.baselineRef,reader.revision,MOBILE_SERVICE_VERSION]);
+  var text=props.getProperty(key),job=text?JSON.parse(text):null;
+  if(!job || job.signature!==signature)job={schemaVersion:1,signature:signature,revision:reader.revision,checks:[]};
+  var catalog=migrationCatalog_().slice().sort(function(a,b){return a.resource.localeCompare(b.resource);}),item=catalog[job.checks.length];
+  if(!item){console.log(JSON.stringify({ok:true,status:'COMPLETE',revision:job.revision,resources:job.checks,sourceOfTruth:'SHEETS'}));return job;}
+  var mirror=reader.resource(item.resource),start=Date.now();
+  var check=migrationWithSourceLock_(function(){
+    var store=migrationSheetsStore_(ctx.book),status=store.status();
+    if(status.highWater!==reader.revision || status.pendingCount || status.reviewCount)throw migrationError_('MIGRATION_VERIFICATION_WAIT_FOR_REPLICA');
+    var source=migrationCaptureResource_(ctx.book,store,item.resource),digest=migrationHash_(source);
+    if(digest!==migrationHash_(mirror))throw migrationError_('MIGRATION_VERIFICATION_MISMATCH');
+    var formulas=0,dates=0;source.records.forEach(function(row){var payload=migrationDecode_(row.payload);payload.formulas.forEach(function(v){if(v)formulas++;});payload.cells.forEach(function(v){if(v instanceof Date)dates++;});});
+    return {resource:item.resource,count:source.records.length,digest:digest,formulaCells:formulas,dateCells:dates};
+  });
+  job.checks.push(check);props.setProperty(key,JSON.stringify(job));
+  var result={ok:true,status:job.checks.length===catalog.length?'COMPLETE':'PROGRESS',revision:job.revision,checkedResources:job.checks.length,totalResources:catalog.length,check:check,elapsedMillis:Date.now()-start,sourceOfTruth:'SHEETS'};
+  console.log(JSON.stringify(result));return result;
+}
+function verifyMigrationProductionRead() {
+  migrationProductionIdentity_();var ctx=migrationOperationsContext_(),repo=migrationOperationsRepository_(ctx.config),reader=migrationServingReader_(repo,ctx.config.baselineRef);
+  var names=['listLinks','listNotices','listFeatureRequests','getTimetable','getStudentTimetable','getStaffRoster','getStudentRoster','listStaffChecklists','listCommitteeState','listTimetableChanges','getTimetableOverrides','getNeisSnapshot','getSyncManifest'];
+  var props=PropertiesService.getScriptProperties(),key='UNG_MIGRATION_READ_PARITY_V1',signature=migrationHash_([ctx.config.baselineRef,reader.revision,MOBILE_SERVICE_VERSION]),text=props.getProperty(key),job=text?JSON.parse(text):null;
+  if(!job || job.signature!==signature)job={schemaVersion:1,signature:signature,revision:reader.revision,checks:[]};
+  var action=names[job.checks.length];if(!action){console.log(JSON.stringify({ok:true,status:'COMPLETE',revision:reader.revision,checks:job.checks,authenticatedTransportTest:false,sourceOfTruth:'SHEETS'}));return job;}
+  var functions={listLinks:listLinks_,listNotices:listNotices_,listFeatureRequests:listFeatureRequests_,getTimetable:getTimetable_,getStudentTimetable:getStudentTimetable_,getStaffRoster:getStaffRoster_,getStudentRoster:getStudentRoster_,listStaffChecklists:listStaffChecklists_,listCommitteeState:listCommitteeState_,listTimetableChanges:listTimetableChanges_,getTimetableOverrides:listTimetableOverrides_,getNeisSnapshot:getNeisSnapshot_,getSyncManifest:getSyncManifest_};
+  var staff=reader.resource('staff'),nameColumn=staff.headers.indexOf('name'),viewer=staff.records.length?String(migrationDecode_(staff.records[0].payload).cells[nameColumn]):'';
+  var body={viewerName:viewer,fromDate:'2026-01-01',toDate:'2026-12-31',includeSchool:true,includeInactive:true};
+  function invoke(){return functions[action](body);}
+  function digest(value){return migrationHash_(JSON.parse(JSON.stringify(value,function(key,v){return key==='generatedAt'?'<request-time>':v;})));}
+  var check=migrationWithSourceLock_(function(){
+    var status=migrationSheetsStore_(ctx.book).status();if(status.highWater!==reader.revision || status.pendingCount || status.reviewCount)throw migrationError_('MIGRATION_VERIFICATION_WAIT_FOR_REPLICA');
+    var start=Date.now(),original=invoke(),sourceMillis=Date.now()-start;start=Date.now();
+    var preview=migrationWithBackend_(reader,ctx.book.getId(),false,invoke),mirrorMillis=Date.now()-start;
+    if(digest(original)!==digest(preview.response))throw migrationError_('MIGRATION_RESPONSE_MISMATCH');
+    return {action:action,digest:digest(original),sourceMillis:sourceMillis,mirrorMillis:mirrorMillis,resourcesRead:preview.loaded};
+  });
+  job.checks.push(check);props.setProperty(key,JSON.stringify(job));console.log(JSON.stringify({ok:true,status:job.checks.length===names.length?'COMPLETE':'PROGRESS',revision:reader.revision,checkedActions:job.checks.length,totalActions:names.length,check:check,authenticatedTransportTest:false,sourceOfTruth:'SHEETS'}));return job;
 }

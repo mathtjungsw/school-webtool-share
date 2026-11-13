@@ -5,6 +5,11 @@
     { "collectionGroup": "records", "fieldPath": "sourceId", "indexes": [] },
     { "collectionGroup": "pages", "fieldPath": "entries", "indexes": [] },
     { "collectionGroup": "operations", "fieldPath": "descriptor", "indexes": [] },
-    { "collectionGroup": "replicaEpochs", "fieldPath": "resources", "indexes": [] }
+    { "collectionGroup": "replicaEpochs", "fieldPath": "resources", "indexes": [] },
+    { "collectionGroup": "servingChunks", "fieldPath": "records", "indexes": [] },
+    { "collectionGroup": "servingResources", "fieldPath": "chunkRefs", "indexes": [] },
+    { "collectionGroup": "servingEpochs", "fieldPath": "resources", "indexes": [] },
+    { "collectionGroup": "rehearsalEpochs", "fieldPath": "resources", "indexes": [] },
+    { "collectionGroup": "rehearsalReceipts", "fieldPath": "responseText", "indexes": [] }
   ]
 }

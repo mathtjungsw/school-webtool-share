@@ -6,8 +6,11 @@ const assert=require('node:assert/strict')
 const ts=require('typescript')
 const {validate}=require('./apps-script-deploy-guard.cjs')
 function businessView(source){
+  source=source.replaceAll('(sourceCacheEnabled_() && CacheService.getScriptCache().get(cacheKey))','CacheService.getScriptCache().get(cacheKey)').replaceAll('if (sourceCacheEnabled_()) CacheService.getScriptCache().put(cacheKey,','CacheService.getScriptCache().put(cacheKey,');
   const ast=ts.createSourceFile('Code.gs',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.JS),edits=[]
   const expectedAccessors={
+    sourceProperties_:"function sourceProperties_() { return typeof migrationBackendProperties_ === 'function' ? migrationBackendProperties_() : PropertiesService.getScriptProperties(); }",
+    sourceCacheEnabled_:"function sourceCacheEnabled_() { return typeof migrationBackendContext_ === 'undefined' || !migrationBackendContext_; }",
     sourceBook_:"function sourceBook_() { return typeof migrationSourceBook_ === 'function' ? migrationSourceBook_() : SpreadsheetApp.getActiveSpreadsheet(); }",
     sourceLock_:"function sourceLock_() { return typeof migrationCompatibleLock_ === 'function' ? migrationCompatibleLock_() : LockService.getScriptLock(); }",
   }
@@ -28,7 +31,7 @@ function businessView(source){
       edits.push([node.getStart(ast),node.end,'']);return
     }
     if(ts.isCallExpression(node)&&ts.isIdentifier(node.expression)&&node.arguments.length===0){
-      const replacement={sourceBook_:'SpreadsheetApp.getActiveSpreadsheet()',sourceLock_:'LockService.getScriptLock()'}[node.expression.text]
+      const replacement={sourceBook_:'SpreadsheetApp.getActiveSpreadsheet()',sourceLock_:'LockService.getScriptLock()',sourceProperties_:'PropertiesService.getScriptProperties()'}[node.expression.text]
       if(replacement)edits.push([node.getStart(ast),node.end,replacement])
     }
     ts.forEachChild(node,walk)

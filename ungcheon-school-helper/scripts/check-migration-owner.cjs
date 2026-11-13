@@ -35,4 +35,12 @@ g.ctx.migrationOwnerEvidence_=()=>({...old,deploymentVersion:1000,sourceFingerpr
 g.ctx.refreshMigrationPreparedDeployment();const refreshed=g.ctx.migrationOperationsConfig_()
 assert.equal(refreshed.deploymentVersion,1000);assert.ok(refreshed.notBefore>=original.notBefore);assert.equal(refreshed.baselineRef,null)
 g.enable();assert.throws(()=>g.ctx.refreshMigrationPreparedDeployment(),e=>e.code==='MIGRATION_REFRESH_NOT_ALLOWED')
+let baselineCalls=0
+g.ctx.migrationFreezeConfiguredBaseline_=()=>{baselineCalls++;return {status:'COMPLETE'}}
+g.ctx.migrationWithSourceLock_(()=>g.ctx.migrationOperationsSaveState_({schemaVersion:1,paused:false,invalidated:false,lease:{id:'competing',expiresAt:Date.now()+600000},lastRun:null}))
+assert.equal(g.ctx.migrationBaselineBatch_().status,'BUSY_OR_PAUSED');assert.equal(baselineCalls,0)
+g.ctx.migrationWithSourceLock_(()=>g.ctx.migrationOperationsSaveState_({schemaVersion:1,paused:false,invalidated:false,lease:null,lastRun:null}))
+assert.equal(g.ctx.migrationBaselineBatch_().status,'COMPLETE');assert.equal(baselineCalls,1);assert.equal(g.ctx.migrationOperationsState_().lease,null)
+g.ctx.migrationFreezeConfiguredBaseline_=()=>{throw Error('synthetic baseline failure')}
+assert.throws(()=>g.ctx.migrationBaselineBatch_(),/synthetic baseline failure/);assert.equal(g.ctx.migrationOperationsState_().lease,null)
 console.log('Migration owner: read-only authorization, deployment mismatch barriers, idempotent trigger and paused worker passed.')

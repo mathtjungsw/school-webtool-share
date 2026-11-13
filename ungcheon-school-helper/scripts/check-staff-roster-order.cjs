@@ -34,7 +34,7 @@ test('Desktop read activates only the one-time roster migration', () => {
     sourceBook_: () => ({}),
     migrateStaffRosterFileOrder1_1_37_: () => { migrations++; applied = true },
     getStaffRoster_: () => ({ members: [] }), json_: value => value }
-  const run = () => vm.runInNewContext('(function() {' + route + '})()', sandbox)
+  const run = () => vm.runInNewContext(server.functions.get('sourceProperties_') + '\n(function() {' + route + '})()', sandbox)
   run(); run()
   assert.equal(migrations, 1)
   assert.ok(!route.includes('ensureSheets_('))
@@ -101,7 +101,7 @@ const context = vm.createContext({ console: undefined, Number, Date, Object,
 for (const name of ['STAFF_ROSTER_SHEET', 'STAFF_ROSTER_META_SHEET', 'STAFF_ROSTER_FILE_ORDER_1_1_37_KEY', 'STAFF_ROSTER_FILE_ORDER_20261008']) {
   vm.runInContext(`const ${name}=${JSON.stringify(server.constants.get(name))};`, context)
 }
-for (const name of ['sourceBook_', 'sourceLock_', 'normalizeStaffHomeroom_', 'ensureDataSheet_', 'replaceSheetRows_', 'migrateStaffRosterFileOrder1_1_37_', 'compareStaffMembers_', 'getStaffRoster_', 'replaceStaffRoster_']) vm.runInContext(server.functions.get(name), context)
+for (const name of ['sourceBook_', 'sourceLock_', 'sourceProperties_', 'normalizeStaffHomeroom_', 'ensureDataSheet_', 'replaceSheetRows_', 'migrateStaffRosterFileOrder1_1_37_', 'compareStaffMembers_', 'getStaffRoster_', 'replaceStaffRoster_']) vm.runInContext(server.functions.get(name), context)
 const call = (name, ...args) => context[name](...args)
 const initialRows = reference.map(([name, position], index) => [`keep-${index}`, name, position, `부서-${index}`, `교과-${index}`, '3-1']).reverse()
 initialRows.find(row => row[1] === '전종택')[1] = '최대식'

@@ -1,4 +1,37 @@
 /** Run only in a separate standalone Apps Script project, never in the live app. */
+function probeNativeFirestoreBackend() {
+  if(ScriptApp.getScriptId()!=='16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9')throw new Error('PROBE_PROJECT_MISMATCH');
+  var props=PropertiesService.getScriptProperties(),id=props.getProperty('SYNTHETIC_NATIVE_ROUTE_BOOK_V1');
+  if(id!=='1n4PZxxSP8rqp-n59V3mU2-gBBC3sqLaJLu2WY0ZGAPM')throw new Error('PROBE_BOOK_MISMATCH');
+  var book=SpreadsheetApp.openById(id);migrationProbeNativeApp_.initialize(book);
+  var config={schemaVersion:1,enabled:true,sourceBookId:id},key='SYNTHETIC_NATIVE_BACKEND_BASELINE_V1',ref=props.getProperty(key);
+  if(!ref){ref=migrationFreezeBaseline_(book,undefined,config);props.setProperty(key,ref);}
+  var repo=migrationRepository_({enabled:true,projectId:'ungcheon-school-helper',schoolId:'migration-probe-backend-v1',environment:'MIRROR',sourceOfTruth:'SHEETS'});
+  var result=migrationRunReplica_(repo,migrationReplicaSource_(book,ref,config),ref,{maxSteps:16,maxMillis:40000});
+  if(result.status!=='IDLE'){console.log(JSON.stringify({ok:true,phase:'ARCHIVE',result:result,dataset:'SYNTHETIC_ONLY'}));return;}
+  var serving=migrationServingStep_(repo,ref);
+  if(serving.status!=='IDLE'){console.log(JSON.stringify({ok:true,phase:'SERVING',result:serving,dataset:'SYNTHETIC_ONLY'}));return;}
+  var reader=migrationServingReader_(repo,ref),request={action:'listLinks',staffToken:'SYNTHETIC_NATIVE_SESSION'},before=migrationSheetsStore_(book).status().highWater;
+  var original=migrationProbeNativeApp_.request(book,request).getContent();
+  var read=migrationWithBackend_(reader,id,false,function(){return migrationProbeNativeApp_.request(book,request);});
+  if(migrationHash_(JSON.parse(original))!==migrationHash_(JSON.parse(read.response.getContent()))){
+    var a=JSON.parse(original),b=JSON.parse(read.response.getContent());
+    console.log(JSON.stringify({dataset:'SYNTHETIC_ONLY',sourceOk:a.ok,mirrorOk:b.ok,sourceCount:Array.isArray(a.data)?a.data.length:null,mirrorCount:Array.isArray(b.data)?b.data.length:null,mirrorError:/^[A-Z_]+$/.test(b.error||'')?b.error:'REDACTED',loaded:read.loaded}));
+    throw new Error('PROBE_READ_MISMATCH');
+  }
+  var timings=[],rowId;
+  ['addLink','deleteLink'].forEach(function(action){
+    var body={action:action,operationId:'native-firestore-v1-'+action,staffToken:'SYNTHETIC_NATIVE_SESSION',adminPassword:'SYNTHETIC_ADMIN_ONLY',department:'Test',title:'Synthetic Firestore',url:'https://example.com',id:rowId||''};
+    var start=Date.now(),write=migrationRehearsal_(repo,ref,id,body,{name:'Synthetic Native Teacher'},function(){return migrationProbeNativeApp_.request(book,body);},'native-v1');
+    var parsed=JSON.parse(write.response);if(!parsed.ok)throw new Error('PROBE_REHEARSAL_FAILED');if(action==='addLink')rowId=parsed.data.id;
+    timings.push({action:action,elapsedMillis:Date.now()-start,replayed:write.replayed});
+    var replay=migrationRehearsal_(repo,ref,id,body,{name:'Synthetic Native Teacher'},function(){throw new Error('PROBE_DUPLICATE_EXECUTED');},'native-v1');
+    if(!replay.replayed||replay.response!==write.response)throw new Error('PROBE_RECEIPT_FAILED');
+  });
+  if(migrationSheetsStore_(book).status().highWater!==before||migrationProbeNativeApp_.request(book,request).getContent()!==original)throw new Error('PROBE_SOURCE_CHANGED');
+  console.log(JSON.stringify({ok:true,phase:'COMPLETE',dataset:'SYNTHETIC_ONLY',checks:['actualDispatcher','nativeFirestoreBatchGet','readParity','atomicWriteRehearsal','duplicateReceipt','sourceUnchanged'],sourceRevision:before,baselineRef:ref,timings:timings,productionScriptChanged:false}));
+}
+
 function probeIncrementalBaseline() {
   if (ScriptApp.getScriptId()!=='16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9') throw new Error('PROBE_PROJECT_MISMATCH');
   var props=PropertiesService.getScriptProperties(), key='SYNTHETIC_BASELINE_BOOK_V1', id=props.getProperty(key), title='웅천고 이전 시험 - 합성 초기복사 성능 v1';

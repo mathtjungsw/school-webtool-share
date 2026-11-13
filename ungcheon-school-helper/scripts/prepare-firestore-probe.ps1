@@ -35,7 +35,7 @@ try {
     @{name='Code';type='SERVER_JS';source=[IO.File]::ReadAllText((Join-Path $probeDir 'Code.gs'))},
     @{name='appsscript';type='JSON';source=[IO.File]::ReadAllText((Join-Path $probeDir 'appsscript.json'))}
   )
-  foreach ($module in @('FirestoreRepository','MigrationSync','MigrationAdmin','MigrationJournal','MigrationStore','MigrationCapture','MigrationTracking','MigrationReplication','MigrationRecovery','MigrationOperations','MigrationBaseline','MigrationSchema')) {
+  foreach ($module in @('FirestoreRepository','MigrationSync','MigrationAdmin','MigrationJournal','MigrationStore','MigrationCapture','MigrationTracking','MigrationReplication','MigrationRecovery','MigrationOperations','MigrationBaseline','MigrationSchema','MigrationServing','MigrationBackend')) {
     $files += @{name=$module;type='SERVER_JS';source=[IO.File]::ReadAllText((Join-Path $PSScriptRoot "../server/$module.gs"))}
   }
   $nativeSource = (& node (Join-Path $PSScriptRoot 'probe-native-app-source.cjs')) -join "`n"
