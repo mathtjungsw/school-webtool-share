@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 68;
+const MOBILE_SERVICE_VERSION = 69;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -425,6 +425,7 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  { key: 'server-v69', title: 'Firebase 자료 저장 전환', body: 'PC와 모바일의 내부 자료를 Firebase에서 조회·저장하도록 준비하고, 변경 자료의 시트 백업과 검증 후 복귀 기능을 추가합니다.', date: '2026-11-13' },
   { key: 'server-v68', title: '서버 이전 날짜 자료 검증', body: '시간표 예외의 변경 감지를 실제 날짜 값 기준으로 맞춰 저장소 간 조회 결과를 일관되게 유지합니다.', date: '2026-11-13' },
   { key: 'server-v67', title: '서버 이전 변경 알림 검증', body: '시험 저장의 변경 알림 번호를 새 저장소에 함께 보존하고 기존 시트 저장과의 대기를 줄였습니다.', date: '2026-11-13' },
   { key: 'server-v66', title: '서버 이전 조회·저장 검증', body: '기존 자료와 로그인을 유지하면서 새 서버의 조회와 저장을 분리된 시험 경로에서 검증합니다.', date: '2026-11-13' },
@@ -983,6 +984,11 @@ function doPost(e) {
   try {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
+
+    // Select the data source before roster-based authentication as well as reads.
+    if (typeof migrationPrimaryDispatchNeeded_ === 'function' && migrationPrimaryDispatchNeeded_(action)) {
+      return migrationPrimaryDispatch_(body, function() { return doPost(e); });
+    }
 
     // Staff authentication is mandatory for all non-mobile protected actions.
     // Mobile endpoints retain their existing independent password/session checks.

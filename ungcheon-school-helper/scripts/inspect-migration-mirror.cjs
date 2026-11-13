@@ -22,7 +22,13 @@ async function main(){
     const documents=await list('replicaEpochs/'+epoch.id+'/operations',['phase','nextPage','verifiedPages','descriptor.revision','descriptor.pageHashes'])
     for(const doc of documents){const f=doc.fields,d=f.descriptor?.mapValue?.fields||{};runs.push({baselineRef:epoch.id,id:doc.id,phase:scalar(f.phase),revision:scalar(d.revision),staged:scalar(f.nextPage),verified:scalar(f.verifiedPages),pages:d.pageHashes?.arrayValue?.values?.length||0})}
   }
-  const report={checkedAt:new Date().toISOString(),readOnly:true,archives:archives.map(summary),serving:serving.map(summary),runs}
+  const primaryDocuments=await list('primaryEpochs',['phase','sourceOfTruth','baseRevision','revision','activatedAt']),primary=[]
+  for(const epoch of primaryDocuments){
+    if(!/^[a-f0-9]{64}$/.test(epoch.id))throw Error('Unexpected primary identity')
+    const backups=await list('primaryEpochs/'+epoch.id+'/sheetBackups',['verifiedRevision','verifiedAt'])
+    primary.push({...summary(epoch),revision:scalar(epoch.fields.revision),activatedAt:scalar(epoch.fields.activatedAt),backups:backups.map(doc=>({id:doc.id,verifiedRevision:scalar(doc.fields.verifiedRevision),verifiedAt:scalar(doc.fields.verifiedAt)}))})
+  }
+  const report={checkedAt:new Date().toISOString(),readOnly:true,archives:archives.map(summary),serving:serving.map(summary),runs,primary}
   fs.writeFileSync(path.join(__dirname,'../out/migration-mirror-status.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report))
 }
 main().catch(error=>{console.error(String(error.message));process.exitCode=1})

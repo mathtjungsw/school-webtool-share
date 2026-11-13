@@ -27,6 +27,7 @@ function makeBook(id='synthetic-book') {
         setValue(v){return target.setValues(Array.from({length:nr},()=>Array(nc).fill(v)))},
         clearContent(){return target.setValues(Array.from({length:nr},()=>Array(nc).fill('')))},clearContents(){return target.clearContent()},
         setNumberFormat(v){point('before-format',name);for(let i=0;i<nr;i++)for(let j=0;j<nc;j++)assign(formats,r+i,c+j,v);return target},
+        setNumberFormats(data){point('before-format',name);for(let i=0;i<nr;i++)for(let j=0;j<nc;j++)assign(formats,r+i,c+j,data[i][j]);return target},
         createTextFinder(key){const options={};const finder={matchEntireCell(v){options.entire=v;return finder},matchCase(v){options.case=v;return finder},useRegularExpression(v){options.regex=v;return finder},findAll(){if(!options.entire||!options.case||options.regex)throw Error('unsafe finder');const found=[];for(let i=0;i<nr;i++)for(let j=0;j<nc;j++)if(String(cell(values,r+i,c+j))===key)found.push(range(r+i,c+j));return found}};return finder},
       };return target
     }

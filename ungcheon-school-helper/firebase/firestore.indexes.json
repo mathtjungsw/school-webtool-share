@@ -1,16 +1,90 @@
 {
   "indexes": [],
   "fieldOverrides": [
-    { "collectionGroup": "records", "fieldPath": "payload", "indexes": [] },
-    { "collectionGroup": "records", "fieldPath": "sourceId", "indexes": [] },
-    { "collectionGroup": "pages", "fieldPath": "entries", "indexes": [] },
-    { "collectionGroup": "operations", "fieldPath": "descriptor", "indexes": [] },
-    { "collectionGroup": "replicaEpochs", "fieldPath": "resources", "indexes": [] },
-    { "collectionGroup": "servingChunks", "fieldPath": "records", "indexes": [] },
-    { "collectionGroup": "servingResources", "fieldPath": "chunkRefs", "indexes": [] },
-    { "collectionGroup": "servingEpochs", "fieldPath": "resources", "indexes": [] },
-    { "collectionGroup": "rehearsalEpochs", "fieldPath": "resources", "indexes": [] },
-    { "collectionGroup": "rehearsalEpochs", "fieldPath": "properties", "indexes": [] },
-    { "collectionGroup": "rehearsalReceipts", "fieldPath": "responseText", "indexes": [] }
+    {
+      "collectionGroup": "records",
+      "fieldPath": "payload",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "records",
+      "fieldPath": "sourceId",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "pages",
+      "fieldPath": "entries",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "operations",
+      "fieldPath": "descriptor",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "replicaEpochs",
+      "fieldPath": "resources",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "servingChunks",
+      "fieldPath": "records",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "servingResources",
+      "fieldPath": "chunkRefs",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "servingEpochs",
+      "fieldPath": "resources",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "rehearsalEpochs",
+      "fieldPath": "resources",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "rehearsalEpochs",
+      "fieldPath": "properties",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "rehearsalReceipts",
+      "fieldPath": "responseText",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "primaryEpochs",
+      "fieldPath": "resources",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "primaryEpochs",
+      "fieldPath": "properties",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "primaryCommits",
+      "fieldPath": "resources",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "primaryCommits",
+      "fieldPath": "properties",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "primaryReceipts",
+      "fieldPath": "responseText",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "sheetBackups",
+      "fieldPath": "resources",
+      "indexes": []
+    }
   ]
 }

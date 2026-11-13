@@ -35,12 +35,13 @@ try {
     @{name='Code';type='SERVER_JS';source=[IO.File]::ReadAllText((Join-Path $probeDir 'Code.gs'))},
     @{name='appsscript';type='JSON';source=[IO.File]::ReadAllText((Join-Path $probeDir 'appsscript.json'))}
   )
-  foreach ($module in @('FirestoreRepository','MigrationSync','MigrationAdmin','MigrationJournal','MigrationStore','MigrationCapture','MigrationTracking','MigrationReplication','MigrationRecovery','MigrationOperations','MigrationBaseline','MigrationSchema','MigrationServing','MigrationBackend')) {
+  foreach ($module in @('FirestoreRepository','MigrationSync','MigrationAdmin','MigrationJournal','MigrationStore','MigrationCapture','MigrationTracking','MigrationReplication','MigrationRecovery','MigrationOperations','MigrationBaseline','MigrationSchema','MigrationServing','MigrationBackend','MigrationPrimary','MigrationReturn')) {
     $files += @{name=$module;type='SERVER_JS';source=[IO.File]::ReadAllText((Join-Path $PSScriptRoot "../server/$module.gs"))}
   }
   $nativeSource = (& node (Join-Path $PSScriptRoot 'probe-native-app-source.cjs')) -join "`n"
   if ($LASTEXITCODE -ne 0) { throw 'Synthetic native app source could not be built.' }
   $files += @{name='NativeApp';type='SERVER_JS';source=$nativeSource}
+  $files += @{name='PrimaryProbe';type='SERVER_JS';source=[IO.File]::ReadAllText((Join-Path $probeDir 'PrimaryProbe.gs'))}
   $payload = [Text.Encoding]::UTF8.GetBytes((@{files=$files} | ConvertTo-Json -Depth 10 -Compress))
   $null = Invoke-RestMethod -Uri "https://script.googleapis.com/v1/projects/$probeId/content" -Method Put -Headers $headers -ContentType 'application/json; charset=utf-8' -Body $payload -TimeoutSec 30
   Write-Output "Isolated probe prepared: https://script.google.com/home/projects/$probeId/edit"

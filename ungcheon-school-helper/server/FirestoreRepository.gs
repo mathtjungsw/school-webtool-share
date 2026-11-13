@@ -81,7 +81,7 @@ function migrationRepository_(config, transport) {
   if (!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(config.projectId || '') || !/^[a-z0-9-]{1,64}$/.test(config.schoolId || '')) throw migrationError_('MIGRATION_INVALID_CONFIG');
   var emulator = config.environment === 'EMULATOR';
   if (emulator && (!/^demo-/.test(config.projectId) || typeof transport !== 'function')) throw migrationError_('MIGRATION_EMULATOR_ONLY');
-  if (!emulator && (config.environment !== 'MIRROR' || config.sourceOfTruth !== 'SHEETS' || transport)) throw migrationError_('MIGRATION_INVALID_CONFIG');
+  if (!emulator && (!(config.environment === 'MIRROR' && config.sourceOfTruth === 'SHEETS' || config.environment === 'PRIMARY' && config.sourceOfTruth === 'FIRESTORE') || transport)) throw migrationError_('MIGRATION_INVALID_CONFIG');
   var root = 'projects/' + config.projectId + '/databases/(default)/documents';
   var prefix = 'schools/' + config.schoolId + '/';
   var origin = emulator ? 'http://127.0.0.1:8185' : 'https://firestore.googleapis.com';

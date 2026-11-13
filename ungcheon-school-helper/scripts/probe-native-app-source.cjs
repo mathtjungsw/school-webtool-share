@@ -17,6 +17,7 @@ function assertBook(book){
     book.getId()!==PropertiesService.getScriptProperties().getProperty('SYNTHETIC_NATIVE_ROUTE_BOOK_V1'))throw new Error('PROBE_BOOK_MISMATCH');
 }
 return {
+  authorize:staffRequire_,
   initialize:function(book){assertBook(book);nativeBook=book;
     [STAFF_ASSIGNMENTS_2026_APPLIED_KEY,STAFF_NAME_MIGRATION_1_1_30_KEY,STAFF_ROSTER_MIGRATION_1_1_31_KEY,STAFF_ROSTER_FILE_ORDER_1_1_37_KEY,TIMETABLE_OVERRIDE_SEED_KEY,OFFICIAL_RELEASE_NOTICE_RESET_KEY]
       .forEach(function(key){PropertiesService.getScriptProperties().setProperty(key,'true');});

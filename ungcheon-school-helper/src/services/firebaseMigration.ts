@@ -12,9 +12,10 @@ export interface MigrationResource {
 }
 
 export interface MigrationStatus {
-  phase: 'PREPARING' | 'DRAINING' | 'TRACKING' | 'COPYING_BASELINE' | 'MIRRORING' | 'NEEDS_REVIEW' | 'PAUSED' | 'REBASE_REQUIRED'
-  mode: 'SHEETS_PRIMARY'
-  activeBackend: 'SHEETS'
+  phase: 'PREPARING' | 'DRAINING' | 'TRACKING' | 'COPYING_BASELINE' | 'MIRRORING' | 'NEEDS_REVIEW' | 'PAUSED' | 'REBASE_REQUIRED' | 'FIRESTORE' | 'RETURNING' | 'SHEETS_RETURNED'
+  mode: 'SHEETS_PRIMARY' | 'FIRESTORE_PRIMARY'
+  activeBackend: 'SHEETS' | 'FIRESTORE'
+  backupVerifiedAt?: string | null
   replicaConnected: boolean
   liveTrackingEnabled: boolean
   cutoverReady: boolean

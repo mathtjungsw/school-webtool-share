@@ -3,7 +3,7 @@ import { Database, Loader2, RefreshCw } from 'lucide-react'
 import { useAdminStore } from '../../stores/adminStore'
 import { confirmMigrationReview, getMigrationInventory, getMigrationStatus, prepareMigrationReview, runMigrationReplica, setMigrationReplicaPaused, type MigrationInventory, type MigrationReview, type MigrationRunResult, type MigrationStatus } from '../../services/firebaseMigration'
 
-const phases: Record<MigrationStatus['phase'], string> = { PREPARING: '운영 설정 전', DRAINING: '추적 활성화 준비 중', TRACKING: '변경 기록 중 · 기준 사본 준비 전', COPYING_BASELINE: '기준 사본 복사 중', MIRRORING: '변경분 복제 중', NEEDS_REVIEW: '원본 상태 확인 필요', PAUSED: '복제 일시정지', REBASE_REQUIRED: '새 기준 사본 준비 필요 · 기존 복제 재개 금지' }
+const phases: Record<MigrationStatus['phase'], string> = { PREPARING: '전환 준비 중', DRAINING: '전환 자료 확인 중', TRACKING: '변경 기록 중 · 기준 사본 준비 전', COPYING_BASELINE: '기준 사본 복사 중', MIRRORING: '변경분 복제 중', NEEDS_REVIEW: '원본 상태 확인 필요', PAUSED: '복제 일시정지', REBASE_REQUIRED: '새 기준 사본 준비 필요 · 기존 복제 재개 금지', FIRESTORE: 'Firebase 운영 중', RETURNING: '시트 복귀 대조 중', SHEETS_RETURNED: '시트 복귀 완료' }
 const runMessages: Record<MigrationRunResult['status'], string> = {
   PROGRESS: '변경분을 반영했습니다.', BUDGET_EXHAUSTED: '이번 분량을 반영했습니다. 남은 작업은 변경분 반영을 다시 누르면 이어집니다.',
   IDLE: '현재 기록까지 복제를 확인했습니다. 운영 전환을 위한 전체 검증은 별도입니다.', NEEDS_REVIEW: '불확실한 기록에서 멈췄습니다. 원본 상태를 검토해 주세요.',
@@ -64,7 +64,7 @@ export default function FirebaseMigrationPanel() {
 
   return <section className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900" aria-label="Firebase 서버 이전">
     <h2 className="flex items-center gap-2 text-base font-bold"><Database size={17} />Firebase 서버 이전</h2>
-    <p className="mt-2 text-sm leading-relaxed text-slate-700">PC와 모바일은 기존 구글시트로 계속 조회·저장합니다. 복제 현황은 수동으로 확인하며, 이 화면에서 운영 저장소를 전환하지 않습니다.</p>
+    <p className="mt-2 text-sm leading-relaxed text-slate-700">PC와 모바일의 저장소와 백업 현황을 확인합니다. 현황은 수동으로 갱신하며, 저장소 전환과 복귀는 담당자가 자료를 검증한 뒤 진행합니다.</p>
     <div className="mt-4 flex flex-wrap gap-2">
       <button type="button" onClick={() => void perform()} disabled={busy || !adminPassword} className={buttonClass}>
         {busy ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}현황 새로고침
@@ -79,9 +79,9 @@ export default function FirebaseMigrationPanel() {
     {notice && <p role="status" className="mt-3 text-sm leading-relaxed text-sky-900">{notice}</p>}
     {status && inventory && <div className="mt-4 space-y-4" aria-live="polite">
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-950">
-        <p className="font-semibold">{phases[status.phase]} · 현재 저장소: 구글시트</p>
+        <p className="font-semibold">{phases[status.phase]} · 현재 저장소: {status.activeBackend === 'FIRESTORE' ? 'Firebase' : '구글시트'}</p>
         <p className="mt-1">기록 번호 {status.recordedRevision ?? '미확인'} · 복제 확인 번호 {status.verifiedRevision ?? '미확인'} · 확인 필요 {status.errorCount ?? '미확인'}건</p>
-        <p className="mt-1">{status.baselinePrepared ? `대기 변경 번호 ${status.pendingCount ?? '미확인'}개 · 전체 자료·업무 동작 대조 전` : '운영 설정과 기준 사본 준비 후 복제를 실행할 수 있습니다.'}</p>
+        <p className="mt-1">{status.activeBackend === 'FIRESTORE' ? `최근 시트 백업 확인: ${status.backupVerifiedAt ? new Date(status.backupVerifiedAt).toLocaleString('ko-KR') : '확인 전'}` : status.phase === 'SHEETS_RETURNED' ? '전환 후 변경분을 대조하고 시트로 복귀했습니다. 다시 이전할 때는 새 기준 사본이 필요합니다.' : status.baselinePrepared ? `대기 변경 번호 ${status.pendingCount ?? '미확인'}개 · 전체 자료·업무 동작 대조 전` : '운영 설정과 기준 사본 준비 후 복제를 실행할 수 있습니다.'}</p>
         {status.workerBusy && <p className="mt-1">다른 복제 실행이 진행 중입니다.</p>}
         {status.lastRun && <p className="mt-1">최근 실행: {new Date(status.lastRun.completedAt).toLocaleString('ko-KR')} · {runMessages[status.lastRun.result.status]}</p>}
       </div>

@@ -14,7 +14,7 @@ async function main(){
   }
   const config=JSON.parse(fs.readFileSync(path.join(__dirname,'../firebase/firestore.indexes.json'),'utf8')),results=[]
   for(const field of config.fieldOverrides){
-    if(!/^(records|pages|operations|replicaEpochs|servingChunks|servingResources|servingEpochs|rehearsalEpochs|rehearsalReceipts)$/.test(field.collectionGroup)||!/^\w+$/.test(field.fieldPath)||field.indexes.length)throw Error('Unexpected field configuration')
+    if(!/^(records|pages|operations|replicaEpochs|servingChunks|servingResources|servingEpochs|rehearsalEpochs|rehearsalReceipts|primaryEpochs|primaryCommits|primaryReceipts|sheetBackups)$/.test(field.collectionGroup)||!/^\w+$/.test(field.fieldPath)||field.indexes.length)throw Error('Unexpected field configuration')
     const name=`${prefix}/collectionGroups/${field.collectionGroup}/fields/${field.fieldPath}`
     let current=await call(name),changed=false
     // Protobuf JSON omits false booleans. An explicit empty indexConfig is the

@@ -91,6 +91,11 @@ function migrationWriteGateEnabled_() {
 }
 function migrationGatedRoute_(body, session, callback) {
   return migrationWithSourceLock_(function() {
+    if(typeof migrationPrimaryConfig_==='function'){
+      var primary=migrationPrimaryConfig_();
+      if(primary&&primary.phase==='DRAINING')throw migrationPrimaryMaintenance_();
+      if(migrationPrimaryServing_(primary))return migrationPrimaryDispatch_(body,callback);
+    }
     // Re-read activation INSIDE the common lock: a request queued before activation
     // must not use its earlier disabled decision after activation has completed.
     var tracking=migrationTrackingConfig_();
@@ -121,6 +126,7 @@ function migrationInvalidateReplica_() {
   });
 }
 function migrationOperationsStatus_() {
+  if(typeof migrationPrimaryConfig_==='function' && migrationPrimaryConfig_())return migrationPrimaryStatus_();
   var config=migrationOperationsConfig_();
   if (!config) return null;
   var book=migrationOperationsBook_(config), tracking=migrationTrackingConfig_(), state=migrationOperationsState_();

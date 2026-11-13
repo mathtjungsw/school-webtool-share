@@ -8,7 +8,7 @@ function migrationProductionIdentity_() {
 }
 // Rotated with each production migration release. The guarded deployment tool
 // records this ID only after checking main, exact immutable source, HEAD and URL.
-function migrationOwnerReleaseId_() {return 'migration-service68-date-v1';}
+function migrationOwnerReleaseId_() {return 'migration-service69-primary-v1';}
 function migrationOwnerEvidence_(identity) {
   var doc=migrationOperationsRepository_({projectId:'ungcheon-school-helper',schoolId:'ungcheon'}).get('migrationChecks/deployment');
   var record=doc && doc.data;
@@ -69,6 +69,11 @@ function installMigrationReplicationTrigger() {
 }
 function migrationReplicationTick() {
   migrationProductionIdentity_();
+  if(typeof migrationPrimaryConfig_==='function'){
+    var primary=migrationPrimaryConfig_();
+    if(migrationPrimaryServing_(primary)){var backup=migrationBackupBatch_();console.log(JSON.stringify({phase:'FIRESTORE_TO_SHEETS',backup:backup}));return backup;}
+    if(primary&&primary.phase==='SHEETS_RETURNED'){console.log(JSON.stringify({phase:'REBASE_REQUIRED'}));return;}
+  }
   var ctx=migrationOperationsContext_(),state=migrationOperationsState_(),start=Date.now(),result;
   if (state.paused) {console.log(JSON.stringify({status:'PAUSED'}));return;}
   if (!ctx.config.baselineRef) {
@@ -100,6 +105,34 @@ function migrationBaselineBatch_() {
 }
 function inspectMigrationProduction() {
   migrationProductionIdentity_();var status=migrationOperationsStatus_();console.log(JSON.stringify(status));return status;
+}
+// These editor-only steps are resumable. No HTTP action accepts a backend switch.
+function prepareFirebaseCutover() {
+  var identity=migrationProductionIdentity_(),evidence=migrationOwnerEvidence_(identity),config=migrationOperationsConfig_();
+  if(!config||config.sourceBookId!==identity.book.getId())throw migrationError_('MIGRATION_SOURCE_MISMATCH');
+  var result=migrationPreparePrimary_(config,evidence);console.log(JSON.stringify({ok:true,phase:result.phase,notBefore:new Date(result.notBefore).toISOString()}));return result;
+}
+function freezeFirebaseCutoverSource() {
+  migrationProductionIdentity_();var result=migrationFreezePrimarySource_();console.log(JSON.stringify({ok:true,phase:result.phase}));return result;
+}
+function verifyFirebaseCutover() {
+  migrationProductionIdentity_();var start=Date.now(),result,steps=0;
+  do{result=migrationVerifyPrimaryStep_();steps++;}while(result.status==='PROGRESS'&&steps<8&&Date.now()-start<40000);
+  console.log(JSON.stringify({ok:true,result:result,elapsedMillis:Date.now()-start}));return result;
+}
+function activateFirebasePrimary() {
+  migrationProductionIdentity_();var result=migrationActivatePrimary_();console.log(JSON.stringify({ok:true,status:result}));return result;
+}
+function runFirebaseSheetBackup() {
+  migrationProductionIdentity_();var result=migrationBackupBatch_();console.log(JSON.stringify({ok:true,backup:result}));return result;
+}
+function beginReturnToSheets() {
+  migrationProductionIdentity_();var result=migrationBeginReturn_();console.log(JSON.stringify({ok:true,result:result}));return result;
+}
+function completeReturnToSheets() {
+  migrationProductionIdentity_();var start=Date.now(),result,steps=0;
+  do{result=migrationCompleteReturn_();steps++;}while(result.status==='PROGRESS'&&steps<6&&Date.now()-start<40000);
+  console.log(JSON.stringify({ok:true,result:result}));return result;
 }
 function verifyMigrationProductionResource() {
   migrationProductionIdentity_();
