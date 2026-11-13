@@ -38,6 +38,11 @@ test('production dispatcher writes only Firestore and atomically retains exact r
   assert.equal(f.post(remove).ok,true);assert.equal(f.post(remove).ok,true);assert.equal(f.post({...remove,adminPassword:'bad'}).ok,false)
   assert.equal(f.root().revision,2);assert.equal(f.post({action:'listLinks'}).data.length,0)
 })
+test('new deployed source can refresh only an unactivated preparation and restarts its drain barrier',()=>{
+  const f=setup(),old=f.ctx.migrationPrimaryConfig_(),next=f.ctx.migrationPreparePrimary_(f.config,{...f.config,sourceFingerprint:'b'.repeat(64),deploymentVersion:1000})
+  assert.notEqual(next.epoch,old.epoch);assert.ok(next.notBefore>=old.notBefore);assert.equal(next.sourceFingerprint,'b'.repeat(64))
+  f.drain();assert.throws(()=>f.ctx.migrationPreparePrimary_(f.config,{...f.config,sourceFingerprint:'c'.repeat(64),deploymentVersion:1001}),e=>e.code==='MIGRATION_PRIMARY_SETUP_CONFLICT')
+})
 test('lost atomic commit acknowledgement is resolved from receipt; precommit failure leaves root intact',()=>{
   const f=setup();f.activate();let once=false
   f.repo.setFault((when,writes)=>{if(!once&&when==='after'&&writes.some(x=>x.path.includes('/primaryReceipts/'))){once=true;throw Error('lost acknowledgement')}})
@@ -106,5 +111,14 @@ test('return compares typed values and rechecks every resource after the freeze 
   f.returnToSheets();assert.equal(f.book.getSheetByName('공유링크').getRange(2,2).getValues()[0][0],'00012')
   assert.equal(f.book.getSheetByName('공유링크').getRange(2,6).getValues()[0][0],false)
   assert.equal(f.book.getSheetByName('공유링크').getRange(2,7).getValues()[0][0].toISOString(),'2026-11-12T15:00:00.000Z')
+})
+test('Sheets return escapes literal apostrophes and formula-like strings without changing their values',()=>{
+  const f=setup(),strings=["'literal","''literal",'=1+1','00012','TRUE','2026-11-13','한글']
+  const capture={schemaVersion:1,resource:'links',present:true,headers:['id','value'],records:strings.map((v,i)=>({sourceId:'literal-'+i,sortOrder:i,payload:f.ctx.migrationEncode_({cells:['literal-'+i,v],formulas:['','']}),isDeleted:false}))}
+  // Use a dedicated synthetic catalog sheet so the assertion includes removal
+  // of obsolete old columns, as well as Google-style quote interpretation.
+  f.ctx.migrationWithSourceLock_(()=>f.ctx.migrationWriteCaptureToSheet_(f.book,capture))
+  const actual=f.ctx.migrationCaptureResource_(f.book,f.store,'links')
+  assert.equal(f.ctx.migrationContentDigest_(actual),f.ctx.migrationContentDigest_(capture))
 })
 console.log(`Migration primary: ${passed} groups passed.`)

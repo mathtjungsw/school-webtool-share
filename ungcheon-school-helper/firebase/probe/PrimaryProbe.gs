@@ -52,3 +52,18 @@ function probeNativeFirebasePrimary() {
   console.log(JSON.stringify(output));return output;
 }
 function staffRequire_(body){return migrationProbeNativeApp_.authorize(body);}
+function probeNativeReturnLiteralTypes() {
+  if(ScriptApp.getScriptId()!=='16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9')throw new Error('PROBE_PROJECT_MISMATCH');
+  var id=PropertiesService.getScriptProperties().getProperty('SYNTHETIC_NATIVE_ROUTE_BOOK_V1');
+  if(id!=='1n4PZxxSP8rqp-n59V3mU2-gBBC3sqLaJLu2WY0ZGAPM')throw new Error('PROBE_BOOK_MISMATCH');
+  var book=SpreadsheetApp.openById(id),name='_SYNTH_RETURN_LITERALS_V1',sheet=book.getSheetByName(name)||book.insertSheet(name);
+  var strings=['00012','TRUE','FALSE','2026-11-13','1e3',"'literal","''literal",'=1+1','+82123','한글'],capture={schemaVersion:1,resource:'links',present:true,headers:['id','value'],records:[]};
+  strings.forEach(function(value,i){capture.records.push({sourceId:'synthetic-'+i,sortOrder:i,payload:migrationEncode_({cells:['synthetic-'+i,value],formulas:['','']}),isDeleted:false});});
+  var proxy={getSheetByName:function(n){if(n!=='공유링크')throw new Error('PROBE_TARGET_MISMATCH');return sheet;}};
+  migrationWithSourceLock_(function(){migrationWriteCaptureToSheet_(proxy,capture);});
+  var actual=migrationCaptureResource_(proxy,null,'links'),values=sheet.getRange(2,2,strings.length,1).getValues().map(function(r){return r[0];}),mismatches=[];
+  strings.forEach(function(v,i){if(values[i]!==v)mismatches.push({index:i,expected:v,actual:values[i]});});
+  if(mismatches.length){console.log(JSON.stringify({ok:false,dataset:'SYNTHETIC_ONLY',mismatches:mismatches}));throw new Error('PROBE_LITERAL_TYPE_MISMATCH');}
+  if(migrationContentDigest_(actual)!==migrationContentDigest_(capture))throw new Error('PROBE_LITERAL_CAPTURE_MISMATCH');
+  console.log(JSON.stringify({ok:true,dataset:'SYNTHETIC_ONLY',checks:['literalApostrophes','formulaLikeStrings','numericLikeStrings','dateLikeStrings','booleansAsText','KoreanText'],productionChanged:false}));
+}

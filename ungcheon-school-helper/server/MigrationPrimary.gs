@@ -105,7 +105,15 @@ function migrationPrimaryWrite_(repo,c,body,callback) {
 function migrationPreparePrimary_(config,evidence) {
   return migrationWithSourceLock_(function(){
     var old=migrationPrimaryConfig_();
-    if(old){if(old.sourceBookId!==config.sourceBookId||old.sourceFingerprint!==evidence.sourceFingerprint)throw migrationError_('MIGRATION_PRIMARY_SETUP_CONFLICT');return old;}
+    if(old){
+      if(old.sourceBookId!==config.sourceBookId||old.projectId!==config.projectId||old.schoolId!==config.schoolId||old.baselineRef!==config.baselineRef)throw migrationError_('MIGRATION_PRIMARY_SETUP_CONFLICT');
+      if(old.sourceFingerprint!==evidence.sourceFingerprint){
+        if(old.phase!=='PREPARING'||migrationPrimaryRepository_(old).get(migrationPrimaryPath_(old)))throw migrationError_('MIGRATION_PRIMARY_SETUP_CONFLICT');
+        old.preparedAt=Date.now();old.notBefore=old.preparedAt+600000;old.sourceFingerprint=evidence.sourceFingerprint;old.deploymentVersion=evidence.deploymentVersion;
+        old.epoch=migrationHash_([old.sourceBookId,old.preparedAt,Utilities.getUuid()]);migrationPrimarySave_(old);
+      }
+      return old;
+    }
     if(!config.baselineRef)throw migrationError_('MIGRATION_BASELINE_REQUIRED');
     var now=Date.now(),c={schemaVersion:1,phase:'PREPARING',sourceBookId:config.sourceBookId,projectId:config.projectId,schoolId:config.schoolId,baselineRef:config.baselineRef,
       epoch:migrationHash_([config.sourceBookId,now,Utilities.getUuid()]),preparedAt:now,notBefore:now+600000,sourceFingerprint:evidence.sourceFingerprint,deploymentVersion:evidence.deploymentVersion};

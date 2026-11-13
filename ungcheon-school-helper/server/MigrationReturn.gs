@@ -29,7 +29,7 @@ function migrationWriteCaptureToSheet_(book,capture) {
   for(var start=0;start<rows;start+=200){
     var count=Math.min(200,rows-start),range=sheet.getRange(start+1,1,count,columns);
     range.setNumberFormats(formats.slice(start,start+count));
-    range.setValues(values.slice(start,start+count).map(function(row){return row.map(function(v){return typeof v==='string'&&v.charAt(0)==='='?"'"+v:v;});}));
+    range.setValues(values.slice(start,start+count).map(function(row){return row.map(function(v){return typeof v==='string'&&/^[=']/.test(v)?"'"+v:v;});}));
   }
   SpreadsheetApp.flush();
 }

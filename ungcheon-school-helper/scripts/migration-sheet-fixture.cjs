@@ -23,7 +23,7 @@ function makeBook(id='synthetic-book') {
         getRow:()=>r,getColumn:()=>c,getNumRows:()=>nr,getNumColumns:()=>nc,
         getValues(){point('read-values',name);Object.assign(events[events.length-1],{row:r,rows:nr,columns:nc});return matrix(values)},getDisplayValues:()=>matrix(values).map(row=>row.map(v=>typeof v==='boolean'?(v?'TRUE':'FALSE'):String(v))),
         getFormulas:()=>matrix(formulas),getNumberFormats:()=>matrix(formats,'General'),
-        setValues(data){if(data.length!==nr||data.some(row=>row.length!==nc))throw Error('shape mismatch');point('before-write',name);for(let i=0;i<nr;i++)for(let j=0;j<nc;j++){assign(values,r+i,c+j,data[i][j]);assign(formulas,r+i,c+j,typeof data[i][j]==='string'&&data[i][j].startsWith('=')?data[i][j]:'')}point('after-write',name);return target},
+        setValues(data){if(data.length!==nr||data.some(row=>row.length!==nc))throw Error('shape mismatch');point('before-write',name);for(let i=0;i<nr;i++)for(let j=0;j<nc;j++){const value=data[i][j];assign(values,r+i,c+j,typeof value==='string'&&value.startsWith("'")?value.slice(1):value);assign(formulas,r+i,c+j,typeof value==='string'&&value.startsWith('=')?value:'')}point('after-write',name);return target},
         setValue(v){return target.setValues(Array.from({length:nr},()=>Array(nc).fill(v)))},
         clearContent(){return target.setValues(Array.from({length:nr},()=>Array(nc).fill('')))},clearContents(){return target.clearContent()},
         setNumberFormat(v){point('before-format',name);for(let i=0;i<nr;i++)for(let j=0;j<nc;j++)assign(formats,r+i,c+j,v);return target},
