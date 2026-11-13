@@ -94,7 +94,7 @@ function probeSheetsChangeTracking() {
     migrationSourceBook_().getSheetByName('공유링크').deleteRow(2); writes++; return result();
   });
   var store = migrationSheetsStore_(book), status = store.status();
-  if (sheet.getLastRow() !== 1 || status.appliedCount !== 3 || status.pendingCount || status.reviewCount) throw new Error('PROBE_JOURNAL_VERIFICATION_FAILED');
+  if (sheet.getLastRow() !== 1 || status.appliedCount < 3 || status.pendingCount || status.reviewCount) throw new Error('PROBE_JOURNAL_VERIFICATION_FAILED');
   var deleteIntent = migrationOperationIntent_({actorHash:migrationHash_('Synthetic Probe'),action:'probeDelete',requestHash:migrationHash_({action:'probeDelete',title:'Deleted'}),operationId:'synthetic-delete-v1',resources:migrationCatalog_().map(function(item){return item.resource;})});
   var deletion = store.load(deleteIntent.operationKey), delta = store.readBlob(deletion.evidence[0].deltaRef);
   if (delta.deletes.length !== 1 || delta.puts.length !== 0) throw new Error('PROBE_TOMBSTONE_FAILED');
@@ -124,4 +124,58 @@ function probeSheetsStorageReadback() {
   if (!record || record.phase !== 'PREPARED' || record.touched.length || !before || !noSourceWrite) throw new Error('PROBE_FAILURE_BOUNDARY_MISMATCH');
   var output = {ok:true,dataset:'SYNTHETIC_ONLY',untypedReadback:untypedReadback,typedReadback:typedReadback,preservedBeforeImageVerified:true,sourceRows:0,preservedPendingOperations:status.pendingCount,spreadsheetId:id,productionScriptChanged:false};
   console.log(JSON.stringify(output)); return output;
+}
+
+/** End-to-end synthetic Sheets journal -> Firestore archive, including recovery. */
+function probeJournalReplication() {
+  if (ScriptApp.getScriptId() !== '16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9') throw new Error('PROBE_PROJECT_MISMATCH');
+  var properties=PropertiesService.getScriptProperties(), id=properties.getProperty('SYNTHETIC_TRACKING_BOOK_V2');
+  if (id!=='1Mab0-2RIeA68lk6ZlhB5yL1eKI7DLY8kpTl6pNjidfI') throw new Error('PROBE_BOOK_MISMATCH');
+  var book=SpreadsheetApp.openById(id);
+  if (book.getName()!=='웅천고 이전 시험 - 합성 변경 기록 전용 v2') throw new Error('PROBE_BOOK_MISMATCH');
+  var store=migrationSheetsStore_(book), config={schemaVersion:1,enabled:true,sourceBookId:id};
+  var key='SYNTHETIC_REPLICA_BASELINE_V1', baselineRef=properties.getProperty(key);
+  if (!baselineRef) {
+    if (store.highWater()!==3) throw new Error('PROBE_BASELINE_BOUNDARY_MISMATCH');
+    baselineRef=migrationFreezeBaseline_(book,['links'],config); properties.setProperty(key,baselineRef);
+  }
+  var source=migrationReplicaSource_(book,baselineRef,config), base=source.baseline(), writes=0;
+  if (base.descriptor.revision!==3) throw new Error('PROBE_BASELINE_BOUNDARY_MISMATCH');
+  function body(action) {return {action:action,operationId:'synthetic-replica-'+action+'-v1'};}
+  function intent(action) {return migrationOperationIntent_({actorHash:migrationHash_('Synthetic Replica Probe'),action:action,requestHash:migrationHash_(migrationBusinessRequest_(body(action))),operationId:body(action).operationId,resources:migrationCatalog_().map(function(x){return x.resource;})});}
+  function response() {return ContentService.createTextOutput(JSON.stringify({ok:true,data:{id:'synthetic-replica-link-1'}})).setMimeType(ContentService.MimeType.JSON);}
+  function run(action,callback) {return migrationTrackedRoute_(body(action),{name:'Synthetic Replica Probe'},callback,config,book);}
+  run('replicaCreate',function(){migrationSourceBook_().getSheetByName('공유링크').appendRow(['synthetic-replica-link-1','Test','Created','https://example.com/replica','','Synthetic','2026-11-13']);writes++;return response();});
+  var uncertain=store.load(intent('replicaUpdate').operationKey);
+  if (!uncertain) {
+    var capture=migrationCaptureResource_, captures=0;
+    try {
+      migrationCaptureResource_=function(){captures++;if(captures===2)throw migrationError_('SYNTHETIC_AFTER_SAVE_FAILURE');return capture.apply(null,arguments);};
+      run('replicaUpdate',function(){migrationSourceBook_().getSheetByName('공유링크').getRange(2,3).setValue('Updated before delete');writes++;return response();});
+    } finally {migrationCaptureResource_=capture;}
+    uncertain=store.load(intent('replicaUpdate').operationKey);
+  }
+  if (!uncertain || uncertain.phase!=='PREPARED' || uncertain.revision!==5) throw new Error('PROBE_UNCERTAIN_BOUNDARY_MISMATCH');
+  run('replicaDelete',function(){migrationSourceBook_().getSheetByName('공유링크').deleteRow(2);writes++;return response();});
+  var repository=migrationRepository_({enabled:true,projectId:'ungcheon-school-helper',schoolId:'migration-probe-tracking-v1',environment:'MIRROR',sourceOfTruth:'SHEETS'});
+  var before=migrationRunReplica_(repository,source,baselineRef,{maxSteps:40,maxMillis:150000}), reviewedNow=false;
+  if (!store.cachedRef(migrationHash_(['review',5]))) {
+    if (before.status!=='NEEDS_REVIEW' || before.blockedRevision!==5) throw new Error('PROBE_REVIEW_GATE_FAILED');
+    var prior=migrationReadReplica_(repository,baselineRef);
+    if (prior.appliedRevision!==4 || prior.resources.links.records.length!==1) throw new Error('PROBE_PREMATURE_PUBLICATION');
+    var review=migrationReviewPlan_(book,5);
+    if (review.changes.length!==1 || review.changes[0].source!=='NEXT_BEFORE_IMAGE' || review.changes[0].count!==1) throw new Error('PROBE_HISTORICAL_RECOVERY_FAILED');
+    migrationConfirmReview_(book,review.planRef,'ACCEPT_OBSERVED_SOURCE',migrationHash_('Synthetic Probe Admin')); reviewedNow=true;
+  }
+  var completed=migrationRunReplica_(repository,source,baselineRef,{maxSteps:40,maxMillis:150000});
+  if (completed.status!=='IDLE' || completed.appliedRevision!==6) throw new Error('PROBE_REPLICA_NOT_COMPLETE');
+  var replica=migrationReadReplica_(repository,baselineRef), status=store.status();
+  var current=migrationWithSourceLock_(function(){return migrationCaptureResource_(book,store,'links');});
+  if (migrationHash_(replica.resources.links)!==migrationHash_(current) || replica.resources.links.records.length || replica.tombstones.links['synthetic-replica-link-1']!==6 || status.pendingCount || status.reviewCount || status.resolvedCount!==1) throw new Error('PROBE_REPLICA_MISMATCH');
+  var written=repository.metrics.documentsWritten;
+  if (migrationRunReplica_(repository,source,baselineRef,{maxSteps:1}).status!=='IDLE' || repository.metrics.documentsWritten!==written) throw new Error('PROBE_IDLE_REWROTE_DATA');
+  var output={ok:true,dataset:'SYNTHETIC_ONLY',checks:['frozenBaseline','orderedDeltas','verifiedPages','uncertainWriteGate','historicalBeforeImageRecovery','sourceNotReplayed','tombstone','fullReplicaReadback','idleNoWrites'],
+    sourceWritesThisExecution:writes,reviewedThisExecution:reviewedNow,mirroredRevision:replica.appliedRevision,pendingOperations:status.pendingCount+status.reviewCount,resolvedOperations:status.resolvedCount,
+    acknowledgedFirestoreWrites:repository.metrics.documentsWritten,successfulRequests:repository.metrics.requests,baselineRef:baselineRef,productionScriptChanged:false};
+  console.log(JSON.stringify(output));return output;
 }

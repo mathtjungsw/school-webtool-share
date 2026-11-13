@@ -28,7 +28,7 @@ function migrationAdminStatus_(body) {
   return {
     schemaVersion: 1, phase: measured ? 'TRACKING' : 'PREPARING', mode: 'SHEETS_PRIMARY', activeBackend: 'SHEETS',
     replicaConnected: false, liveTrackingEnabled: !!measured, cutoverReady: false,
-    pendingCount: measured ? measured.appliedCount + measured.pendingCount + measured.reviewCount : null,
+    pendingCount: measured ? measured.appliedCount + measured.resolvedCount + measured.pendingCount + measured.reviewCount : null,
     errorCount: measured ? measured.pendingCount + measured.reviewCount : null, verifiedRevision: null,
     recordedRevision: measured ? measured.highWater : null,
     resources: migrationCatalog_().map(function(item) {

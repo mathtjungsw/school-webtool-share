@@ -27,7 +27,7 @@ try {
   $project=Invoke-RestMethod -Uri "https://script.googleapis.com/v1/projects/$probeId" -Headers $headers -TimeoutSec 30
   if($project.title -ne '웅천고 Firestore 연결 시험 (운영 분리)') { throw 'Probe project identity mismatch.' }
   $remote=Invoke-RestMethod -Uri "https://script.googleapis.com/v1/projects/$probeId/content" -Headers $headers -TimeoutSec 30
-  $names=@('Code','FirestoreRepository','MigrationSync','MigrationAdmin','MigrationJournal','MigrationStore','MigrationCapture','MigrationTracking')
+  $names=@('Code','FirestoreRepository','MigrationSync','MigrationAdmin','MigrationJournal','MigrationStore','MigrationCapture','MigrationTracking','MigrationReplication','MigrationRecovery')
   if($remote.files.Count -ne $names.Count+1) { throw 'Unexpected probe file count.' }
   $modules=foreach($name in $names) {
     $matches=@($remote.files | Where-Object name -eq $name)

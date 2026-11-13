@@ -2,6 +2,9 @@
   "indexes": [],
   "fieldOverrides": [
     { "collectionGroup": "records", "fieldPath": "payload", "indexes": [] },
-    { "collectionGroup": "records", "fieldPath": "sourceId", "indexes": [] }
+    { "collectionGroup": "records", "fieldPath": "sourceId", "indexes": [] },
+    { "collectionGroup": "pages", "fieldPath": "entries", "indexes": [] },
+    { "collectionGroup": "operations", "fieldPath": "descriptor", "indexes": [] },
+    { "collectionGroup": "replicaEpochs", "fieldPath": "resources", "indexes": [] }
   ]
 }

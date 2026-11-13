@@ -1,6 +1,6 @@
 /** Private Sheets journal. No initialization or writes at module load. */
 function migrationStoreNames_() {
-  return { meta: '_UNG_MIG_META_V1', journal: '_UNG_MIG_JOURNAL_V1', blobs: '_UNG_MIG_BLOBS_V1', ids: '_UNG_MIG_IDS_' };
+  return { meta: '_UNG_MIG_META_V1', journal: '_UNG_MIG_JOURNAL_V1', blobs: '_UNG_MIG_BLOBS_V1', ids: '_UNG_MIG_IDS_', index: '_UNG_MIG_INDEX_V1' };
 }
 function migrationStoreSeal_(value) {
   var copy = JSON.parse(JSON.stringify(value)); delete copy.checksum;
@@ -67,6 +67,39 @@ function migrationSheetsStore_(book) {
     var confirmed = load(sealed.intent.operationKey);
     if (!confirmed || confirmed.checksum !== sealed.checksum) throw migrationError_('MIGRATION_STORE_WRITE_NOT_CONFIRMED');
     return confirmed;
+  }
+  function readRevision(revision) {
+    locked(); var highWater = state();
+    if (!Number.isSafeInteger(revision) || revision < 1 || revision > highWater) throw migrationError_('MIGRATION_INVALID_REVISION');
+    if (revision + 1 > journal.getLastRow()) return null;
+    var cells = journal.getRange(revision + 1, 1, 1, 2).getValues()[0];
+    if (!cells[0] && !cells[1]) return null;
+    var record; try { record = JSON.parse(cells[1]); } catch (_) { throw migrationError_('MIGRATION_STORE_CORRUPT'); }
+    migrationStoreAssert_(record);
+    if (record.schemaVersion !== 2 || record.revision !== revision || record.intent.operationKey !== cells[0]) throw migrationError_('MIGRATION_STORE_CORRUPT');
+    return record;
+  }
+  function cachedRef(key) {
+    if (!/^[a-f0-9]{64}$/.test(key)) throw migrationError_('MIGRATION_INVALID_INDEX_KEY');
+    var sheet = book.getSheetByName(names.index);
+    if (!sheet) return null;
+    var found = find(sheet, key);
+    if (!found.length) return null;
+    if (found.length !== 1) throw migrationError_('MIGRATION_INDEX_CORRUPT');
+    var ref = sheet.getRange(found[0].getRow(), 2).getValues()[0][0];
+    if (!/^[a-f0-9]{64}$/.test(ref)) throw migrationError_('MIGRATION_INDEX_CORRUPT');
+    return ref;
+  }
+  function remember(key, ref) {
+    locked(); var existing = cachedRef(key);
+    if (existing) { if (existing !== ref) throw migrationError_('MIGRATION_INDEX_CONFLICT'); return existing; }
+    if (!readBlob(ref)) throw migrationError_('MIGRATION_BLOB_INCOMPLETE');
+    var sheet = book.getSheetByName(names.index);
+    if (!sheet) { sheet = book.insertSheet(names.index); sheet.appendRow(['keyHash','blobRef']); sheet.hideSheet(); }
+    var row = sheet.getLastRow() + 1; capacity(sheet, row, 2);
+    sheet.getRange(row, 1, 1, 2).setValues([[key, ref]]); SpreadsheetApp.flush();
+    if (cachedRef(key) !== ref) throw migrationError_('MIGRATION_INDEX_NOT_CONFIRMED');
+    return ref;
   }
   function readBlob(key) {
     if (!/^[a-f0-9]{64}$/.test(key || '')) throw migrationError_('MIGRATION_INVALID_BLOB_KEY');
@@ -151,8 +184,13 @@ function migrationSheetsStore_(book) {
     return map;
   }
   function status() {
-    var highWater = state(), pending = 0, applied = 0, review = 0;
+    var highWater = state(), pending = 0, applied = 0, review = 0, resolved = 0;
     var rowsToRead = Math.min(highWater, Math.max(0, journal.getLastRow() - 1)), gaps = highWater - rowsToRead;
+    var indexSheet=book.getSheetByName(names.index), refs=Object.create(null);
+    if (indexSheet && indexSheet.getLastRow()>1) indexSheet.getRange(2,1,indexSheet.getLastRow()-1,2).getValues().forEach(function(row) {
+      if (!/^[a-f0-9]{64}$/.test(row[0]) || !/^[a-f0-9]{64}$/.test(row[1]) || refs[row[0]]) throw migrationError_('MIGRATION_INDEX_CORRUPT');
+      refs[row[0]]=row[1];
+    });
     // Manual admin inspection only. Never run this full journal scan on ordinary requests.
     // A reservation may fail before the journal grows. Count the missing tail
     // without reading beyond the sheet grid or allocating rows during inspection.
@@ -161,9 +199,15 @@ function migrationSheetsStore_(book) {
       var record; try { record = JSON.parse(row[1]); } catch (_) { throw migrationError_('MIGRATION_STORE_CORRUPT'); }
       migrationStoreAssert_(record);
       if (record.revision !== index + 1 || record.intent.operationKey !== row[0]) throw migrationError_('MIGRATION_STORE_CORRUPT');
-      if (record.phase === 'APPLIED') applied++; else if (record.phase === 'PREPARED') pending++; else if (record.phase === 'REVIEW_REQUIRED') review++; else throw migrationError_('MIGRATION_STORE_CORRUPT');
+      var resolutionRef = refs[migrationHash_(['review', record.revision])];
+      if (resolutionRef) {
+        var resolution = readBlob(resolutionRef);
+        if (!resolution || resolution.sourceBookHash !== migrationHash_(book.getId()) || resolution.sourceRecordChecksum !== record.checksum || resolution.revision !== record.revision || resolution.decision !== 'ACCEPT_OBSERVED_SOURCE' || ['PREPARED','REVIEW_REQUIRED'].indexOf(record.phase)<0) throw migrationError_('MIGRATION_REVIEW_CORRUPT');
+        resolved++;
+      } else if (record.phase === 'APPLIED') applied++; else if (record.phase === 'PREPARED') pending++; else if (record.phase === 'REVIEW_REQUIRED') review++; else throw migrationError_('MIGRATION_STORE_CORRUPT');
     });
-    return {highWater: highWater, pendingCount: pending, reviewCount: review, appliedCount: applied, reservationGaps: gaps};
+    return {highWater: highWater, pendingCount: pending, reviewCount: review, appliedCount: applied, resolvedCount: resolved, reservationGaps: gaps};
   }
-  return {load: load, reserve: reserve, touch: touch, finish: finish, putBlob: putBlob, readBlob: readBlob, identityMap: identityMap, status: status};
+  return {load: load, reserve: reserve, touch: touch, finish: finish, putBlob: putBlob, readBlob: readBlob, identityMap: identityMap, status: status,
+    highWater: state, readRevision: readRevision, cachedRef: cachedRef, remember: remember};
 }

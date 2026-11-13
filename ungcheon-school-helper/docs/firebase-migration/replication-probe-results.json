@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "observedDate": "2026-11-13",
+  "timezone": "Asia/Seoul",
+  "source": "Observed Apps Script execution log and synthetic probe assertions",
+  "dataset": "SYNTHETIC_ONLY",
+  "probeFunction": "probeJournalReplication",
+  "baselineRef": "886d5a548b83b1dc45ec047b275012e127b97b6bd0d90ab4a42724f276cd3d78",
+  "scope": "migration-probe-tracking-v1",
+  "checks": ["frozenBaseline", "orderedDeltas", "verifiedPages", "uncertainWriteGate", "historicalBeforeImageRecovery", "sourceNotReplayed", "tombstone", "fullReplicaReadback", "idleNoWrites"],
+  "firstRun": {
+    "startedAt": "13:31:06",
+    "resultAt": "13:33:19",
+    "completedAt": "13:33:20",
+    "ok": true,
+    "sourceWritesThisExecution": 3,
+    "reviewedThisExecution": true,
+    "mirroredRevision": 6,
+    "pendingOperations": 0,
+    "resolvedOperations": 1,
+    "acknowledgedFirestoreWrites": 22,
+    "successfulRequests": 62,
+    "screenshot": "replication-native-first-success.jpg"
+  },
+  "retryRun": {
+    "startedAt": "13:36:23",
+    "resultAt": "13:36:37",
+    "completedAt": "13:36:37",
+    "ok": true,
+    "sourceWritesThisExecution": 0,
+    "reviewedThisExecution": false,
+    "mirroredRevision": 6,
+    "pendingOperations": 0,
+    "resolvedOperations": 1,
+    "acknowledgedFirestoreWrites": 0,
+    "successfulRequests": 11,
+    "screenshot": "replication-native-retry-success.jpg"
+  },
+  "interpretation": {
+    "countsAreAdapterObservationsNotBilling": true,
+    "elapsedTimeIsEntireProbeNotUserSaveLatency": true,
+    "retryDoesNotRepeatFaultInjectionOrReview": true,
+    "productionScriptChanged": false,
+    "schoolDataCopied": false,
+    "productionTrackingActivated": false,
+    "productionReadBackendChanged": false,
+    "automaticWorkerInstalled": false,
+    "servingQueryProjectionImplemented": false,
+    "newIndexExemptionsDeployed": false
+  }
+}
