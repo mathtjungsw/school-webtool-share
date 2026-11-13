@@ -8,10 +8,11 @@ export interface MigrationResource {
   exists?: boolean
   usedRowsUpperBound?: number
   usedColumns?: number
+  replicaCount?: number | null
 }
 
 export interface MigrationStatus {
-  phase: 'PREPARING' | 'TRACKING'
+  phase: 'PREPARING' | 'DRAINING' | 'TRACKING' | 'COPYING_BASELINE' | 'MIRRORING' | 'NEEDS_REVIEW' | 'PAUSED' | 'REBASE_REQUIRED'
   mode: 'SHEETS_PRIMARY'
   activeBackend: 'SHEETS'
   replicaConnected: boolean
@@ -21,7 +22,47 @@ export interface MigrationStatus {
   errorCount: number | null
   verifiedRevision: number | null
   recordedRevision?: number | null
+  baselinePrepared?: boolean
+  replicaPaused?: boolean
+  workerBusy?: boolean
+  canRun?: boolean
+  baseRevision?: number | null
+  blockedRevision?: number | null
+  resolvedCount?: number | null
+  activationNotBefore?: string
+  lastRun?: { completedAt: string; result: MigrationRunResult } | null
   resources: MigrationResource[]
+}
+
+export interface MigrationRunResult {
+  status: 'PROGRESS' | 'BUDGET_EXHAUSTED' | 'IDLE' | 'NEEDS_REVIEW' | 'RETRY_LATER' | 'BUSY' | 'PAUSED' | 'ERROR'
+  steps: number
+  appliedRevision?: number
+  blockedRevision?: number
+  code?: string
+}
+
+export interface MigrationReview {
+  challengeRef: string
+  revision: number
+  expiresAt: string
+  changes: { resource: string; sheetName: string; count: number; putCount: number; deleteCount: number; source: 'NEXT_BEFORE_IMAGE' | 'CURRENT_SOURCE' }[]
+}
+
+export function runMigrationReplica(adminPassword: string) {
+  return hubRequest<MigrationRunResult>({ action: 'runMigrationReplica', adminPassword })
+}
+
+export function setMigrationReplicaPaused(adminPassword: string, paused: boolean) {
+  return hubRequest<{ paused: boolean; trackingContinues: boolean }>({ action: 'setMigrationReplicaPaused', adminPassword, paused })
+}
+
+export function prepareMigrationReview(adminPassword: string, revision: number) {
+  return hubRequest<MigrationReview>({ action: 'prepareMigrationReview', adminPassword, revision })
+}
+
+export function confirmMigrationReview(adminPassword: string, challengeRef: string) {
+  return hubRequest<{ accepted: boolean; duplicate: boolean; revision: number }>({ action: 'confirmMigrationReview', adminPassword, challengeRef, decision: 'ACCEPT_OBSERVED_SOURCE', sourceChecked: true })
 }
 
 export interface MigrationInventory {

@@ -370,6 +370,10 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
       'replaceNeisSnapshot',
       'getMigrationStatus',
       'getMigrationInventory',
+      'runMigrationReplica',
+      'setMigrationReplicaPaused',
+      'prepareMigrationReview',
+      'confirmMigrationReview',
     ].includes(action)
     if (needsServerUpdate && message.includes('허용되지 않는 요청')) {
       throw new Error('학교 공유 서버 업데이트가 필요합니다. 관리자에게 문의하세요.')

@@ -179,3 +179,59 @@ function probeJournalReplication() {
     acknowledgedFirestoreWrites:repository.metrics.documentsWritten,successfulRequests:repository.metrics.requests,baselineRef:baselineRef,productionScriptChanged:false};
   console.log(JSON.stringify(output));return output;
 }
+
+/** Native management smoke check: reuse the completed synthetic epoch, never source rows. */
+function probeMigrationOperations() {
+  if (ScriptApp.getScriptId()!=='16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9') throw new Error('PROBE_PROJECT_MISMATCH');
+  var properties=PropertiesService.getScriptProperties(),id=properties.getProperty('SYNTHETIC_TRACKING_BOOK_V2');
+  if (id!=='1Mab0-2RIeA68lk6ZlhB5yL1eKI7DLY8kpTl6pNjidfI') throw new Error('PROBE_BOOK_MISMATCH');
+  var book=SpreadsheetApp.openById(id),ref=properties.getProperty('SYNTHETIC_REPLICA_BASELINE_V1');
+  if (book.getName()!=='웅천고 이전 시험 - 합성 변경 기록 전용 v2' || !/^[a-f0-9]{64}$/.test(ref || '')) throw new Error('PROBE_BOOK_MISMATCH');
+  var keys=['UNG_MIGRATION_OPERATIONS_V1','UNG_MIGRATION_TRACKING_V1','UNG_MIGRATION_REPLICA_STATE_V1'],restoreKey='SYNTHETIC_OPS_RESTORE_V1';
+  function restore(saved) {keys.forEach(function(key){if(saved[key]===null)properties.deleteProperty(key);else properties.setProperty(key,saved[key]);});}
+  var prior=properties.getProperty(restoreKey);
+  if (prior) {restore(JSON.parse(prior));properties.deleteProperty(restoreKey);}
+  var saved={};keys.forEach(function(key){saved[key]=properties.getProperty(key);});properties.setProperty(restoreKey,JSON.stringify(saved));
+  var originalBook=migrationOperationsBook_, originalRepository=migrationOperationsRepository_, counters={requests:0,writes:0},output;
+  try {
+    keys.forEach(function(key){properties.deleteProperty(key);});
+    migrationOperationsBook_=function(config){if(config.sourceBookId!==id)throw new Error('PROBE_BOOK_MISMATCH');return book;};
+    migrationOperationsRepository_=function(config){
+      if(config.projectId!=='ungcheon-school-helper'||config.schoolId!=='migration-probe-tracking-v1')throw new Error('PROBE_TARGET_MISMATCH');
+      var repository=originalRepository(config),get=repository.get,commit=repository.commit;
+      repository.get=function(path){counters.requests++;return get(path);};
+      repository.commit=function(writes){var result=commit(writes);counters.requests++;counters.writes+=writes.length;return result;};
+      return repository;
+    };
+    migrationPrepareOperations_(book,{projectId:'ungcheon-school-helper',schoolId:'migration-probe-tracking-v1',deploymentVersion:999,sourceFingerprint:migrationHash_('SYNTHETIC_DEPLOYMENT_RECORD_ONLY')});
+    var blocked=false;try{migrationActivatePreparedTracking_();}catch(error){if(error.code==='MIGRATION_DRAIN_NOT_FINISHED')blocked=true;else throw error;}
+    if(!blocked)throw new Error('PROBE_DRAIN_GATE_FAILED');
+    // This is a synthetic completed-epoch fixture, not evidence that ten real minutes elapsed.
+    properties.setProperty('UNG_MIGRATION_TRACKING_V1',JSON.stringify({schemaVersion:1,enabled:true,sourceBookId:id}));
+    var config=migrationOperationsConfig_();config.baselineRef=ref;migrationOperationsSaveConfig_(config);
+    var denied=false;try{migrationAdminRunReplica_({adminPassword:'DENIED_SYNTHETIC'});}catch(error){if(error.message==='SYNTHETIC_ADMIN_REQUIRED')denied=true;else throw error;}
+    var admin={adminPassword:'SYNTHETIC_ADMIN_ONLY'},status=migrationAdminStatus_(admin),before=migrationSheetsStore_(book).status().highWater;
+    if(!denied||status.verifiedRevision!==6||status.pendingCount!==0||status.activeBackend!=='SHEETS'||status.cutoverReady)throw new Error('PROBE_STATUS_FAILED');
+    if(migrationAdminRunReplica_(admin).status!=='IDLE')throw new Error('PROBE_RUN_FAILED');
+    migrationAdminPauseReplica_({adminPassword:admin.adminPassword,paused:true});
+    if(migrationAdminRunReplica_(admin).status!=='PAUSED')throw new Error('PROBE_PAUSE_FAILED');
+    migrationAdminPauseReplica_({adminPassword:admin.adminPassword,paused:false});
+    migrationWithSourceLock_(function(){var state=migrationOperationsState_();state.lease={id:'synthetic-competing-worker',expiresAt:Date.now()+600000};migrationOperationsSaveState_(state);});
+    if(migrationAdminRunReplica_(admin).status!=='BUSY')throw new Error('PROBE_LEASE_FAILED');
+    migrationWithSourceLock_(function(){var state=migrationOperationsState_();state.lease=null;migrationOperationsSaveState_(state);});
+    if(migrationAdminRunReplica_(admin).status!=='IDLE'||migrationSheetsStore_(book).status().highWater!==before||counters.writes!==0)throw new Error('PROBE_MANAGEMENT_REWROTE_DATA');
+    migrationInvalidateReplica_();
+    if(migrationAdminStatus_(admin).phase!=='REBASE_REQUIRED'||!migrationTrackingConfig_().enabled)throw new Error('PROBE_INVALIDATION_FAILED');
+    var resumeDenied=false;try{migrationAdminPauseReplica_({adminPassword:admin.adminPassword,paused:false});}catch(error){if(error.code==='MIGRATION_REPLICA_REBASE_REQUIRED')resumeDenied=true;else throw error;}
+    if(!resumeDenied)throw new Error('PROBE_INVALIDATED_RESUME_ALLOWED');
+    output={ok:true,dataset:'SYNTHETIC_ONLY',checks:['targetAccess','earlyActivationRejected','adminDenied','aggregateStatus','manualIdle','pauseResume','overlappingWorkerRejected','rollbackInvalidatesReplica','unchangedSourceRevision','zeroFirestoreWrites','settingsRestored'],mirroredRevision:6,sourceRevisionBefore:before,sourceRevisionAfter:before,acknowledgedFirestoreWrites:counters.writes,requests:counters.requests,productionScriptChanged:false,realDrainWaitPerformed:false};
+  } finally {
+    migrationOperationsBook_=originalBook;migrationOperationsRepository_=originalRepository;restore(saved);
+    keys.forEach(function(key){if(properties.getProperty(key)!==saved[key])throw new Error('PROBE_SETTINGS_RESTORE_FAILED');});properties.deleteProperty(restoreKey);
+  }
+  console.log(JSON.stringify(output));return output;
+}
+// This stand-alone probe has no production Code.gs; synthetic authorization only.
+function requireAdmin_(password) {
+  if(ScriptApp.getScriptId()!=='16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9'||password!=='SYNTHETIC_ADMIN_ONLY')throw new Error('SYNTHETIC_ADMIN_REQUIRED');
+}

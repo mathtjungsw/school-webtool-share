@@ -184,7 +184,7 @@ function migrationSheetsStore_(book) {
     return map;
   }
   function status() {
-    var highWater = state(), pending = 0, applied = 0, review = 0, resolved = 0;
+    var highWater = state(), pending = 0, applied = 0, review = 0, resolved = 0, firstUnresolved = null;
     var rowsToRead = Math.min(highWater, Math.max(0, journal.getLastRow() - 1)), gaps = highWater - rowsToRead;
     var indexSheet=book.getSheetByName(names.index), refs=Object.create(null);
     if (indexSheet && indexSheet.getLastRow()>1) indexSheet.getRange(2,1,indexSheet.getLastRow()-1,2).getValues().forEach(function(row) {
@@ -204,9 +204,12 @@ function migrationSheetsStore_(book) {
         var resolution = readBlob(resolutionRef);
         if (!resolution || resolution.sourceBookHash !== migrationHash_(book.getId()) || resolution.sourceRecordChecksum !== record.checksum || resolution.revision !== record.revision || resolution.decision !== 'ACCEPT_OBSERVED_SOURCE' || ['PREPARED','REVIEW_REQUIRED'].indexOf(record.phase)<0) throw migrationError_('MIGRATION_REVIEW_CORRUPT');
         resolved++;
-      } else if (record.phase === 'APPLIED') applied++; else if (record.phase === 'PREPARED') pending++; else if (record.phase === 'REVIEW_REQUIRED') review++; else throw migrationError_('MIGRATION_STORE_CORRUPT');
+      } else if (record.phase === 'APPLIED') applied++; else if (record.phase === 'PREPARED' || record.phase === 'REVIEW_REQUIRED') {
+        if (firstUnresolved === null) firstUnresolved = record.revision;
+        if (record.phase === 'PREPARED') pending++; else review++;
+      } else throw migrationError_('MIGRATION_STORE_CORRUPT');
     });
-    return {highWater: highWater, pendingCount: pending, reviewCount: review, appliedCount: applied, resolvedCount: resolved, reservationGaps: gaps};
+    return {highWater: highWater, pendingCount: pending, reviewCount: review, appliedCount: applied, resolvedCount: resolved, reservationGaps: gaps, firstUnresolvedRevision: firstUnresolved};
   }
   return {load: load, reserve: reserve, touch: touch, finish: finish, putBlob: putBlob, readBlob: readBlob, identityMap: identityMap, status: status,
     highWater: state, readRevision: readRevision, cachedRef: cachedRef, remember: remember};

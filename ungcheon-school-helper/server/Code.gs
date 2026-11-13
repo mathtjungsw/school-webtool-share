@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 62;
+const MOBILE_SERVICE_VERSION = 63;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -973,6 +973,10 @@ function doPost(e) {
     // Administrator-only metadata inspection; never runs sheet initialization.
     if (action === 'getMigrationStatus') return json_({ ok: true, data: migrationAdminStatus_(body) });
     if (action === 'getMigrationInventory') return json_({ ok: true, data: migrationAdminInventory_(body) });
+    if (action === 'runMigrationReplica') return json_({ ok: true, data: migrationAdminRunReplica_(body) });
+    if (action === 'setMigrationReplicaPaused') return json_({ ok: true, data: migrationAdminPauseReplica_(body) });
+    if (action === 'prepareMigrationReview') return json_({ ok: true, data: migrationAdminPrepareReview_(body, staffSession) });
+    if (action === 'confirmMigrationReview') return json_({ ok: true, data: migrationAdminConfirmReview_(body, staffSession) });
 
     // 읽기 전용 모바일 요청은 전체 시트 초기화 및 잠금을 거치지 않습니다.
     if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: MOBILE_SERVICE_VERSION } });
@@ -992,10 +996,9 @@ function doPost(e) {
       return json_({ ok: true, data: executiveResetPassword_(body) });
     }
 
-    // Track only authenticated write/repair routes. Disabled mode preserves the legacy path.
-    if (typeof migrationTrackingConfig_ === 'function' && !migrationRouteActive_ && migrationShouldTrack_(action)) {
-      const migrationConfig = migrationTrackingConfig_();
-      if (migrationConfig) return migrationTrackedRoute_(body, staffSession, function() { return doPost(e); }, migrationConfig);
+    // Serialize staged writers and recheck tracking inside the activation lock.
+    if (typeof migrationWriteGateEnabled_ === 'function' && !migrationRouteActive_ && migrationShouldTrack_(action) && migrationWriteGateEnabled_()) {
+      return migrationGatedRoute_(body, staffSession, function() { return doPost(e); });
     }
     // 일반 조회에서 전체 시트 생성·보정을 매번 실행하지 않는다.
     // 쓰기 요청은 버전 변경에 필요한 스키마만 보정한다.

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "observedDate": "2026-11-13",
+  "timezone": "Asia/Seoul",
+  "probeFunction": "probeMigrationOperations",
+  "dataset": "SYNTHETIC_ONLY",
+  "startedAt": "14:13:44",
+  "completedAt": "14:14:00",
+  "ok": true,
+  "checks": ["targetAccess", "earlyActivationRejected", "adminDenied", "aggregateStatus", "manualIdle", "pauseResume", "overlappingWorkerRejected", "rollbackInvalidatesReplica", "unchangedSourceRevision", "zeroFirestoreWrites", "settingsRestored"],
+  "mirroredRevision": 6,
+  "sourceRevisionBefore": 6,
+  "sourceRevisionAfter": 6,
+  "acknowledgedFirestoreWrites": 0,
+  "requests": 5,
+  "settingsRestored": true,
+  "productionScriptChanged": false,
+  "realDrainWaitPerformed": false,
+  "deployedHttpRoutesExercised": false,
+  "countsAreAdapterObservationsNotBilling": true,
+  "browserUi": {
+    "source": "Actual React component with synthetic transport",
+    "checks": ["manualStatus", "explicitReviewCheckbox", "reviewConfirmation", "pauseResume", "manualRun", "clearStaleCountersOnError", "ignoreDelayedResponseAfterLogout", "adminReentry"],
+    "screenshot": "management-review-synthetic.jpg"
+  },
+  "nativeScreenshot": "management-native-success.jpg"
+}

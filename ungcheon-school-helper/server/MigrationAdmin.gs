@@ -1,4 +1,4 @@
-/** Read-only preparation endpoints. No initialization, trigger or migration writes. */
+/** Read-only metadata/status endpoints. No initialization or automatic polling. */
 function migrationCatalog_() {
   return [
     ['links', '공유링크', 'id'], ['notices', '공지', 'id'], ['featureRequests', '기능개선요청', 'id'],
@@ -17,6 +17,8 @@ function migrationCatalog_() {
 
 function migrationAdminStatus_(body) {
   requireAdmin_(body.adminPassword);
+  var operational = typeof migrationOperationsStatus_ === 'function' ? migrationOperationsStatus_() : null;
+  if (operational) return Object.assign({schemaVersion:1,mode:'SHEETS_PRIMARY',activeBackend:'SHEETS',cutoverReady:false},operational);
   var config = typeof migrationTrackingConfig_ === 'function' ? migrationTrackingConfig_() : null;
   var measured = null;
   if (config) measured = migrationWithSourceLock_(function() {

@@ -1055,6 +1055,10 @@ const HUB_ACTIONS = new Set([
   // Administrator credentials must stay in POST bodies, never GET URLs.
   'getMigrationStatus',
   'getMigrationInventory',
+  'runMigrationReplica',
+  'setMigrationReplicaPaused',
+  'prepareMigrationReview',
+  'confirmMigrationReview',
 ])
 
 // 학교 유선망은 외부 POST 요청만 별도로 차단하는 경우가 있어 조회 요청은 GET으로 보낸다.
@@ -1079,6 +1083,12 @@ const HUB_READ_ACTIONS = new Set([
 ])
 
 const HUB_LARGE_DATA_ACTIONS = new Set([
+  'getMigrationStatus',
+  'getMigrationInventory',
+  'runMigrationReplica',
+  'setMigrationReplicaPaused',
+  'prepareMigrationReview',
+  'confirmMigrationReview',
   'getSyncManifest',
   'getStaffRoster',
   'listStaffChecklists',

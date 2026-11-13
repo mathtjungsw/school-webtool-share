@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "inspectedAt": "2026-11-13T05:13:59.3536069Z",
+  "readOnly": true,
+  "probeScriptId": "16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9",
+  "modules": [
+    {
+      "name": "Code",
+      "sha256": "0b5be82bdeba0d0ef2e77d384f334c07db30963245379dfa06ba1980ec01d3aa",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "FirestoreRepository",
+      "sha256": "c7cacce7d2e5b47a0bed95980a93aabd2e6f461ebba332293fa9bb49ee6639ff",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationSync",
+      "sha256": "e2f0d54e919de5ebd52bfd88b9d4a873cfce06c20ad4887dd7825c89ecb63668",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationAdmin",
+      "sha256": "f2b320a6fc762119472f10ff71ecc6ae117c34d80a2b4b5d00f9d64d37d7baea",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationJournal",
+      "sha256": "09810db871c29083959225cb8c0ed64c5fb446b72d33979eb51c1ff2a83b3427",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationStore",
+      "sha256": "a4b77304796c37bfa922c2b71d9afbdf958735696ee16ce19f32830766c13cda",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationCapture",
+      "sha256": "deacee95c5d386d7e61ed63ce19d7eac522bbe8f4276e5a1c7bb09c45798622a",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationTracking",
+      "sha256": "33f32f7782554d2eb581848d1a003465f1a5a97057beeefafc1f231ae14d713c",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationReplication",
+      "sha256": "f42217a04df5b782c6215cf26dac75f057322abc83b61c4b9dd67971162054ec",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationRecovery",
+      "sha256": "b3bc1feb0655920dec65ca2cd3c0918ab107921c4148ad8fbbb612676e4f414c",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationOperations",
+      "sha256": "8ecade8123526831f9880793a1799baafbbe30c7b4afc55fd837ce079293e279",
+      "remoteMatchesLocal": true
+    }
+  ],
+  "manifestMatches": true,
+  "workbooks": [
+    {
+      "id": "1c2JHqYpIMGBGRuDe7wqZOBwLStGfuTq42e5Zm-gTpJ4",
+      "name": "웅천고 이전 시험 - 합성 변경 기록 전용",
+      "version": "6",
+      "ownerCount": 1,
+      "nonOwnerPermissionCount": 0,
+      "rowValuesRead": false
+    },
+    {
+      "id": "1Mab0-2RIeA68lk6ZlhB5yL1eKI7DLY8kpTl6pNjidfI",
+      "name": "웅천고 이전 시험 - 합성 변경 기록 전용 v2",
+      "version": "9",
+      "ownerCount": 1,
+      "nonOwnerPermissionCount": 0,
+      "rowValuesRead": false
+    }
+  ],
+  "productionScriptChanged": false
+}

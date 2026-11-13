@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "inspectedAt": "2026-11-13T05:05:49.9914209Z",
+  "readOnly": true,
+  "scriptId": "1rLmGrYBAeMUHxGr9CSeT1DUtTUoDbmNpydp1rGe5DL-RzDlyoZCleLnb",
+  "deploymentId": "AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w",
+  "deploymentVersion": 89,
+  "liveServiceVersion": 60,
+  "headServiceVersion": 60,
+  "liveFingerprint": "b804d6714f7724cce4b9afbcebe3c76be417414c56ee006658d685188dca5f92",
+  "headFingerprint": "b804d6714f7724cce4b9afbcebe3c76be417414c56ee006658d685188dca5f92",
+  "liveModuleNames": [
+    "appsscript",
+    "Code",
+    "StaffAuth"
+  ],
+  "healthServiceVersion": 60,
+  "healthOk": true,
+  "explicitLiveOAuthScopes": [],
+  "propertiesRead": false,
+  "sourceRowsRead": false,
+  "productionChanged": false
+}
