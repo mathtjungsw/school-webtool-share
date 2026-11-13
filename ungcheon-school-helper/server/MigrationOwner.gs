@@ -11,7 +11,15 @@ function migrationOwnerApi_(identity,path) {
   try {response=UrlFetchApp.fetch('https://script.googleapis.com/v1/projects/'+identity.scriptId+path,
     {headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});}
   catch (_) {throw migrationError_('MIGRATION_DEPLOYMENT_READ_FAILED');}
-  if (response.getResponseCode()!==200) throw migrationError_('MIGRATION_DEPLOYMENT_READ_FAILED');
+  if (response.getResponseCode()!==200) {
+    var reason='UNKNOWN';
+    try {
+      var payload=JSON.parse(response.getContentText());
+      var detail=(payload.error && payload.error.details || []).filter(function(x){return x['@type']==='type.googleapis.com/google.rpc.ErrorInfo';})[0];
+      if (detail && /^[A-Z_]{1,80}$/.test(detail.reason || '')) reason=detail.reason;
+    } catch (_) {}
+    throw migrationError_('MIGRATION_DEPLOYMENT_READ_HTTP_'+response.getResponseCode()+'_'+reason);
+  }
   try {return JSON.parse(response.getContentText());}catch(_){throw migrationError_('MIGRATION_DEPLOYMENT_READ_FAILED');}
 }
 function migrationOwnerContentHash_(content) {

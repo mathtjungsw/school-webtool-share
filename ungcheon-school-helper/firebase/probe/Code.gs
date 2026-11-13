@@ -63,6 +63,32 @@ function probeFirestoreConnection() {
   return result;
 }
 
+function probeTrackedWriteLatency() {
+  if (ScriptApp.getScriptId()!=='16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9') throw new Error('PROBE_PROJECT_MISMATCH');
+  var id=PropertiesService.getScriptProperties().getProperty('SYNTHETIC_BASELINE_BOOK_V1');
+  if (!id || id==='12HhlpO5xjhp0JlKNlf6UVd1Dlz8ZgThFYJ9j4jM0nf4' || id==='1OBt8XHMYH8uNAfuozbjc8iON954FjBSmojf4y2c74GQ') throw new Error('PROBE_SOURCE_FORBIDDEN');
+  var book=SpreadsheetApp.openById(id);
+  if (book.getName()!=='웅천고 이전 시험 - 합성 초기복사 성능 v1') throw new Error('PROBE_BOOK_MISMATCH');
+  var config={schemaVersion:1,enabled:true,sourceBookId:id},timings=[],writes=0;
+  ['create','update','delete'].forEach(function(action){
+    var start=Date.now();
+    migrationTrackedRoute_({action:'probeLatency'+action,operationId:'synthetic-latency-v1-'+action},{name:'Synthetic Latency'},function(){
+      var sheet=migrationSourceBook_().getSheetByName('공유링크');
+      if(action==='create') sheet.appendRow(['synthetic-latency-v1','Test','Synthetic','https://example.com','','Synthetic','2026-11-13']);
+      else {
+        var values=sheet.getDataRange().getValues(),row=values.findIndex(function(v){return v[0]==='synthetic-latency-v1';})+1;
+        if(row<2) throw new Error('PROBE_SYNTHETIC_ROW_MISSING');
+        if(action==='update') sheet.getRange(row,3).setValue('Updated synthetic');else sheet.deleteRow(row);
+      }
+      writes++;return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
+    },config,book);
+    timings.push({action:action,elapsedMillis:Date.now()-start});
+  });
+  var status=migrationSheetsStore_(book).status();
+  var result={ok:true,dataset:'SYNTHETIC_ONLY',sourceWrites:writes,timings:timings,recordedRevision:status.highWater,pendingCount:status.pendingCount,productionScriptChanged:false};
+  console.log(JSON.stringify(result));return result;
+}
+
 /** Exercises the actual replica adapter in an isolated synthetic school scope. */
 function probeFirestoreReplica() {
   var repository = migrationRepository_({ enabled: true, projectId: 'ungcheon-school-helper', schoolId: 'migration-probe', environment: 'MIRROR', sourceOfTruth: 'SHEETS' });
