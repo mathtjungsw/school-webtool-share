@@ -72,11 +72,11 @@ function probeTrackedWriteLatency() {
   var config={schemaVersion:1,enabled:true,sourceBookId:id},timings=[],writes=0;
   ['create','update','delete'].forEach(function(action){
     var start=Date.now();
-    migrationTrackedRoute_({action:'probeLatency'+action,operationId:'synthetic-latency-v1-'+action},{name:'Synthetic Latency'},function(){
+    migrationTrackedRoute_({action:'probeLatency'+action,operationId:'synthetic-latency-v2-'+action},{name:'Synthetic Latency'},function(){
       var sheet=migrationSourceBook_().getSheetByName('공유링크');
-      if(action==='create') sheet.appendRow(['synthetic-latency-v1','Test','Synthetic','https://example.com','','Synthetic','2026-11-13']);
+      if(action==='create') sheet.appendRow(['synthetic-latency-v2','Test','Synthetic','https://example.com','','Synthetic','2026-11-13']);
       else {
-        var values=sheet.getDataRange().getValues(),row=values.findIndex(function(v){return v[0]==='synthetic-latency-v1';})+1;
+        var values=sheet.getDataRange().getValues(),row=values.findIndex(function(v){return v[0]==='synthetic-latency-v2';})+1;
         if(row<2) throw new Error('PROBE_SYNTHETIC_ROW_MISSING');
         if(action==='update') sheet.getRange(row,3).setValue('Updated synthetic');else sheet.deleteRow(row);
       }

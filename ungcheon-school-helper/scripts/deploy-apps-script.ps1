@@ -170,6 +170,43 @@ function Assert-RemoteFilesPreserved {
   }
 }
 
+function Write-MigrationDeploymentEvidence {
+  param([object]$Local, [string]$Fingerprint, [int]$VersionNumber, [int]$ServiceVersion, [string]$MainCommit)
+  $owner = @($Local.files | Where-Object { $_.name -eq 'MigrationOwner' -and $_.type -eq 'SERVER_JS' })
+  if ($owner.Count -eq 0) { return }
+  $releaseMatch = [regex]::Match([string]$owner[0].source, "function migrationOwnerReleaseId_\(\)\s*\{return '([a-zA-Z0-9_-]{8,100})';\}")
+  if (-not $releaseMatch.Success) { throw 'Migration deployment evidence blocked: release ID missing.' }
+  # Default Apps Script Cloud projects cannot enable the Apps Script REST API.
+  # The authenticated deployer records its verified result in the existing private
+  # school Firestore. No credential or school row is placed in this document.
+  $root = 'https://firestore.googleapis.com/v1/projects/ungcheon-school-helper/databases/(default)/documents'
+  $name = 'projects/ungcheon-school-helper/databases/(default)/documents/schools/ungcheon/migrationChecks/deployment'
+  $uri = 'https://firestore.googleapis.com/v1/' + $name
+  $headers = @{ Authorization = "Bearer $script:oauthAccessToken" }
+  $prior = $null
+  try { $prior = Invoke-RestMethod -Uri $uri -Headers $headers -TimeoutSec 30 }
+  catch {
+    if (-not $_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 404) { throw 'Migration deployment evidence could not be read. No remote body was logged.' }
+  }
+  if ($prior -and [int]$prior.fields.deploymentVersion.integerValue -gt $VersionNumber) { throw 'A newer deployment evidence record exists; it was not overwritten.' }
+  $fields = @{
+    schemaVersion=@{integerValue='1'}; scriptId=@{stringValue=$scriptId}; deploymentId=@{stringValue=$deploymentId}
+    deploymentVersion=@{integerValue=[string]$VersionNumber}; serviceVersion=@{integerValue=[string]$ServiceVersion}
+    sourceFingerprint=@{stringValue=$Fingerprint}; mainCommit=@{stringValue=$MainCommit}
+    releaseId=@{stringValue=$releaseMatch.Groups[1].Value}; headMatchesDeployment=@{booleanValue=$true}
+    verifiedAt=@{integerValue=[string][DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()}
+  }
+  $precondition = if ($prior) { @{updateTime=[string]$prior.updateTime} } else { @{exists=$false} }
+  $body = @{writes=@(@{update=@{name=$name;fields=$fields};currentDocument=$precondition})} | ConvertTo-Json -Depth 12 -Compress
+  try {
+    $null = Invoke-RestMethod -Uri ($root+':commit') -Method Post -Headers $headers -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body)) -TimeoutSec 30
+    $confirmed = Invoke-RestMethod -Uri $uri -Headers $headers -TimeoutSec 30
+    if ($confirmed.fields.sourceFingerprint.stringValue -ne $Fingerprint -or [int]$confirmed.fields.deploymentVersion.integerValue -ne $VersionNumber -or $confirmed.fields.releaseId.stringValue -ne $releaseMatch.Groups[1].Value) { throw 'evidence mismatch' }
+  } catch { throw 'Migration deployment evidence was not confirmed. Live service is deployed; tracking activation remains blocked. No credentials or response bodies were logged.' }
+  finally { $headers=$null; $body=$null; $prior=$null; $confirmed=$null }
+  Write-Host 'Private deployment evidence confirmed for owner activation. No school rows or login properties were changed.'
+}
+
 if (-not (Test-Path -LiteralPath $sourceFile) -or -not (Test-Path -LiteralPath $guardFile)) { throw 'Required deployment source/guard is missing.' }
 $projectFile = Join-Path $serverDir '.clasp.json'
 if (Test-Path -LiteralPath $projectFile) {
@@ -250,6 +287,9 @@ try {
   catch { throw 'Deployment updated, but the unauthenticated mobile route probe failed.' }
   $unknownActionError = ConvertFrom-Json '"\ud5c8\uc6a9\ub418\uc9c0 \uc54a\ub294 \uc694\uccad\uc785\ub2c8\ub2e4."'
   if ($probe.ok -or [string]$probe.error -eq $unknownActionError -or -not [string]$probe.error) { throw 'The mobile route failed to reject the unauthenticated probe correctly.' }
+  $finalSnapshot = Get-RemoteSnapshot
+  if ($finalSnapshot.version -ne $versionNumber -or $finalSnapshot.deployedHash -ne $localHash -or $finalSnapshot.headHash -ne $localHash) { throw 'Deployment evidence blocked: fixed version or HEAD changed after verification.' }
+  Write-MigrationDeploymentEvidence -Local $localContent -Fingerprint $localHash -VersionNumber $versionNumber -ServiceVersion $expectedServiceVersion -MainCommit $mainCommit
   Write-Host "Apps Script fixed deployment updated: service v$expectedServiceVersion, project version @$versionNumber"
   Write-Host "URL preserved: $webAppUrl"
   Write-Host 'Existing ScriptProperties and login sessions were not reset. Run authenticated mobile acceptance checks separately without logging secrets.'

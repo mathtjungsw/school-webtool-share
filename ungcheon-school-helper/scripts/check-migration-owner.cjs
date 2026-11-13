@@ -3,18 +3,24 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const f=fixture();new vm.Script(fs.readFileSync(path.join(__dirname,'../server/MigrationOwner.gs'),'utf8')).runInContext(f.ctx)
 const identity={scriptId:'synthetic-script',deploymentId:'synthetic-fixed',book:f.book}
 const version=vm.runInContext('MOBILE_SERVICE_VERSION',f.ctx)
-const content={files:[{name:'Code',type:'SERVER_JS',source:`const MOBILE_SERVICE_VERSION = ${version};`},{name:'MigrationOwner',type:'SERVER_JS',source:'synthetic'}]}
+const evidence={schemaVersion:1,scriptId:identity.scriptId,deploymentId:identity.deploymentId,serviceVersion:version,deploymentVersion:999,
+  releaseId:f.ctx.migrationOwnerReleaseId_(),sourceFingerprint:'1'.repeat(64),headMatchesDeployment:true,verifiedAt:Date.now()}
+let recorded=null,healthy=true
 let writes=0,reads=0,triggers=[]
 f.ctx.migrationProductionIdentity_=()=>identity
-f.ctx.migrationOwnerApi_=(_,p)=>p.startsWith('/deployments/')?{deploymentId:identity.deploymentId,deploymentConfig:{versionNumber:999}}:content
-f.ctx.migrationOperationsRepository_=()=>({get(){reads++;return null},commit(){writes++}})
+f.ctx.migrationOperationsRepository_=()=>({get(){reads++;return recorded?{data:recorded}:null},commit(){writes++}})
+f.ctx.UrlFetchApp={fetch:()=>({getResponseCode:()=>200,getContentText:()=>JSON.stringify({ok:healthy,data:{service:'UngcheonSchoolHub',version}})})}
 f.ctx.ScriptApp={getProjectTriggers:()=>triggers,newTrigger:handler=>({timeBased(){return this},everyMinutes(n){assert.equal(n,5);return this},create(){triggers.push({getHandlerFunction:()=>handler})}})}
 const properties=JSON.stringify([...f.properties]),rows=JSON.stringify(f.book.events)
 assert.equal(f.ctx.authorizeMigrationConnection().ok,true);assert.equal(writes,0);assert.equal(reads,1)
 assert.equal(JSON.stringify([...f.properties]),properties);assert.equal(JSON.stringify(f.book.events),rows)
-const verified=f.ctx.migrationOwnerEvidence_(identity);assert.equal(verified.deploymentVersion,999)
-f.ctx.migrationOwnerApi_=(_,p)=>p.startsWith('/deployments/')?{deploymentId:identity.deploymentId,deploymentConfig:{versionNumber:999}}:p.includes('?')?content:{files:[]}
-assert.throws(()=>f.ctx.prepareMigrationProduction(),e=>e.code==='MIGRATION_DEPLOYMENT_HEAD_DIFFERS');assert.equal(JSON.stringify([...f.properties]),properties)
+assert.throws(()=>f.ctx.prepareMigrationProduction(),e=>e.code==='MIGRATION_INVALID_DEPLOYMENT_RECORD')
+recorded=evidence;const verified=f.ctx.migrationOwnerEvidence_(identity);assert.equal(verified.deploymentVersion,999)
+for(const change of [{verifiedAt:Date.now()-3600001},{verifiedAt:Date.now()+60000},{releaseId:'old-release'},{headMatchesDeployment:false},{scriptId:'another-script'},{serviceVersion:version-1}]){
+  recorded={...evidence,...change};assert.throws(()=>f.ctx.prepareMigrationProduction(),e=>e.code==='MIGRATION_INVALID_DEPLOYMENT_RECORD')
+}
+recorded=evidence;healthy=false;assert.throws(()=>f.ctx.prepareMigrationProduction(),e=>e.code==='MIGRATION_DEPLOYMENT_HEALTH_FAILED');healthy=true
+assert.equal(JSON.stringify([...f.properties]),properties)
 f.ctx.migrationOwnerEvidence_=()=>verified;f.ctx.migrationOperationsConfig_=()=>({...verified,sourceFingerprint:'0'.repeat(64)})
 assert.throws(()=>f.ctx.activateMigrationProduction(),e=>e.code==='MIGRATION_DEPLOYMENT_CODE_DIFFERS')
 f.ctx.migrationOperationsContext_=()=>({config:{baselineRef:null}})

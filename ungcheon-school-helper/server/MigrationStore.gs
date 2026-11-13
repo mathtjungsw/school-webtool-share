@@ -33,6 +33,7 @@ function migrationSheetsStore_(book) {
   var names = migrationStoreNames_();
   var meta = book.getSheetByName(names.meta), journal = book.getSheetByName(names.journal), blobs = book.getSheetByName(names.blobs);
   if (!meta || !journal || !blobs) throw migrationError_('MIGRATION_STORE_NOT_INITIALIZED');
+  var blobCache=Object.create(null),blobCacheBytes=0,blobCacheGeneration=-1;
   function locked() { if (migrationSourceLockDepth_ < 1) throw migrationError_('MIGRATION_LOCK_REQUIRED'); }
   function capacity(sheet, row, columns) {
     if (row > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(), row - sheet.getMaxRows());
@@ -64,7 +65,12 @@ function migrationSheetsStore_(book) {
     capacity(journal, row, 2);
     journal.getRange(row, 1, 1, 2).setValues([[sealed.intent.operationKey, JSON.stringify(sealed)]]);
     SpreadsheetApp.flush();
-    var confirmed = load(sealed.intent.operationKey);
+    // The reserved row number is known under the common lock. Confirm the exact
+    // persisted row directly, rather than scanning operation keys and metadata
+    // again after each of reserve/touch/finish.
+    var cells=journal.getRange(row,1,1,2).getValues()[0],confirmed;
+    try {confirmed=migrationStoreAssert_(JSON.parse(cells[1]));} catch (_) {throw migrationError_('MIGRATION_STORE_WRITE_NOT_CONFIRMED');}
+    if (cells[0]!==sealed.intent.operationKey || confirmed.intent.operationKey!==sealed.intent.operationKey || confirmed.revision!==sealed.revision) throw migrationError_('MIGRATION_STORE_WRITE_NOT_CONFIRMED');
     if (!confirmed || confirmed.checksum !== sealed.checksum) throw migrationError_('MIGRATION_STORE_WRITE_NOT_CONFIRMED');
     return confirmed;
   }
@@ -101,8 +107,14 @@ function migrationSheetsStore_(book) {
     if (cachedRef(key) !== ref) throw migrationError_('MIGRATION_INDEX_NOT_CONFIRMED');
     return ref;
   }
-  function readBlob(key) {
+  function readBlob(key,force) {
     if (!/^[a-f0-9]{64}$/.test(key || '')) throw migrationError_('MIGRATION_INVALID_BLOB_KEY');
+    // Cache only immutable blobs already verified in this lock acquisition.
+    // Never reuse across requests/locks or to confirm a newly written blob.
+    if (migrationSourceLockDepth_<1 || blobCacheGeneration!==migrationSourceLockGeneration_) {
+      blobCache=Object.create(null);blobCacheBytes=0;blobCacheGeneration=migrationSourceLockGeneration_;
+    }
+    if (!force && migrationSourceLockDepth_>0 && blobCache[key]) return JSON.parse(blobCache[key]);
     var found = find(blobs, key);
     if (!found.length) return null;
     var rows = found.map(function(cell) { return blobs.getRange(cell.getRow(), 1, 1, 4).getValues()[0]; }).sort(function(a, b) { return a[1] - b[1]; });
@@ -116,6 +128,10 @@ function migrationSheetsStore_(book) {
     try { payload = JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(encoded), 'application/x-gzip')).getDataAsString('UTF-8')); }
     catch (_) { throw migrationError_('MIGRATION_BLOB_CORRUPT'); }
     if (migrationHash_(payload) !== key) throw migrationError_('MIGRATION_BLOB_CORRUPT');
+    if (migrationSourceLockDepth_>0) {
+      var serialized=JSON.stringify(payload);
+      if (blobCacheBytes+serialized.length<=4000000) {blobCache[key]=serialized;blobCacheBytes+=serialized.length;}
+    }
     return payload;
   }
   function putBlob(payload) {
@@ -127,7 +143,7 @@ function migrationSheetsStore_(book) {
     for (var i = 0; i < count; i++) rows.push([key, i, count, 'z1:' + compressed.slice(i * 36000, (i + 1) * 36000)]);
     var start = blobs.getLastRow() + 1; capacity(blobs, start + count - 1, 4);
     blobs.getRange(start, 1, count, 4).setValues(rows); SpreadsheetApp.flush();
-    if (!readBlob(key)) throw migrationError_('MIGRATION_BLOB_WRITE_NOT_CONFIRMED');
+    if (!readBlob(key,true)) throw migrationError_('MIGRATION_BLOB_WRITE_NOT_CONFIRMED');
     return key;
   }
   function reserve(intent, accessMode) {

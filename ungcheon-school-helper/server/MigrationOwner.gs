@@ -6,44 +6,27 @@ function migrationProductionIdentity_() {
   if (!book || book.getId()!=='12HhlpO5xjhp0JlKNlf6UVd1Dlz8ZgThFYJ9j4jM0nf4') throw migrationError_('MIGRATION_SOURCE_MISMATCH');
   return {scriptId:scriptId,book:book,deploymentId:'AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w'};
 }
-function migrationOwnerApi_(identity,path) {
-  var response;
-  try {response=UrlFetchApp.fetch('https://script.googleapis.com/v1/projects/'+identity.scriptId+path,
-    {headers:{Authorization:'Bearer '+ScriptApp.getOAuthToken()},muteHttpExceptions:true});}
-  catch (_) {throw migrationError_('MIGRATION_DEPLOYMENT_READ_FAILED');}
-  if (response.getResponseCode()!==200) {
-    var reason='UNKNOWN';
-    try {
-      var payload=JSON.parse(response.getContentText());
-      var detail=(payload.error && payload.error.details || []).filter(function(x){return x['@type']==='type.googleapis.com/google.rpc.ErrorInfo';})[0];
-      if (detail && /^[A-Z_]{1,80}$/.test(detail.reason || '')) reason=detail.reason;
-    } catch (_) {}
-    throw migrationError_('MIGRATION_DEPLOYMENT_READ_HTTP_'+response.getResponseCode()+'_'+reason);
-  }
-  try {return JSON.parse(response.getContentText());}catch(_){throw migrationError_('MIGRATION_DEPLOYMENT_READ_FAILED');}
-}
-function migrationOwnerContentHash_(content) {
-  return migrationHash_(content.files.map(function(file){return {name:file.name,type:file.type,source:file.source.replace(/\r\n/g,'\n').trimEnd()};})
-    .sort(function(a,b){return a.name<b.name?-1:a.name>b.name?1:0;}));
-}
+// Rotated with each production migration release. The guarded deployment tool
+// records this ID only after checking main, exact immutable source, HEAD and URL.
+function migrationOwnerReleaseId_() {return 'migration-service64-rollout-v2';}
 function migrationOwnerEvidence_(identity) {
-  var deployment=migrationOwnerApi_(identity,'/deployments/'+identity.deploymentId), version=deployment.deploymentConfig.versionNumber;
-  if (deployment.deploymentId!==identity.deploymentId || !Number.isSafeInteger(version) || version<1) throw migrationError_('MIGRATION_INVALID_DEPLOYMENT_RECORD');
-  var deployed=migrationOwnerApi_(identity,'/content?versionNumber='+version), head=migrationOwnerApi_(identity,'/content');
-  var fingerprint=migrationOwnerContentHash_(deployed);
-  if (fingerprint!==migrationOwnerContentHash_(head)) throw migrationError_('MIGRATION_DEPLOYMENT_HEAD_DIFFERS');
-  var code=deployed.files.filter(function(file){return file.name==='Code' && file.type==='SERVER_JS';})[0];
-  if (!code || !new RegExp('const MOBILE_SERVICE_VERSION = '+MOBILE_SERVICE_VERSION+';').test(code.source) ||
-    !deployed.files.some(function(file){return file.name==='MigrationOwner';})) throw migrationError_('MIGRATION_DEPLOYMENT_CODE_DIFFERS');
-  return {projectId:'ungcheon-school-helper',schoolId:'ungcheon',deploymentVersion:version,sourceFingerprint:fingerprint};
+  var doc=migrationOperationsRepository_({projectId:'ungcheon-school-helper',schoolId:'ungcheon'}).get('migrationChecks/deployment');
+  var record=doc && doc.data;
+  if (!record || record.schemaVersion!==1 || record.scriptId!==identity.scriptId || record.deploymentId!==identity.deploymentId ||
+      record.serviceVersion!==MOBILE_SERVICE_VERSION || record.releaseId!==migrationOwnerReleaseId_() || record.headMatchesDeployment!==true ||
+      !Number.isSafeInteger(record.deploymentVersion) || record.deploymentVersion<1 || !/^[a-f0-9]{64}$/.test(record.sourceFingerprint || '') ||
+      !Number.isSafeInteger(record.verifiedAt) || record.verifiedAt>Date.now()+30000 || Date.now()-record.verifiedAt>3600000) throw migrationError_('MIGRATION_INVALID_DEPLOYMENT_RECORD');
+  var response=UrlFetchApp.fetch('https://script.google.com/macros/s/'+identity.deploymentId+'/exec',{muteHttpExceptions:true}),health;
+  try {health=JSON.parse(response.getContentText());}catch(_){throw migrationError_('MIGRATION_DEPLOYMENT_HEALTH_FAILED');}
+  if (response.getResponseCode()!==200 || !health.ok || !health.data || health.data.service!=='UngcheonSchoolHub' || health.data.version!==MOBILE_SERVICE_VERSION) throw migrationError_('MIGRATION_DEPLOYMENT_HEALTH_FAILED');
+  return {projectId:'ungcheon-school-helper',schoolId:'ungcheon',deploymentVersion:record.deploymentVersion,sourceFingerprint:record.sourceFingerprint};
 }
 // Run this in staged HEAD to grant the explicit scopes before the live update.
 // Reads access only; does not initialize migration properties or source tables.
 function authorizeMigrationConnection() {
   var identity=migrationProductionIdentity_();
   migrationOperationsRepository_({projectId:'ungcheon-school-helper',schoolId:'ungcheon'}).get('migrationChecks/access');
-  migrationOwnerApi_(identity,'/deployments/'+identity.deploymentId);
-  var result={ok:true,firestoreAccess:true,deploymentReadAccess:true,ownedTriggerCount:ScriptApp.getProjectTriggers().length,sourceOfTruth:'SHEETS',sourceChanged:false};
+  var result={ok:true,firestoreAccess:true,ownedTriggerCount:ScriptApp.getProjectTriggers().length,sourceOfTruth:'SHEETS',sourceChanged:false};
   console.log(JSON.stringify(result));return result;
 }
 function prepareMigrationProduction() {

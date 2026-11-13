@@ -15,7 +15,7 @@ function migrationCompatibleLock_() {
   return {
     waitLock: function(timeout) {
       if (opened) throw migrationError_('MIGRATION_LOCK_REUSE');
-      if (migrationSourceLockDepth_ === 0) { nativeLock = LockService.getScriptLock(); nativeLock.waitLock(timeout); owns = true; }
+      if (migrationSourceLockDepth_ === 0) { nativeLock = LockService.getScriptLock(); nativeLock.waitLock(timeout); owns = true; migrationSourceLockGeneration_++; }
       migrationSourceLockDepth_++; opened = true;
     },
     releaseLock: function() {

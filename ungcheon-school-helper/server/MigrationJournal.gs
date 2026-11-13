@@ -4,6 +4,7 @@
  * replay an uncertain source write. Firestore replication is a separate worker.
  */
 var migrationSourceLockDepth_ = 0;
+var migrationSourceLockGeneration_ = 0;
 var migrationSourceOperationActive_ = false;
 function migrationWithSourceLock_(callback) {
   if (migrationSourceLockDepth_ > 0) {
@@ -12,6 +13,7 @@ function migrationWithSourceLock_(callback) {
   }
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
+  migrationSourceLockGeneration_++;
   migrationSourceLockDepth_ = 1;
   try { return callback(); }
   finally { migrationSourceLockDepth_ = 0; lock.releaseLock(); }
