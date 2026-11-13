@@ -1,6 +1,6 @@
 # 변경 기록 저장소와 업무 저장 경로 연결
 
-2026-11-13. 사용자의 다음 단계 진행 지시에 따라 개발 브랜치에 실제 Sheets 변경 기록 어댑터와 업무 경로 연결을 구현했다. **로컬 검증 완료 / 분리된 Google Sheets 시험의 추가 권한 승인 대기 / 운영 미배포** 상태다. 학교 자료를 Firestore에 복제하거나 조회·저장 기준을 전환하지 않았다.
+2026-11-13. 사용자의 다음 단계 진행 지시에 따라 개발 브랜치에 실제 Sheets 변경 기록 어댑터와 업무 경로 연결을 구현했다. **로컬 검증 완료 / 추가 권한 승인 및 실제 Google Sheets 합성 시험 완료 / 운영 미배포** 상태다. 학교 자료를 Firestore에 복제하거나 조회·저장 기준을 전환하지 않았다.
 
 ## 구현과 보존 범위
 
@@ -27,6 +27,8 @@ PC와 모바일은 최종 전환 후에도 기존 Apps Script 주소·로그인�
 | `npm run build` | PC 빌드 성공. 설치파일·자동업데이트 게시 안 함 |
 | 모바일 `npm run typecheck`, `npm test` | 공유 데이터 검사 및 60개 시험 통과. 실제 휴대폰/Firestore 조회 시험은 아님 |
 | 관리자 화면 | 밝은 모드의 실제 컴포넌트에 합성 기록 7건·확인 필요 2건을 주입하여 화면 및 오류 시 이전 수치 제거 확인 |
+| 실제 Google Sheets | 13:04:26~13:05:02 KST 생성·수정·삭제 3건 완료, 13:05:28~13:05:38 KST 재실행 시 추가 원본 쓰기 0회·완료 작업 3건 유지. 최신 v2 합성 자료의 미완결/확인 필요 기록 0건을 함수 내부에서 검증 |
+| 원격 시험 코드·접근 권한 | 8개 모듈의 SHA-256 및 manifest가 로컬 최종본과 일치. 진단용 v1·정상 시험용 v2 문서 모두 소유자 1명·그 외 권한 0개 |
 | 원격 main | `git ls-remote origin refs/heads/main` 결과 `80f12b0179e55d1b46106d3e3c7ebca18a2afc1b` |
 | 읽기 전용 배포 사전 검사 | `npm run deploy:apps-script -- -PreflightOnly`가 `protected desktop function changed: ensureSheets_`로 **정상 차단**. 원격 조회 단계 전의 소스 가드에서 종료 |
 
@@ -34,17 +36,21 @@ PC와 모바일은 최종 전환 후에도 기존 Apps Script 주소·로그인�
 
 업무 함수 내용 비교 시험은 명시적 원본 접근·잠금 연결만 원래 호출로 정규화하여 기존 업무 로직이 같은지 검사한다. **실제 배포 가드와 배포 스크립트는 수정하지 않았으며 원본 소스 그대로의 차이를 차단한다.** 이 시험 통과가 배포 승인이나 main 검토 완료를 뜻하지 않는다. 실제 배포 전 [프로젝트 규칙](../../AGENTS.md)에 따라 데스크톱 변경을 main에서 검토·검증해야 한다.
 
-## 실제 Google Sheets 시험의 남은 확인
+## 실제 Google Sheets 시험 결과와 수정
 
 - 별도 프로젝트 [웅천고 Firestore 연결 시험 (운영 분리)](https://script.google.com/home/projects/16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9/edit)에 `probeSheetsChangeTracking`과 모듈을 올렸다. 운영 프로젝트는 업로드하지 않았다.
-- 추가 `spreadsheets` OAuth 범위 때문에 Google의 권한 승인이 필요하다. 이전에 완료한 Firestore/외부 요청 승인과 다른 범위다. Chrome에서 권한 검토 화면을 열고 사용자의 승인·시험 실행을 요청한 상태이며 이번 보고 시점에는 완료 응답과 성공 로그를 확인하지 못했다.
-- 시험 코드는 고정된 별도 스크립트 ID를 확인하고 합성 자료 문서 하나만 만들거나 재사용한다. 운영 원본·보존 사본 ID를 명시적으로 거부한다. 업무 자료를 열거나 Firestore로 보내지 않는다.
-- 생성/수정/삭제·삭제표식·중첩 잠금·같은 ID 중복 요청·내용 충돌·저널 완료를 확인하도록 준비했다. 재실행 시 합성 원본 추가 쓰기 0회가 기대되지만 **실제 Google 환경에서 이 결과를 아직 확인하지 않았다.**
-- 원격 시험 업로드 후 로컬 상태 집계의 빈 예약 구간 처리와 UUID 중복 검사를 추가 보완했다. 승인 완료 후 실행 로그를 먼저 확인하고, 최종 모듈을 `scripts/prepare-firestore-probe.ps1`로 다시 올려 동일 시험을 마친다. 실제 네이티브 Apps Script 메서드와 저장 동작 확인을 로컬 모형으로 대체하지 않는다.
+- 사용자가 추가 `spreadsheets` OAuth 권한 승인·실행 완료를 알렸다. 화면에 남은 로그는 기존 Firestore 연결 검사였으므로, 최종 모듈을 다시 업로드하고 `probeSheetsChangeTracking`을 직접 선택해 실행했다. 추가 승인 요구 없이 실제 Sheets 호출이 실행되는 것을 확인했다.
+- 시험 코드는 고정된 별도 스크립트 ID를 확인하고 시험용으로 등록한 합성 자료 문서만 만들거나 재사용한다. 운영 원본·보존 사본 ID를 명시적으로 거부한다. 업무 자료를 열거나 Firestore로 보내지 않는다.
+- 첫 실제 실행은 원본 수정 전 압축 본문 복원에서 `MIGRATION_BLOB_CORRUPT`로 멈췄다. 원인은 바이너리 Blob을 다시 만들 때 gzip MIME을 생략한 것이었다. `Utilities.newBlob(bytes, 'application/x-gzip')`로 수정했다. 진단 함수에서 동일 바이트에 대해 MIME 미지정은 실패, 지정은 성공을 확인했으며, 이미 저장했던 변경 전 사본도 해시가 일치했다. [Google Utilities API의 Blob·gzip 메서드](https://developers.google.com/apps-script/reference/utilities/utilities)와 실제 실행 결과를 함께 확인했다.
+- 실패 기록은 [진단용 v1 문서](https://docs.google.com/spreadsheets/d/1c2JHqYpIMGBGRuDe7wqZOBwLStGfuTq42e5Zm-gTpJ4/edit)에 그대로 보존했다. `PREPARED` 1건·touched 0개·원본 자료 행 0개를 확인했다. 불확실 작업을 자동 재적용하거나 이력을 지우지 않았다. 이 기록은 **보존한 합성 시험의 실패 이력**이며 운영 학교 작업이 아니다.
+- 수정 후 [정상 시험용 v2 문서](https://docs.google.com/spreadsheets/d/1Mab0-2RIeA68lk6ZlhB5yL1eKI7DLY8kpTl6pNjidfI/edit)를 고정 키 `SYNTHETIC_TRACKING_BOOK_V2`로 만들고 이후 재사용했다. 생성/수정/삭제·삭제표식·중첩 잠금·같은 ID 중복 요청·내용 충돌·저널 완료 읽기를 통과했다. 첫 실행 원본 쓰기 3회, 전체 재실행 추가 원본 쓰기 **0회**, 완료 작업 수 **3건**을 실제 로그에서 확인했다.
+- 로컬 Sheets 모형도 gzip MIME 누락을 거부하도록 보강했다. 수정 후 `npm run check:migration`과 전체 `npm run typecheck`가 다시 통과했다. PC/모바일 화면 코드에는 이번 수정이 없어 빌드·모바일 앱 60개 시험은 앞서 완료한 결과를 유지한다.
+- `scripts/inspect-migration-probe.ps1`로 원격 8개 모듈과 manifest의 로컬 일치 및 두 시험 문서의 비공개 권한을 읽기 전용으로 검증했다. [코드·권한 검사 결과](native-probe-verification.json), [관측한 실행 결과](native-probe-results.json)를 남겼다. 학교 원본 본문·인증 값은 기록하지 않았다.
+- 실행 화면은 원래 작업 폴더 `outputs/firebase-migration-20261113/`의 `tracking-codec-native.jpg`, `tracking-native-first-success.jpg`, `tracking-native-retry-success.jpg`에 있다. 실학교 자료, 실시간 복제 작업자, 전체 업무 시나리오가 Google 환경에서 모두 검증됐다는 의미는 아니다.
 
 ## 이어서 할 일
 
-1. 대기 중인 추가 권한 승인·합성 시험 결과를 확인하고 최종 모듈로 반복 실행의 추가 쓰기 0회까지 검증한다. 새 사본이나 Firebase 프로젝트를 다시 만들지 않는다.
+1. 완료된 추가 승인·합성 시험을 반복 요청하지 않는다. 기존 원본 보존 사본·Firebase 프로젝트·합성 v2 문서를 재사용한다.
 2. 운영 활성화 전 모든 쓰기 종류·오래된 요청·진행 중 실행의 경계를 재점검하고, 기존 승인 범위와 배포 규칙에 맞춰 main 검토 및 고정 배포 갱신 절차를 수행한다. 현재 변경은 서비스 62 개발본이며 운영 배포를 시도하지 않았다.
 3. 변경 추적 초기화와 `UNG_MIGRATION_TRACKING_V1` 활성화를 안전하게 적용할 관리 절차를 만든다. 기존 비밀번호·세션 속성은 읽어 내보내거나 초기화하지 않는다. 이전 코드로 시작해 실행 중인 요청이 모두 끝나기 전에는 R0 경계를 잡지 않는다.
 4. 추적 중 누락이 없는지 확인하고 공통 잠금에서 R0를 얻는다. 기존 보존 사본은 조사용 백업이며 R0가 아니다.

@@ -80,7 +80,7 @@ function migrationSheetsStore_(book) {
       encoded += row[3].slice(3);
     });
     var payload;
-    try { payload = JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(encoded))).getDataAsString('UTF-8')); }
+    try { payload = JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(encoded), 'application/x-gzip')).getDataAsString('UTF-8')); }
     catch (_) { throw migrationError_('MIGRATION_BLOB_CORRUPT'); }
     if (migrationHash_(payload) !== key) throw migrationError_('MIGRATION_BLOB_CORRUPT');
     return payload;

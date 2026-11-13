@@ -59,8 +59,10 @@ function probeFirestoreReplica() {
 /** Creates/reuses one private synthetic workbook. Never opens the school source. */
 function probeSheetsChangeTracking() {
   if (ScriptApp.getScriptId() !== '16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9') throw new Error('PROBE_PROJECT_MISMATCH');
-  var properties = PropertiesService.getScriptProperties(), key = 'SYNTHETIC_TRACKING_BOOK_V1';
-  var id = properties.getProperty(key), title = '웅천고 이전 시험 - 합성 변경 기록 전용';
+  // Preserve the failed v1 journal for diagnosis. Never automatically replay its
+  // uncertain operation. This fixed v2 dataset is reused on every subsequent run.
+  var properties = PropertiesService.getScriptProperties(), key = 'SYNTHETIC_TRACKING_BOOK_V2';
+  var id = properties.getProperty(key), title = '웅천고 이전 시험 - 합성 변경 기록 전용 v2';
   if (id === '12HhlpO5xjhp0JlKNlf6UVd1Dlz8ZgThFYJ9j4jM0nf4' || id === '1OBt8XHMYH8uNAfuozbjc8iON954FjBSmojf4y2c74GQ') throw new Error('PROBE_SOURCE_FORBIDDEN');
   var book;
   if (!id) { book = SpreadsheetApp.create(title); id = book.getId(); properties.setProperty(key, id); }
@@ -97,5 +99,29 @@ function probeSheetsChangeTracking() {
   var deletion = store.load(deleteIntent.operationKey), delta = store.readBlob(deletion.evidence[0].deltaRef);
   if (delta.deletes.length !== 1 || delta.puts.length !== 0) throw new Error('PROBE_TOMBSTONE_FAILED');
   var output = {ok:true,dataset:'SYNTHETIC_ONLY',checks:['durableJournal','beforeImage','delta','nestedLock','duplicate','payloadConflict','tombstone','completionReadback'],sourceWritesThisExecution:writes,appliedOperations:status.appliedCount,spreadsheetId:id,spreadsheetUrl:book.getUrl(),productionScriptChanged:false};
+  console.log(JSON.stringify(output)); return output;
+}
+
+/** Read-only diagnosis of the preserved synthetic v1 failure and native codec. */
+function probeSheetsStorageReadback() {
+  if (ScriptApp.getScriptId() !== '16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9') throw new Error('PROBE_PROJECT_MISMATCH');
+  var text = JSON.stringify({marker:'synthetic-codec-check',empty:'',zero:0});
+  var gzip = Utilities.gzip(Utilities.newBlob(text,'application/json'));
+  var bytes = Utilities.base64Decode(Utilities.base64Encode(gzip.getBytes()));
+  var untypedReadback = false;
+  try { untypedReadback = Utilities.ungzip(Utilities.newBlob(bytes)).getDataAsString('UTF-8') === text; } catch (_) {}
+  var typedReadback = Utilities.ungzip(Utilities.newBlob(bytes,'application/x-gzip')).getDataAsString('UTF-8') === text;
+  if (!typedReadback) throw new Error('PROBE_TYPED_CODEC_FAILED');
+  var id = PropertiesService.getScriptProperties().getProperty('SYNTHETIC_TRACKING_BOOK_V1');
+  if (!id || id === '12HhlpO5xjhp0JlKNlf6UVd1Dlz8ZgThFYJ9j4jM0nf4' || id === '1OBt8XHMYH8uNAfuozbjc8iON954FjBSmojf4y2c74GQ') throw new Error('PROBE_SOURCE_FORBIDDEN');
+  var book = SpreadsheetApp.openById(id);
+  if (book.getName() !== '웅천고 이전 시험 - 합성 변경 기록 전용') throw new Error('PROBE_BOOK_MISMATCH');
+  var store = migrationSheetsStore_(book), status = store.status();
+  var intent = migrationOperationIntent_({actorHash:migrationHash_('Synthetic Probe'),action:'probeCreate',requestHash:migrationHash_({action:'probeCreate',title:'Synthetic'}),operationId:'synthetic-create-v1',resources:migrationCatalog_().map(function(item){return item.resource;})});
+  var record = store.load(intent.operationKey);
+  var before = store.readBlob(migrationHash_({schemaVersion:1,resource:'links',present:true,headers:['id','department','title','url','description','registeredBy','createdAt'],records:[]}));
+  var noSourceWrite = book.getSheetByName('공유링크').getLastRow() === 1;
+  if (!record || record.phase !== 'PREPARED' || record.touched.length || !before || !noSourceWrite) throw new Error('PROBE_FAILURE_BOUNDARY_MISMATCH');
+  var output = {ok:true,dataset:'SYNTHETIC_ONLY',untypedReadback:untypedReadback,typedReadback:typedReadback,preservedBeforeImageVerified:true,sourceRows:0,preservedPendingOperations:status.pendingCount,spreadsheetId:id,productionScriptChanged:false};
   console.log(JSON.stringify(output)); return output;
 }

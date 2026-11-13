@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-13",
+  "timeZone": "Asia/Seoul",
+  "evidence": "Observed Apps Script editor execution logs; aggregate synthetic values only",
+  "probeScriptId": "16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9",
+  "dataset": "SYNTHETIC_ONLY",
+  "initialFailure": {
+    "startedAt": "13:00:46",
+    "failedAt": "13:00:54",
+    "code": "MIGRATION_BLOB_CORRUPT",
+    "stage": "before source write, compressed before-image readback"
+  },
+  "diagnostic": {
+    "startedAt": "13:03:41",
+    "completedAt": "13:03:47",
+    "ok": true,
+    "untypedReadback": false,
+    "typedReadback": true,
+    "preservedBeforeImageVerified": true,
+    "sourceRows": 0,
+    "preservedPendingOperations": 1,
+    "spreadsheetId": "1c2JHqYpIMGBGRuDe7wqZOBwLStGfuTq42e5Zm-gTpJ4"
+  },
+  "successfulRun": {
+    "startedAt": "13:04:26",
+    "completedAt": "13:05:02",
+    "ok": true,
+    "sourceWritesThisExecution": 3,
+    "appliedOperations": 3,
+    "spreadsheetId": "1Mab0-2RIeA68lk6ZlhB5yL1eKI7DLY8kpTl6pNjidfI"
+  },
+  "retry": {
+    "startedAt": "13:05:28",
+    "completedAt": "13:05:38",
+    "ok": true,
+    "sourceWritesThisExecution": 0,
+    "appliedOperations": 3,
+    "spreadsheetId": "1Mab0-2RIeA68lk6ZlhB5yL1eKI7DLY8kpTl6pNjidfI"
+  },
+  "checks": ["durableJournal", "beforeImage", "delta", "nestedLock", "duplicate", "payloadConflict", "tombstone", "completionReadback"],
+  "productionScriptChanged": false,
+  "schoolDataCopiedToFirestore": false,
+  "productionTrackingEnabled": false
+}

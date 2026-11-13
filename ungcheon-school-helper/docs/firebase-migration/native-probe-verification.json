@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "inspectedAt": "2026-11-13T04:05:49.5345666Z",
+  "readOnly": true,
+  "probeScriptId": "16HGqhZ9mL-qtcvj9x0lIUrJ49l33xmB8PZgbB-af9BX5HEgonPcp9_x9",
+  "modules": [
+    {
+      "name": "Code",
+      "sha256": "b74b976dda2fbd621773f5a97302680ecb9c5ed899339e0230df4829e3d5856c",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "FirestoreRepository",
+      "sha256": "c7cacce7d2e5b47a0bed95980a93aabd2e6f461ebba332293fa9bb49ee6639ff",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationSync",
+      "sha256": "e2f0d54e919de5ebd52bfd88b9d4a873cfce06c20ad4887dd7825c89ecb63668",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationAdmin",
+      "sha256": "92ef57559640c82c7f3b3a181bde5ace0bca0d5a012a4a28c84bc5a9e530a2fe",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationJournal",
+      "sha256": "09810db871c29083959225cb8c0ed64c5fb446b72d33979eb51c1ff2a83b3427",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationStore",
+      "sha256": "b8f26e48037579fa8f01e2532906063cb9a58f7bb44e21013fe83bc88066604a",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationCapture",
+      "sha256": "deacee95c5d386d7e61ed63ce19d7eac522bbe8f4276e5a1c7bb09c45798622a",
+      "remoteMatchesLocal": true
+    },
+    {
+      "name": "MigrationTracking",
+      "sha256": "33f32f7782554d2eb581848d1a003465f1a5a97057beeefafc1f231ae14d713c",
+      "remoteMatchesLocal": true
+    }
+  ],
+  "manifestMatches": true,
+  "workbooks": [
+    {
+      "id": "1c2JHqYpIMGBGRuDe7wqZOBwLStGfuTq42e5Zm-gTpJ4",
+      "name": "웅천고 이전 시험 - 합성 변경 기록 전용",
+      "version": "5",
+      "ownerCount": 1,
+      "nonOwnerPermissionCount": 0,
+      "rowValuesRead": false
+    },
+    {
+      "id": "1Mab0-2RIeA68lk6ZlhB5yL1eKI7DLY8kpTl6pNjidfI",
+      "name": "웅천고 이전 시험 - 합성 변경 기록 전용 v2",
+      "version": "3",
+      "ownerCount": 1,
+      "nonOwnerPermissionCount": 0,
+      "rowValuesRead": false
+    }
+  ],
+  "productionScriptChanged": false
+}

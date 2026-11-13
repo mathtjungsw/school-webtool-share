@@ -4,8 +4,8 @@ const {makeBook}=require('./migration-sheet-fixture.cjs')
 const root=path.resolve(__dirname,'..');let passed=0
 function fixture(){
   const book=makeBook(),properties=new Map();let held=false,locks=0
-  const blob=v=>{const bytes=Buffer.isBuffer(v)?v:typeof v==='string'?Buffer.from(v):Buffer.from(v);return {getBytes:()=>[...bytes],getDataAsString:()=>bytes.toString('utf8')}}
-  const ctx=vm.createContext({console,Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},getUuid:()=>crypto.randomUUID(),computeDigest:(_,v)=>[...crypto.createHash('sha256').update(v).digest()],base64Encode:v=>Buffer.from(v).toString('base64'),base64Decode:v=>[...Buffer.from(v,'base64')],newBlob:blob,gzip:b=>blob(zlib.gzipSync(Buffer.from(b.getBytes()))),ungzip:b=>blob(zlib.gunzipSync(Buffer.from(b.getBytes()))),formatDate:d=>d.toISOString().slice(0,10)},
+  const blob=(v,type)=>{const bytes=Buffer.isBuffer(v)?v:typeof v==='string'?Buffer.from(v):Buffer.from(v);return {getBytes:()=>[...bytes],getDataAsString:()=>bytes.toString('utf8'),getContentType:()=>type||null}}
+  const ctx=vm.createContext({console,Utilities:{DigestAlgorithm:{SHA_256:'sha256'},Charset:{UTF_8:'utf8'},getUuid:()=>crypto.randomUUID(),computeDigest:(_,v)=>[...crypto.createHash('sha256').update(v).digest()],base64Encode:v=>Buffer.from(v).toString('base64'),base64Decode:v=>[...Buffer.from(v,'base64')],newBlob:blob,gzip:b=>blob(zlib.gzipSync(Buffer.from(b.getBytes())),'application/x-gzip'),ungzip:b=>{assert.equal(b.getContentType(),'application/x-gzip','Apps Script ungzip requires a gzip MIME type');return blob(zlib.gunzipSync(Buffer.from(b.getBytes())))},formatDate:d=>d.toISOString().slice(0,10)},
     SpreadsheetApp:{getActiveSpreadsheet:()=>book,flush:()=>book.flush()},
     LockService:{getScriptLock:()=>({waitLock(){assert.equal(held,false);held=true;locks++},releaseLock(){assert.equal(held,true);held=false}})},
     PropertiesService:{getScriptProperties:()=>({getProperty:k=>properties.get(k)||null,setProperty:(k,v)=>properties.set(k,v),getProperties:()=>Object.fromEntries(properties),deleteProperty:k=>properties.delete(k)})},
