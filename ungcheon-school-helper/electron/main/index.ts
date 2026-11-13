@@ -1052,6 +1052,9 @@ const HUB_ACTIONS = new Set([
   'revokeNeisSyncDevice',
   'getNeisSnapshot',
   'replaceNeisSnapshot',
+  // Administrator credentials must stay in POST bodies, never GET URLs.
+  'getMigrationStatus',
+  'getMigrationInventory',
 ])
 
 // 학교 유선망은 외부 POST 요청만 별도로 차단하는 경우가 있어 조회 요청은 GET으로 보낸다.

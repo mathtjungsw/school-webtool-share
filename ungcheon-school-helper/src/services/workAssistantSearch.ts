@@ -324,6 +324,12 @@ const DETAILED_WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
     keywords: ['위원회', '위원 명단', '위원회 일정', '위원회 캘린더', '위원 겹침', '위원회 개최'],
   },
   {
+    id: 'firebase-migration', title: 'Firebase 서버 이전 준비 현황', page: 'settings', category: '설정·도움말',
+    summary: '관리자가 기존 구글시트의 이전 준비 상태와 자료별 사용 행 상한을 수동으로 확인합니다.',
+    steps: ['관리자 모드에서 환경설정을 엽니다.', 'Firebase 서버 이전의 이전 준비 현황 확인을 누릅니다.', '자료별 시트 상태와 고정 ID 대응표 필요 여부를 확인합니다. 실제 동기화와 운영 전환은 별도 검증 뒤 진행합니다.'],
+    keywords: ['Firebase', '파이어베이스', '서버 이전', '이전 준비', '동기화 검증', '자료 복제'],
+  },
+  {
     id: 'neis-key', title: '학교 공용 NEIS 동기화', page: 'settings', category: '설정·도움말',
     summary: '일반 사용자는 API 키를 입력하지 않으며, 등록된 관리자 PC 한 대가 매일 13시에 공용 자료를 갱신합니다.',
     steps: ['관리자 모드에서 환경설정의 학교 공용 NEIS 동기화를 엽니다.', '이 PC를 동기화 PC로 등록합니다.', '관리자 본인의 API 키를 이 PC에만 저장하고 지금 10일치 동기화를 실행합니다.', '일반 사용자는 대시보드와 캘린더에서 공용 자료를 바로 조회합니다.'],

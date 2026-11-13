@@ -9,6 +9,7 @@ import {
 import { useAppStore } from '../stores/appStore'
 import { useAuthStore } from '../stores/authStore'
 import { useAdminStore } from '../stores/adminStore'
+import FirebaseMigrationPanel from '../components/settings/FirebaseMigrationPanel'
 import { SIDEBAR_MENU_OPTIONS } from '../config/navigationRegistry'
 import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 import {
@@ -179,6 +180,8 @@ export default function UngcheonSettingsPage() {
           </Field>
         </div>
       </Section>
+
+      <FirebaseMigrationPanel />
 
       <Section icon={<MonitorCheck size={17} />} title="학교 공용 NEIS 동기화">
         <div className="rounded-xl border border-sky-400/20 bg-sky-500/10 p-4">

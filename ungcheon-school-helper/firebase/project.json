@@ -1,0 +1,12 @@
+{
+  "projectId": "ungcheon-school-helper",
+  "displayName": "Ungcheon School Helper",
+  "plan": "SPARK",
+  "databaseId": "(default)",
+  "edition": "STANDARD",
+  "locationId": "asia-northeast3",
+  "verifiedDate": "2026-11-13",
+  "productionDataCopied": false,
+  "productionBackend": "SHEETS",
+  "purpose": "Migration target; only isolated synthetic probe data currently stored"
+}

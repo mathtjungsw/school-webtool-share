@@ -1,0 +1,7 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    { "collectionGroup": "records", "fieldPath": "payload", "indexes": [] },
+    { "collectionGroup": "records", "fieldPath": "sourceId", "indexes": [] }
+  ]
+}

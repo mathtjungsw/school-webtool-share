@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 60;
+const MOBILE_SERVICE_VERSION = 61;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -969,6 +969,10 @@ function doPost(e) {
     // Mobile endpoints retain their existing independent password/session checks.
     if (['staffLogin','staffSession','staffLogout','caseLibrary','caseDocument'].indexOf(action) >= 0) return json_({ ok: true, data: staffAuthAction_(body) });
     if (['health','verifyMobileViewer','getMobileScheduleBundle','getMobileAttendanceRoster'].indexOf(action) < 0) staffRequire_(body);
+
+    // Administrator-only metadata inspection; never runs sheet initialization.
+    if (action === 'getMigrationStatus') return json_({ ok: true, data: migrationAdminStatus_(body) });
+    if (action === 'getMigrationInventory') return json_({ ok: true, data: migrationAdminInventory_(body) });
 
     // 읽기 전용 모바일 요청은 전체 시트 초기화 및 잠금을 거치지 않습니다.
     if (action === 'health') return json_({ ok: true, data: { service: 'UngcheonSchoolHub', version: MOBILE_SERVICE_VERSION } });

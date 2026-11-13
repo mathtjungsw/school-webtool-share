@@ -1,0 +1,669 @@
+{
+  "baseline": "80f12b0179e55d1b46106d3e3c7ebca18a2afc1b",
+  "sourceOnly": true,
+  "sheets": [
+    "공유링크",
+    "공지",
+    "기능개선요청",
+    "시간표정보",
+    "시간표",
+    "학생시간표정보",
+    "학생시간표",
+    "교원명렬정보",
+    "교원명렬",
+    "학생명렬정보",
+    "학생명렬",
+    "업무체크리스트",
+    "업무체크응답",
+    "위원회명단",
+    "위원회일정",
+    "교환대강반영",
+    "일일시간표예외",
+    "일일시간표예외이력",
+    "NEIS동기화정보",
+    "NEIS급식",
+    "NEIS학사일정",
+    "NEIS학급시간표"
+  ],
+  "actions": [
+    "addCommitteeEvent",
+    "addFeatureRequest",
+    "addLink",
+    "addNotice",
+    "addStaffChecklist",
+    "applyTimetableChangeForRequester",
+    "cancelTimetableChange",
+    "caseDocument",
+    "caseLibrary",
+    "changeExecutivePassword",
+    "createTimetableChange",
+    "deactivateTimetableOverride",
+    "deleteCommitteeEvent",
+    "deleteFeatureRequest",
+    "deleteLink",
+    "deleteNotice",
+    "deleteStaffChecklist",
+    "getExecutiveScheduleBundle",
+    "getMigrationInventory",
+    "getMigrationStatus",
+    "getMobileAttendanceRoster",
+    "getMobileScheduleBundle",
+    "getNeisSnapshot",
+    "getNeisSyncStatus",
+    "getStaffRoster",
+    "getStudentRoster",
+    "getStudentTimetable",
+    "getSyncManifest",
+    "getTimetable",
+    "getTimetableOverrides",
+    "getWidgetAttendanceSummaries",
+    "health",
+    "listCommitteeState",
+    "listFeatureRequests",
+    "listLinks",
+    "listNotices",
+    "listStaffChecklists",
+    "listTimetableChanges",
+    "registerNeisSyncDevice",
+    "replaceNeisSnapshot",
+    "replaceStaffRoster",
+    "replaceStudentRoster",
+    "replaceStudentTimetable",
+    "replaceTimetable",
+    "resetExecutivePassword",
+    "respondTimetableChange",
+    "revokeNeisSyncDevice",
+    "saveCommitteeMembers",
+    "saveTimetableOverride",
+    "staffLogin",
+    "staffLogout",
+    "staffSession",
+    "submitStaffChecklist",
+    "updateFeatureRequest",
+    "updateStaffChecklist",
+    "verifyAdmin",
+    "verifyExecutive",
+    "verifyMobileViewer"
+  ],
+  "directMutations": [
+    {
+      "name": "executiveAudit_",
+      "line": 1146,
+      "mutations": [
+        "setProperty"
+      ]
+    },
+    {
+      "name": "executiveInvalidateSessions_",
+      "line": 1152,
+      "mutations": [
+        "deleteProperty"
+      ]
+    },
+    {
+      "name": "executiveVerify_",
+      "line": 1170,
+      "mutations": [
+        "setProperty"
+      ]
+    },
+    {
+      "name": "executiveChangePassword_",
+      "line": 1214,
+      "mutations": [
+        "setProperty"
+      ]
+    },
+    {
+      "name": "executiveResetPassword_",
+      "line": 1225,
+      "mutations": [
+        "deleteProperty"
+      ]
+    },
+    {
+      "name": "getSyncManifest_",
+      "line": 1233,
+      "mutations": [
+        "setProperty"
+      ]
+    },
+    {
+      "name": "initialSetup",
+      "line": 1275,
+      "mutations": [
+        "setProperty"
+      ]
+    },
+    {
+      "name": "ensureSheets_",
+      "line": 1287,
+      "mutations": [
+        "insertSheet",
+        "appendRow",
+        "insertColumnsAfter",
+        "setValues"
+      ]
+    },
+    {
+      "name": "touchSyncResource_",
+      "line": 1436,
+      "mutations": [
+        "setProperty"
+      ]
+    },
+    {
+      "name": "ensureDataSheet_",
+      "line": 1445,
+      "mutations": [
+        "insertSheet",
+        "insertColumnsAfter",
+        "setValues"
+      ]
+    },
+    {
+      "name": "ensureTimetableOverrideSheets_",
+      "line": 1457,
+      "mutations": [
+        "setValues",
+        "setProperty"
+      ]
+    },
+    {
+      "name": "appendTimetableOverrideHistory_",
+      "line": 1528,
+      "mutations": [
+        "appendRow"
+      ]
+    },
+    {
+      "name": "saveTimetableOverride_",
+      "line": 1534,
+      "mutations": [
+        "setValues",
+        "appendRow"
+      ]
+    },
+    {
+      "name": "deactivateTimetableOverride_",
+      "line": 1565,
+      "mutations": [
+        "setValue"
+      ]
+    },
+    {
+      "name": "ensureStaffAssignments2026_",
+      "line": 1584,
+      "mutations": [
+        "setValues",
+        "setProperty"
+      ]
+    },
+    {
+      "name": "migrateStaffName1_1_30_",
+      "line": 1620,
+      "mutations": [
+        "setValues",
+        "setProperty"
+      ]
+    },
+    {
+      "name": "repairStaffHomeroomCells_",
+      "line": 1673,
+      "mutations": [
+        "setValues"
+      ]
+    },
+    {
+      "name": "repairTimetableChangeClassCells_",
+      "line": 1709,
+      "mutations": [
+        "setValues"
+      ]
+    },
+    {
+      "name": "ensureReleaseNotices_",
+      "line": 1729,
+      "mutations": [
+        "clearContent",
+        "deleteRow",
+        "appendRow",
+        "setProperty"
+      ]
+    },
+    {
+      "name": "addLink_",
+      "line": 1827,
+      "mutations": [
+        "appendRow"
+      ]
+    },
+    {
+      "name": "addNotice_",
+      "line": 1865,
+      "mutations": [
+        "appendRow"
+      ]
+    },
+    {
+      "name": "addFeatureRequest_",
+      "line": 1905,
+      "mutations": [
+        "appendRow"
+      ]
+    },
+    {
+      "name": "updateFeatureRequest_",
+      "line": 1921,
+      "mutations": [
+        "setValue"
+      ]
+    },
+    {
+      "name": "replaceTimetable_",
+      "line": 1979,
+      "mutations": [
+        "clearContent",
+        "setValues"
+      ]
+    },
+    {
+      "name": "replaceStudentTimetable_",
+      "line": 2056,
+      "mutations": [
+        "clearContent",
+        "setValues"
+      ]
+    },
+    {
+      "name": "migrateStaffRoster1_1_31_",
+      "line": 2287,
+      "mutations": [
+        "setProperty"
+      ]
+    },
+    {
+      "name": "migrateStaffRosterFileOrder1_1_37_",
+      "line": 2329,
+      "mutations": [
+        "setProperty"
+      ]
+    },
+    {
+      "name": "addStaffChecklist_",
+      "line": 2513,
+      "mutations": [
+        "appendRow"
+      ]
+    },
+    {
+      "name": "updateStaffChecklist_",
+      "line": 2585,
+      "mutations": [
+        "setValues"
+      ]
+    },
+    {
+      "name": "submitStaffChecklist_",
+      "line": 2657,
+      "mutations": [
+        "setValues",
+        "appendRow"
+      ]
+    },
+    {
+      "name": "repairCommitteeTimeCells_",
+      "line": 2744,
+      "mutations": [
+        "setValues"
+      ]
+    },
+    {
+      "name": "saveCommitteeMembers_",
+      "line": 2806,
+      "mutations": [
+        "setValues",
+        "appendRow"
+      ]
+    },
+    {
+      "name": "addCommitteeEvent_",
+      "line": 2838,
+      "mutations": [
+        "appendRow"
+      ]
+    },
+    {
+      "name": "replaceSheetRows_",
+      "line": 2903,
+      "mutations": [
+        "clearContent",
+        "setValues"
+      ]
+    },
+    {
+      "name": "deleteRowsByValue_",
+      "line": 2940,
+      "mutations": [
+        "deleteRow"
+      ]
+    },
+    {
+      "name": "registerNeisSyncDevice_",
+      "line": 2974,
+      "mutations": [
+        "setProperty",
+        "deleteProperty"
+      ]
+    },
+    {
+      "name": "revokeNeisSyncDevice_",
+      "line": 2989,
+      "mutations": [
+        "deleteProperty"
+      ]
+    },
+    {
+      "name": "replaceSheetRows_",
+      "line": 3047,
+      "mutations": [
+        "clearContent",
+        "setValues"
+      ]
+    },
+    {
+      "name": "deleteRowById_",
+      "line": 3127,
+      "mutations": [
+        "deleteRow"
+      ]
+    },
+    {
+      "name": "createTimetableChange_",
+      "line": 3174,
+      "mutations": [
+        "appendRow"
+      ]
+    },
+    {
+      "name": "respondTimetableChange_",
+      "line": 3208,
+      "mutations": [
+        "setValue"
+      ]
+    },
+    {
+      "name": "applyTimetableChangeForRequester_",
+      "line": 3258,
+      "mutations": [
+        "setValue"
+      ]
+    },
+    {
+      "name": "cancelTimetableChange_",
+      "line": 3291,
+      "mutations": [
+        "setValue"
+      ]
+    },
+    {
+      "name": "mobileCreateSession_",
+      "line": 3352,
+      "mutations": [
+        "deleteProperty",
+        "setProperty"
+      ]
+    }
+  ],
+  "transitiveMutationFunctions": [
+    {
+      "name": "doGet",
+      "line": 948
+    },
+    {
+      "name": "doPost",
+      "line": 963
+    },
+    {
+      "name": "executiveAudit_",
+      "line": 1146
+    },
+    {
+      "name": "executiveInvalidateSessions_",
+      "line": 1152
+    },
+    {
+      "name": "executiveVerify_",
+      "line": 1170
+    },
+    {
+      "name": "executiveScheduleBundle_",
+      "line": 1202
+    },
+    {
+      "name": "executiveChangePassword_",
+      "line": 1214
+    },
+    {
+      "name": "executiveResetPassword_",
+      "line": 1225
+    },
+    {
+      "name": "getSyncManifest_",
+      "line": 1233
+    },
+    {
+      "name": "initialSetup",
+      "line": 1275
+    },
+    {
+      "name": "ensureSheets_",
+      "line": 1287
+    },
+    {
+      "name": "ensureStaffChecklistSheets_",
+      "line": 1422
+    },
+    {
+      "name": "touchSyncResource_",
+      "line": 1436
+    },
+    {
+      "name": "ensureDataSheet_",
+      "line": 1445
+    },
+    {
+      "name": "ensureTimetableOverrideSheets_",
+      "line": 1457
+    },
+    {
+      "name": "listTimetableOverrides_",
+      "line": 1506
+    },
+    {
+      "name": "appendTimetableOverrideHistory_",
+      "line": 1528
+    },
+    {
+      "name": "saveTimetableOverride_",
+      "line": 1534
+    },
+    {
+      "name": "deactivateTimetableOverride_",
+      "line": 1565
+    },
+    {
+      "name": "ensureStaffAssignments2026_",
+      "line": 1584
+    },
+    {
+      "name": "migrateStaffName1_1_30_",
+      "line": 1620
+    },
+    {
+      "name": "repairStaffHomeroomCells_",
+      "line": 1673
+    },
+    {
+      "name": "repairTimetableChangeClassCells_",
+      "line": 1709
+    },
+    {
+      "name": "ensureReleaseNotices_",
+      "line": 1729
+    },
+    {
+      "name": "addLink_",
+      "line": 1827
+    },
+    {
+      "name": "addNotice_",
+      "line": 1865
+    },
+    {
+      "name": "addFeatureRequest_",
+      "line": 1905
+    },
+    {
+      "name": "updateFeatureRequest_",
+      "line": 1921
+    },
+    {
+      "name": "replaceTimetable_",
+      "line": 1979
+    },
+    {
+      "name": "replaceStudentTimetable_",
+      "line": 2056
+    },
+    {
+      "name": "replaceStaffRoster_",
+      "line": 2209
+    },
+    {
+      "name": "migrateStaffRoster1_1_31_",
+      "line": 2287
+    },
+    {
+      "name": "migrateStaffRosterFileOrder1_1_37_",
+      "line": 2329
+    },
+    {
+      "name": "replaceStudentRoster_",
+      "line": 2402
+    },
+    {
+      "name": "addStaffChecklist_",
+      "line": 2513
+    },
+    {
+      "name": "updateStaffChecklist_",
+      "line": 2585
+    },
+    {
+      "name": "submitStaffChecklist_",
+      "line": 2657
+    },
+    {
+      "name": "deleteStaffChecklist_",
+      "line": 2700
+    },
+    {
+      "name": "repairCommitteeTimeCells_",
+      "line": 2744
+    },
+    {
+      "name": "saveCommitteeMembers_",
+      "line": 2806
+    },
+    {
+      "name": "addCommitteeEvent_",
+      "line": 2838
+    },
+    {
+      "name": "replaceSheetRows_",
+      "line": 2903
+    },
+    {
+      "name": "deleteRowsByValue_",
+      "line": 2940
+    },
+    {
+      "name": "registerNeisSyncDevice_",
+      "line": 2974
+    },
+    {
+      "name": "revokeNeisSyncDevice_",
+      "line": 2989
+    },
+    {
+      "name": "replaceSheetRows_",
+      "line": 3047
+    },
+    {
+      "name": "replaceNeisSnapshot_",
+      "line": 3057
+    },
+    {
+      "name": "deleteRowById_",
+      "line": 3127
+    },
+    {
+      "name": "createTimetableChange_",
+      "line": 3174
+    },
+    {
+      "name": "respondTimetableChange_",
+      "line": 3208
+    },
+    {
+      "name": "applyTimetableChangeForRequester_",
+      "line": 3258
+    },
+    {
+      "name": "cancelTimetableChange_",
+      "line": 3291
+    },
+    {
+      "name": "mobileCreateSession_",
+      "line": 3352
+    },
+    {
+      "name": "mobileAttendanceSourceSlot_",
+      "line": 3555
+    },
+    {
+      "name": "mobileAttendanceContext_",
+      "line": 3596
+    },
+    {
+      "name": "mobileAttendanceStudentsForSlot_",
+      "line": 3716
+    },
+    {
+      "name": "mobileAttendanceSummaryForSlot_",
+      "line": 3743
+    },
+    {
+      "name": "mobileAttendanceSummaries_",
+      "line": 3796
+    },
+    {
+      "name": "getWidgetAttendanceSummaries_",
+      "line": 3811
+    },
+    {
+      "name": "getMobileAttendanceRoster_",
+      "line": 3840
+    },
+    {
+      "name": "getMobileScheduleBundle_",
+      "line": 3946
+    }
+  ],
+  "limitations": [
+    "Static call graph includes initialization and authentication writes.",
+    "Dynamic dispatch, external editors, triggers and external-sheet writers require separate inspection.",
+    "No production row counts, source revisions or payloads were inspected."
+  ]
+}
