@@ -1,3 +1,4 @@
+import { enableZeroReplacement } from '../../utils/zeroNumberInput'
 import React,{useEffect,useRef,useState} from 'react'
 import {createRoot} from 'react-dom/client'
 import Grades from './Grades'
@@ -6,6 +7,7 @@ import * as pdfjs from 'pdfjs-dist-v3'
 import workerUrl from 'pdfjs-dist-v3/build/pdf.worker.min.js?url'
 import './private.css'
 
+enableZeroReplacement(document)
 pdfjs.GlobalWorkerOptions.workerSrc=workerUrl
 const api=window.privateTool
 function App(){

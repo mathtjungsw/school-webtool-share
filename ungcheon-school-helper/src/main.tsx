@@ -7,6 +7,9 @@ import './components/widget/widget.css'
 import './components/widget/widgetCompact.css'
 import './components/widget/widgetProductivity.css'
 import { logger } from './utils/logger'
+import { enableZeroReplacement } from './utils/zeroNumberInput'
+
+enableZeroReplacement(document)
 
 // 웹보기가 첫 화면을 그리기 전부터 밝은 모드로 고정한다.
 // 기존 PC에 남은 dark 클래스나 OS 색상 설정이 섞인 화면을 만들지 못하게 한다.

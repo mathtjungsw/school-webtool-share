@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 71;
+const MOBILE_SERVICE_VERSION = 72;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -425,6 +425,24 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'server-v72',
+    title: '업무도우미 1.1.41 안내 추가',
+    body: '과목별 추정분할점수 작업과 나이스 성적 파일 안내, 숫자 입력과 알림 개선 내용을 추가합니다.',
+    date: '2026-11-16'
+  },
+  {
+    key: 'v1.1.41',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.41 · 추정분할점수 과목별 작업 및 나이스 안내',
+    body: [
+      '· 추정분할점수 도우미에서 여러 과목을 탭으로 관리하고 과목별 점수·설정·계산 결과를 이 PC에 자동 저장합니다. 이어하기용 엑셀로 다른 PC에서 작업을 계속할 수 있습니다.',
+      '· 나이스 정기시험 저장 메뉴의 XLS data 위치를 04번에서 확인할 수 있습니다. 예시 화면의 과목명과 조회값, 성적표 상세는 가렸습니다.',
+      '· 파일 끌어다 놓기와 재업로드, 2차 예상점수 복사·가감, 성취도 분포 기본 보기, 정수 공지 기준과 교사별 예상 정답률 안내가 추가됩니다.',
+      '· 성적 산출 미리보기를 등급 미리보기로 바꾸고, 기본값 0을 바로 덮어쓸 수 있도록 숫자 입력칸을 개선했습니다. 밝은 모드에서 알림 글씨를 읽기 쉽게 조정했습니다.',
+      '· 서울대 권장도서 100선에서 확인된 판본의 표지와 웅천고 소장 표시를 보고, 독서로 조회 결과를 바로 열 수 있습니다.'
+    ].join('\n'),
+    date: '2026-11-16'
+  },
   { key: 'server-v71', title: '저장소 전환 중 재시도 보호', body: '전환과 시트 복귀 전후에도 이미 완료한 저장 요청을 중복 반영하지 않도록 저장 결과를 함께 보존합니다.', date: '2026-11-13' },
   { key: 'server-v70', title: '시트 복귀 문자 보존', body: 'Firebase 자료를 시트로 복구할 때 작은따옴표와 수식처럼 보이는 문자를 원래 값 그대로 보존하고 전수 대조합니다.', date: '2026-11-13' },
   { key: 'server-v69', title: 'Firebase 자료 저장 전환', body: 'PC와 모바일의 내부 자료를 Firebase에서 조회·저장하도록 준비하고, 변경 자료의 시트 백업과 검증 후 복귀 기능을 추가합니다.', date: '2026-11-13' },

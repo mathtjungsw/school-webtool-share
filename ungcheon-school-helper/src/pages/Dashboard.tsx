@@ -148,7 +148,7 @@ const PORTFOLIO_GROUPS: PortfolioGroup[] = [
     { id: 'student_locator', label: '학생 위치 찾기', icon: FileSearch, desc: '학번·이름으로 현재 수업과 교실 확인' },
     { id: 'student_identity_audit', label: '학생 학번·이름 교정기', icon: ScanSearch, desc: '파일·붙여넣기의 잘못 연결된 학번과 이름 확인' },
     { id: 'attendance_print', label: '출석부 출력', icon: ClipboardList, desc: '학급·수업·교사·과목별 출석부 묶음 출력' },
-    { id: 'grade_preview', label: '성적 산출 미리보기', icon: BarChart3, desc: '평가 점수 합산·석차등급·성취도 사전 확인' },
+    { id: 'grade_preview', label: '등급 미리보기', icon: BarChart3, desc: '평가 점수 합산·석차등급·성취도 사전 확인' },
     { id: 'estimated_split_score', label: '추정분할점수 도우미', icon: SquareStack, desc: '분할점수 구성·성취도 분포 예측과 목표 분포 역산' },
     { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText, desc: '4개 편제표 확인·PDF 출력과 과목선택 상담' },
   ]},

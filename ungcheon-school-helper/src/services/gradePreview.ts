@@ -1,8 +1,9 @@
 import { schoolDate } from './schoolDate'
 import * as XLSX from 'xlsx'
 import {
-  activeSplitBoundaries, defaultSplitScores, emptySplitScores,
-  type SplitScores,
+  activeSplitBoundaries, defaultSplitScores, emptySplitScores, weightedFinalCuts,
+  DEFAULT_DIFFICULTY_WEIGHTS, SPLIT_BOUNDARIES,
+  type DifficultyWeights, type OutcomeLabel, type SplitScores,
 } from './achievementScenario'
 
 export type CalculationMode = 'term' | 'firstExam'
@@ -37,6 +38,7 @@ export interface GradeComponent {
   maxScore: number
   splitScores: SplitScores
   scores: Record<string, ScoreEntry>
+  scoreOrigin?: 'actual' | 'expected'
 }
 
 export interface GradeResult {
@@ -60,12 +62,27 @@ export interface GradeResult {
   achievement: string | null
 }
 
+export type PlannerSettings = {
+  teacherCount?: number
+  tolerance?: number
+  weights?: DifficultyWeights
+  targets?: SplitScores
+}
+
+export interface SplitPlanning {
+  firstExam?: PlannerSettings
+  secondExam?: PlannerSettings
+  percentages?: Partial<Record<OutcomeLabel, number>>
+  scenarioCalculated?: boolean
+}
+
 export interface GradePreviewState {
   config: GradePreviewConfig
   components: GradeComponent[]
   componentCache: Partial<Record<CalculationMode, GradeComponent[]>>
   results: GradeResult[]
   calculatedAt: string | null
+  splitPlanning?: SplitPlanning
 }
 
 export type Matrix = { name: string; rows: unknown[][] }
@@ -110,6 +127,15 @@ export function numberValue(value: unknown): number | null {
 
 export function round2(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+export function adjustExpectedScores(source: GradeComponent, targetMax: number, adjustment: number): GradeComponent['scores'] {
+  return Object.fromEntries(Object.entries(source.scores).map(([key, entry]) => [
+    key,
+    entry.rawScore === null || entry.status
+      ? { ...entry }
+      : { ...entry, rawScore: Math.max(0, Math.min(targetMax, round2(entry.rawScore + adjustment))) },
+  ]))
 }
 
 export function normalizeScoreRows(rows: Array<Record<string, unknown>>): Record<string, ScoreEntry> {
@@ -340,11 +366,11 @@ export function buildGradeCutSummary(rows: GradeResult[], system: GradeSystem) {
   })
 }
 
-export function exportRestoreWorkbook(state: GradePreviewState) {
+export function exportRestoreWorkbook(state: GradePreviewState, subjectName: string) {
   const workbook = XLSX.utils.book_new()
   const readme = [
-    ['추정분할점수 도우미 복원 파일'],
-    ['이 파일은 설정·점수·현재 계산 결과를 다른 PC에서 복원하기 위한 파일입니다.'],
+    ['추정분할점수 도우미 · 이어서 하기'],
+    ['업무도우미에서 ‘업로드로 이어서 하기’를 눌러 이 파일을 과목으로 불러오세요.'],
     ['학생 개인정보와 점수정보가 포함될 수 있으므로 안전하게 보관하세요.'],
     ['생성 시각', new Date().toLocaleString('ko-KR')],
   ]
@@ -353,15 +379,73 @@ export function exportRestoreWorkbook(state: GradePreviewState) {
     ...Object.entries(state.config).filter(([key]) => key !== 'thresholds').map(([key, value]) => [key, value]),
     ...Object.entries(state.config.thresholds).map(([key, value]) => [`threshold_${key}`, value ?? '']),
   ]
-  const components = [['id', 'name', 'type', 'weight', 'maxScore', 'splitA', 'splitB', 'splitC', 'splitD', 'splitE'], ...state.components.map(component => [component.id, component.name, component.type, component.weight, component.maxScore, component.splitScores.A ?? '', component.splitScores.B ?? '', component.splitScores.C ?? '', component.splitScores.D ?? '', component.splitScores.E ?? ''])]
-  const scores: unknown[][] = [['classNo', 'studentNo', 'studentName', 'componentId', 'rawScore', 'status']]
-  state.components.forEach(component => Object.values(component.scores).forEach(score => scores.push([score.classNo, score.studentNo, score.studentName, component.id, score.rawScore, score.status])))
+  const workspace = [['subjectName', 'splitPlanning', 'calculatedAt'], [subjectName, JSON.stringify(state.splitPlanning ?? {}), state.calculatedAt ?? '']]
+  const componentRows = (items: GradeComponent[]) => [
+    ['id', 'name', 'type', 'weight', 'maxScore', 'splitA', 'splitB', 'splitC', 'splitD', 'splitE', 'scoreOrigin'],
+    ...items.map(component => [
+      component.id, component.name, component.type, component.weight, component.maxScore,
+      ...SPLIT_BOUNDARIES.map(boundary => component.splitScores[boundary] ?? ''), component.scoreOrigin ?? '',
+    ]),
+  ]
+  const scoreRows = (items: GradeComponent[]) => [
+    ['classNo', 'studentNo', 'studentName', 'componentId', 'rawScore', 'status'],
+    ...items.flatMap(component => Object.values(component.scores).map(score =>
+      [score.classNo, score.studentNo, score.studentName, component.id, score.rawScore, score.status])),
+  ]
   const results = [['classNo', 'studentNo', 'studentName', 'total', 'integerScore', 'rank', 'tieCount', 'midRank', 'midPct', 'grade', 'achievement', 'notes'], ...state.results.map(row => [row.classNo, row.studentNo, row.studentName, row.total, row.integerScore, row.rank, row.tieCount, row.midRank, row.midPct, row.grade ?? '', row.achievement ?? '', row.notes.join(', ')])]
-  ;([['README', readme], ['CONFIG', config], ['COMPONENTS', components], ['SCORES', scores], ['RESULTS', results]] as Array<[string, unknown[][]]>).forEach(([name, data]) => XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), name))
-  XLSX.writeFile(workbook, `추정분할점수_도우미_${schoolDate()}.xlsx`)
+  const inactiveMode = state.config.calculationMode === 'firstExam' ? 'term' : 'firstExam'
+  const otherComponents = state.componentCache[inactiveMode] ?? []
+  const sheets: Array<[string, unknown[][]]> = [
+    ['README', readme], ['CONFIG', config], ['COMPONENTS', componentRows(state.components)],
+    ['SCORES', scoreRows(state.components)], ['RESULTS', results], ['WORKSPACE', workspace],
+  ]
+  if (otherComponents.length) sheets.push(['OTHER_COMPONENTS', componentRows(otherComponents)], ['OTHER_SCORES', scoreRows(otherComponents)])
+  sheets.forEach(([name, data]) => XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), name))
+  const safeName = subjectName.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
+  const bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer
+  return { name: `추정분할점수_${safeName}_${schoolDate()}.xlsx`, bytes: Array.from(new Uint8Array(bytes)) }
 }
 
-export async function importRestoreWorkbook(file: File): Promise<GradePreviewState> {
+const outcomeKeys = [...SPLIT_BOUNDARIES, '미도달'] as const
+
+function parsePlannerSettings(value?: PlannerSettings): PlannerSettings | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const settings: PlannerSettings = {}
+  const count = value.teacherCount
+  if (typeof count === 'number' && Number.isInteger(count) && count >= 1 && count <= 8) settings.teacherCount = count
+  if (value.tolerance === 0 || value.tolerance === 0.5 || value.tolerance === 1 || value.tolerance === 2) settings.tolerance = value.tolerance
+  if (value.weights) {
+    settings.weights = { ...DEFAULT_DIFFICULTY_WEIGHTS }
+    for (const key of Object.keys(settings.weights) as Array<keyof DifficultyWeights>) {
+      const weight = value.weights[key]
+      if (Number.isFinite(weight) && weight >= 0 && weight <= 100) settings.weights[key] = weight
+    }
+  }
+  if (value.targets) {
+    settings.targets = emptySplitScores()
+    for (const key of SPLIT_BOUNDARIES) settings.targets[key] = numberValue(value.targets[key])
+  }
+  return settings
+}
+
+function parseSplitPlanning(value: unknown): SplitPlanning | undefined {
+  if (typeof value !== 'string' || !value) return undefined
+  const parsed = JSON.parse(value) as SplitPlanning | null
+  if (!parsed || typeof parsed !== 'object') return undefined
+  const percentages: SplitPlanning['percentages'] = {}
+  for (const key of outcomeKeys) {
+    const number = parsed.percentages?.[key]
+    if (typeof number === 'number' && Number.isFinite(number)) percentages[key] = number
+  }
+  return {
+    firstExam: parsePlannerSettings(parsed.firstExam),
+    secondExam: parsePlannerSettings(parsed.secondExam),
+    percentages: Object.keys(percentages).length ? percentages : undefined,
+    scenarioCalculated: parsed.scenarioCalculated === true,
+  }
+}
+
+export async function importRestoreWorkbook(file: File): Promise<{ state: GradePreviewState; subjectName?: string }> {
   const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' })
   for (const required of ['CONFIG', 'COMPONENTS', 'SCORES']) if (!workbook.SheetNames.includes(required)) throw new Error(`missing ${required}`)
   const config = defaultGradePreviewState().config
@@ -372,16 +456,23 @@ export async function importRestoreWorkbook(file: File): Promise<GradePreviewSta
     else if (key === 'includeNonattainment') config.includeNonattainment = String(row.value).toLowerCase() === 'true'
     else if (key in config && key !== 'thresholds') (config as unknown as Record<string, unknown>)[key] = String(row.value)
   })
-  const components = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.COMPONENTS, { defval: '' }).map(row => ({
-    id: String(row.id), name: String(row.name), type: String(row.type) as GradeComponent['type'],
-    weight: Number(row.weight), maxScore: Number(row.maxScore),
-    splitScores: emptySplitScores({ A: numberValue(row.splitA), B: numberValue(row.splitB), C: numberValue(row.splitC), D: numberValue(row.splitD), E: numberValue(row.splitE) }),
-    scores: {} as Record<string, ScoreEntry>,
-  }))
-  XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.SCORES, { defval: '' }).forEach(row => {
-    const component = components.find(item => item.id === String(row.componentId))
-    if (component) Object.assign(component.scores, normalizeScoreRows([row]))
-  })
+  const readComponents = (componentsSheet: string, scoresSheet: string): GradeComponent[] => {
+    const components: GradeComponent[] = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[componentsSheet], { defval: '' }).map(row => ({
+      id: String(row.id), name: String(row.name), type: String(row.type) as GradeComponent['type'],
+      weight: Number(row.weight), maxScore: Number(row.maxScore),
+      splitScores: emptySplitScores({ A: numberValue(row.splitA), B: numberValue(row.splitB), C: numberValue(row.splitC), D: numberValue(row.splitD), E: numberValue(row.splitE) }),
+      scores: {} as Record<string, ScoreEntry>,
+      scoreOrigin: row.scoreOrigin === 'actual' || row.scoreOrigin === 'expected' ? row.scoreOrigin : undefined,
+    }))
+    const byId = new Map(components.map(component => [component.id, component]))
+    if (byId.size !== components.length || components.some(component => !component.id || !['exam', 'performance'].includes(component.type))) throw new Error('invalid components')
+    XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[scoresSheet], { defval: '' }).forEach(row => {
+      const component = byId.get(String(row.componentId))
+      if (component) Object.assign(component.scores, normalizeScoreRows([row]))
+    })
+    return components
+  }
+  const components = readComponents('COMPONENTS', 'SCORES')
   if (!components.length) throw new Error('no components')
   if (!config.calculationMode) config.calculationMode = 'term'
   if (config.calculationMode === 'firstExam') {
@@ -389,7 +480,26 @@ export async function importRestoreWorkbook(file: File): Promise<GradePreviewSta
     components[0].type = 'exam'
     components[0].weight = 100
   }
-  return { config, components, componentCache: {}, results: [], calculatedAt: null }
+  const state: GradePreviewState = { config, components, componentCache: {}, results: [], calculatedAt: null }
+  if (workbook.Sheets.OTHER_COMPONENTS && workbook.Sheets.OTHER_SCORES) {
+    const otherMode = config.calculationMode === 'firstExam' ? 'term' : 'firstExam'
+    state.componentCache[otherMode] = readComponents('OTHER_COMPONENTS', 'OTHER_SCORES')
+  }
+  const [workspace] = workbook.Sheets.WORKSPACE
+    ? XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.WORKSPACE)
+    : []
+  state.splitPlanning = parseSplitPlanning(workspace?.splitPlanning)
+  if (typeof workspace?.calculatedAt === 'string' && Number.isFinite(Date.parse(workspace.calculatedAt))) {
+    if (config.splitMethod === 'estimated') {
+      config.thresholds = weightedFinalCuts(components, activeSplitBoundaries(config.includeNonattainment, config.achievementScale))
+    }
+    if (!validateGradePreviewState(state).length) {
+      state.results = calculateGradePreview(state)
+      if (state.results.length) state.calculatedAt = workspace.calculatedAt
+    }
+  }
+  const subjectName = typeof workspace?.subjectName === 'string' ? workspace.subjectName.trim() : undefined
+  return { state, subjectName }
 }
 
 export async function readScoreWorkbook(file: File) {

@@ -147,7 +147,7 @@ export default function ClubPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold shadow-2xl z-50 pointer-events-none"
+            role="status" className="app-toast fixed bottom-6 left-1/2 z-50 -translate-x-1/2 pointer-events-none"
           >
             {toast}
           </motion.div>

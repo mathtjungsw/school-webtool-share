@@ -52,7 +52,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   { id: 'committees', label: '각종 위원회 현황', icon: Landmark, assistantCategory: '학교운영', searchAliases: ['위원회 명단', '위원회 일정'] },
   { id: 'feature_requests', label: '기능개선 요청', icon: MessageSquareText, assistantCategory: '지원', searchAliases: ['개선 의견', '새 기능 요청'] },
   { id: 'transfer_score', label: '전보내신점수 계산기', icon: MapPinned, assistantCategory: '인사행정', searchAliases: ['전보 점수', '내신 이동'] },
-  { id: 'grade_preview', label: '성적 산출 미리보기', icon: Calculator, assistantCategory: '성적', searchAliases: ['성적 미리보기', '성취도 분포'] },
+  { id: 'grade_preview', label: '등급 미리보기', icon: Calculator, assistantCategory: '성적', searchAliases: ['성적 산출 미리보기', '성적 미리보기', '성취도 분포'] },
   { id: 'estimated_split_score', label: '추정분할점수 도우미', icon: Table2, assistantCategory: '성적', searchAliases: ['분할점수', '정답률 역산'] },
   { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText, assistantCategory: '교육과정', searchAliases: ['편제표', '교육과정 출력'] },
   { id: 'form_center', label: '서식센터', icon: FilePenLine, assistantCategory: '서식 출력', searchAliases: ['학교 서식', '회의록', '계획서'] },

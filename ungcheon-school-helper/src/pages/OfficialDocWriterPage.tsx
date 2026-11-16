@@ -450,7 +450,7 @@ export default function OfficialDocWriterPage() {
 
       {/* 토스트 */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-surface-700 text-white text-sm px-4 py-2 rounded-xl shadow-xl border border-white/10 z-50">
+        <div role="status" className="app-toast fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
           {toast}
         </div>
       )}

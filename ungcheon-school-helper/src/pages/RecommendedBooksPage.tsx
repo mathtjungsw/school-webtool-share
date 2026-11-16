@@ -1,5 +1,48 @@
 import {useEffect,useState} from 'react'
+import { BookOpen, ExternalLink } from 'lucide-react'
 import books from '../data/recommendedBooks.json'
+import editionData from '../data/recommendedBookEditions.json'
+
+type Book = typeof books[number]
+interface BookEdition {
+  cover?: string
+  isbn?: string
+  editionTitle?: string
+  publisher?: string
+  year?: string
+  held?: boolean
+  source?: string
+}
+
+const editions: Record<string, BookEdition | undefined> = editionData.editions
+
+function schoolCatalogUrl(book: Book) {
+  const url = new URL('https://read365.edunet.net/SchoolSearchResult')
+  url.search = new URLSearchParams({
+    searchKeyword: book.title === '이기적유전자' ? '이기적 유전자' : book.title,
+    schoolName: '웅천고등학교',
+    provCode: 'S10',
+    neisCode: 'S100000673',
+  }).toString()
+  return url.href
+}
+
+function BookCover({ book, detail = false }: { book: Book; detail?: boolean }) {
+  const cover = editions[book.id]?.cover
+  const [failed, setFailed] = useState(false)
+  return <div className={`grid shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-slate-500 ${detail ? 'h-40 w-28' : 'h-24 w-16'}`}>
+    {cover && !failed
+      ? <img src={cover} alt={`${book.title} 표지`} loading={detail ? 'eager' : 'lazy'} referrerPolicy="no-referrer" onError={() => setFailed(true)} className="h-full w-full object-contain" />
+      : <div className="flex flex-col items-center gap-1 text-xs"><BookOpen size={detail ? 24 : 17} /><span>{failed ? '표지 불러오기 실패' : '표지 미확인'}</span></div>}
+  </div>
+}
+
+function HoldingsBadge({ book }: { book: Book }) {
+  return editions[book.id]?.held
+    ? <span className="inline-block rounded-full bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-900">웅천고 소장 확인</span>
+    : <span className="inline-block rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">소장 미확인</span>
+}
+
 const themes:Record<string,{majors:string[];jobs:string[];question:string;intro:string}>={
  과학기술:{majors:['자연과학','공학','과학교육'],jobs:['연구자','과학교사'],question:'이 책의 설명을 현재의 과학 지식과 비교하면 무엇이 같고 다를까요?',intro:'관찰·실험·이론이 지식을 바꾸는 과정을 탐색하는 분야입니다.'},
  동양사상:{majors:['철학','역사','윤리교육'],jobs:['연구자','교사'],question:'이 사상의 인간관을 오늘날의 학교와 사회 문제에 적용할 수 있을까요?',intro:'인간과 공동체, 삶의 방식에 대한 동양의 다양한 질문을 만납니다.'},
@@ -16,10 +59,22 @@ const details:Record<string,{intro:string;majors:string[];jobs:string[];keywords
  '광장':{intro:'분단과 이념의 갈등 속에서 개인이 살아갈 공간을 찾는 문제를 다룬 한국 소설입니다.',majors:['국어국문','정치외교','사회학'],jobs:['작가','편집자','교사'],keywords:['분단','이념','개인'],question:'개인의 사적 공간과 공동체의 공적 공간은 어떤 관계여야 할까요?'},
 }
 export default function RecommendedBooksPage(){
- const [q,setQ]=useState(''),[category,setCategory]=useState(''),[major,setMajor]=useState(''),[job,setJob]=useState(''),[selected,setSelected]=useState(books[4]),[favorites,setFavorites]=useState<number[]>([]),[onlyStars,setOnlyStars]=useState(false)
+ const [q,setQ]=useState(''),[category,setCategory]=useState(''),[major,setMajor]=useState(''),[job,setJob]=useState(''),[selected,setSelected]=useState(books[4]),[favorites,setFavorites]=useState<number[]>([]),[onlyStars,setOnlyStars]=useState(false),[onlyHeld,setOnlyHeld]=useState(false)
  useEffect(()=>{void window.electron.configGet('recommendedSubjects.bookFavorites.v1').then(v=>{if(Array.isArray(v))setFavorites(v)})},[])
  const toggle=()=>{const next=favorites.includes(selected.id)?favorites.filter(n=>n!==selected.id):[...favorites,selected.id];setFavorites(next);void window.electron.configSet('recommendedSubjects.bookFavorites.v1',next)}
- const found=books.filter(b=>{const t=themes[b.category],d=details[b.title];return(!category||b.category===category)&&(!major||(d?.majors||t.majors).includes(major))&&(!job||(d?.jobs||t.jobs).includes(job))&&(!onlyStars||favorites.includes(b.id))&&`${b.title} ${b.author} ${b.category} ${(d?.keywords||[]).join(' ')}`.includes(q)})
- const theme=themes[selected.category],detail=details[selected.title]
- return <div className="mx-auto max-w-[1500px] p-7"><p className="text-xs font-bold text-emerald-700">독서교육 · 대학 추천도서</p><h1 className="mt-2 text-3xl font-black text-slate-950">서울대 권장도서 100선</h1><p className="mt-3 text-sm leading-7 text-slate-600">책에서 질문을 찾고 전공·진로 탐색으로 이어 보세요. 2005년 교양 독서 목록의 재게시 자료를 기준으로 한 시험판이며, 최신 입시 필독서가 아닙니다.</p><div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">목록 100항목은 서경대 재게시 목록 기준으로 대조 중입니다. 분류 안내·전공·직업 연결은 웅천고용 탐구 제안이며 서울대의 공식 전공별 추천이 아닙니다. 개별 해설은 검토한 대표 도서부터 제공합니다.</div><div className="my-5 flex flex-wrap gap-3"><input className="input-field" style={{width:240,flex:'1 1 160px'}} aria-label="도서 검색" placeholder="제목·저자·키워드 검색" value={q} onChange={e=>setQ(e.target.value)}/><select className="input-field" style={{width:240,flex:'1 1 160px'}} value={category} onChange={e=>setCategory(e.target.value)}><option value="">전체 분야</option>{Object.keys(themes).map(k=><option key={k}>{k}</option>)}</select><select className="input-field" style={{width:240,flex:'1 1 160px'}} value={major} onChange={e=>setMajor(e.target.value)}><option value="">관심 전공</option>{[...new Set([...Object.values(themes),...Object.values(details)].flatMap(t=>t.majors))].map(v=><option key={v}>{v}</option>)}</select><select className="input-field" style={{width:240,flex:'1 1 160px'}} value={job} onChange={e=>setJob(e.target.value)}><option value="">관심 직업</option>{[...new Set([...Object.values(themes),...Object.values(details)].flatMap(t=>t.jobs))].map(v=><option key={v}>{v}</option>)}</select><button className="btn-secondary" onClick={()=>setOnlyStars(!onlyStars)}>{onlyStars?'전체 보기':'★ 관심 도서'}</button></div><p className="mb-3 text-xs text-slate-500">{found.length}개 선정 항목</p><div className="grid grid-cols-[minmax(0,1.1fr)_minmax(320px,.9fr)] gap-6 max-lg:grid-cols-1"><div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">{found.map(b=><button key={b.id} onClick={()=>setSelected(b)} className={`rounded-2xl border bg-white p-5 text-left ${selected.id===b.id?'border-emerald-600 ring-1 ring-emerald-600':'border-slate-200'}`}><span className="text-xs font-bold text-emerald-700">{String(b.id).padStart(2,'0')} · {b.category}</span><h2 className="my-3 text-lg font-black text-slate-950">{b.title}</h2><p className="text-sm text-slate-600">{b.author||'원목록·판본 확인 필요'}</p><p className="mt-3 text-xs leading-6 text-slate-500">{details[b.title]?.intro||themes[b.category].intro}</p><p className="mt-3 text-xs font-bold text-emerald-700">{(details[b.title]?.majors||themes[b.category].majors).join(' · ')}</p></button>)}</div><aside className="sticky top-0 h-fit rounded-3xl border border-emerald-200 bg-white p-7 shadow-sm"><p className="text-xs font-bold text-emerald-700">{selected.category} · 도서 탐색</p><h2 className="my-3 text-2xl font-black text-slate-950">{selected.title}</h2><p className="text-slate-600">{selected.author||'저자·편자 원목록 확인 필요'}</p><button className="btn-secondary my-4" onClick={toggle}>{favorites.includes(selected.id)?'★ 관심 도서 해제':'☆ 관심 도서 저장'}</button><h3 className="mt-4 font-black">{detail?'어떤 책인가':'분야 안내 · 개별 해설 검토 중'}</h3><p className="mt-2 text-sm leading-7 text-slate-600">{detail?.intro||theme.intro}</p><h3 className="mt-5 font-black">전공·직업 탐색 제안</h3><p className="mt-2 text-sm leading-7 text-slate-600">{(detail?.majors||theme.majors).join(' · ')}<br/>{(detail?.jobs||theme.jobs).join(' · ')}<br/>책의 주제 또는 분야가 다루는 질문과 연결해 탐색하는 제안입니다.</p><h3 className="mt-5 font-black">읽으며 생각할 질문</h3><p className="mt-2 rounded-xl bg-emerald-50 p-4 text-sm leading-7 text-emerald-950">{detail?.question||theme.question}</p><h3 className="mt-5 font-black">후속 탐구</h3><p className="mt-2 text-sm leading-7 text-slate-600">읽은 내용에서 주장 하나와 근거를 고르고, 오늘날의 사례 하나를 찾아 비교해 보세요. 인용한 쪽과 자료 출처를 함께 남깁니다.</p><h3 className="mt-5 font-black">출처·판본</h3><p className="mt-2 text-xs leading-6 text-slate-500">선정 목록 재게시: 서경대학교 경영학부. 전공·직업과 읽기 질문: 자체 탐구 제안. ISBN·출판사·쪽수는 판본을 확인한 뒤 제공합니다.</p><button className="btn-secondary mt-3" onClick={()=>void window.electron.openExternal(selected.source)}>원목록 참고 출처 열기 ↗</button></aside></div></div>
+ const found=books.filter(b=>{const t=themes[b.category],d=details[b.title];return(!category||b.category===category)&&(!major||(d?.majors||t.majors).includes(major))&&(!job||(d?.jobs||t.jobs).includes(job))&&(!onlyStars||favorites.includes(b.id))&&(!onlyHeld||editions[b.id]?.held)&&`${b.title} ${b.author} ${b.category} ${(d?.keywords||[]).join(' ')}`.includes(q)})
+ const theme=themes[selected.category],detail=details[selected.title],edition=editions[selected.id]
+ return <div className="mx-auto max-w-[1500px] p-7"><p className="text-xs font-bold text-emerald-700">독서교육 · 대학 추천도서</p><h1 className="mt-2 text-3xl font-black text-slate-950">서울대 권장도서 100선</h1><p className="mt-3 text-sm leading-7 text-slate-600">책에서 질문을 찾고 전공·진로 탐색으로 이어 보세요. 2005년 교양 독서 목록의 재게시 자료를 기준으로 한 시험판이며, 최신 입시 필독서가 아닙니다.</p><div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">목록 100항목은 서경대 재게시 목록 기준으로 대조 중입니다. 분류 안내·전공·직업 연결은 웅천고용 탐구 제안이며 서울대의 공식 전공별 추천이 아닙니다. 개별 해설은 검토한 대표 도서부터 제공합니다.</div><div className="my-5 flex flex-wrap gap-3"><input className="input-field" style={{width:240,flex:'1 1 160px'}} aria-label="도서 검색" placeholder="제목·저자·키워드 검색" value={q} onChange={e=>setQ(e.target.value)}/><select className="input-field" style={{width:240,flex:'1 1 160px'}} value={category} onChange={e=>setCategory(e.target.value)}><option value="">전체 분야</option>{Object.keys(themes).map(k=><option key={k}>{k}</option>)}</select><select className="input-field" style={{width:240,flex:'1 1 160px'}} value={major} onChange={e=>setMajor(e.target.value)}><option value="">관심 전공</option>{[...new Set([...Object.values(themes),...Object.values(details)].flatMap(t=>t.majors))].map(v=><option key={v}>{v}</option>)}</select><select className="input-field" style={{width:240,flex:'1 1 160px'}} value={job} onChange={e=>setJob(e.target.value)}><option value="">관심 직업</option>{[...new Set([...Object.values(themes),...Object.values(details)].flatMap(t=>t.jobs))].map(v=><option key={v}>{v}</option>)}</select><button className="btn-secondary" onClick={()=>setOnlyStars(!onlyStars)}>{onlyStars?'전체 보기':'★ 관심 도서'}</button><button className="btn-secondary" aria-pressed={onlyHeld} onClick={()=>setOnlyHeld(!onlyHeld)}>웅천고 소장 도서만</button></div><p className="mb-3 text-sm text-slate-600">{found.length}개 선정 항목 · 소장 확인 기준 {editionData.checkedOn}</p><div className="grid grid-cols-[minmax(0,1.1fr)_minmax(320px,.9fr)] gap-6 max-lg:grid-cols-1"><div className="grid content-start grid-cols-2 gap-3 max-sm:grid-cols-1">{found.length === 0 && <p className="col-span-full rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">선택한 조건에 맞는 책이 없습니다.</p>}{found.map(b=><button key={b.id} onClick={()=>setSelected(b)} className={`rounded-2xl border bg-white p-5 text-left ${selected.id===b.id?'border-emerald-600 ring-1 ring-emerald-600':'border-slate-200'}`}><div className="flex items-start gap-3"><BookCover book={b} /><div className="min-w-0"><span className="text-xs font-bold text-emerald-700">{b.category}</span><h2 className="my-1 text-lg font-bold text-slate-950">{b.title}</h2><p className="mb-2 text-sm text-slate-600">{b.author||'저자 확인 필요'}</p><HoldingsBadge book={b} /></div></div><p className="mt-3 text-xs leading-6 text-slate-500">{details[b.title]?.intro||themes[b.category].intro}</p><p className="mt-3 text-xs font-bold text-emerald-700">{(details[b.title]?.majors||themes[b.category].majors).join(' · ')}</p></button>)}</div><aside className="sticky top-0 h-fit rounded-3xl border border-emerald-200 bg-white p-7 shadow-sm"><div className="flex flex-wrap items-start gap-4">
+  <BookCover key={selected.id} book={selected} detail />
+  <div className="min-w-0 flex-1 basis-40">
+    <p className="text-xs font-bold text-emerald-700">{selected.category}</p>
+    <h2 className="my-2 text-2xl font-bold text-slate-950">{selected.title}</h2>
+    <p className="mb-2 text-slate-600">{selected.author||'저자·편자 원목록 확인 필요'}</p>
+    <HoldingsBadge book={selected} />
+    <button className="mt-3 flex items-center gap-1 text-sm font-bold text-emerald-800 underline" onClick={()=>void window.electron.openExternal(schoolCatalogUrl(selected))}><ExternalLink size={14} />웅천고 독서로에서 확인</button>
+  </div>
+</div><button className="btn-secondary my-4" onClick={toggle}>{favorites.includes(selected.id)?'★ 관심 도서 해제':'☆ 관심 도서 저장'}</button><h3 className="mt-4 font-black">{detail?'어떤 책인가':'분야 안내 · 개별 해설 검토 중'}</h3><p className="mt-2 text-sm leading-7 text-slate-600">{detail?.intro||theme.intro}</p><h3 className="mt-5 font-black">전공·직업 탐색 제안</h3><p className="mt-2 text-sm leading-7 text-slate-600">{(detail?.majors||theme.majors).join(' · ')}<br/>{(detail?.jobs||theme.jobs).join(' · ')}<br/>책의 주제 또는 분야가 다루는 질문과 연결해 탐색하는 제안입니다.</p><h3 className="mt-5 font-black">읽으며 생각할 질문</h3><p className="mt-2 rounded-xl bg-emerald-50 p-4 text-sm leading-7 text-emerald-950">{detail?.question||theme.question}</p><h3 className="mt-5 font-black">후속 탐구</h3><p className="mt-2 text-sm leading-7 text-slate-600">읽은 내용에서 주장 하나와 근거를 고르고, 오늘날의 사례 하나를 찾아 비교해 보세요. 인용한 쪽과 자료 출처를 함께 남깁니다.</p><h3 className="mt-5 font-black">출처·판본</h3><p className="mt-2 text-xs leading-6 text-slate-500">선정 목록 재게시: 서경대학교 경영학부. 전공·직업과 읽기 질문: 자체 탐구 제안.</p>
+  {edition && <p className="mt-2 text-sm text-slate-700">{[edition.editionTitle, edition.publisher, edition.year, edition.isbn && `ISBN ${edition.isbn}`].filter(Boolean).join(' · ')}</p>}
+  {edition?.source && <button className="mt-2 text-sm font-bold text-emerald-800 underline" onClick={()=>void window.electron.openExternal(edition.source!)}>표지 판본 확인</button>}
+  <p className="mt-2 text-xs leading-6 text-slate-600">소장 표시는 확인일의 독서로 목록 기준입니다. 현재 대출 가능 여부와 다른 판본은 독서로에서 확인하세요.</p><button className="btn-secondary mt-3" onClick={()=>void window.electron.openExternal(selected.source)}>원목록 참고 출처 열기 ↗</button></aside></div></div>
 }

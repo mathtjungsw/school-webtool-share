@@ -1,0 +1,596 @@
+{
+  "checkedOn": "2026-11-16",
+  "editions": {
+    "1": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/13378/41/cover500/8972916536_1.jpg",
+      "isbn": "9788972916536",
+      "publisher": "까치글방",
+      "year": "2018",
+      "editionTitle": "같기도 하고 아니 같기도 하고"
+    },
+    "2": {
+      "cover": "https://image.aladin.co.kr/product/4414/46/cover200/1130457230_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=44144699",
+      "editionTitle": "신기관"
+    },
+    "3": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/19841/97/cover500/k712635336_2.jpg",
+      "isbn": "9791189198862",
+      "publisher": "사이언스북스",
+      "year": "2019",
+      "editionTitle": "종의 기원"
+    },
+    "4": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/751/8/cover500/8932471630_1.jpg",
+      "isbn": "9788932471631",
+      "publisher": "을유문화사",
+      "year": "2015",
+      "editionTitle": "이기적 유전자"
+    },
+    "5": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/3158/61/cover500/8972915548_1.jpg",
+      "isbn": "9788972915546",
+      "publisher": "까치",
+      "year": "2013",
+      "editionTitle": "과학혁명의 구조"
+    },
+    "6": {
+      "cover": "https://image.aladin.co.kr/product/19/79/cover200/8972912301_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=197995",
+      "editionTitle": "괴델, 에셔, 바흐 : 영원한 황금 노끈 -상"
+    },
+    "7": {
+      "cover": "https://image.aladin.co.kr/product/6/30/cover200/8942389058_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=63045",
+      "editionTitle": "부분과 전체"
+    },
+    "8": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/5566/66/cover500/898669882x_1.jpg",
+      "isbn": "9788986698824",
+      "publisher": "세종연구원",
+      "year": "2015",
+      "editionTitle": "엔트로피"
+    },
+    "9": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/2703/25/cover500/8962620693_1.jpg",
+      "isbn": "9788962620696",
+      "publisher": "동아시아",
+      "year": "2013",
+      "editionTitle": "카오스"
+    },
+    "10": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/627/26/cover500/8955591489_2.jpg",
+      "isbn": "9788955591484",
+      "publisher": "새물결",
+      "year": "2005",
+      "editionTitle": "객관성의 칼날"
+    },
+    "11": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/8569/30/cover500/8974747863_1.jpg",
+      "isbn": "9788974747862",
+      "publisher": "풀빛",
+      "year": "2016",
+      "editionTitle": "삼국유사 - 우리 역사로 되살아난 신화와 전설"
+    },
+    "15": {
+      "cover": "https://image.aladin.co.kr/product/3/47/cover200/9788981330989.gif",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=34749",
+      "editionTitle": "다산문선"
+    },
+    "17": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/18444/94/cover500/k822534255_2.jpg",
+      "isbn": "9788970654904",
+      "publisher": "홍익",
+      "year": "2015",
+      "editionTitle": "논어"
+    },
+    "18": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/25967/85/cover500/k562738380_2.jpg",
+      "isbn": "9791160805352",
+      "publisher": "휴머니스트",
+      "year": "2021",
+      "editionTitle": "맹자"
+    },
+    "19": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/55/34/cover500/8970650369_2.jpg",
+      "isbn": "9788970650364",
+      "publisher": "홍익",
+      "year": "2011",
+      "editionTitle": "대학·중용"
+    },
+    "21": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/12/55/cover500/8932309779_2.jpg",
+      "isbn": "9788932309774",
+      "publisher": "현암사",
+      "year": "2003",
+      "editionTitle": "장자"
+    },
+    "22": {
+      "cover": "https://image.aladin.co.kr/product/27/56/cover200/8932311021_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=275677",
+      "editionTitle": "아함경"
+    },
+    "23": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/61/45/cover500/8960010146_1.jpg",
+      "isbn": "8960010146",
+      "publisher": "타임기획",
+      "year": "2013",
+      "editionTitle": "사기열전"
+    },
+    "24": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/54/71/cover500/8974745283_2.jpg",
+      "isbn": "8974745283",
+      "publisher": "풀빛",
+      "year": "2018",
+      "editionTitle": "우파니샤드 - 귓속말로 전하는 지혜"
+    },
+    "25": {
+      "cover": "https://image.aladin.co.kr/product/328/29/cover200/8991290264_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=3282955",
+      "editionTitle": "역사"
+    },
+    "26": {
+      "cover": "https://image.aladin.co.kr/product/35729/66/cover200/k072036437_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=357296607",
+      "editionTitle": "키케로 의무론 (라틴어 원전 완역본)"
+    },
+    "27": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/54/71/cover500/8974745275_2.jpg",
+      "isbn": "8974745275",
+      "publisher": "풀빛",
+      "year": "2019",
+      "editionTitle": "국가 - 올바름을 향한 끝없는 대화"
+    },
+    "28": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/58/22/cover500/8974745321_3.jpg",
+      "isbn": "8974745321",
+      "publisher": "풀빛",
+      "year": "2019",
+      "editionTitle": "니코마코스 윤리학 - 아들에게 들려주는 행복의 길: 아들에게 들려주는 행복의 길"
+    },
+    "29": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/9082/8/cover500/8944724083_1.jpg",
+      "isbn": "9788944724084",
+      "publisher": "크리스천다이제스트",
+      "year": "2016",
+      "editionTitle": "고백록"
+    },
+    "30": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/14901/85/cover500/8959065013_1.jpg",
+      "isbn": "9788959065011",
+      "publisher": "인물과사상사",
+      "year": "2018",
+      "editionTitle": "군주론"
+    },
+    "31": {
+      "cover": "https://image.aladin.co.kr/product/34/48/cover200/s442832997_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=344881",
+      "editionTitle": "방법서설"
+    },
+    "32": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/27143/58/cover500/8949718022_3.jpg",
+      "isbn": "9788949718026",
+      "publisher": "동서문화사",
+      "year": "2021",
+      "editionTitle": "리바이어던"
+    },
+    "34": {
+      "cover": "https://image.aladin.co.kr/product/5/95/cover200/8970551190_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=59548",
+      "editionTitle": "법의 정신"
+    },
+    "35": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/432/88/cover500/8980971869_1.jpg",
+      "isbn": "9788980971862",
+      "publisher": "산수야",
+      "year": "2015",
+      "editionTitle": "에밀"
+    },
+    "36": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/228/80/cover500/8949704765_1.jpg",
+      "isbn": "9788949704760",
+      "publisher": "동서문화사",
+      "year": "2008",
+      "editionTitle": "국부론"
+    },
+    "37": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/20640/95/cover500/8957336419_1.jpg",
+      "isbn": "9788957336410",
+      "publisher": "아카넷",
+      "year": "2019",
+      "editionTitle": "실천이성비판"
+    },
+    "38": {
+      "cover": "https://image.aladin.co.kr/product/3202/55/cover200/8946047445_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=32025546",
+      "editionTitle": "페더랄리스트 페이퍼"
+    },
+    "39": {
+      "cover": "https://image.aladin.co.kr/product/5/34/cover200/8935601950_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=53451",
+      "editionTitle": "미국의 민주주의 1"
+    },
+    "40": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/1147/56/cover500/8974745615_1.jpg",
+      "isbn": "9788974745615",
+      "publisher": "풀빛",
+      "year": "2019",
+      "editionTitle": "자유론 - 자유에 관한 인류 최고의 보고서"
+    },
+    "41": {
+      "cover": "https://image.aladin.co.kr/product/7114/32/cover200/8937604329_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=71143243",
+      "editionTitle": "자본론 1 - 상"
+    },
+    "42": {
+      "cover": "https://image.aladin.co.kr/product/23677/29/cover200/k212638932_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=236772985",
+      "editionTitle": "도덕의 계보학"
+    },
+    "43": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/33406/91/cover500/8975583600_1.jpg",
+      "isbn": "9788975583605",
+      "publisher": "선영사",
+      "year": "2024",
+      "editionTitle": "꿈의 해석"
+    },
+    "44": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/15/54/cover500/9788975851483.gif",
+      "isbn": "8975851486",
+      "publisher": "계명대학교출판부",
+      "year": "2012",
+      "editionTitle": "프로테스탄티즘의 윤리와 자본주의 정신"
+    },
+    "45": {
+      "cover": "https://image.aladin.co.kr/product/34/25/cover200/8935630918_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=342520",
+      "editionTitle": "간디 자서전"
+    },
+    "46": {
+      "cover": "https://image.aladin.co.kr/product/20/19/cover200/8930032486_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=201965",
+      "editionTitle": "감시와 처벌"
+    },
+    "47": {
+      "cover": "https://image.aladin.co.kr/product/5/31/cover200/897291083x_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=53100",
+      "editionTitle": "물질문명과 자본주의 1-1"
+    },
+    "48": {
+      "cover": "https://image.aladin.co.kr/product/16/95/cover200/8935651761_3.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=169555",
+      "editionTitle": "혁명의 시대"
+    },
+    "49": {
+      "cover": "https://image.aladin.co.kr/product/18/97/cover200/8935651745_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=189780",
+      "editionTitle": "슬픈 열대"
+    },
+    "50": {
+      "cover": "https://image.aladin.co.kr/product/5/21/cover200/893648303x_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=52162",
+      "editionTitle": "문학과 예술의 사회사 1"
+    },
+    "51": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/1146/53/cover500/8964061519_1.jpg",
+      "isbn": "9788964061510",
+      "publisher": "커뮤니케이션북스",
+      "year": "2011",
+      "editionTitle": "미디어의 이해: 인간의 확장 (비평판)"
+    },
+    "52": {
+      "cover": "https://image.aladin.co.kr/product/5200/36/cover200/1157940013_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=52003649",
+      "editionTitle": "당시선"
+    },
+    "53": {
+      "cover": "https://image.aladin.co.kr/product/2118/17/cover200/8981336237_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=21181740",
+      "editionTitle": "홍루몽 1~7권 세트 - 전7권"
+    },
+    "54": {
+      "cover": "https://image.aladin.co.kr/product/830/81/cover200/8976822234_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=8308117",
+      "editionTitle": "루쉰 전집 1 : 무덤.열풍"
+    },
+    "55": {
+      "cover": "https://image.aladin.co.kr/product/49/70/cover200/8932015147_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=497015",
+      "editionTitle": "변신 인형"
+    },
+    "56": {
+      "cover": "https://image.aladin.co.kr/product/8350/55/cover200/8901208253_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=83505505",
+      "editionTitle": "마음 (무선)"
+    },
+    "57": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/7/73/cover500/8935201669_1.gif",
+      "isbn": "8935201669",
+      "publisher": "청림",
+      "year": "2002",
+      "editionTitle": "설국"
+    },
+    "58": {
+      "cover": "https://image.aladin.co.kr/product/27/23/cover150/8970922032_1.gif",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=272365",
+      "editionTitle": "일리아스"
+    },
+    "59": {
+      "cover": "https://image.aladin.co.kr/product/39940/12/cover200/8932476462_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=399401298",
+      "editionTitle": "오뒷세이아"
+    },
+    "60": {
+      "cover": "https://image.aladin.co.kr/product/14311/58/cover200/8932912351_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=143115851",
+      "editionTitle": "변신 이야기"
+    },
+    "61": {
+      "cover": "https://image.aladin.co.kr/product/9571/44/cover200/8949714620_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=95714496",
+      "editionTitle": "그리스 비극"
+    },
+    "62": {
+      "cover": "https://image.aladin.co.kr/product/2/3/cover150/8908071016_1.gif",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=20302",
+      "editionTitle": "그리스.로마 신화"
+    },
+    "63": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/29173/87/cover500/8932921393_1.jpg",
+      "isbn": "9788932921396",
+      "publisher": "열린책들",
+      "year": "2022",
+      "editionTitle": "신곡"
+    },
+    "64": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/1413/67/cover500/8925880377_1.jpg",
+      "isbn": "9788925880372",
+      "publisher": "채우리",
+      "year": "2011",
+      "editionTitle": "주홍글씨"
+    },
+    "65": {
+      "cover": "https://image.aladin.co.kr/product/2090/86/cover200/s402638427_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=20908675",
+      "editionTitle": "셰익스피어 4대 비극 세트 : 햄릿.오셀로.맥베스.리어 왕 - 전4권"
+    },
+    "66": {
+      "cover": "https://image.aladin.co.kr/product/27/29/cover150/8934401753_1.gif",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=272960",
+      "editionTitle": "위대한 유산"
+    },
+    "67": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/1566/76/cover500/892588092x_1.jpg",
+      "isbn": "9788925880921",
+      "publisher": "채우리",
+      "year": "2011",
+      "editionTitle": "젊은 예술가의 초상"
+    },
+    "68": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/1539/38/cover500/8925880911_1.jpg",
+      "isbn": "9788925880914",
+      "publisher": "채우리",
+      "year": "2011",
+      "editionTitle": "허클베리핀의 모험"
+    },
+    "69": {
+      "cover": "https://image.aladin.co.kr/product/17/40/cover200/8937418258_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=174082",
+      "editionTitle": "황무지"
+    },
+    "70": {
+      "cover": "https://image.aladin.co.kr/product/36429/26/cover200/8931025041_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=364292669",
+      "editionTitle": "보바리 부인"
+    },
+    "71": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/1960/91/cover500/8937485621_1.jpg",
+      "isbn": "9788937485626",
+      "publisher": "민음사",
+      "year": "2012",
+      "editionTitle": "잃어버린 시간을 찾아서 2: 스완네 집 쪽으로"
+    },
+    "72": {
+      "cover": "https://image.aladin.co.kr/product/25/85/cover200/8986045532_3.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=258555",
+      "editionTitle": "인간의 조건"
+    },
+    "73": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/657/71/cover500/8954610390_1.jpg",
+      "isbn": "9788954610391",
+      "publisher": "문학동네",
+      "year": "2010",
+      "editionTitle": "파우스트 1"
+    },
+    "74": {
+      "cover": "https://image.aladin.co.kr/product/4/62/cover200/8908070281_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=46235",
+      "editionTitle": "마의 산 -상"
+    },
+    "75": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/2984/33/cover500/8971849789_1.jpg",
+      "isbn": "9788971849781",
+      "publisher": "푸른숲주니어",
+      "year": "2013",
+      "editionTitle": "변신"
+    },
+    "76": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/1630/12/cover500/8925880458_1.jpg",
+      "isbn": "9788925880457",
+      "publisher": "채우리",
+      "year": "2012",
+      "editionTitle": "양철북"
+    },
+    "77": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/1413/67/cover500/8925880881_1.jpg",
+      "isbn": "9788925880884",
+      "publisher": "채우리",
+      "year": "2011",
+      "editionTitle": "돈키호테"
+    },
+    "78": {
+      "cover": "https://image.aladin.co.kr/product/5/86/cover200/8970126937_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=58631",
+      "editionTitle": "백년 동안의 고독"
+    },
+    "79": {
+      "cover": "https://image.aladin.co.kr/product/15/63/cover200/8937401762_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=156344",
+      "editionTitle": "픽션들"
+    },
+    "80": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/1726/18/cover500/8925880466_1.jpg",
+      "isbn": "9788925880464",
+      "publisher": "채우리",
+      "year": "2012",
+      "editionTitle": "고도를 기다리며"
+    },
+    "81": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/1474/81/cover500/8925880903_1.jpg",
+      "isbn": "9788925880907",
+      "publisher": "채우리",
+      "year": "2011",
+      "editionTitle": "카라마조프가의 형제들"
+    },
+    "82": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/657/70/cover500/8954610315_1.jpg",
+      "isbn": "9788954610315",
+      "publisher": "문학동네",
+      "year": "2010",
+      "editionTitle": "안나 카레니나 1"
+    },
+    "83": {
+      "cover": "https://image.aladin.co.kr/product/39331/48/cover200/8937464756_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=393314834",
+      "editionTitle": "체호프 희곡선"
+    },
+    "85": {
+      "cover": "https://image.aladin.co.kr/product/59/73/cover200/8932016488_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=597377",
+      "editionTitle": "고향"
+    },
+    "86": {
+      "cover": "https://image.aladin.co.kr/product/3572/87/cover200/8932025320_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=35728710",
+      "editionTitle": "탁류"
+    },
+    "87": {
+      "cover": "https://image.aladin.co.kr/product/26/34/cover200/8973811967_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=263499",
+      "editionTitle": "인간문제"
+    },
+    "88": {
+      "cover": "https://image.aladin.co.kr/product/41/23/cover200/8937407116_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=412375",
+      "editionTitle": "정지용 전집 1"
+    },
+    "89": {
+      "cover": "https://image.aladin.co.kr/product/3445/45/cover200/8966804004_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=34454570",
+      "editionTitle": "백석 시전집"
+    },
+    "90": {
+      "cover": "https://image.aladin.co.kr/product/62/13/cover200/8932016690_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=621361",
+      "editionTitle": "카인의 후예"
+    },
+    "91": {
+      "cover": "https://image.aladin.co.kr/product/31830/63/cover200/k442833125_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=318306324",
+      "editionTitle": "토지 1"
+    },
+    "92": {
+      "cover": "https://image.aladin.co.kr/product/281/47/cover200/8932019150_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=2814706",
+      "editionTitle": "광장 / 구운몽"
+    },
+    "93": {
+      "cover": "https://image.aladin.co.kr/product/55/4/cover150/8987948447_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=550472",
+      "editionTitle": "연암산문선"
+    },
+    "94": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/12485/31/cover500/8971998350_1.jpg",
+      "isbn": "9788971998359",
+      "publisher": "돌베개",
+      "year": "2017",
+      "editionTitle": "구운몽"
+    },
+    "95": {
+      "cover": "https://image.aladin.co.kr/product/48/1/cover200/s572934786_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=480138",
+      "editionTitle": "춘향전"
+    },
+    "96": {
+      "cover": "https://image.aladin.co.kr/product/42/57/cover200/8974831937_3.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=425791",
+      "editionTitle": "한중록"
+    },
+    "97": {
+      "cover": "https://image.aladin.co.kr/product/20407/13/cover200/8954655432_2.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=204071309",
+      "editionTitle": "청구야담 - 상"
+    },
+    "98": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/7492/3/cover500/k592434918_1.jpg",
+      "isbn": "9791195632671",
+      "publisher": "새움",
+      "year": "2016",
+      "editionTitle": "삼대"
+    },
+    "99": {
+      "cover": "https://image.aladin.co.kr/product/5/15/cover200/8973811711_1.jpg",
+      "source": "https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=51597",
+      "editionTitle": "무정"
+    },
+    "100": {
+      "held": true,
+      "cover": "https://image.aladin.co.kr/product/53/97/cover500/8932015708_1.jpg",
+      "isbn": "8932015708",
+      "publisher": "문학과지성사",
+      "year": "2013",
+      "editionTitle": "한국문학전집 10: 천변풍경"
+    }
+  }
+}

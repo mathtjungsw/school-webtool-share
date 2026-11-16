@@ -558,7 +558,7 @@ export default function SpecialRemarksMasterPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-surface-700 text-white text-sm px-4 py-2 rounded-xl shadow-xl border border-white/10 z-50"
+          role="status" className="app-toast fixed bottom-6 left-1/2 z-50 -translate-x-1/2"
         >
           {toast}
         </motion.div>

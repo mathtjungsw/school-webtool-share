@@ -195,7 +195,7 @@ export default function GradePreviewPage() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div>
             <p className="text-[10px] font-bold tracking-[.2em] text-amber-400 mb-2">SCHOOL GRADE PREVIEW</p>
-            <h1 className="page-title flex items-center gap-3"><Calculator className="text-amber-400" size={25} />성적 산출 미리 해보기</h1>
+            <h1 className="page-title flex items-center gap-3"><Calculator className="text-amber-400" size={25} />등급 미리보기</h1>
             <p className="page-subtitle">정기시험·수행평가 점수로 환산점수, 석차등급과 성취도를 미리 확인합니다.</p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -296,7 +296,7 @@ export default function GradePreviewPage() {
         <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-[11px] text-amber-200/80">복원용 엑셀에는 학생 개인정보와 점수가 포함될 수 있습니다. 공용 PC나 공개 폴더에 보관하지 마세요.</div>
       </StepCard>
 
-      {toast && <div role="status" className="fixed right-6 bottom-6 z-50 max-w-sm rounded-xl bg-slate-950 border border-amber-400/30 px-4 py-3 text-xs text-slate-200 shadow-2xl animate-slide-up">{toast}</div>}
+      {toast && <div role="status" className="app-toast fixed bottom-6 right-6 z-50 animate-slide-up">{toast}</div>}
     </div>
   )
 }

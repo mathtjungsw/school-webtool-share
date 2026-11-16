@@ -410,6 +410,21 @@
 [data-theme="light"] textarea { color: #1e293b !important; }
 [data-theme="light"] option { background: #ffffff; color: #1e293b; }
 
+.app-toast {
+  width: max-content;
+  max-width: min(24rem, calc(100vw - 3rem));
+  padding: 0.75rem 1rem;
+  border: 1px solid #d39b17;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  box-shadow: 0 8px 24px #0f172a26;
+}
+
 /* 교직원 명렬 가상 표는 Windows 색상 설정이 아니라 앱에서 선택한 테마만 따른다. */
 [data-theme="light"] .staff-roster-virtual-table > [role="rowgroup"]:first-child {
   background: #f1f5f9 !important;
