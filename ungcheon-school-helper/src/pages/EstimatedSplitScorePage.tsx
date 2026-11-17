@@ -865,18 +865,27 @@ function ScenarioTargetPanel({ state, boundaries, secondExam, firstWeights, plan
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h3 className="text-lg font-bold text-slate-950">2차 시험 권장 추정분할점수</h3>
         {hasCuts && <p className="rounded-lg border border-amber-400 bg-amber-100 px-3 py-2 font-extrabold text-amber-950">
-          아래 공지용 점수는 학생·학부모에게 안내할 정수 기준입니다.
+          학생·학부모에게 안내할 2차 시험 기준은 각 카드 하단의 공지용 점수입니다.
         </p>}
       </div>
-      {hasCuts && <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+      {hasCuts && <div className={clsx('mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3', boundaries.length === 4 ? 'xl:grid-cols-4' : 'xl:grid-cols-5')}>
         {boundaries.map(boundary => {
           const finalCut = result.finalCuts[boundary]
-          return <div key={boundary} className="rounded-lg border border-amber-200 bg-white p-3">
-            <span className="text-sm font-semibold text-slate-700">{boundary} 기준</span>
-            <strong className="block text-xl text-amber-950">공지용 {finalCut === null ? '—' : `${Math.ceil(finalCut)}점`}</strong>
-            <p className="text-sm text-slate-700">최종 계산 기준 {finalCut ?? '—'}점</p>
-            <p className="text-sm text-slate-700">2차 시험 권장 {result.recommendedComponentCuts[boundary] ?? '—'}점</p>
-          </div>
+          const announcementCut = result.recommendedComponentCuts[boundary]
+          return <article key={boundary} className="flex min-w-0 flex-col overflow-hidden rounded-lg border border-amber-200 bg-white">
+            <div className="flex-1 p-3">
+              <h4 className="text-sm font-bold text-slate-700">{boundary} 기준</h4>
+              <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-sm font-bold text-slate-950">
+                <span>학기말 추정분할 점수</span>
+                <strong className="whitespace-nowrap text-xl tabular-nums">{finalCut === null ? '—' : `${Math.ceil(finalCut)}점`}</strong>
+              </p>
+              <p className="text-sm text-slate-700">최종 계산 기준 {finalCut === null ? '—' : `${finalCut}점`}</p>
+            </div>
+            <div className="border-l-4 border-t border-amber-400 bg-amber-100 px-3 py-2 text-amber-950">
+              <span className="block text-sm font-extrabold">공지용 점수</span>
+              <strong className="block whitespace-nowrap text-2xl font-black leading-tight tabular-nums tracking-tight sm:text-3xl">{announcementCut === null ? '—' : `${announcementCut}점`}</strong>
+            </div>
+          </article>
         })}
       </div>}
       {hasCuts && <div className="mt-4 overflow-auto rounded-xl border border-slate-200">

@@ -458,7 +458,7 @@ export default function WidgetApp() {
   const fetchNotices = useNoticeStore(state => state.fetchNotices);
   const [settings, setSettings] = useState<WidgetSettings>(DEFAULT_WIDGET_SETTINGS);
   const shellRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<HTMLElement>(null);
@@ -1323,24 +1323,27 @@ export default function WidgetApp() {
       data-widget-density={settings.density}
       className={`widget-shell preset-${settings.preset} ${settings.expanded ? "is-expanded" : "is-collapsed"} widget-density-${settings.density}`}
     >
-      <header ref={headerRef} className="widget-header drag-region">
-        <span className="widget-grip"><GripHorizontal size={16} /></span>
-        <div className="widget-identity">
-          <i className={offline ? "offline" : "online"} />
-          <b>{auth.teacherName} 선생님</b><UpdateStatus compact />
-          <small>· {format(now, "M월 d일(EEE) HH:mm", { locale: ko })}</small>
-        </div>
-        <nav className="no-drag">
-          <button title={settings.pinned ? "항상 위에 표시 해제" : "항상 위에 표시"} onClick={() => void applySettings({ pinned: !settings.pinned })}>
-            {settings.pinned ? <Pin size={15} /> : <PinOff size={15} />}
-          </button>
-          <button title="설정" onClick={() => setShowSettings(value => !value)}><Settings2 size={15} /></button>
-          <button title={settings.expanded ? "접기" : "펼치기"} onClick={() => void applySettings({ expanded: !settings.expanded })}>
-            {settings.expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
-          <button title="위젯 숨기기" onClick={() => window.electron.hideWidget()}><X size={16} /></button>
-        </nav>
-      </header>
+      <div ref={headerRef} className="shrink-0">
+        <header className="widget-header drag-region">
+          <span className="widget-grip"><GripHorizontal size={16} /></span>
+          <div className="widget-identity">
+            <i className={offline ? "offline" : "online"} />
+            <b>{auth.teacherName} 선생님</b>
+            <small>· {format(now, "M월 d일(EEE) HH:mm", { locale: ko })}</small>
+          </div>
+          <nav className="no-drag">
+            <button title={settings.pinned ? "항상 위에 표시 해제" : "항상 위에 표시"} onClick={() => void applySettings({ pinned: !settings.pinned })}>
+              {settings.pinned ? <Pin size={15} /> : <PinOff size={15} />}
+            </button>
+            <button title="설정" onClick={() => setShowSettings(value => !value)}><Settings2 size={15} /></button>
+            <button title={settings.expanded ? "접기" : "펼치기"} onClick={() => void applySettings({ expanded: !settings.expanded })}>
+              {settings.expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            <button title="위젯 숨기기" onClick={() => window.electron.hideWidget()}><X size={16} /></button>
+          </nav>
+        </header>
+        <UpdateStatus compact />
+      </div>
 
       {showSettings && (
         <section className="widget-settings no-drag">
