@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 72;
+const MOBILE_SERVICE_VERSION = 73;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -425,6 +425,18 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'server-v73',
+    title: '업무도우미 1.1.42 안내 추가',
+    body: '추정분할점수 도우미의 수행평가 예상점수 일괄 입력 안내를 추가합니다.',
+    date: '2026-11-17'
+  },
+  {
+    key: 'v1.1.42',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.42 · 수행평가 예상점수 일괄 입력',
+    body: '추정분할점수 도우미 04번의 각 수행평가에서 전원에게 만점 또는 입력한 점수를 예상점수로 줄 수 있습니다. 해당 수행평가의 결시는 유지하며, 과목에 입력한 예상점수는 이 PC에 저장됩니다.',
+    date: '2026-11-17'
+  },
   {
     key: 'server-v72',
     title: '업무도우미 1.1.41 안내 추가',

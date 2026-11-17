@@ -14,7 +14,7 @@ import {
   normalizeScoreRows, numberValue, parseColumnGradeSheet, readScoreWorkbook, round2,
   uid, validateGradePreviewState,
   type CalculationMode, type GradeComponent, type GradePreviewConfig, type GradePreviewState,
-  type GradeResult, type Matrix, type PlannerSettings, type SplitPlanning,
+  type GradeResult, type Matrix, type PlannerSettings, type ScoreEntry, type SplitPlanning,
 } from '../services/gradePreview'
 import {
   DEFAULT_DIFFICULTY_WEIGHTS, DIFFICULTY_CATEGORIES, activeSplitBoundaries,
@@ -245,6 +245,7 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
   const [pendingWorkbooks, setPendingWorkbooks] = useState<Record<string, PendingWorkbook | undefined>>({})
   const [uploadStatus, setUploadStatus] = useState<Record<string, UploadStatus | undefined>>({})
   const [adjustments, setAdjustments] = useState<Record<string, string>>({})
+  const [performanceScores, setPerformanceScores] = useState<Record<string, string>>({})
   const [dragTarget, setDragTarget] = useState('')
   const imports = useRef(new Map<string, symbol>())
   const mounted = useRef(true)
@@ -292,10 +293,14 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
     : state,
   [state, splitBoundaries])
   const errors = useMemo(() => validateGradePreviewState(preparedState), [preparedState])
-  const studentKeys = useMemo(() => {
-    const keys = new Set<string>()
-    state.components.forEach(component => Object.keys(component.scores).forEach(key => keys.add(key)))
-    return keys
+  const studentRoster = useMemo(() => {
+    const roster = new Map<string, ScoreEntry>()
+    for (const component of state.components) {
+      for (const [key, entry] of Object.entries(component.scores)) {
+        if (!roster.get(key)?.studentName) roster.set(key, entry)
+      }
+    }
+    return roster
   }, [state.components])
   const weightTotal = round2(state.components.reduce((sum, component) => sum + (numberValue(component.weight) ?? 0), 0))
   const firstExamComponent = state.components.find(component => component.type === 'exam')
@@ -363,16 +368,34 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
     setToast(`${target.name}에 1차 시험 기준 예상점수를 입력했습니다.`)
   }
 
-  const fillExpectedScores = (target: GradeComponent, rawScore = target.maxScore) => {
-    const source = state.components.find(component => Object.keys(component.scores).length > 0)
-    if (!source) { setToast('학생 명단을 만들 1차 지필평가 점수를 먼저 입력해 주세요.'); return }
-    const scores = Object.fromEntries(Object.entries(source.scores).map(([key, entry]) => [key, {
-      ...entry, rawScore: Math.max(0, Math.min(target.maxScore, rawScore)), status: '',
-    }]))
-    imports.current.delete(target.id)
-    setComponentScores(target.id, scores, 'expected')
+  const fillPerformanceScores = (target: GradeComponent, rawScore: number | null) => {
+    if (!Number.isFinite(target.maxScore) || target.maxScore <= 0) {
+      setToast('03번 평가 구성에서 수행평가 만점을 확인해 주세요.')
+      return
+    }
+    if (rawScore === null || !Number.isFinite(rawScore) || rawScore < 0 || rawScore > target.maxScore) {
+      setToast(`0점부터 ${target.maxScore}점 사이의 예상점수를 입력해 주세요.`)
+      return
+    }
+
+    let applied = 0
+    const entries = Array.from(studentRoster, ([key, student]) => {
+      const existing = target.scores[key]
+      if (existing?.rawScore === null && existing.status) return [key, existing] as const
+      applied++
+      return [key, { ...student, rawScore, status: '' }] as const
+    })
+    if (!applied) {
+      setToast(studentRoster.size ? '예상점수를 입력할 학생이 없습니다. 이 수행평가의 결시를 확인해 주세요.' : '이 과목의 학생 성적을 먼저 입력해 주세요.')
+      return
+    }
+    const hasExistingScores = Object.values(target.scores).some(entry => entry.rawScore !== null)
+    if (hasExistingScores && target.scoreOrigin !== 'expected' &&
+        !window.confirm(`'${target.name}'의 기존 점수를 ${applied}명의 예상점수 ${rawScore}점으로 바꿀까요?`)) return
+
+    setComponentScores(target.id, Object.fromEntries(entries), 'expected')
     setUploadStatus(current => ({ ...current, [target.id]: undefined }))
-    setToast(`${target.name}에 학생별 예상점수 ${rawScore}점을 입력했습니다.`)
+    setToast(`${target.name}에 ${applied}명의 예상점수 ${rawScore}점을 입력했습니다.`)
   }
 
   const removeComponent = (component: GradeComponent) => {
@@ -493,6 +516,7 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
     setPendingWorkbooks({})
     setUploadStatus({})
     setAdjustments({})
+    setPerformanceScores({})
     setManualOpen({})
     setMappingOpen({})
     setManualText({})
@@ -574,7 +598,7 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
                 <Field label="만점"><input className={inputClass} type="number" min="0.01" step="0.01" value={component.maxScore} onChange={event => updateComponent(component.id, { maxScore: Number(event.target.value) })} /></Field>
                 <button disabled={state.config.calculationMode === 'firstExam' || state.components.length === 1} onClick={() => removeComponent(component)} aria-label={`${component.name} 항목 삭제`} className="h-11 px-3 rounded-lg border border-rose-500/30 text-rose-300 hover:bg-rose-500/10 disabled:opacity-30"><Trash2 size={14} /></button>
               </div>
-              {state.config.splitMethod === 'estimated' && splitBoundaries.length > 0 && <div className="mt-4 pt-4 border-t border-white/5"><div className="flex items-center justify-between gap-3 mb-2"><p className="text-sm font-bold text-slate-300">영역별 추정분할점수</p><div className="flex flex-wrap gap-1.5">{component.id === secondExamComponent?.id && <button onClick={() => firstExamComponent && updateComponent(component.id, { splitScores: { ...firstExamComponent.splitScores } })} className={smallButton}><Copy size={13} />1차 분할점수 복사</button>}{component.type === 'performance' && <button onClick={() => fillExpectedScores(component, component.maxScore)} className={smallButton}>전원 만점으로 예상</button>}</div></div><div className="grid grid-cols-2 sm:grid-cols-5 gap-2">{splitBoundaries.map(boundary => <Field key={boundary} label={`${boundary} 기준`}><input className={inputClass} type="number" min="0" max={component.maxScore} step="0.1" value={component.splitScores?.[boundary] ?? ''} onChange={event => updateComponentSplit(component.id, boundary, numberValue(event.target.value))} /></Field>)}</div></div>}
+              {state.config.splitMethod === 'estimated' && splitBoundaries.length > 0 && <div className="mt-4 pt-4 border-t border-white/5"><div className="flex items-center justify-between gap-3 mb-2"><p className="text-sm font-bold text-slate-300">영역별 추정분할점수</p><div className="flex flex-wrap gap-1.5">{component.id === secondExamComponent?.id && <button onClick={() => firstExamComponent && updateComponent(component.id, { splitScores: { ...firstExamComponent.splitScores } })} className={smallButton}><Copy size={13} />1차 분할점수 복사</button>}</div></div><div className="grid grid-cols-2 sm:grid-cols-5 gap-2">{splitBoundaries.map(boundary => <Field key={boundary} label={`${boundary} 기준`}><input className={inputClass} type="number" min="0" max={component.maxScore} step="0.1" value={component.splitScores?.[boundary] ?? ''} onChange={event => updateComponentSplit(component.id, boundary, numberValue(event.target.value))} /></Field>)}</div></div>}
             </div>
           ))}
         </div>
@@ -582,7 +606,7 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
         <div className="mt-4 rounded-xl bg-white/3 border border-white/5 p-3 flex justify-between text-sm"><span className="text-slate-400">{state.config.calculationMode === 'firstExam' ? '1차 시험 점수만 100% 기준으로 계산합니다.' : '반영비율 합계는 정확히 100%여야 합니다.'}</span><strong className={Math.abs(weightTotal - 100) < .0001 ? 'text-emerald-400' : 'text-rose-400'}>{weightTotal}%</strong></div>
       </StepCard>
 
-      <StepCard number="04" title="점수 엑셀 업로드와 가상점수" description="각 평가 카드에 성적 파일을 놓거나 선택하세요. 2차 시험에는 실제 점수나 예상점수를 입력할 수 있습니다.">
+      <StepCard number="04" title="점수 엑셀 업로드와 가상점수" description="각 평가 카드에 성적 파일을 놓거나 선택하세요. 2차 시험과 수행평가에는 실제 점수나 예상점수를 입력할 수 있습니다.">
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950">
           <h3 className="text-lg font-bold">나이스 시험 성적 파일은 XLS Data로 저장하세요</h3>
           <p className="mt-1 text-sm leading-relaxed">나이스 → 교과담임 → 정기시험조회/통계 → 정기시험조회 → 교과목별일람표-전체학급 → 조회 → 저장 버튼</p>
@@ -654,6 +678,25 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
                   </div>
                   <p className="text-sm text-slate-600">1차 원점수에 가감해 0점부터 2차 만점까지 반영합니다. 100점 만점에서 98점에 5점을 더하면 100점입니다.</p>
                 </div>}
+                {component.type === 'performance' && <div className="mt-4 space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-bold text-sky-950">수행평가 예상점수</p>
+                    <button disabled={busy || !studentRoster.size} onClick={() => fillPerformanceScores(component, component.maxScore)} className={smallButton}>전원 만점 주기</button>
+                  </div>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <Field label="공통 예상점수 (점)" className="flex-1 basis-40">
+                      <input type="number" min={0} max={component.maxScore} step="any" className={inputClass}
+                        disabled={busy || !studentRoster.size} placeholder={`만점 ${component.maxScore}점`}
+                        value={performanceScores[component.id] ?? ''}
+                        onChange={event => setPerformanceScores(current => ({ ...current, [component.id]: event.target.value }))} />
+                    </Field>
+                    <button disabled={busy || !studentRoster.size} className={smallButton}
+                      onClick={() => fillPerformanceScores(component, numberValue(performanceScores[component.id]))}>전원에게 같은 점수 주기</button>
+                  </div>
+                  <p className="text-sm text-slate-700">{studentRoster.size
+                    ? '이 과목의 학생에게 적용합니다. 이 수행평가에 입력된 결시는 유지합니다.'
+                    : '이 과목의 학생 성적을 먼저 입력하면 예상점수를 줄 수 있습니다.'}</p>
+                </div>}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button onClick={() => setManualOpen(current => ({ ...current, [component.id]: !current[component.id] }))} className={smallButton}>직접 붙여넣기</button>
                   <button disabled={!pendingWorkbooks[component.id]} onClick={() => setMappingOpen(current => ({ ...current, [component.id]: !current[component.id] }))} className={smallButton}>열 위치 지정</button>
@@ -671,8 +714,8 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
           })}
         </div>
         <div className="mt-5 rounded-2xl border border-amber-400/25 bg-surface-950/95 backdrop-blur p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xl">
-          <div><strong className="block text-sm text-white">{errors.length ? errors[0] : studentKeys.size ? `${studentKeys.size}명의 점수를 계산할 준비가 되었습니다.` : '평가 항목별 점수를 입력해 주세요.'}</strong><span className="text-sm text-slate-500">계산 전 입력값과 업로드 인원을 검사합니다.</span></div>
-          <button disabled={errors.length > 0 || studentKeys.size === 0} onClick={calculate} className="btn-primary inline-flex items-center justify-center gap-2 whitespace-nowrap"><Calculator size={15} />성적 미리 계산하기</button>
+          <div><strong className="block text-sm text-white">{errors.length ? errors[0] : studentRoster.size ? `${studentRoster.size}명의 점수를 계산할 준비가 되었습니다.` : '평가 항목별 점수를 입력해 주세요.'}</strong><span className="text-sm text-slate-500">계산 전 입력값과 업로드 인원을 검사합니다.</span></div>
+          <button disabled={errors.length > 0 || studentRoster.size === 0} onClick={calculate} className="btn-primary inline-flex items-center justify-center gap-2 whitespace-nowrap"><Calculator size={15} />성적 미리 계산하기</button>
         </div>
       </StepCard>
 
