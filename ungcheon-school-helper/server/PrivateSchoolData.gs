@@ -8,10 +8,10 @@ function privateSchoolRevision_(group) {
   if (!props.getProperty('UNG_PRIVATE_REPO') || !/^[a-f0-9]{40}$/.test(pinned || '')) return '';
   return props.getProperty('UNG_PRIVATE_REV_'+group) || pinned;
 }
-function privateSchoolGit_(endpoint, writer, content) {
-  const props=PropertiesService.getScriptProperties(), repo=props.getProperty('UNG_PRIVATE_REPO');
+function privateSchoolGit_(endpoint, writer, content, credentials) {
+  const props=PropertiesService.getScriptProperties(), repo=credentials?credentials.repo:props.getProperty('UNG_PRIVATE_REPO');
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo || '')) throw Error('비공개 학교 저장소 설정을 확인해 주세요.');
-  const token=props.getProperty(writer?'UNG_PRIVATE_WRITE_TOKEN':'UNG_PRIVATE_READ_TOKEN');
+  const token=credentials?(writer?credentials.write:credentials.read):props.getProperty(writer?'UNG_PRIVATE_WRITE_TOKEN':'UNG_PRIVATE_READ_TOKEN');
   if (!token) throw Error('학교 저장소 접근 권한 설정을 확인해 주세요.');
   const options={method:content?'put':'get',headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json'},followRedirects:false,muteHttpExceptions:true};
   if(content){ options.contentType='application/json';options.payload=JSON.stringify(content); }
@@ -22,7 +22,7 @@ function privateSchoolGit_(endpoint, writer, content) {
 function privateSchoolRead_(group) {
   return privateSchoolReadAt_(group,privateSchoolRevision_(group));
 }
-function privateSchoolReadAt_(group,rev) {
+function privateSchoolReadAt_(group,rev,credentials) {
   if(PRIVATE_SCHOOL_GROUPS_.indexOf(group)<0 || !/^[0-9a-f]{40}$/.test(rev)) throw Error('학교 자료 버전이 올바르지 않습니다.');
   const cache=CacheService.getScriptCache(),key='private-school:'+group+':'+rev;
   const saved=cache.get(key);if(saved) return JSON.parse(saved);
@@ -35,8 +35,8 @@ function privateSchoolReadAt_(group,rev) {
       }
     }
   }catch(_){}
-  const blob=privateSchoolGit_('/contents/school/'+group+'.json?ref='+rev,false);
-  const payload=(blob.content && blob.encoding==='base64') ? blob : privateSchoolGit_('/git/blobs/'+blob.sha,false);
+  const blob=privateSchoolGit_('/contents/school/'+group+'.json?ref='+rev,false,null,credentials);
+  const payload=(blob.content && blob.encoding==='base64') ? blob : privateSchoolGit_('/git/blobs/'+blob.sha,false,null,credentials);
   const raw=Utilities.newBlob(Utilities.base64Decode(payload.content.replace(/\s/g,''))).getDataAsString('UTF-8');
   try {
     if(raw.length<23000) cache.put(key,raw,300);
@@ -109,23 +109,31 @@ function privateSchoolReaders_() {
 // repository credentials. It is never routed from a desktop or mobile request.
 function activatePrivateSchoolConnection() {
   return migrationWithSourceLock_(function(){
-    const props=PropertiesService.getScriptProperties(),repo=props.getProperty('UNG_PRIVATE_REPO');
-    const readerAccess=privateSchoolGit_('',false),writerAccess=privateSchoolGit_('',true);
+    const props=PropertiesService.getScriptProperties(),config=migrationPrimaryConfig_();
+    if(!config || config.phase!=='FIRESTORE') throw Error('운영 Firestore 자료 상태를 확인해 주세요.');
+    const source=migrationPrimaryRepository_(config),root=migrationPrimaryRoot_(source,config);
+    const staged=source.get('privateConnectionSetup/pending'),credentials=staged&&staged.data;
+    const now=Date.now();
+    if(credentials && (!(credentials.expiresAt>now && credentials.expiresAt<now+30*60000) ||
+       !/^github_pat_[A-Za-z0-9_]{30,}$/.test(credentials.read || '') ||
+       !/^github_pat_[A-Za-z0-9_]{30,}$/.test(credentials.write || '') ||
+       credentials.read===credentials.write || !/^[A-Za-z0-9+/]{43}=$/.test(credentials.caseVerifier || ''))) {
+      throw Error('서버 인증 등록 자료의 만료시간 또는 형식을 확인해 주세요.');
+    }
+    const repo=credentials?credentials.repo:props.getProperty('UNG_PRIVATE_REPO');
+    const readerAccess=privateSchoolGit_('',false,null,credentials),writerAccess=privateSchoolGit_('',true,null,credentials);
     if(!readerAccess.private || !writerAccess.private || readerAccess.full_name!==repo || writerAccess.full_name!==repo) {
       throw Error('등록된 학교 자료 저장소가 비공개인지 확인해 주세요.');
     }
     const branch=readerAccess.default_branch;
     if(!/^[\w.-]+$/.test(branch || '')) throw Error('학교 자료 저장소의 기본 브랜치를 확인해 주세요.');
-    const githubHead=function(){return privateSchoolGit_('/git/ref/heads/'+branch,false).object.sha;};
+    const githubHead=function(){return privateSchoolGit_('/git/ref/heads/'+branch,false,null,credentials).object.sha;};
     const head=githubHead();
     if(!/^[a-f0-9]{40}$/.test(head || '')) throw Error('검증할 GitHub 자료 버전이 없습니다.');
-    const config=migrationPrimaryConfig_();
-    if(!config || config.phase!=='FIRESTORE') throw Error('운영 Firestore 자료 상태를 확인해 주세요.');
-    const source=migrationPrimaryRepository_(config),root=migrationPrimaryRoot_(source,config);
     migrationWithBackend_(migrationPrimaryReader_(source,config,root),config.sourceBookId,false,function(){
       const readers=privateSchoolReaders_();
       PRIVATE_SCHOOL_GROUPS_.forEach(function(group){
-        const copy=Object.assign({},privateSchoolReadAt_(group,head));
+        const copy=Object.assign({},privateSchoolReadAt_(group,head,credentials));
         if(group==='timetable') delete copy.pulledLessons;
         if(group==='studentTimetable') delete copy.helpClassSchedules;
         if(migrationHash_(copy)!==migrationHash_(readers[group]())) throw Error('운영 자료와 대조가 필요한 항목: '+group);
@@ -135,7 +143,14 @@ function activatePrivateSchoolConnection() {
     if(PRIVATE_SCHOOL_GROUPS_.some(function(group){return props.getProperty('UNG_PRIVATE_REV_'+group);})) {
       throw Error('이미 개별 버전이 반영되었습니다. 최초 연결 설정을 다시 적용할 수 없습니다.');
     }
-    props.setProperty('UNG_PRIVATE_ACTIVE_COMMIT',head);
+    const updates={UNG_PRIVATE_ACTIVE_COMMIT:head};
+    if(credentials){
+      updates.UNG_PRIVATE_REPO=repo;
+      updates.UNG_PRIVATE_READ_TOKEN=credentials.read;
+      updates.UNG_PRIVATE_WRITE_TOKEN=credentials.write;
+      if(!props.getProperty('UNG_CASE_PIN_HASH')) updates.UNG_CASE_PIN_HASH=credentials.caseVerifier;
+    }
+    props.setProperties(updates,false);
     return {revision:head,groups:PRIVATE_SCHOOL_GROUPS_.length};
   });
 }
