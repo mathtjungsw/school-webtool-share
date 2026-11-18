@@ -8,7 +8,7 @@ import type {
 } from './types'
 import { PULLED_LESSONS_2026 } from './shared/pulledLessons2026'
 
-export const SCHOOL_HUB_URL = 'https://script.google.com/macros/s/AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w/exec'
+export const SCHOOL_HUB_URL = import.meta.env.MODE === 'preview' ? '/mobile-api' : 'https://script.google.com/macros/s/AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w/exec'
 
 interface HubResponse<T> { ok: boolean; data?: T; error?: string; code?: string; errorCode?: string }
 
@@ -41,7 +41,7 @@ export function friendlyLoginError(error: unknown) {
 }
 
 export async function secureReadAction<T>(action: string, payload: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
-  if (!['verifyMobileViewer', 'getMobileScheduleBundle', 'getMobileAttendanceRoster'].includes(action)) throw new Error('허용되지 않는 모바일 조회입니다.')
+  if (!['verifyMobileViewer', 'logoutMobileViewer','getMobileResource', 'getMobileScheduleBundle', 'getMobileAttendanceRoster'].includes(action)) throw new Error('허용되지 않는 모바일 조회입니다.')
   const controller = new AbortController()
   let timedOut = false
   const abort = () => controller.abort()
@@ -136,11 +136,15 @@ function normalizeBundle(bundle: MobileScheduleBundle): MobileScheduleBundle {
   return normalized
 }
 
-export async function loadDashboard(name: string, accessToken: string, fromDate: string, toDate: string, signal?: AbortSignal): Promise<DashboardPayload> {
+export async function loadDashboard(name: string, accessToken: string, fromDate: string, toDate: string, signal?: AbortSignal, previous?:DashboardPayload|null): Promise<DashboardPayload> {
   const { attendancePulledLessons, attendanceContextVersion } = attendanceContextFor(name)
-  const received = await secureReadAction<MobileScheduleBundle>('getMobileScheduleBundle', {
-    viewerName: name, accessToken, fromDate, toDate, attendancePulledLessons, attendanceContextVersion,
+  const received = await secureReadAction<MobileScheduleBundle | {notModified:true;revision:string}>('getMobileScheduleBundle', {
+    viewerName: name, accessToken, fromDate, toDate, attendancePulledLessons, attendanceContextVersion, ifRevision:previous?.bundle?.revision,
   }, signal)
+  if ('notModified' in received) {
+    if (!previous?.bundle?.revision || previous.bundle.revision !== received.revision) throw Error('자료 버전을 다시 확인해 주세요.')
+    return {...previous,cachedAt:new Date().toISOString()}
+  }
   const bundle = normalizeBundle(received)
   return {
     timetable: bundle.teacherTimetable ? { version: 0, title: '교사 주간시간표', uploadedAt: bundle.sourceStatus?.timetable?.dataUpdatedAt || bundle.fetchedAt, teachers: [bundle.teacherTimetable] } : null,

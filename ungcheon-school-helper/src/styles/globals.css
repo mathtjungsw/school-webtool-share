@@ -148,7 +148,7 @@
       linear-gradient(90deg, var(--paper-grid) 1px, transparent 1px);
     background-size: 24px 24px;
     color: var(--text-primary);
-    font-family: 'Noto Sans KR', system-ui, sans-serif;
+    font-family: "Malgun Gothic", system-ui, sans-serif;
     font-size: 14px;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;

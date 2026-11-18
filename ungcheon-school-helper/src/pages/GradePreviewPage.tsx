@@ -1,3 +1,4 @@
+import { localGradeStore } from '../services/localGradeStore'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, BarChart3, Calculator, CheckCircle2, ChevronDown, Download,
@@ -23,13 +24,15 @@ const SPLIT_STORAGE_KEY = 'ungcheon-estimated-split-helper-v1'
 
 function loadState(): GradePreviewState {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null') as GradePreviewState | null
+    const saved = JSON.parse(localGradeStore.getItem(STORAGE_KEY) ?? 'null') as GradePreviewState | null
     if (saved?.config && Array.isArray(saved.components)) {
       const raw = saved as unknown as { config: Record<string, unknown>; components: Array<Record<string, unknown>> }
       const isCombinedVersion = 'includeNonattainment' in raw.config || raw.components.some(component => 'splitScores' in component)
       if (isCombinedVersion) {
-        if (!localStorage.getItem(SPLIT_STORAGE_KEY)) localStorage.setItem(SPLIT_STORAGE_KEY, JSON.stringify(saved))
-        localStorage.removeItem(STORAGE_KEY)
+        const original = localGradeStore.getItem(SPLIT_STORAGE_KEY)
+        if (original === null) localGradeStore.setItem(SPLIT_STORAGE_KEY,JSON.stringify(saved))
+        if (localGradeStore.getItem(SPLIT_STORAGE_KEY) !== JSON.stringify(saved)) throw Error('이전 성적 작업과 현재 작업이 다릅니다. 원본을 보관했습니다.')
+        localGradeStore.removeItem(STORAGE_KEY)
         return defaultGradePreviewState()
       }
       return {
@@ -38,7 +41,7 @@ function loadState(): GradePreviewState {
         componentCache: saved.componentCache ?? {}, results: saved.results ?? [],
       }
     }
-  } catch { /* 손상된 임시 저장은 기본값으로 시작 */ }
+  } catch (error) { throw error }
   return defaultGradePreviewState()
 }
 
@@ -59,8 +62,7 @@ export default function GradePreviewPage() {
   const restoreInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    const timer = window.setTimeout(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(state)), 250)
-    return () => window.clearTimeout(timer)
+    try { localGradeStore.setItem(STORAGE_KEY, JSON.stringify(state)) } catch (error) { setToast(error instanceof Error ? error.message : '성적 작업을 저장할 수 없습니다.') }
   }, [state])
 
   useEffect(() => {
@@ -169,7 +171,7 @@ export default function GradePreviewPage() {
 
   const reset = () => {
     if (!window.confirm('현재 설정과 점수, 계산 결과를 모두 지울까요?')) return
-    localStorage.removeItem(STORAGE_KEY)
+    localGradeStore.removeItem(STORAGE_KEY)
     setState(defaultGradePreviewState())
     setPendingMatrices({})
     setManualText({})
@@ -199,7 +201,7 @@ export default function GradePreviewPage() {
             <p className="page-subtitle">정기시험·수행평가 점수로 환산점수, 석차등급과 성취도를 미리 확인합니다.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); setToast('현재 작업을 이 PC에 저장했습니다.') }} className={smallButton}><Save size={13} />임시 저장</button>
+            <button onClick={() => { localGradeStore.setItem(STORAGE_KEY, JSON.stringify(state)); setToast('현재 작업을 이 PC에 저장했습니다.') }} className={smallButton}><Save size={13} />임시 저장</button>
             <button onClick={reset} className="px-3 py-1.5 rounded-lg border border-rose-500/30 text-rose-300 hover:bg-rose-500/10 text-xs font-semibold inline-flex items-center gap-1.5"><RotateCcw size={13} />처음부터</button>
           </div>
         </div>
@@ -288,7 +290,7 @@ export default function GradePreviewPage() {
 
       <StepCard number="05" title="저장·복원" description="작업을 이 PC에 저장하거나 다른 PC로 옮길 복원 파일을 만듭니다.">
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); setToast('현재 작업을 이 PC에 저장했습니다.') }} className={smallButton}><Save size={13} />이 PC에 임시 저장</button>
+          <button onClick={() => { localGradeStore.setItem(STORAGE_KEY, JSON.stringify(state)); setToast('현재 작업을 이 PC에 저장했습니다.') }} className={smallButton}><Save size={13} />이 PC에 임시 저장</button>
           <button onClick={() => { exportRestoreWorkbook(state); setToast('복원용 정리 엑셀을 만들었습니다.') }} className={smallButton}><Download size={13} />복원용 정리 엑셀 저장</button>
           <button onClick={() => restoreInput.current?.click()} className={smallButton}><FolderOpen size={13} />정리 엑셀에서 복원</button>
           <input ref={restoreInput} className="hidden" type="file" accept=".xlsx" onChange={event => { const file = event.target.files?.[0]; if (file) void restore(file); event.target.value = '' }} />

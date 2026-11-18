@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog, safeStorage, session, net, Tray, Menu, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog, safeStorage, session, net, Tray, Menu, screen, Notification } from 'electron'
 import { join, resolve as pathResolve, basename, extname } from 'path'
 import { pathToFileURL } from 'url'
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync, readdirSync, copyFileSync } from 'fs'
@@ -7,8 +7,11 @@ import { execFile, spawn } from 'child_process'
 import { get as httpGet } from 'http'
 import { promisify } from 'util'
 import { autoUpdater } from 'electron-updater'
+import { randomBytes, scryptSync, createHash } from 'node:crypto'
+import { mkdirSync } from 'node:fs'
 import { startPreviewBackend } from './preview-backend'
 import { createStaffAuth } from './staff-auth'
+import { registerGradeVault } from './grade-vault'
 import { registerFeatureViews } from './feature-views'
 import { registerUpdateManager } from './update-manager'
 import Store from 'electron-store'
@@ -18,6 +21,7 @@ import { getWeeklyPlanMonth } from './weekly-plan'
 import { getDutyScheduleMonth } from './duty-schedule'
 import { getCreativeScheduleMonth } from './creative-schedule'
 import {
+  bindHubCacheOwner,
   clearPersistentHubCache,
   deletePersistentHubCacheResource,
   persistentHubCacheStatus,
@@ -75,9 +79,9 @@ if (IS_VALIDATION) {
   app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'Codex', `ungcheon-validation-${app.getVersion()}`))
 }
 if (IS_PREVIEW) {
-  app.setName('웅천고 업무도우미 시험판')
-  app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'UngcheonSchoolHelper-Preview-20261104'))
-  app.setAppUserModelId('kr.hs.ungcheon.schoolhelper.preview20261104')
+  app.setName('웅천고 업무도우미 통합 시험판')
+  app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'UngcheonSchoolHelper-Preview-20261118'))
+  app.setAppUserModelId('kr.hs.ungcheon.schoolhelper.preview20261118')
 } else app.setAppUserModelId(IS_VALIDATION ? 'kr.hs.ungcheon.schoolhelper.validation' : 'kr.hs.ungcheon.schoolhelper')
 const store = new Store()
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
@@ -92,9 +96,24 @@ let widgetWindow: BrowserWindow | null = null
 let widgetRequestedHeight = 0
 let tray: Tray | null = null
 let isQuitting = false
+let lastSync = 0
+function syncWindows(force = false) {
+  if (!staffAuth.snapshot().authenticated) return
+  const windows = [mainWindow,widgetWindow].filter((w): w is BrowserWindow => !!w && !w.isDestroyed())
+  const visible = windows.some(w=>w.isVisible() && !w.isMinimized())
+  const elapsed = Date.now()-lastSync
+  if (elapsed < (force ? 250 : visible ? 30_000 : 300_000)) return
+  lastSync = Date.now()
+  windows.forEach(w=>w.webContents.send('schedule:sync'))
+}
 let previewEndpoint = ''
+let previewLogin: {name:string;password:string} | null = null
 const trustedApp = (event: Electron.IpcMainInvokeEvent) => [mainWindow?.webContents, widgetWindow?.webContents].includes(event.sender) && event.senderFrame === event.sender.mainFrame
 const staffAuth = createStaffAuth(() => previewEndpoint || UNGCHEON_SCHOOL_HUB_URL, trustedApp)
+bindHubCacheOwner(()=>staffAuth.snapshot().authenticated ? staffAuth.snapshot().teacherName : '')
+registerGradeVault(() => mainWindow, () => staffAuth.snapshot().authenticated ? staffAuth.snapshot().teacherName : '')
+ipcMain.handle('preview:loginHint', event => IS_PREVIEW && trustedApp(event) ? previewLogin : null)
+ipcMain.handle('preview:mobile', event => { if (trustedApp(event) && IS_PREVIEW && previewEndpoint) return shell.openExternal(previewEndpoint + '/'); })
 const featureViews = registerFeatureViews(() => mainWindow, staffAuth)
 const updateManager = registerUpdateManager(autoUpdater, () => { showMainWindow(); mainWindow?.webContents.send('navigate:request', 'help'); mainWindow?.webContents.executeJavaScript("window.dispatchEvent(new Event('update:open'))").catch(() => undefined) }, trustedApp)
 
@@ -177,6 +196,7 @@ function createWindow() {
 
   // 시작 시 창 최대화를 기본으로 — ready-to-show에서 표시하여 깜빡임 방지
   mainWindow.maximize()
+  mainWindow.on('show',()=>syncWindows(true)); mainWindow.on('restore',()=>syncWindows(true))
   mainWindow.once('ready-to-show', () => mainWindow?.show())
 
   nativeTheme.themeSource = 'light'
@@ -196,11 +216,22 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   if (IS_PREVIEW) {
-    const profileConfig=join(app.getPath('userData'),'preview-server.json')
-    const sharedConfig=join(process.env.LOCALAPPDATA || app.getPath('userData'), 'Codex', 'ungcheon-preview', 'server-config.json')
-    if(!existsSync(profileConfig)&&existsSync(sharedConfig))copyFileSync(sharedConfig,profileConfig)
-    const server = await startPreviewBackend(existsSync(profileConfig)?profileConfig:sharedConfig)
+    const dir = app.getPath('userData')
+    mkdirSync(dir,{recursive:true})
+    const profileConfig = join(dir,'integrated-preview.json')
+    const credential = join(dir,'fixture-credential.bin')
+    const password = existsSync(credential) && safeStorage.isEncryptionAvailable()
+      ? safeStorage.decryptString(readFileSync(credential)) : randomBytes(12).toString('base64url')
+    if (!existsSync(credential) && safeStorage.isEncryptionAvailable()) writeFileSync(credential, safeStorage.encryptString(password))
+    const name = '테스트교사'
+    previewLogin = {name,password}
+    const salt = randomBytes(16).toString('hex')
+    const documents = [{id:'demo',title:'시험용 인문계열 사례집',path:join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(),'resources'),'fixtures','admissions-synthetic.pdf')}]
+    const config = existsSync(profileConfig) && existsSync(credential) ? JSON.parse(readFileSync(profileConfig,'utf8')) : {salt,verifier:scryptSync(password,salt,32).toString('hex'),names:[name],caseVerifier:createHash('sha256').update('0000').digest('hex')}
+    writeFileSync(profileConfig,JSON.stringify({...config,documents}))
+    const server = await startPreviewBackend(profileConfig, join(process.resourcesPath,'mobile-preview'))
     previewEndpoint = server.url
+    writeFileSync(join(dir,'preview-address.txt'),previewEndpoint)
     app.on('will-quit', () => server.close())
   }
   // X-Frame-Options 제거 — 구글 캘린더 embed 전용 (.google.com 도메인만, C-3)
@@ -223,6 +254,9 @@ app.whenReady().then(async () => {
   if (!process.argv.includes('--widget')) createWindow()
   createWidgetWindow()
   createTray()
+  const notifyTimer = setInterval(() => { if (store.get('notifier.sharedEnabled') === true && staffAuth.snapshot().authenticated) void checkTodaySchedule().catch(() => undefined) }, 15 * 60_000)
+  notifyTimer.unref(); app.once('will-quit', () => clearInterval(notifyTimer))
+  const syncTimer=setInterval(()=>syncWindows(),1000); syncTimer.unref(); app.on('will-quit',()=>clearInterval(syncTimer))
   if (!IS_PREVIEW && !IS_VALIDATION && store.get('widget.autoLaunchInitialized') !== true) {
     store.set('widget.autoLaunchInitialized', true)
     setWidgetAutoLaunch(true)
@@ -298,7 +332,7 @@ ipcMain.on('auth:changed', () => BrowserWindow.getAllWindows().forEach(window =>
 
 // Gate local data IPC independently of renderer login state.
 const originalHandle = ipcMain.handle.bind(ipcMain)
-const PUBLIC_CHANNELS = new Set(['staff:auth','preview:update','feature:view','private:call','app:getVersion','app:getAutoLaunch','app:resourcesPath','widget:getSettings','widget:fitHeight','widget:openMain','update:check','config:get','config:getAll','config:set','config:setMany','config:delete','apiKey:getAll'])
+const PUBLIC_CHANNELS = new Set(['staff:auth','preview:loginHint','preview:mobile','preview:update','feature:view','private:call','app:getVersion','app:getAutoLaunch','app:resourcesPath','widget:getSettings','widget:fitHeight','widget:openMain','update:check','config:get','config:getAll','config:set','config:setMany','config:delete','apiKey:getAll'])
 ipcMain.handle = ((channel: string, listener: any) => originalHandle(channel, async (event: Electron.IpcMainInvokeEvent, ...args: any[]) => {
   if (!['staff:auth','feature:view','private:call','preview:update'].includes(channel) && !trustedApp(event)) throw new Error('허용되지 않은 화면입니다.')
   const loggedIn = staffAuth.snapshot().authenticated
@@ -320,7 +354,7 @@ const ALLOWED_CONFIG_KEY_PREFIXES = [
   'special_remarks:', 'exam_supervisor:', 'newSemClass:',
   'wr:', 'club:', 'photo:', 'insa:',
   'assessment:', 'feedback.', 'timetable_plan:',
-  'personal.', 'sidebar.', 'pilotLogin.', 'neisSync.', 'notifier.',
+  'personal.', 'sidebar.', 'pilotLogin.', 'neisSync.', 'notifier.', 'futureOperations.',
   'staffTasks.',
   'recommendedSubjects.',
   'widget.',
@@ -631,7 +665,12 @@ ipcMain.handle('dialog:saveFilesToDir', async (_, files: { name: string; bytes: 
   for (const f of files) {
     // I-8: basename으로 '..' path traversal 제거 후 특수문자 치환
     const safe = basename(f.name).replace(/[\\/:*?"<>|]/g, '_') || '_'
-    try { writeFileSync(join(dir, safe), Buffer.from(f.bytes)); count++ } catch { /* skip */ }
+    const ext = extname(safe), stem = basename(safe, ext)
+    for (let suffix=1; ;suffix++) {
+      const name=suffix===1 ? safe : stem+' ('+suffix+')'+ext
+      try {writeFileSync(join(dir,name),Buffer.from(f.bytes),{flag:'wx'});count++;break}
+      catch (error) {if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error}
+    }
   }
   return count
 })
@@ -760,7 +799,7 @@ ipcMain.handle('document:parseFile', async (_, filePath: string) => {
   if (!ALLOWED_READ_EXTS.has(ext)) throw new Error('허용되지 않는 파일 형식입니다.')
   const { parse } = await import('kordoc')
   const buf = readFileSync(filePath)
-  return await parse(buf.buffer as ArrayBuffer)
+  return await parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer)
 })
 
 // ── PDF 텍스트 추출 (opendataloader-pdf JAR 엔진) ─────────────────────────────
@@ -879,7 +918,7 @@ async function runHybrid(
     const produced = findOutputFile(outDir, ext)
     if (!produced) return null
     const content = readFileSync(produced, 'utf-8')
-    return content.trim().length >= 10 ? content : null
+    return content.trim().length > 0 ? content : null
   } catch {
     return null
   } finally {
@@ -922,7 +961,7 @@ ipcMain.handle('pdf:extractDocument', async (_, filePath: string, format: Extrac
     let usedOcr = false
 
     // Stage 1 결과가 비어있으면(스캔본) Stage 2 Hybrid OCR 시도
-    if (content.trim().length < 10) {
+    if (content.trim().length === 0) {
       const hybridExe = await findExecutable('opendataloader-pdf-hybrid')
       if (hybridExe) {
         const ocr = await runHybrid(jar, safeInput, tmpOut, format, ext, hybridExe)
@@ -933,7 +972,7 @@ ipcMain.handle('pdf:extractDocument', async (_, filePath: string, format: Extrac
         return { success: true, content, empty: true, usedOcr: false, ocrAvailable: !!hybridExe }
       }
     }
-    return { success: true, content, empty: content.trim().length < 10, usedOcr }
+    return { success: true, content, empty: content.trim().length === 0, usedOcr }
   } catch (e) {
     const err = e as NodeJS.ErrnoException & { stderr?: string; stdout?: string }
     if (err.code === 'ENOENT') return { success: false, error: 'NO_JAVA' }
@@ -1164,8 +1203,15 @@ async function fetchSchoolHub(
 
 async function requestSchoolHub(payload: Record<string, unknown>) {
   if (IS_PREVIEW) {
-    try { return { ok: true, data: await staffAuth.request(payload) } }
-    catch { return { ok: false, code: 'AUTH_REQUIRED', error: '시험 환경의 로그인을 확인해 주세요.' } }
+    if (!HUB_ACTIONS.has(String(payload.action))) return { ok:false, code:'LOCAL_ACTION_BLOCKED', error:'허용되지 않은 요청입니다.' }
+    const before = staffAuth.snapshot()
+    if (!before.authenticated) return {ok:false,code:'AUTH_REQUIRED',error:'시험 계정으로 로그인해 주세요.'}
+    try {
+      const data = await staffAuth.request(payload)
+      const after = staffAuth.snapshot()
+      if (!after.authenticated || before.expiresAt !== after.expiresAt || before.teacherName !== after.teacherName) throw Error('로그인이 변경되었습니다.')
+      return {ok:true,data}
+    } catch (error) { return { ok: false, error:error instanceof Error ? error.message : '시험 서버 연결을 확인해 주세요.' } }
   }
   if (!staffAuth.snapshot().authenticated) return { ok: false, code: 'AUTH_REQUIRED', error: '로그인이 필요합니다.' }
 
@@ -1265,6 +1311,7 @@ function createWidgetWindow() {
     webPreferences: { preload: join(__dirname, '../preload/index.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   })
   widgetWindow.setOpacity(Math.max(0.65, Math.min(1, settings.opacity)))
+  widgetWindow.on('show',()=>syncWindows(true)); widgetWindow.on('restore',()=>syncWindows(true))
   widgetWindow.once('ready-to-show', () => widgetWindow?.show())
   widgetWindow.on('moved', () => {
     if (!widgetWindow) return
@@ -1331,7 +1378,43 @@ function createTray() {
   tray.on('double-click', () => createWidgetWindow())
 }
 
-ipcMain.handle('schoolHub:request', (_, payload: Record<string, unknown>) => requestSchoolHub(payload))
+type ScheduleAlert = {id:string; title:string; summary:string; category:'reference';source:'timetable';createdAt:string;dueAt:string;readAt:string;snoozedUntil:string}
+let scheduleCheck: Promise<{neisPending:number;edufaiPending:number;timestamp:string}> | null = null
+function checkTodaySchedule() {
+  if (scheduleCheck) return scheduleCheck
+  const viewer = staffAuth.snapshot()
+  scheduleCheck = (async () => {
+    if (!viewer.authenticated) throw Error('로그인이 필요합니다.')
+    const response = await requestSchoolHub({action:'getNeisSnapshot'}) as {ok:boolean;data?:{schedules?:Array<{date:string;eventName:string;eventContent?:string}>};error?:string}
+    if (!response.ok || !staffAuth.snapshot().authenticated || staffAuth.snapshot().expiresAt !== viewer.expiresAt) throw Error(response.error || '다시 로그인해 주세요.')
+    const today = new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date()), stamp=new Date().toISOString()
+    const key='notifier.events.'+createHash('sha256').update(viewer.teacherName).digest('hex')
+    const previous=(store.get(key,[]) as ScheduleAlert[]).filter(x => x.createdAt >= new Date(Date.now()-30*86400000).toISOString())
+    const ids = new Set(previous.map(x=>x.id)), fresh:ScheduleAlert[]=[]
+    const rows=(response.data?.schedules || []).filter(x=>x.date.replace(/-/g,'')===today.replace(/-/g,''))
+    for (const item of rows) {
+      const id='schedule-'+createHash('sha256').update([viewer.teacherName,today,item.eventName,item.eventContent||''].join('|')).digest('hex')
+      if(ids.has(id)) continue
+      ids.add(id);fresh.push({id,title:item.eventName,summary:item.eventContent||'오늘의 학교 일정',category:'reference',source:'timetable',createdAt:stamp,dueAt:today,readAt:'',snoozedUntil:''})
+    }
+    store.set(key,[...fresh,...previous]); if (fresh.length && Notification.isSupported()) new Notification({title:'웅천고 학사일정',body:fresh.map(x=>x.title).join(' · ')}).show()
+    mainWindow?.webContents.send('notifier:changed'); return {neisPending:rows.length,edufaiPending:0,timestamp:stamp}
+  })().finally(()=>{scheduleCheck=null})
+  return scheduleCheck
+}
+ipcMain.handle('notifier:check',()=>checkTodaySchedule())
+ipcMain.handle('notifier:list',()=>store.get('notifier.events.'+createHash('sha256').update(staffAuth.snapshot().teacherName).digest('hex'),[]))
+const hubReads = new Map<string, ReturnType<typeof requestSchoolHub>>()
+ipcMain.handle('schoolHub:request', (_, payload: Record<string, unknown>) => {
+  if (!HUB_READ_ACTIONS.has(String(payload.action))) return requestSchoolHub(payload)
+  const identity = staffAuth.snapshot()
+  const key = JSON.stringify([identity.teacherName,identity.expiresAt,payload])
+  const pending = hubReads.get(key)
+  if (pending) return pending
+  const request = requestSchoolHub(payload).finally(()=>hubReads.delete(key))
+  hubReads.set(key,request)
+  return request
+})
 ipcMain.handle('schoolHubCache:getAll', () => readPersistentHubCache())
 ipcMain.handle('schoolHubCache:set', (_, entry: PersistentHubCacheEntry) => {
   if (!entry || typeof entry.cacheKey !== 'string' || typeof entry.resource !== 'string') {
@@ -1409,6 +1492,10 @@ async function diagnoseSchoolHubRead(endpoint: string, action: string, payload: 
 }
 
 ipcMain.handle('schoolHub:diagnose', async () => {
+  if (IS_PREVIEW) {
+    const check=async(action:string)=>{const start=Date.now();const response=await requestSchoolHub({action});return {ok:response.ok,status:response.ok?200:503,elapsedMs:Date.now()-start,version:75,error:response.ok?'':'시험 서버를 확인해 주세요.'}}
+    const post=await check('health');return {checkedAt:new Date().toISOString(),get:post,post,roster:await check('getStaffRoster'),tasks:await check('listStaffChecklists')}
+  }
   const endpoint = resolveSchoolHubEndpoint(store.get('config.schoolHubUrl', ''))
   let parsed: URL
   try { parsed = new URL(endpoint) } catch { throw new Error('학교 공유 서비스 URL이 올바르지 않습니다.') }

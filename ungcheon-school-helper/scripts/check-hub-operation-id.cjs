@@ -7,7 +7,7 @@ const captured = [], invalidated = [], moduleFixture = {exports: {}}
 let sequence = 0, reject = false
 vm.runInNewContext(compiled, {
   module: moduleFixture, exports: moduleFixture.exports,
-  require: name => { assert.ok(['./studentTimetable', './rosterAttendance', './studentId'].includes(name)); return {} },
+  require: name => { assert.ok(['./studentTimetable', './rosterAttendance', './studentId', '../data/pulledLessons2026','./helpClassSchedule'].includes(name)); return {} },
   crypto: {randomUUID: () => `synthetic-operation-${++sequence}`},
   window: {electron: {
     schoolHubRequest: async request => {captured.push(request); if (reject) throw Error('synthetic network failure'); return {ok:true, data:{saved:true}}},

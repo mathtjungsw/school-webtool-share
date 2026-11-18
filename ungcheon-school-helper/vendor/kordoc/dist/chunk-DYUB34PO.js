@@ -706,6 +706,8 @@ function walkParagraphChildren(node, blocks, tableCtx, tableStack, styleMap, war
       } else {
         tableCtx = tableStack.length > 0 ? tableStack.pop() : null;
       }
+    } else if (localTag === "run" || localTag === "ctrl") {
+      tableCtx = walkParagraphChildren(el, blocks, tableCtx, tableStack, styleMap, warnings, sectionNum)
     } else if (localTag === "pic" || localTag === "shape" || localTag === "drawingObject") {
       if (warnings && sectionNum) {
         warnings.push({ page: sectionNum, message: `\uC2A4\uD0B5\uB41C \uC694\uC18C: ${localTag}`, code: "SKIPPED_IMAGE" });

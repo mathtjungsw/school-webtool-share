@@ -17,9 +17,11 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
   const loadedSites = new Map<string,string>()
   const slotFor = (id:string) => ['saenggibu_generator','ungcheon_library','mandatory_training_submit','mandatory_training_excel'].includes(id) ? id : 'university_webzines'
   let privateView: WebContentsView | null = null; let privateKind = ''; let active = ''; let epoch = 0; let caseUnlocked = false
+  let grant = ''
+  let documents: Array<{id:string;revision:string;title:string}> = []
   const workers = new Set<Worker>()
   const localRoot = join(process.env.LOCALAPPDATA || app.getPath('userData'), app.getName(), 'private')
-  const root = (kind: string) => { const p=join(localRoot,kind); mkdirSync(p,{recursive:true}); if(lstatSync(p).isSymbolicLink() || realpathSync(p).toLowerCase()!==resolve(p).toLowerCase())throw new Error('로컬 저장 경로의 연결/리디렉션을 확인해 주세요.'); return p }
+  const root = (kind: string) => { const owner = auth.snapshot().teacherName; if(!owner)throw Error('로그인이 필요합니다.'); const p=join(localRoot,createHash('sha256').update(owner).digest('hex'),kind); mkdirSync(p,{recursive:true}); if(lstatSync(p).isSymbolicLink() || realpathSync(p).toLowerCase()!==resolve(p).toLowerCase())throw new Error('로컬 저장 경로의 연결/리디렉션을 확인해 주세요.'); return p }
   const loadKey = (kind: string) => {
     if (!safeStorage.isEncryptionAvailable()) throw new Error('이 PC에서 암호화 보관을 사용할 수 없습니다.')
     const file=join(root(kind),'key.bin')
@@ -37,7 +39,7 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
     return JSON.parse(Buffer.concat([decipher.update(b.subarray(12,-16)),decipher.final()]).toString('utf8'))
   }
   const terminate = () => { epoch++; workers.forEach(w=>void w.terminate()); workers.clear() }
-  const closePrivate = () => { terminate(); caseUnlocked=false; if(privateView){ const v=privateView; privateView=null; main()?.contentView.removeChildView(v); v.webContents.close() } }
+  const closePrivate = () => { terminate(); if(grant) void auth.request({action:'caseClose',grant}).catch(()=>undefined); grant=''; documents=[]; caseUnlocked=false; if(privateView){ const v=privateView; privateView=null; main()?.contentView.removeChildView(v); v.webContents.close() } }
   const parse = (bytes: Uint8Array,kind: string,title: string) => new Promise<any>((resolveResult,reject)=> {
     const generation=epoch; const target=privateView
     const worker=new Worker(join(__dirname,'privacyParser.js'),{workerData:{bytes,kind,title,fileId:createHash('sha256').update(bytes).digest('hex')}}); workers.add(worker)
@@ -98,11 +100,27 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
     view.setBounds({x,y,width:Math.max(1,Math.min(Math.round(rect.width*z),bounds.width-x)),height:Math.max(1,Math.min(Math.round(rect.height*z),bounds.height-y))});view.setVisible(true)
     return true
   })
+  ipcMain.handle('private:clearArea',(event,area:string)=>{
+    if (event.sender !== main()?.webContents || event.senderFrame !== event.sender.mainFrame || !auth.snapshot().authenticated || !['admission-cases','average-grade'].includes(area)) throw Error('저장 자료를 확인할 권한이 없습니다.')
+    if(privateView) throw Error('열려 있는 자료 화면을 먼저 닫아 주세요.')
+    const dir = root(area)
+    for (const name of readdirSync(dir)) {
+      if (!/^[\\w-]+\\.bin(?:\\.tmp)?$/.test(name) || (area==='admission-cases' && !name.startsWith('book-'))) continue
+      const file=join(dir,name); if (!lstatSync(file).isFile() || lstatSync(file).isSymbolicLink()) throw Error('자료 경로를 확인해 주세요.')
+      unlinkSync(file)
+    }
+  })
   ipcMain.handle('private:call',async(e,action:string,args:any={})=>{
     if(!privateView || e.sender!==privateView.webContents || e.senderFrame!==e.sender.mainFrame || !auth.snapshot().authenticated)throw new Error('열람 권한이 없습니다.')
     const generation=epoch
     const isCases=privateKind==='admission_success_cases';const scope=isCases?'admission-cases':'average-grade'
-    if(action==='unlock'){if(!isCases || args.password!=='0000')throw new Error('비밀번호를 확인해 주세요.');caseUnlocked=true;return true}
+    if(action==='unlock'){
+      if (!isCases) throw new Error('허용되지 않은 화면입니다.')
+      const result = await auth.request({action:'caseUnlock',password:String(args.password || '')})
+      const list = await auth.request({action:'caseLibrary',grant:result.grant})
+      if (epoch !== generation || !Array.isArray(list)) throw new Error('열람을 다시 확인해 주세요.')
+      documents=list; grant=result.grant; caseUnlocked=true; return true
+    }
     if(isCases && !caseUnlocked)throw new Error('우수사례 비밀번호를 입력해 주세요.')
     if(action==='load')return { ...(load(scope,'data') || { rows: [] }), epoch }
     if(action==='gradeSource'){
@@ -134,12 +152,13 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
       if(!isCases || args.epoch!==epoch || !Array.isArray(args.favorites) || args.favorites.length>1000 || args.favorites.some((id:unknown)=>typeof id!=='string'||!/[a-z0-9_-]+:\d+$/.test(id)))throw new Error('관심 자료 저장을 확인해 주세요.')
       save(scope,'data',{favorites:args.favorites,lastBook:String(args.lastBook||''),lastPage:Number(args.lastPage)||1});return true
     }
-    if(action==='library')return auth.request({action:'caseLibrary'})
+    if(action==='library' && isCases)return documents
     if(action==='getCaseBook'){
       const id=String(args.id||'');if(!/^[a-z0-9_-]{1,60}$/.test(id))throw new Error('자료 ID 오류')
-      const name='book-'+id; const cached=load(scope,name)
-      if(cached && cached.revision===args.revision){if(cached.parserVersion===2)return cached;const parsed=await parse(new Uint8Array(Buffer.from(cached.bytes,'base64')),'cases',cached.title);if(epoch!==generation)throw new Error('작업이 취소되었습니다.');const data={...cached,...parsed};save(scope,name,data);return data}
-      const response=await auth.request({action:'caseDocument',id})
+      const allowed=documents.find(item=>item.id===id); if(!isCases || !allowed)throw Error('자료 열람 권한을 확인해 주세요.')
+      const name='book-'+id; let cached=null; try{cached=load(scope,name)}catch{}
+      if(cached && cached.revision===allowed.revision){if(cached.parserVersion===2)return cached;const parsed=await parse(new Uint8Array(Buffer.from(cached.bytes,'base64')),'cases',cached.title);if(epoch!==generation)throw new Error('작업이 취소되었습니다.');const data={...cached,...parsed};save(scope,name,data);return data}
+      const response=await auth.request({action:'caseDocument',id,grant})
       if(epoch!==generation)throw new Error('작업이 취소되었습니다.')
       const bytes=Buffer.from(response.data,'base64');const parsed=await parse(new Uint8Array(bytes),'cases',response.title)
       if(epoch!==generation)throw new Error('작업이 취소되었습니다.')

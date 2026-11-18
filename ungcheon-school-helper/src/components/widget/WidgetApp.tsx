@@ -1,3 +1,6 @@
+import './widget.css'
+import './widgetCompact.css'
+import './widgetProductivity.css'
 import { taskNavigationTarget } from '../../services/taskNavigation';
 import {
   useCallback,
@@ -841,8 +844,7 @@ export default function WidgetApp() {
   useEffect(() => {
     if (!auth.authenticated || !auth.teacherName) return;
     void refresh(false);
-    const sync = window.setInterval(() => void refresh(false), 5 * 60_000);
-    return () => clearInterval(sync);
+    return window.preview.onSync(() => void refresh(false));
   }, [auth.authenticated, auth.teacherName, refresh, today]);
 
   useEffect(() => {
@@ -1131,7 +1133,8 @@ export default function WidgetApp() {
   if (!auth.authenticated) {
     return (
       <div className="widget-shell widget-login">
-        <UpdateStatus compact /><strong>로그인이 필요합니다</strong>
+        <UpdateStatus compact /><strong>{auth.retryRequired ? "학교 서버에 연결할 수 없습니다" : "로그인이 필요합니다"}</strong>
+        {auth.retryRequired && <button onClick={() => void auth.bootstrap()}>연결 다시 확인</button>}
         <span>개인 시간표와 업무는 로그인 후 표시됩니다.</span>
         <button onClick={() => window.electron.widgetOpenMain("dashboard")}>
           업무도우미에서 로그인

@@ -13,13 +13,16 @@ export default function NotificationsTab({ state, saving, update }: FutureTabPro
   const [filter, setFilter] = useState<NotificationCategory>('action')
   const [refreshing, setRefreshing] = useState(false)
   const [message, setMessage] = useState('')
+  const [schedules,setSchedules] = useState<OperationsNotification[]>([])
+  useEffect(()=>{let active=true; const read=()=>void window.preview.scheduleAlerts().then(items=>{if(active)setSchedules(items)}).catch(()=>undefined);read();const off=window.preview.onScheduleAlerts(read);return ()=>{active=false;off()}},[viewerName])
   const localItems = useMemo(() => localOperationalNotifications(state), [state])
   const allItems = useMemo(() => {
     const generatedIds = new Set(localItems.map(item => item.id))
     const now = new Date().toISOString()
-    return [...localItems, ...state.notifications.filter(item => item.id.startsWith('hub-') && !generatedIds.has(item.id) && (!item.snoozedUntil || item.snoozedUntil <= now))]
+    const scheduleItems = schedules.map(item=>state.notifications.find(x=>x.id===item.id) || item).filter(item=>!item.snoozedUntil || item.snoozedUntil<=now)
+    return [...localItems, ...scheduleItems, ...state.notifications.filter(item => item.id.startsWith('hub-') && !generatedIds.has(item.id) && (!item.snoozedUntil || item.snoozedUntil <= now))]
       .sort((a, b) => a.dueAt.localeCompare(b.dueAt) || b.createdAt.localeCompare(a.createdAt))
-  }, [localItems, state.notifications])
+  }, [localItems, state.notifications,schedules])
   const counts = notificationCounts(allItems)
   const visible = allItems.filter(item => item.category === filter)
 

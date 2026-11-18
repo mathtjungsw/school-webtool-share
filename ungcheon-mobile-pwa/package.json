@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vinext dev",
+    "build:preview": "node scripts/sync-shared-data.mjs --check && vite build --mode preview --config vite.preview.config.ts",
     "sync:shared": "node scripts/sync-shared-data.mjs --write",
     "prebuild": "node scripts/sync-shared-data.mjs --check",
     "build": "vinext build",

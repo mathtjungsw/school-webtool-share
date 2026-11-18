@@ -1,3 +1,4 @@
+import { localGradeStore } from '../services/localGradeStore'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, BarChart3, Calculator, CheckCircle2, ChevronDown, Download,
@@ -44,7 +45,7 @@ function subjectStorageKey(id: string) {
 
 function loadSubjects(): SubjectRegistry {
   try {
-    const saved = JSON.parse(localStorage.getItem(SUBJECTS_STORAGE_KEY) ?? 'null') as SubjectRegistry | null
+    const saved = JSON.parse(localGradeStore.getItem(SUBJECTS_STORAGE_KEY) ?? 'null') as SubjectRegistry | null
     if (Array.isArray(saved?.subjects) && saved.subjects.length && saved.subjects.every(subject =>
       subject && typeof subject.id === 'string' && typeof subject.name === 'string' && subject.name.trim(),
     )) {
@@ -53,7 +54,7 @@ function loadSubjects(): SubjectRegistry {
         activeId: saved.subjects.some(subject => subject.id === saved.activeId) ? saved.activeId : saved.subjects[0].id,
       }
     }
-  } catch { /* 읽을 수 없는 과목 목록은 기본 과목으로 엽니다. */ }
+  } catch (error) { throw error }
   return { activeId: FIRST_SUBJECT_ID, subjects: [{ id: FIRST_SUBJECT_ID, name: '과목 1' }] }
 }
 
@@ -62,12 +63,12 @@ const smallButton = 'btn-secondary min-h-10 !px-3 !py-2 !text-sm inline-flex ite
 
 function loadState(subjectId: string): GradePreviewState {
   try {
-    const previous = subjectId === FIRST_SUBJECT_ID ? localStorage.getItem(LEGACY_STORAGE_KEY) : null
+    const previous = subjectId === FIRST_SUBJECT_ID ? localGradeStore.getItem(LEGACY_STORAGE_KEY) : null
     const legacyPlanning = subjectId === FIRST_SUBJECT_ID ? {
       firstExam: loadLegacyPlannerSettings('first-exam'),
       secondExam: loadLegacyPlannerSettings('second-exam'),
     } : undefined
-    const saved = JSON.parse(localStorage.getItem(subjectStorageKey(subjectId)) ?? previous ?? 'null') as GradePreviewState | null
+    const saved = JSON.parse(localGradeStore.getItem(subjectStorageKey(subjectId)) ?? previous ?? 'null') as GradePreviewState | null
     if (saved?.config && Array.isArray(saved.components)) {
       const defaults = defaultGradePreviewState()
       const includeNonattainment = saved.config.includeNonattainment ?? saved.config.gradeYear === '1'
@@ -83,7 +84,7 @@ function loadState(subjectId: string): GradePreviewState {
       }
     }
     return { ...defaultGradePreviewState(), splitPlanning: legacyPlanning }
-  } catch { /* 손상된 임시 저장은 기본값으로 시작 */ }
+  } catch (error) { throw error }
   return defaultGradePreviewState()
 }
 
@@ -113,7 +114,7 @@ export default function EstimatedSplitScorePage() {
 
   const updateRegistry = (next: SubjectRegistry) => {
     try {
-      localStorage.setItem(SUBJECTS_STORAGE_KEY, JSON.stringify(next))
+      localGradeStore.setItem(SUBJECTS_STORAGE_KEY, JSON.stringify(next))
       setRegistry(next)
       return true
     } catch {
@@ -125,9 +126,9 @@ export default function EstimatedSplitScorePage() {
   const addSubject = (name: string, state: GradePreviewState) => {
     const subject = { id: uid(), name }
     const key = subjectStorageKey(subject.id)
-    localStorage.setItem(key, JSON.stringify(state))
+    localGradeStore.setItem(key, JSON.stringify(state))
     if (updateRegistry({ activeId: subject.id, subjects: [...registry.subjects, subject] })) return true
-    localStorage.removeItem(key)
+    localGradeStore.removeItem(key)
     return false
   }
 
@@ -258,7 +259,7 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
   const storageKey = subjectStorageKey(subject.id)
   const persist = (state: GradePreviewState) => {
     try {
-      localStorage.setItem(storageKey, JSON.stringify(state))
+      localGradeStore.setItem(storageKey, JSON.stringify(state))
       setSaveError(false)
       return true
     } catch {
@@ -277,6 +278,7 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
     }
   }, [])
 
+  const [exportMode, setExportMode] = useState<'settings' | 'full'>('settings')
   const saveNow = () => {
     if (persist(state)) setToast(`${subject.name} 작업을 이 PC에 저장했습니다.`)
   }
@@ -742,12 +744,16 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
       </StepCard>
 
       <StepCard number="07" title="다른 PC에서 이어서 하기" description="다른 PC나 다른 사용자의 업무도우미에서 이 과목 작업을 이어서 할 수 있습니다.">
+        <fieldset className="mb-3 flex flex-wrap gap-4"><legend className="font-bold">내려받을 자료</legend>
+          <label><input type="radio" checked={exportMode === 'settings'} onChange={() => setExportMode('settings')} /> 평가 설정만 공유하기</label>
+          <label><input type="radio" checked={exportMode === 'full'} onChange={() => setExportMode('full')} /> 학생 점수까지 담아 이어서 하기</label>
+        </fieldset>
         <div className="flex flex-wrap gap-2">
           <button onClick={saveNow} className={smallButton}><Save size={15} />이 PC에 저장</button>
           <button onClick={async () => {
             try {
-              const { name, bytes } = exportRestoreWorkbook(state, subject.name)
-              if (await window.electron.saveFileDialog(name, bytes)) setToast('이어하기 자료를 저장했습니다.')
+              const { name, bytes } = exportRestoreWorkbook(state, subject.name, exportMode)
+              if (await window.electron.saveFileDialog(name, bytes)) { setToast('이어하기 자료를 저장했습니다.'); setExportMode('settings') }
             } catch {
               setToast('이어하기 자료를 만들지 못했습니다. 다시 시도해 주세요.')
             }
@@ -755,7 +761,7 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
           <button onClick={onRestore} disabled={busy || saveError} className={smallButton}><FolderOpen size={16} />업로드로 이어서 하기</button>
         </div>
         <p className="mt-3 text-sm text-slate-700">‘이어서 하기 자료 다운로드’는 현재 과목을 엑셀로 저장합니다. 다른 업무도우미에서 이 파일을 올리면 새 과목 탭에서 작업을 이어갈 수 있습니다.</p>
-        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">엑셀에는 학생 이름과 성적이 들어갈 수 있습니다. 함께 일하는 교직원에게만 전달하고 공용 폴더에 보관하지 마세요.</p>
+        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">{exportMode === 'full' ? '학생 이름과 점수가 포함될 수 있습니다. 안전한 위치에 저장하세요.' : '평가 설정만 담습니다. 받는 선생님은 새 과목 탭에 본인의 성적 자료를 올릴 수 있습니다.'}</p>
       </StepCard>
     </div>
   )
@@ -763,7 +769,7 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
 
 function loadLegacyPlannerSettings(storageId: string): PlannerSettings | undefined {
   try {
-    const saved = JSON.parse(localStorage.getItem(`ungcheon-split-planner-${storageId}`) ?? 'null') as PlannerSettings | null
+    const saved = JSON.parse(localGradeStore.getItem(`ungcheon-split-planner-${storageId}`) ?? 'null') as PlannerSettings | null
     return saved ?? undefined
   } catch {
     return undefined

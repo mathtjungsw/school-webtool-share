@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Bell, BellRing, CalendarDays, Info, Play, Square } from 'lucide-react'
-import { format } from 'date-fns'
-import { getSharedNeisSnapshot } from '../services/sharedNeis'
 
 interface NotifierResult {
   neisPending: number
@@ -18,35 +16,13 @@ export default function NotifierPage() {
     window.electron.configGet('notifier.sharedEnabled').then(value => setRunning(value === true)).catch(() => undefined)
   }, [])
 
-  const checkNow = async (force = true) => {
-    try {
-      const snapshot = await getSharedNeisSnapshot(force)
-      const today = format(new Date(), 'yyyyMMdd')
-      const next: NotifierResult = {
-        neisPending: snapshot?.schedules.filter(item => item.date === today).length ?? 0,
-        edufaiPending: 0,
-        timestamp: new Date().toISOString(),
-      }
-      setResult(next)
-      if (next.neisPending > 0 && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification('웅천고 업무 알림', { body: `오늘 등록된 학사일정이 ${next.neisPending}건 있습니다.` })
-      }
-    } catch (error) {
-      setResult({ neisPending: 0, edufaiPending: 0, timestamp: new Date().toISOString(), error: error instanceof Error ? error.message : String(error) })
-    }
+  const checkNow = async () => {
+    try { setResult(await window.preview.checkSchedule()) } catch (error) {setResult({neisPending:0,edufaiPending:0,timestamp:new Date().toISOString(),error:error instanceof Error ? error.message : String(error)})}
   }
-
-  useEffect(() => {
-    if (!running) return
-    void checkNow(false)
-    const timer = window.setInterval(() => void checkNow(true), 15 * 60_000)
-    return () => window.clearInterval(timer)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running])
 
   const start = () => {
     void window.electron.configSet('notifier.sharedEnabled', true)
-    setRunning(true)
+    setRunning(true); void checkNow()
   }
 
   const stop = () => {

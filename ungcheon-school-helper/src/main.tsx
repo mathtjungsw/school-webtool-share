@@ -1,11 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App'
-import WidgetApp from './components/widget/WidgetApp'
 import './styles/globals.css'
-import './components/widget/widget.css'
-import './components/widget/widgetCompact.css'
-import './components/widget/widgetProductivity.css'
 import { logger } from './utils/logger'
 import { enableZeroReplacement } from './utils/zeroNumberInput'
 
@@ -41,8 +36,9 @@ window.addEventListener('error', e => {
   logger.error(`${e.message} (${e.filename}:${e.lineno})`, 'globalError')
 })
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    {new URLSearchParams(window.location.search).get('window') === 'widget' ? <WidgetApp /> : <App />}
+const isWidget = new URLSearchParams(window.location.search).get('window') === 'widget'
+const screen = isWidget ? import('./components/widget/WidgetApp') : import('./App')
+void screen.then(({ default: Screen }) => ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode><Screen />
   </React.StrictMode>
-)
+))

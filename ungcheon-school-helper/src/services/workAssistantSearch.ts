@@ -396,7 +396,7 @@ const DETAILED_WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
     keywords: ['생기부 블라인드', '학생부 개인정보', '생기부 개인정보 가리기', '학교생활기록부 가리기', '이름 가리기', '학교명 가리기', '주민번호 가리기', 'PDF 블라인드', 'PDF 마스킹', '개인정보 삭제', '로컬 처리'],
   },
   {
-    id: 'pdf-text', title: 'PDF 텍스트 추출', page: 'pdf_extractor', category: '파일 처리',
+    id: 'pdf-text', title: '파일 처리 도구 · PDF 텍스트 추출', page: 'pdf_extractor', category: '파일 처리',
     summary: '일반 PDF 또는 스캔 PDF에서 텍스트를 추출해 복사하거나 저장합니다.',
     steps: ['PDF 텍스트 추출 메뉴를 엽니다.', 'PDF 파일을 선택하고 추출을 실행합니다.', '결과를 복사하거나 텍스트 파일로 저장합니다.'],
     keywords: ['PDF 글자 추출', 'pdf 텍스트', '스캔 pdf', 'OCR', 'PDF 복사'],
@@ -427,7 +427,7 @@ const DETAILED_WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
     keywords: ['인사기록', '나이스 인사기록', '법정 연수', '경력 분석', '인사 PDF'],
   },
   {
-    id: 'notifier', title: '업무알리미 설정', page: 'notifier', category: '알림',
+    id: 'notifier', title: '학사일정 알림 설정', page: 'operations_notifications', category: '알림',
     summary: '오늘의 학사일정과 학교 공지를 일정한 간격으로 확인하도록 알림을 설정합니다.',
     steps: ['업무알리미 메뉴를 엽니다.', '확인 간격과 알림 조건을 설정합니다.', '알리미를 시작하고 실행 상태를 확인합니다.'],
     keywords: ['업무알리미', '업무 알리미', '일정 알림', '공지 알림', '알림 설정', '오늘 일정 알림', '알리미 시작'],

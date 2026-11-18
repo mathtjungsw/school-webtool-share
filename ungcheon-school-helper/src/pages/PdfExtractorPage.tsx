@@ -199,7 +199,7 @@ export default function PdfExtractorPage() {
     if (outputFiles.length > 0) {
       const saved = await window.electron?.saveFilesToDir(outputFiles)
       if (saved && saved > 0) {
-        addLog(`💾 ${outputFiles.length}개 파일 저장 완료`)
+        addLog(`💾 ${saved}개 파일 저장 완료`)
       } else if (saved === 0) {
         addLog('저장 취소됨')
       }

@@ -18,7 +18,7 @@ export async function parseFile(path: string, name: string): Promise<ParseResult
 
   if (cat === 'excel') {
     const bytes = await window.electron.readFile(path)
-    return parseWorkbook(new Uint8Array(bytes))
+    return parseWorkbook(new Uint8Array(bytes), ext === 'csv')
   }
   if (cat === 'doc') {
     if (ext === 'pdf') {
@@ -37,7 +37,7 @@ export async function parseFile(path: string, name: string): Promise<ParseResult
 // 바이트 기반 파싱 (경로 없는 드롭 폴백) — 엑셀/텍스트만 가능, 문서는 경로 필요
 export function parseBytes(bytes: Uint8Array, name: string): ParseResult | null {
   const cat = categorize(name)
-  if (cat === 'excel') return parseWorkbook(bytes)
+  if (cat === 'excel') return parseWorkbook(bytes, name.toLowerCase().endsWith('.csv'))
   if (cat === 'text' || cat === 'unsupported') return { kind: 'text', text: decodeText(bytes) }
   return null
 }

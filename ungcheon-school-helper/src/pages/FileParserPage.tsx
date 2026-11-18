@@ -51,7 +51,8 @@ export default function FileParserPage() {
     e.preventDefault(); setDrag(false)
     const f = e.dataTransfer.files[0] as (File & { path?: string }) | undefined
     if (!f) return
-    if (f.path) { load(f.path, f.name); return }
+    const path = window.preview.filePath(f)
+    if (path) { load(path, f.name); return }
     // 경로가 없으면(샌드박스) 바이트로 직접 파싱 — 엑셀/텍스트만 가능
     setLoading(true); setError(''); setResult(null); setFileName(f.name)
     try {
@@ -116,7 +117,8 @@ export default function FileParserPage() {
 function ExcelView({ result, fileName }: { result: Extract<ParseResult, { kind: 'excel' }>; fileName: string }) {
   const [active, setActive] = useState(0)
   const [showAll, setShowAll] = useState(false)
-  const sheet = result.sheets[active]
+  const sheet = result.sheets[active] ?? result.sheets[0]
+  if (!sheet) return <p>표시할 시트가 없습니다.</p>
   const base = fileName.replace(/\.\w+$/, '')
 
   if (result.sheets.length === 0) return <div className="card text-sm text-slate-500">시트가 비어 있습니다.</div>

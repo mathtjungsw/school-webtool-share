@@ -11,3 +11,4 @@ src/**/*.d.ts
 .env
 .clasp.json
 .DS_Store
+release-preview*/

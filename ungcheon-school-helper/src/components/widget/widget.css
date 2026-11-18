@@ -9,7 +9,7 @@ html[data-widget-window="true"] #root {
   margin: 0;
   background: transparent !important;
   overflow: hidden;
-  font-family: Pretendard, "Noto Sans KR", sans-serif;
+  font-family: "Malgun Gothic", system-ui, sans-serif;
   color: #172033;
 }
 .widget-shell {

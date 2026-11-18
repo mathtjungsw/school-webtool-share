@@ -57,7 +57,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText, assistantCategory: '교육과정', searchAliases: ['편제표', '교육과정 출력'] },
   { id: 'form_center', label: '서식센터', icon: FilePenLine, assistantCategory: '서식 출력', searchAliases: ['학교 서식', '회의록', '계획서'] },
   { id: 'teacher_tools', label: '교사용 도구', icon: Wrench, assistantCategory: '개인 도구', searchAliases: ['명단 비교', '날짜 계산', '추첨'] },
-  { id: 'excel_processor', label: 'Excel 전처리', icon: Table2, assistantCategory: '파일 처리', searchAliases: ['엑셀 정리', '명단 정리'] },
+  { id: 'excel_processor', label: '파일 처리 도구', icon: Table2, assistantCategory: '파일 처리', searchAliases: ['엑셀 정리', '명단 정리'] },
   { id: 'recommended_subjects', label: '대학 권장과목', icon: BookOpen, assistantCategory: '자료·진로', searchAliases: ['학과 권장과목', '선택과목 상담'] },
   { id: 'payroll', label: '호봉획정 계산기', icon: Calculator, assistantCategory: '인사행정', searchAliases: ['호봉 계산', '경력 인정'] },
   { id: 'insa_analysis', label: 'NEIS 인사기록 분석', icon: FileScan, assistantCategory: '인사행정', searchAliases: ['나이스 인사기록', '경력 분석'] },

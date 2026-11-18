@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { Clock3, LogIn, ShieldCheck, UserRound } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import schoolLogo from '../assets/ungcheon-logo.png'
@@ -9,6 +9,15 @@ export default function PilotLogin() {
   const login = useAuthStore(state => state.login)
   const loading = useAuthStore(state => state.loading)
   const error = useAuthStore(state => state.error)
+
+  const auth = useAuthStore()
+  const [hint,setHint] = useState<{name:string;password:string}|null>(null)
+  useEffect(() => { void window.preview.loginHint().then(setHint) }, [])
+  if (auth.retryRequired) return <main className="min-h-screen grid place-items-center"><section className="card p-8 space-y-4">
+    <h1 className="page-title">학교 서버에 연결할 수 없습니다</h1><p>연결 상태를 확인한 뒤 다시 시도해 주세요.</p>
+    <button className="btn-primary" onClick={() => void auth.bootstrap()}>연결 다시 확인</button>
+    <button className="btn-ghost" onClick={() => void auth.logout()}>로그아웃</button>
+  </section></main>
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -26,6 +35,10 @@ export default function PilotLogin() {
           <h1 className="text-2xl font-black text-white">웅천고 업무도우미</h1>
           <p className="mt-2 text-sm text-slate-400">교직원 명렬에 등록된 본인 이름을 직접 입력하세요.</p>
         </div>
+        {hint && <div className="mt-4 rounded-xl bg-amber-50 p-3 space-y-2"><strong>통합 시험판 · 가상 자료</strong>
+          <p className="text-sm">모바일 시험 계정 {hint.name} · {hint.password}</p>
+          <button className="btn-secondary" onClick={() => void login(hint.name,hint.password)}>시험 계정으로 로그인</button>
+          <button className="btn-ghost" onClick={() => void window.preview.mobile()}>모바일 시험 화면 열기</button></div>}
         <form onSubmit={submit} className="mt-7 space-y-4">
           <label className="block">
             <span className="field-label flex items-center gap-1.5"><UserRound size={13} />이름</span>

@@ -150,6 +150,7 @@ export default function Sidebar({
     return orderedIds
       .map(id => NAV_BY_ID.get(id))
       .filter((item): item is NavigationItem => Boolean(item))
+      .filter(item => !['notifier','pdf_extractor','file_parser'].includes(item.id) || pinnedMenus.includes(item.id))
       .filter(item => item.id === 'dashboard' || !hiddenMenus.includes(item.id))
       .filter(item => item.id !== 'admin_center' || isAdmin)
       .filter(item => !EXECUTIVE_MENU_IDS.includes(item.id))

@@ -47,7 +47,22 @@ function staffAuthAction_(body) {
   var session = staffRequire_(body);
   if (action === 'staffSession') return { name: session.name, expiresAt: new Date(session.expiresAt).toISOString() };
   if (action === 'staffLogout') { properties.deleteProperty(staffSessionKey_(body.staffToken)); return true; }
+  var grantKey = 'CASE_' + sha256_(String(body.staffToken) + ':' + String(body.grant || ''));
+  var grants = CacheService.getScriptCache();
+  if (action === 'caseUnlock') {
+    var expected = properties.getProperty('UNG_CASE_PIN_HASH');
+    var attempts = 'CASE_ATTEMPTS_' + sha256_(String(body.staffToken));
+    var count = Number(grants.get(attempts) || 0);
+    if (count >= 5 || !expected || expected !== sha256_(String(body.password || ''))) {
+      grants.put(attempts, String(count + 1), 30); throw new Error('자료 열람 비밀번호를 확인해 주세요.');
+    }
+    var grant = Utilities.getUuid() + Utilities.getUuid();
+    grants.put('CASE_' + sha256_(String(body.staffToken) + ':' + grant), '1', 21600);
+    grants.remove(attempts); return { grant: grant };
+  }
+  if (action === 'caseClose') { grants.remove(grantKey); return true; }
   if (action === 'caseLibrary' || action === 'caseDocument') {
+    if (!body.grant || grants.get(grantKey) !== '1') throw new Error('자료 열람을 다시 확인해 주세요.');
     var manifest = staffCaseManifest_();
     if (action === 'caseLibrary') return manifest.map(function(d) { return { id: d.id, title: d.title, revision: d.revision }; });
     var selected = manifest.filter(function(d) { return d.id === body.id; })[0];

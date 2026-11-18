@@ -1,3 +1,5 @@
+import { PULLED_LESSONS_2026 } from '../data/pulledLessons2026'
+import { HELP_CLASS_SCHEDULES } from './helpClassSchedule'
 import type { ParsedTimetable, SchoolTimetable } from './schoolTimetable'
 import {
   normalizeSharedStudentTimetable,
@@ -188,6 +190,9 @@ function revisionFromData(data: unknown) {
 }
 
 function normalizeHubResourceData(resource: HubResource, data: unknown) {
+  const extras = data as { pulledLessons?: typeof PULLED_LESSONS_2026; helpClassSchedules?: typeof HELP_CLASS_SCHEDULES } | null
+  if (resource === 'timetable') PULLED_LESSONS_2026.splice(0, PULLED_LESSONS_2026.length, ...(extras?.pulledLessons || []))
+  if (resource === 'studentTimetable') HELP_CLASS_SCHEDULES.splice(0, HELP_CLASS_SCHEDULES.length, ...(extras?.helpClassSchedules || []))
   if (resource === 'studentRoster') {
     return normalizeSharedStudentRoster(data as SharedStudentRoster | null)
   }
@@ -259,6 +264,7 @@ function persistCacheEntry(cacheKey: string, entry: CacheEntry) {
 }
 
 export function clearSchoolHubSessionCache() {
+  PULLED_LESSONS_2026.length=0; HELP_CLASS_SCHEDULES.length=0
   cacheGeneration += 1
   sessionCache.clear()
   resourceFailures.clear()
@@ -402,7 +408,7 @@ async function refreshSyncManifest(force = false): Promise<SyncManifest | null> 
     })
     .catch(() => {
       if (cacheGeneration !== generation) return null
-      manifestSupported = false
+      manifestLoadedAt = 0
       return null
     })
     .finally(() => {
@@ -424,8 +430,8 @@ async function fetchAndStore<T>(
   const generation = cacheGeneration
   let requestPromise: Promise<T>
   requestPromise = hubRequest<T>(request).then(rawData => {
+    if (cacheGeneration !== generation || (resourceEpoch.get(resource) ?? 0) !== epoch) throw Error('로그인 또는 자료 버전이 변경되었습니다.')
     const data = normalizeHubResourceData(resource, rawData) as T
-    if (cacheGeneration !== generation || (resourceEpoch.get(resource) ?? 0) !== epoch) return data
     const revision = knownRevision || revisionFromData(data)
     const signature = revision || dataSignature(data)
     const previous = sessionCache.get(cacheKey)
@@ -843,11 +849,9 @@ async function runSchoolHubBackgroundSync(viewerName: string) {
 export function startSchoolHubBackgroundSync(viewerName: string) {
   if (backgroundSyncTimer !== null) window.clearInterval(backgroundSyncTimer)
   void preloadSchoolHubCache(viewerName)
-  const initial = window.setTimeout(() => void runSchoolHubBackgroundSync(viewerName), 5_000)
-  backgroundSyncTimer = window.setInterval(() => void runSchoolHubBackgroundSync(viewerName), 30_000)
+  const off = window.preview.onSync(() => void runSchoolHubBackgroundSync(viewerName))
   return () => {
-    window.clearTimeout(initial)
-    if (backgroundSyncTimer !== null) window.clearInterval(backgroundSyncTimer)
+    off()
     backgroundSyncTimer = null
     backgroundSyncRunning = false
   }

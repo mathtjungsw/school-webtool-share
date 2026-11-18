@@ -1,6 +1,6 @@
 import { useNoticeStore } from '../stores/noticeStore'
 import { acceptChangeNavigation, acceptTaskNavigation } from '../services/taskNavigation'
-import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react'
+import { Component, type ReactNode, lazy, Suspense, useEffect, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { KeyRound, ShieldCheck, X } from 'lucide-react'
 import TitleBar from './TitleBar'
@@ -20,6 +20,16 @@ const SchoolHubPage = lazy(() => import('../pages/SchoolHubPage'))
 const FeatureRequestsPage = lazy(() => import('../pages/FeatureRequestsPage'))
 const TimetableSwapPage = lazy(() => import('../pages/TimetableSwapPage'))
 const StudentTimetablePage = lazy(() => import('../pages/StudentTimetablePage'))
+function FileTools({initial}: {initial:string}) {
+  const [tool,setTool] = useState(initial)
+  const [opened,setOpened] = useState([initial])
+  const choices = [['excel','엑셀 정리'],['pdf','PDF 글자 추출'],['parser','파일 내용·구조 확인']]
+  return <section><nav className="p-3 flex gap-2" aria-label="파일 처리 도구">{choices.map(([key,label])=><button key={key} className={tool===key?'btn-primary':'btn-secondary'} onClick={()=>{setTool(key);setOpened(previous=>previous.includes(key)?previous:[...previous,key])}}>{label}</button>)}</nav>
+    {opened.includes('excel') && <div hidden={tool!=='excel'}><ExcelProcessorPage/></div>}
+    {opened.includes('pdf') && <div hidden={tool!=='pdf'}><PdfExtractorPage/></div>}
+    {opened.includes('parser') && <div hidden={tool!=='parser'}><FileParserPage/></div>}
+  </section>
+}
 const ExcelProcessorPage = lazy(() => import('../pages/ExcelProcessorPage'))
 const RecommendedSubjectsPage = lazy(() => import('../pages/RecommendedSubjectsPage'))
 const PayrollPage = lazy(() => import('../pages/PayrollPage'))
@@ -76,7 +86,7 @@ const PAGES: Record<string, React.ComponentType> = {
   feature_requests: FeatureRequestsPage,
   timetable_swap: TimetableSwapPage,
   student_timetable: StudentTimetablePage,
-  excel_processor: ExcelProcessorPage,
+  excel_processor: () => <FileTools initial="excel" />,
   recommended_subjects: RecommendedSubjectsPage,
   payroll: PayrollPage,
   afterschool_checker: AfterSchoolCheckerPage,
@@ -86,9 +96,9 @@ const PAGES: Record<string, React.ComponentType> = {
   student_record: StudentRecordPage,
   attendance: AttendancePage,
   committees: SchoolCommitteesPage,
-  pdf_extractor: PdfExtractorPage,
-  file_parser: FileParserPage,
-  notifier: NotifierPage,
+  pdf_extractor: () => <FileTools initial="pdf" />,
+  file_parser: () => <FileTools initial="parser" />,
+  notifier: OperationsNotificationsPage,
   operations_notifications: OperationsNotificationsPage,
   staff_tasks: StaffTasksPage,
   staff_roster: StaffRosterPage,
@@ -112,6 +122,11 @@ const PAGES: Record<string, React.ComponentType> = {
 }
 
 const MAX_HISTORY = 40
+class ToolErrorBoundary extends Component<{children:ReactNode},{failed:boolean}> {
+  state = {failed:false}
+  static getDerivedStateFromError(){return {failed:true}}
+  render(){return this.state.failed ? <section role="alert" className="card m-6 p-5"><h2 className="font-bold">작업을 열 수 없습니다</h2><p className="my-2">이 PC의 로그인과 저장 자료를 확인해 주세요.</p><button className="btn-secondary" onClick={()=>this.setState({failed:false})}>다시 열기</button></section> : this.props.children}
+}
 const INITIAL_PAGE = 'dashboard'
 
 export default function Layout() {
@@ -238,9 +253,9 @@ export default function Layout() {
               transition={{ duration: 0.13 }}
               className="absolute inset-0 overflow-y-auto"
             >
-              <Suspense fallback={<div className="h-full grid place-items-center text-sm text-slate-500">불러오는 중...</div>}>
+              <ToolErrorBoundary key={page}><Suspense fallback={<div className="h-full grid place-items-center text-sm text-slate-500">불러오는 중...</div>}>
                 {page === 'dashboard' ? <Dashboard onNavigate={navigate} /> : Page ? <Page /> : <Dashboard onNavigate={navigate} />}
-              </Suspense>
+              </Suspense></ToolErrorBoundary>
             </motion.div>
           </AnimatePresence>
         </main>

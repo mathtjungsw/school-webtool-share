@@ -167,7 +167,7 @@ test('service v44+, current desktop version and earlier desktop/mobile release n
   const packageVersion = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')).version;
   assert.ok(h.constants.version >= 44);
   assert.equal(h.constants.notes[0].key, `server-v${h.constants.version}`);
-  assert.equal(h.constants.notes.find(note => /^v\d+\.\d+\.\d+$/.test(note.key)).key, packageVersion.includes('-preview.') ? 'v1.1.38' : `v${packageVersion}`);
+  assert.equal(h.constants.notes.find(note => /^v\d+\.\d+\.\d+$/.test(note.key)).key, packageVersion.includes('-preview.') ? 'v1.1.43' : `v${packageVersion}`);
   for (const key of ['v1.1.24', 'v1.1.25', 'v1.1.26', 'mobile-service-2026-08-26', 'mobile-service-2026-08-30', 'mobile-service-meal-range-2026-08-30']) {
     assert.equal(h.constants.notes.filter(note => note.key === key).length, 1, key);
   }
@@ -259,7 +259,7 @@ test('mobile response excludes full student and forbidden NEIS datasets', () => 
   assert.ok(h.readNames.includes('NEIS급식'));
   assert.equal(h.readNames.includes('학생시간표'), true);
   assert.equal(h.readNames.some(name => /학생명렬|NEIS학사일정|NEIS학급시간표/.test(name)), false);
-  assert.deepEqual(Object.keys(result.data).sort(), ['attendanceSummaries', 'committeeEvents', 'contractVersion', 'events', 'fetchedAt', 'meals', 'servedAt', 'sourceStatus', 'teacherTimetable', 'timetableChanges', 'timetableOverrides', 'todayMeals']);
+  assert.deepEqual(Object.keys(result.data).sort(), ['attendanceSummaries', 'committeeEvents', 'contractVersion', 'events', 'fetchedAt', 'meals', 'revision', 'servedAt', 'sourceStatus', 'teacherTimetable', 'timetableChanges', 'timetableOverrides', 'todayMeals']);
 });
 
 test('executive menu uses a separate expiring server session without touching mobile credentials', () => {
@@ -429,7 +429,8 @@ test('attendance moves with a pulled course and disappears from its original slo
   });
   h.rows.교환대강반영 = [];
   const pulled = [{ id: 'pulled-test', date: '2026-08-31', period: 3, classLabel: '3-3', subject: '미적분', teacherName: '테스트교사', originalTeacherName: '테스트교사', originalSlot: '월2', originalDate: '2026-08-31' }];
-  const summaries = h.post(h.request({ attendancePulledLessons: pulled, attendanceContextVersion: 'pulled-test-v1' })).data.attendanceSummaries;
+  const getTable=h.context.getTimetable_;h.context.getTimetable_=()=>({...getTable(),pulledLessons:pulled});
+  const summaries = h.post(h.request({ attendancePulledLessons: [], attendanceContextVersion: 'pulled-test-v1' })).data.attendanceSummaries;
   assert.deepEqual(summaries.map(item => item.period), [3]);
   assert.equal(summaries[0].changeType, 'pulled');
   assert.equal(summaries[0].entries[0].name, '당김수강생');

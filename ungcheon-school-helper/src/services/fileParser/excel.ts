@@ -55,8 +55,8 @@ function dominantKind(cells: TypedCell[]): CellKind {
 
 function cellAddr(r: number, c: number) { return XLSX.utils.encode_cell({ r, c }) }
 
-export function parseWorkbook(bytes: Uint8Array): ParsedWorkbook {
-  const wb = XLSX.read(bytes, { type: 'array', cellDates: true, cellFormula: true, cellNF: false })
+export function parseWorkbook(bytes: Uint8Array, csv = false): ParsedWorkbook {
+  const wb = XLSX.read(csv ? new TextDecoder('utf-8').decode(bytes) : bytes, { type: csv ? 'string' : 'array', cellDates: true, cellFormula: true, cellNF: false })
   const sheets: ParsedSheet[] = []
   for (const name of wb.SheetNames) {
     const ws = wb.Sheets[name]
@@ -86,7 +86,7 @@ export function parseWorkbook(bytes: Uint8Array): ParsedWorkbook {
           const d = cell.v
           raw = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
         } else {
-          raw = cell.v != null ? String(cell.v) : ''
+          raw = cell.v != null ? String(cell.v) : cell.f ? '='+cell.f : ''
         }
       }
       return { raw, formula: cell.f ? `=${cell.f}` : undefined, merged }

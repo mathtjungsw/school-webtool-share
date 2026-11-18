@@ -167,7 +167,7 @@ export function isApplied(change: TimetableChange, name: string) {
 export function timetableForDate(teacher: TeacherTimetable | null, date: string, changes: TimetableChange[], teacherName: string, overrides: DailyTimetableOverride[] = []): LessonView[] {
   const dayIndex = getTimetableDayIndex(date)
   if (!teacher || dayIndex < 0 || dayIndex > 4) return []
-  const pulledLessons = effectiveMobilePulledLessons(PULLED_LESSONS_2026, overrides)
+  const pulledLessons = effectiveMobilePulledLessons(teacher.pulledLessons ?? PULLED_LESSONS_2026, overrides)
   const hasEighth = pulledLessons.some(item => item.date === date && item.teacherName.trim() === teacherName.trim() && item.period === 8)
   const rawBase = Array.from({ length: 7 }, (_, index) => teacher.slots[dayIndex * 7 + index]?.value ?? '')
   const overrideBase = applyTeacherOverrides(teacher, date, rawBase, overrides)
@@ -200,7 +200,7 @@ export function collectEvents(data: DashboardPayload, name: string): MobileEvent
     const title = item.kind === 'exchange' ? `수업 교환 · ${item.originalClass} ↔ ${item.replacementClass}` : `대강 · ${item.originalClass} ${item.originalSubject}`
     ;[...new Set([item.originalDate, item.replacementDate])].forEach(date => events.push({ id: `change-${item.id}-${date}`, date, title, source: 'timetableChange', label: item.status === 'approved' ? '승인된 수업 변경' : '우선 반영' }))
   })
-  effectiveMobilePulledLessons(PULLED_LESSONS_2026, data.bundle?.timetableOverrides ?? []).filter(item => item.teacherName.trim() === name.trim() && !isCancelledGradePeriod(item.date, item.classLabel, item.period)).forEach(item => events.push({ id: item.id, date: item.date, title: `${item.period}교시 ${item.classLabel} ${item.subject}`, source: 'pulledLesson', label: '당김수업' }))
+  effectiveMobilePulledLessons(findTeacher(data.timetable,name)?.pulledLessons ?? PULLED_LESSONS_2026, data.bundle?.timetableOverrides ?? []).filter(item => item.teacherName.trim() === name.trim() && !isCancelledGradePeriod(item.date, item.classLabel, item.period)).forEach(item => events.push({ id: item.id, date: item.date, title: `${item.period}교시 ${item.classLabel} ${item.subject}`, source: 'pulledLesson', label: '당김수업' }))
   return events.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
 }
 

@@ -37,11 +37,12 @@ export function registerUpdateManager(updater: AppUpdater, open:()=>void, truste
   ipcMain.handle('preview:update',async(e,action:string)=>{
     if(!trusted(e))throw new Error('허용되지 않은 화면입니다.')
     if(action==='snapshot')return state
-    if(action==='simulate' && preview){send({phase:'available',targetVersion:'1.1.39-preview.1',simulated:true});setTimeout(()=>send({phase:'downloading',progress:45}),1000);setTimeout(()=>send({phase:'ready',progress:100}),2500);return state}
+    if(action==='simulate' && preview){send({phase:'available',targetVersion:app.getVersion().replace(/preview\.\d+$/, 'preview.2'),simulated:true});setTimeout(()=>send({phase:'downloading',progress:45}),1000);setTimeout(()=>send({phase:'ready',progress:100}),2500);return state}
 
     if(action==='check')return check()
     if(action==='open'){open();return state}
     if (action === 'install' || action === 'install-from-widget') {
+      if (preview && state.simulated && state.phase==='ready') {send({phase:'preview',targetVersion:'',progress:null,simulated:false});return state}
       if (preview || state.phase !== 'ready' || installing) throw new Error('설치 가능한 정식 업데이트가 없습니다.')
       installing = true
       send({ phase: 'installing' })

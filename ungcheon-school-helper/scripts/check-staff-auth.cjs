@@ -22,10 +22,14 @@ context.Utilities.DigestAlgorithm={SHA_256:'sha256'}
 context.Utilities.base64Decode=value=>[...Buffer.from(value,'base64')]
 context.Utilities.computeDigest=(_,bytes)=>[...crypto.createHash('sha256').update(Buffer.from(bytes)).digest()]
 context.SpreadsheetApp={openById:id=>({getSheets:()=>[{getLastRow:()=>id==='synthetic-index'?2:1,getRange:()=>({getValues:()=>[['fixture','합성 자료집',revision,pdf.length,revision,'synthetic-book']],getDisplayValues:()=>[['b64:'+(corrupt?Buffer.from('corrupt'):pdf).toString('base64')]]})}]})}
-const library=post({action:'caseLibrary',staffToken:token});assert.equal(library.ok,true);assert.equal(library.data[0].id,'fixture');assert.equal(library.data[0].spreadsheetId,undefined)
-const document=post({action:'caseDocument',staffToken:token,id:'fixture'});assert.equal(document.ok,true);assert.equal(document.data.data,pdf.toString('base64'))
-assert.equal(post({action:'caseDocument',staffToken:token,id:'other-document'}).ok,false)
-corrupt=true;assert.equal(post({action:'caseDocument',staffToken:token,id:'fixture'}).ok,false)
+assert.equal(post({action:'caseLibrary',staffToken:token}).ok,false)
+props.set('UNG_CASE_PIN_HASH',digest('synthetic-pin'))
+assert.equal(post({action:'caseUnlock',staffToken:token,password:'bad-pin'}).ok,false)
+const unlocked=post({action:'caseUnlock',staffToken:token,password:'synthetic-pin'});assert.equal(unlocked.ok,true);const grant=unlocked.data.grant
+const library=post({action:'caseLibrary',staffToken:token,grant});assert.equal(library.ok,true);assert.equal(library.data[0].id,'fixture');assert.equal(library.data[0].spreadsheetId,undefined)
+const document=post({action:'caseDocument',staffToken:token,grant,id:'fixture'});assert.equal(document.ok,true);assert.equal(document.data.data,pdf.toString('base64'))
+assert.equal(post({action:'caseDocument',staffToken:token,grant,id:'other-document'}).ok,false)
+corrupt=true;assert.equal(post({action:'caseDocument',staffToken:token,grant,id:'fixture'}).ok,false)
 assert.equal(post({action:'staffSession',staffToken:token}).ok,true)
 assert.equal(post({action:'staffSession',staffToken:'forged'}).ok,false)
 assert.equal(post({action:'staffSession',staffToken:token,viewerName:'다른교사'}).ok,false)

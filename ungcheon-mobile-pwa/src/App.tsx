@@ -5,6 +5,7 @@ import { AlertTriangle, CalendarDays, Check, CheckCircle2, ChevronLeft, ChevronR
 import { addDays, format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { friendlyLoginError, isSessionExpiredError, loadAttendanceRoster, loadDashboard, markDashboardCached, mergeDashboardWithCache, MobileRequestTimeoutError, SESSION_EXPIRED_MESSAGE, verifyViewer } from './api'
+import { secureReadAction } from './api'
 import { deleteUserCache, readUserCache, writeUserCache } from './cache'
 import { DAYS, DEFAULT_VISIBILITY, SOURCE_LABELS, buildMobileTimelineRows, collectEvents, eventFingerprint, findTeacher, lessonFocus, newEventFingerprints, parseSlot, rangeForToday, schoolClock, sortMealsByType, timetableForDate, ymd } from './domain'
 import type { DashboardPayload, LessonView, MealInfo, MobileAttendanceRoster, MobileAttendanceSummary, MobileEvent, MobileResourceKey, ScheduleSource } from './types'
@@ -27,6 +28,7 @@ function readSession() {
   try {
     const value = JSON.parse(localStorage.getItem(SESSION_KEY) ?? '{}') as Partial<MobileSession>
     if (value.name && value.accessToken && Number(value.expiresAt) > Date.now()) return { session: { name: value.name, accessToken: value.accessToken, expiresAt: Number(value.expiresAt) }, notice: '' }
+    if (value.name) void deleteUserCache(value.name)
     localStorage.removeItem(SESSION_KEY)
     return { ...empty, notice: value.name && value.accessToken ? SESSION_EXPIRED_MESSAGE : '' }
   } catch { return empty }
@@ -309,7 +311,7 @@ export default function App() {
     return () => window.clearInterval(timer)
   }, [loading])
 
-  const clearSession = useCallback((notice = '') => {
+  const clearSession = useCallback((notice = '', removeStored = true) => {
     const name = sessionRef.current?.name ?? ''
     ++requestSequence.current
     requestController.current?.abort()
@@ -319,7 +321,7 @@ export default function App() {
     lastRequest.current = { key: '', at: 0 }
     sessionRef.current = null
     dataRef.current = null
-    try { localStorage.removeItem(SESSION_KEY) } catch { /* 저장소가 막혀도 화면의 세션은 종료한다. */ }
+    try { if(removeStored) localStorage.removeItem(SESSION_KEY) } catch { /* 저장소가 막혀도 화면의 세션은 종료한다. */ }
     setSession(null); setData(null); setNewKeys([]); setSelectedAttendancePeriod(null); setAttendanceRoster(null); setAttendanceRosterLoading(false); setAttendanceRosterError(''); setLoading(false)
     setMessage(''); setCacheWarning(''); setSessionNotice(notice)
     if (name) void deleteUserCache(name)
@@ -340,14 +342,34 @@ export default function App() {
     activeRequest.current = null
   }, [])
 
+  const [retrying,setRetrying]=useState('')
+  const retryInFlight=useRef(false)
+  const retrySource = async (resource:'meals'|'attendance')=>{
+    const active=sessionRef.current, current=dataRef.current, sequence=requestSequence.current
+    if (retryInFlight.current || !active || !current?.bundle || active.expiresAt<=Date.now()) return
+    retryInFlight.current=true;setRetrying(resource)
+    try {
+      const response=await secureReadAction<{items: (MealInfo|MobileAttendanceSummary)[];status:import('./types').MobileResourceStatus}>('getMobileResource',{viewerName:active.name,accessToken:active.accessToken,date:selectedDate,resource})
+      if (sequence!==requestSequence.current || sessionRef.current!==active || !dataRef.current?.bundle) return
+      if(!Array.isArray(response.items) || !['fresh','empty'].includes(response.status?.state)) throw Error('해당 자료를 확인할 수 없습니다.')
+      const prev=dataRef.current, bundle={...prev.bundle!,revision:undefined,sourceStatus:{...prev.bundle!.sourceStatus,[resource]:response.status}}
+      if(resource==='meals') {bundle.meals=response.items as MealInfo[];if(selectedDate===today)bundle.todayMeals=bundle.meals} else bundle.attendanceSummaries=response.items as MobileAttendanceSummary[]
+      const next={...prev,bundle};dataRef.current=next;setData(next);await writeUserCache(active.name,next,selectedDate+'/'+selectedDate)
+    } catch(error){if(sequence===requestSequence.current){if(isSessionExpiredError(error))clearSession(SESSION_EXPIRED_MESSAGE);else setMessage('자료를 다시 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.')}}
+    finally{retryInFlight.current=false;setRetrying('')}
+  }
+  const loadedRange = useRef('')
+  const start = view === 'today' ? selectedDate : view === 'next' ? range.nextWeek[0] : view === 'timetable' ? ymd(addDays(new Date(range.thisWeek[0]+'T12:00:00'), 7*weekOffset)) : range.thisWeek[0]
+  const end = view === 'today' ? selectedDate : ymd(addDays(new Date(start+'T12:00:00'), 6))
   const refresh = useCallback(async (name: string, silent = false) => {
     const currentSession = sessionRef.current
     if (!currentSession || currentSession.name !== name) return
     if (currentSession.expiresAt <= Date.now()) { clearSession(SESSION_EXPIRED_MESSAGE); return }
-    const key = `${name}|${currentSession.expiresAt}|${range.from}|${range.to}`
+    const key = `${name}|${currentSession.expiresAt}|${start}|${end}`
     // pageshow/visibilitychange/online는 같은 요청을 취소하거나 중복 실행하지 않는다.
     if (activeRequest.current === key) return
     if (silent && lastRequest.current.key === key && Date.now() - lastRequest.current.at < RESUME_COALESCE_MS) return
+    if (loadedRange.current !== key) { dataRef.current = null; setData(null) }
     const sequence = ++requestSequence.current
     requestController.current?.abort()
     const controller = new AbortController()
@@ -356,15 +378,17 @@ export default function App() {
     lastRequest.current = { key, at: Date.now() }
     setLoading(true)
     // IndexedDB가 느리거나 차단되어도 API 요청은 즉시 시작한다.
-    void readUserCache(name).then(cached => {
-      if (cached && !dataRef.current && sequence === requestSequence.current && !controller.signal.aborted) {
-        const marked = markDashboardCached(cached); dataRef.current = marked; setData(marked)
+    const scope = start + '/' + end
+    void readUserCache(name, scope).then(cached => {
+      if (cached && (!dataRef.current || loadedRange.current !== key) && sequence === requestSequence.current && !controller.signal.aborted) {
+        loadedRange.current = key; const marked = markDashboardCached(cached); dataRef.current = marked; setData(marked)
       }
     }).catch(() => undefined)
     try {
-      const fresh = await loadDashboard(name, currentSession.accessToken, range.from, range.to, controller.signal)
+      const fresh = await loadDashboard(name, currentSession.accessToken, start, end, controller.signal, loadedRange.current===key ? dataRef.current : null)
       if (sequence !== requestSequence.current) return
-      const previous = dataRef.current
+      const previous = loadedRange.current === key ? dataRef.current : null
+      loadedRange.current = key
       const merged = mergeDashboardWithCache(fresh, previous)
       const additions = newEventFingerprints(previous, merged, name, today)
       if (additions.length) setNewKeys(current => [...new Set([...current, ...additions])])
@@ -374,13 +398,13 @@ export default function App() {
       setOffline(false)
       setCacheWarning('')
       // 캐시 저장 실패는 정상 API 응답을 오프라인/연결 실패로 바꾸지 않는다.
-      void writeUserCache(name, merged).catch(() => {
+      if (!previous?.bundle?.revision || previous.bundle.revision!==fresh.bundle?.revision) void writeUserCache(name, merged, scope).catch(() => {
         if (sequence === requestSequence.current) setCacheWarning('최신 자료를 조회했지만 이 기기에 저장하지 못했습니다. 인터넷 연결 중에는 계속 볼 수 있습니다.')
       })
     } catch (error) {
       if (sequence !== requestSequence.current) return
       if (isSessionExpiredError(error)) { clearSession(SESSION_EXPIRED_MESSAGE); return }
-      const fallback = dataRef.current
+      const fallback = loadedRange.current === key ? dataRef.current : null
       if (fallback) {
         const marked = markDashboardCached(fallback); setData(marked); dataRef.current = marked
         setMessage('연결이 불안정해 마지막 정상 조회 자료를 표시합니다.')
@@ -391,7 +415,7 @@ export default function App() {
         activeRequest.current = null; requestController.current = null; setLoading(false)
       }
     }
-  }, [clearSession, range.from, range.to, today])
+  }, [clearSession, start, end, today])
 
   useEffect(() => { if (session && !visualMode) void refresh(session.name) }, [session, refresh])
   useEffect(() => {
@@ -429,7 +453,22 @@ export default function App() {
       sessionRef.current = next; setSession(next); return ''
     } catch (error) { return friendlyLoginError(error) }
   }
-  const logout = () => clearSession()
+  useEffect(() => {
+    const synchronize = (event: StorageEvent) => {
+      if (event.key !== SESSION_KEY && event.key !== null) return
+      const next = readSession().session, current=sessionRef.current
+      if (next?.accessToken === current?.accessToken) return
+      clearSession('',false)
+      if(next){sessionRef.current=next;setSession(next)}
+    }
+    window.addEventListener('storage', synchronize)
+    return () => window.removeEventListener('storage', synchronize)
+  }, [clearSession])
+  const logout = () => {
+    const current = sessionRef.current
+    clearSession()
+    if (current) void secureReadAction('logoutMobileViewer', { viewerName: current.name, accessToken: current.accessToken }).catch(() => setSessionNotice('이 기기에서 로그아웃했습니다. 서버 종료를 확인할 수 없습니다.'))
+  }
   const closeAttendance = useCallback(() => {
     attendanceRosterController.current?.abort()
     attendanceRosterController.current = null
@@ -499,7 +538,8 @@ export default function App() {
       const status = resourceStatus(data, key)
       return <div key={key}><b>{RESOURCE_LABELS[key]}</b><span className={`resource-state status-${status.state}`}>{status.state === 'fresh' ? '정상 조회' : status.state === 'empty' ? '등록 자료 없음' : status.state === 'cached' ? '이전 자료' : '확인 필요'}</span><small>정상 확인 {formatCheckedAt(status.lastSuccessAt)}{status.dataUpdatedAt && ` · 원본 갱신 ${formatCheckedAt(status.dataUpdatedAt)}`}{status.state === 'unavailable' && ` · 조회 시도 ${formatCheckedAt(status.lastAttemptAt)}`}</small></div>
     })}</div></details>}
-    <nav className="view-tabs" aria-label="일정 범위"><button role="tab" aria-selected={view === 'today'} className={view === 'today' ? 'active' : ''} onClick={() => setView('today')}>날짜</button><button role="tab" aria-selected={view === 'timetable'} className={view === 'timetable' ? 'active' : ''} onClick={() => setView('timetable')}>주간 시간표</button><button role="tab" aria-selected={view === 'week'} className={view === 'week' ? 'active' : ''} onClick={() => setView('week')}>이번 주</button><button role="tab" aria-selected={view === 'next'} className={view === 'next' ? 'active' : ''} onClick={() => setView('next')}>다음 주</button></nav>
+    <nav className="view-tabs" aria-label="일정 범위"><button role="tab" aria-selected={view === 'today'} className={view === 'today' ? 'active' : ''} onClick={() => setView('today')}>날짜</button><button role="tab" aria-selected={view === 'timetable'} className={view === 'timetable' ? 'active' : ''} onClick={() => setView('timetable')}>주간 시간표</button><button role="tab" aria-selected={view === 'week' || view === 'next'} className={view === 'week' || view === 'next' ? 'active' : ''} onClick={() => setView('week')}>주간 일정</button></nav>
+    {(view === 'week' || view === 'next') && <div className="week-navigation"><button aria-pressed={view === 'week'} onClick={() => setView('week')}>이번 주</button><strong>{start.slice(5)} ~ {end.slice(5)}</strong><button aria-pressed={view === 'next'} onClick={() => setView('next')}>다음 주</button></div>}
     <main className="content">
       <div className="section-heading"><div><p>{view === 'today' ? `${session.name} 선생님` : 'SCHEDULE'}</p><h1>{heading}</h1>{view === 'today' && <div className="today-stats"><span><b>{selectedClassCount}</b> 수업</span><span><b>{selectedEvents.length}</b> 일정</span>{visibleNewCount > 0 && <span className="new-stat"><b>{visibleNewCount}</b> 새 소식</span>}</div>}</div><div className="section-tools"><button className="icon-button" aria-label="일정 종류 설정" aria-expanded={filterOpen} onClick={() => setFilterOpen(value => !value)}><Filter size={18} /></button><button className="icon-button refresh-button" aria-label={loading ? `자료 조회 중 ${refreshElapsed}초` : '새로고침'} aria-busy={loading} onClick={() => refresh(session.name)} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={18} />{loading && <small className="refresh-elapsed">{refreshElapsed}초</small>}</button></div></div>
       {filterOpen && <section className="filter-panel"><h2>표시할 일정</h2><div className="filter-grid">{(Object.keys(SOURCE_LABELS) as ScheduleSource[]).map(source => <button key={source} className={visibility[source] ? 'selected' : ''} aria-pressed={visibility[source]} onClick={() => toggleSource(source)}><span>{visibility[source] && <Check size={13} />}</span>{SOURCE_LABELS[source]}</button>)}</div></section>}
@@ -509,6 +549,7 @@ export default function App() {
         {selectedDate === today && <details className="focus-disclosure"><summary>현재·다음 수업 요약</summary><NowNextCard lessons={selectedLessons} events={selectedEvents} minuteOfDay={clock.minutes} /></details>}
         <section className="panel timetable-primary"><div className="panel-title"><div className="panel-icon"><Clock3 size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘의 교사 시간표' : '선택한 날의 교사 시간표'}</h2></div><StatusBadge status={timetableStatus} /></div>{selectedSpecialDay && <p className="special-timetable-note" role="note">{selectedSpecialDay.message}</p>}<DailyTimeline lessons={selectedLessons} events={selectedEvents} attendance={selectedAttendanceSummaries} onOpenAttendance={openAttendance} onOpenEvent={setEventDetail} teacherFound={Boolean(teacher)} isNew={isNew} /></section>
         <section className="panel"><div className="panel-title"><div className="panel-icon secondary"><CalendarDays size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘 일정' : '선택한 날의 일정'}</h2></div><StatusBadge status={scheduleStatus} /></div><div className="event-list">{selectedEvents.map(event => <EventCard key={event.id} event={event} onOpen={setEventDetail} isNew={isNew(event)} />)}{!selectedEvents.length && <div className="empty">표시할 일정이 없습니다.</div>}</div></section>
+        <div className="week-switch">{(['meals','attendance'] as const).filter(key=>['cached','unavailable'].includes(data.bundle?.sourceStatus?.[key]?.state ?? '')).map(key=><button key={key} disabled={!!retrying || loading} onClick={()=>void retrySource(key)}>{key==='meals'?'급식':'출결 요약'} 다시 확인</button>)}</div>
         <MealPanel meals={selectedMeals} status={mealStatus} isToday={selectedDate === today} />
       </>}
       {data && (view === 'week' || view === 'next') && <div className="day-stack">{dateSet.map(date => {

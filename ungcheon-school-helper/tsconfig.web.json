@@ -108,6 +108,7 @@
     "src/services/studentTimetable.ts",
     "src/services/rosterAttendance.ts",
     "src/services/gradePreview.ts",
+    "src/services/localGradeStore.ts",
     "src/services/gradeCalculationPreview.ts",
     "src/services/achievementScenario.ts",
     "src/services/ungcheonSchedule.ts",

@@ -39,18 +39,27 @@ async function openDb() {
   })
 }
 
+const pendingKey=(key:string)=>'ungcheon.cache.wipe.'+key
+function pending(key:string){try{return localStorage.getItem(pendingKey(key))==='1'}catch{return false}}
+async function cleanupPending(db:IDBDatabase,key:string){
+  if(!pending(key)) return
+  await transact(db,'readwrite',store=>store.delete(IDBKeyRange.bound(key,key+'\uffff')))
+  try{localStorage.removeItem(pendingKey(key))}catch{}
+}
+
 async function userKey(name: string) {
   const bytes = new TextEncoder().encode(`ungcheon-mobile:${name.trim()}`)
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
-export async function readUserCache(name: string): Promise<DashboardPayload | null> {
+export async function readUserCache(name: string, scope = ''): Promise<DashboardPayload | null> {
   let db: IDBDatabase | undefined
   try {
     db = await openDb()
     const key = await userKey(name)
-    return (await transact<DashboardPayload | undefined>(db, 'readonly', store => store.get(key))) ?? null
+    await cleanupPending(db,key)
+    return (await transact<DashboardPayload | undefined>(db, 'readonly', store => store.get(scope ? key + ':' + scope : key))) ?? null
   } catch { return null } finally { db?.close() }
 }
 
@@ -69,15 +78,16 @@ function transact<T>(db: IDBDatabase, mode: IDBTransactionMode, operation: (stor
   })
 }
 
-export async function writeUserCache(name: string, payload: DashboardPayload) {
+export async function writeUserCache(name: string, payload: DashboardPayload, scope = '') {
   const normalizedName = name.trim()
   const generation = userGenerations.get(normalizedName) ?? 0
   const db = await openDb()
   try {
     const key = await userKey(normalizedName)
+    await cleanupPending(db,key)
     // 로그아웃 이후 뒤늦게 열린 저장 작업이 개인정보 캐시를 되살리지 않는다.
     if (generation !== (userGenerations.get(normalizedName) ?? 0)) return
-    await transact(db, 'readwrite', store => store.put(payload, key))
+    await transact(db, 'readwrite', store => store.put(payload, scope ? key + ':' + scope : key))
   } finally { db.close() }
 }
 
@@ -86,9 +96,11 @@ export async function deleteUserCache(name: string) {
   userGenerations.set(normalizedName, (userGenerations.get(normalizedName) ?? 0) + 1)
   let db: IDBDatabase | undefined
   try {
-    db = await openDb()
     const key = await userKey(normalizedName)
-    await transact(db, 'readwrite', store => store.delete(key))
+    try{localStorage.setItem(pendingKey(key),'1')}catch{}
+    db = await openDb()
+    await transact(db, 'readwrite', store => store.delete(IDBKeyRange.bound(key, key + '\uffff')))
+    try{localStorage.removeItem(pendingKey(key))}catch{}
   } catch { /* 로그아웃은 저장소를 쓸 수 없는 환경에서도 계속한다. */ }
   finally { db?.close() }
 }

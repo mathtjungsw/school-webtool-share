@@ -28,8 +28,12 @@ const MAX_ENTRY_COUNT = 80
 const MAX_AGE_MS = 45 * 24 * 60 * 60 * 1000
 const CACHE_FOLDER = 'school-hub-cache-v1'
 
+let cacheOwner: () => string = () => ''
+export function bindHubCacheOwner(getName:()=>string) { cacheOwner=getName }
 function cacheRoot() {
-  const root = join(app.getPath('userData'), CACHE_FOLDER)
+  const owner=cacheOwner()
+  if (!owner) throw Error('로그인이 필요합니다.')
+  const root = join(app.getPath('userData'), CACHE_FOLDER, createHash('sha256').update(owner).digest('hex'))
   if (!existsSync(root)) mkdirSync(root, { recursive: true })
   return root
 }

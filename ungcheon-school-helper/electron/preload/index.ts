@@ -1,10 +1,19 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { WidgetSettingsPatch } from '../../src/services/widgetSettings'
 
 contextBridge.exposeInMainWorld('preview', {
+  clearArea: (area:string)=>ipcRenderer.invoke('private:clearArea',area),
+  loginHint: () => ipcRenderer.invoke('preview:loginHint'),
+  filePath: (file: File) => webUtils.getPathForFile(file),
+  mobile: () => ipcRenderer.invoke('preview:mobile'),
+  checkSchedule: () => ipcRenderer.invoke('notifier:check'),
+  scheduleAlerts: () => ipcRenderer.invoke('notifier:list'),
+  onScheduleAlerts: (cb:()=>void) => {ipcRenderer.on('notifier:changed',cb);return ()=>ipcRenderer.removeListener('notifier:changed',cb)},
+  gradeVault: (action: string, key: string, value?: string) => ipcRenderer.sendSync('grade:vault', action, key, value),
   auth: (action: string, args?: unknown) => ipcRenderer.invoke('staff:auth', action, args),
   view: (payload: unknown) => ipcRenderer.invoke('feature:view', payload),
   update: (action: string) => ipcRenderer.invoke('preview:update', action),
+  onSync: (cb: () => void) => { const listener = () => cb(); ipcRenderer.on('schedule:sync',listener); return () => ipcRenderer.removeListener('schedule:sync',listener) },
   onUpdate: (cb: (state: any) => void) => { const fn = (_: unknown, state: any) => cb(state); ipcRenderer.on('preview:update', fn); return () => ipcRenderer.removeListener('preview:update', fn) },
 })
 contextBridge.exposeInMainWorld('electron', {

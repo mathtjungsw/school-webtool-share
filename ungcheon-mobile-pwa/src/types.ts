@@ -17,7 +17,7 @@ export interface MobileEvent {
 export interface StaffMember { name: string }
 export interface SharedStaffRoster { version: number; members: StaffMember[] }
 export interface TimetableSlot { value: string; locked: boolean }
-export interface TeacherTimetable { name: string; label: string; load: string; slots: TimetableSlot[] }
+export interface TeacherTimetable { pulledLessons?:import('./shared/pulledLessons2026').PulledLesson[]; name: string; label: string; load: string; slots: TimetableSlot[] }
 export interface SchoolTimetable { version: number; title: string; uploadedAt: string; teachers: TeacherTimetable[] }
 export interface CommitteeEvent { id: string; committeeName: string; title: string; date: string; startTime: string; endTime: string; location: string; memberNames: string[] }
 export interface CommitteeState { events: CommitteeEvent[] }
@@ -87,6 +87,7 @@ export interface DailyTimetableOverride {
   note: string; active: boolean; createdBy: string; createdAt: string; updatedAt: string
 }
 export interface MobileScheduleBundle {
+  revision?:string
   events: Array<{ date: string; title: string; source: 'weekly' | 'creative' | 'schoolEvent' | 'gateDuty' | 'mealDuty'; label: string; time?: string; startTime?: string; endTime?: string; periodStart?: number; periodEnd?: number }>
   teacherTimetable: TeacherTimetable | null
   committeeEvents: CommitteeEvent[]

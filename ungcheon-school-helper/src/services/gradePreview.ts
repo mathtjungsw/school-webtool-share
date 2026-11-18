@@ -366,17 +366,20 @@ export function buildGradeCutSummary(rows: GradeResult[], system: GradeSystem) {
   })
 }
 
-export function exportRestoreWorkbook(state: GradePreviewState, subjectName: string) {
+export function exportRestoreWorkbook(source: GradePreviewState, subjectName: string, mode: 'settings' | 'full' = 'full') {
+  const settingsOnly = mode === 'settings'
+  const state = settingsOnly ? { ...source, calculatedAt: null, results: [], splitPlanning: parseSplitPlanning(JSON.stringify(source.splitPlanning ?? {})) } : source
+  if (settingsOnly && state.splitPlanning) state.splitPlanning.scenarioCalculated = false
   const workbook = XLSX.utils.book_new()
   const readme = [
     ['추정분할점수 도우미 · 이어서 하기'],
     ['업무도우미에서 ‘업로드로 이어서 하기’를 눌러 이 파일을 과목으로 불러오세요.'],
-    ['학생 개인정보와 점수정보가 포함될 수 있으므로 안전하게 보관하세요.'],
+    [settingsOnly ? '평가 설정만 공유합니다. 이 파일을 열고 본인의 성적 자료를 입력하세요.' : '학생 개인정보와 점수정보가 포함될 수 있으므로 안전하게 보관하세요.'],
     ['생성 시각', new Date().toLocaleString('ko-KR')],
   ]
   const config = [
     ['key', 'value'],
-    ...Object.entries(state.config).filter(([key]) => key !== 'thresholds').map(([key, value]) => [key, value]),
+    ...Object.entries(state.config).filter(([key]) => key !== 'thresholds' && key in defaultGradePreviewState().config).map(([key, value]) => [key, value]),
     ...Object.entries(state.config.thresholds).map(([key, value]) => [`threshold_${key}`, value ?? '']),
   ]
   const workspace = [['subjectName', 'splitPlanning', 'calculatedAt'], [subjectName, JSON.stringify(state.splitPlanning ?? {}), state.calculatedAt ?? '']]
@@ -384,7 +387,7 @@ export function exportRestoreWorkbook(state: GradePreviewState, subjectName: str
     ['id', 'name', 'type', 'weight', 'maxScore', 'splitA', 'splitB', 'splitC', 'splitD', 'splitE', 'scoreOrigin'],
     ...items.map(component => [
       component.id, component.name, component.type, component.weight, component.maxScore,
-      ...SPLIT_BOUNDARIES.map(boundary => component.splitScores[boundary] ?? ''), component.scoreOrigin ?? '',
+      ...SPLIT_BOUNDARIES.map(boundary => component.splitScores[boundary] ?? ''), settingsOnly ? '' : component.scoreOrigin ?? '',
     ]),
   ]
   const scoreRows = (items: GradeComponent[]) => [
@@ -397,13 +400,17 @@ export function exportRestoreWorkbook(state: GradePreviewState, subjectName: str
   const otherComponents = state.componentCache[inactiveMode] ?? []
   const sheets: Array<[string, unknown[][]]> = [
     ['README', readme], ['CONFIG', config], ['COMPONENTS', componentRows(state.components)],
-    ['SCORES', scoreRows(state.components)], ['RESULTS', results], ['WORKSPACE', workspace],
+    ['WORKSPACE', workspace], ['FORMAT', [['version','mode'], [1, mode]]],
   ]
-  if (otherComponents.length) sheets.push(['OTHER_COMPONENTS', componentRows(otherComponents)], ['OTHER_SCORES', scoreRows(otherComponents)])
+  if (!settingsOnly) sheets.push(['SCORES', scoreRows(state.components)], ['RESULTS', results])
+  if (otherComponents.length) {
+    sheets.push(['OTHER_COMPONENTS', componentRows(otherComponents)])
+    if (!settingsOnly) sheets.push(['OTHER_SCORES', scoreRows(otherComponents)])
+  }
   sheets.forEach(([name, data]) => XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data), name))
   const safeName = subjectName.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
   const bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer
-  return { name: `추정분할점수_${safeName}_${schoolDate()}.xlsx`, bytes: Array.from(new Uint8Array(bytes)) }
+  return { name: `추정분할점수_${settingsOnly ? '설정공유' : '전체이어하기'}_${safeName}_${schoolDate()}.xlsx`, bytes: Array.from(new Uint8Array(bytes)) }
 }
 
 const outcomeKeys = [...SPLIT_BOUNDARIES, '미도달'] as const
@@ -447,7 +454,11 @@ function parseSplitPlanning(value: unknown): SplitPlanning | undefined {
 
 export async function importRestoreWorkbook(file: File): Promise<{ state: GradePreviewState; subjectName?: string }> {
   const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' })
-  for (const required of ['CONFIG', 'COMPONENTS', 'SCORES']) if (!workbook.SheetNames.includes(required)) throw new Error(`missing ${required}`)
+  const meta = workbook.Sheets.FORMAT ? XLSX.utils.sheet_to_json<{version: number; mode: string}>(workbook.Sheets.FORMAT)[0] : undefined
+  if (workbook.Sheets.FORMAT && (!meta || meta.version !== 1 || !['full','settings'].includes(meta.mode))) throw Error('지원하지 않는 형식입니다.')
+  const settingsOnly = meta?.mode === 'settings'
+  if (settingsOnly && workbook.SheetNames.some(name => !['README','CONFIG','COMPONENTS','OTHER_COMPONENTS','WORKSPACE','FORMAT'].includes(name))) throw Error('설정 공유 파일에 추가 자료가 들어 있습니다.')
+  for (const required of settingsOnly ? ['CONFIG','COMPONENTS'] : ['CONFIG', 'COMPONENTS', 'SCORES']) if (!workbook.SheetNames.includes(required)) throw new Error(`missing ${required}`)
   const config = defaultGradePreviewState().config
   const configRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.CONFIG, { defval: '' })
   configRows.forEach(row => {
@@ -466,7 +477,7 @@ export async function importRestoreWorkbook(file: File): Promise<{ state: GradeP
     }))
     const byId = new Map(components.map(component => [component.id, component]))
     if (byId.size !== components.length || components.some(component => !component.id || !['exam', 'performance'].includes(component.type))) throw new Error('invalid components')
-    XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[scoresSheet], { defval: '' }).forEach(row => {
+    if (!settingsOnly) XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[scoresSheet], { defval: '' }).forEach(row => {
       const component = byId.get(String(row.componentId))
       if (component) Object.assign(component.scores, normalizeScoreRows([row]))
     })
@@ -481,7 +492,7 @@ export async function importRestoreWorkbook(file: File): Promise<{ state: GradeP
     components[0].weight = 100
   }
   const state: GradePreviewState = { config, components, componentCache: {}, results: [], calculatedAt: null }
-  if (workbook.Sheets.OTHER_COMPONENTS && workbook.Sheets.OTHER_SCORES) {
+  if (workbook.Sheets.OTHER_COMPONENTS && (settingsOnly || workbook.Sheets.OTHER_SCORES)) {
     const otherMode = config.calculationMode === 'firstExam' ? 'term' : 'firstExam'
     state.componentCache[otherMode] = readComponents('OTHER_COMPONENTS', 'OTHER_SCORES')
   }
@@ -489,7 +500,7 @@ export async function importRestoreWorkbook(file: File): Promise<{ state: GradeP
     ? XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets.WORKSPACE)
     : []
   state.splitPlanning = parseSplitPlanning(workspace?.splitPlanning)
-  if (typeof workspace?.calculatedAt === 'string' && Number.isFinite(Date.parse(workspace.calculatedAt))) {
+  if (!settingsOnly && typeof workspace?.calculatedAt === 'string' && Number.isFinite(Date.parse(workspace.calculatedAt))) {
     if (config.splitMethod === 'estimated') {
       config.thresholds = weightedFinalCuts(components, activeSplitBoundaries(config.includeNonattainment, config.achievementScale))
     }

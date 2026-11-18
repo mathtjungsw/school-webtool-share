@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 74;
+const MOBILE_SERVICE_VERSION = 75;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -425,6 +425,7 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {key:'server-v75',title:'통합 시험판 · 일정과 자료 보호',body:'모바일 날짜별 조회, 개별 자료 재확인, 로그아웃과 우수사례 열람 권한을 시험합니다.',date:'2026-11-18'},
   {
     key: 'server-v74',
     title: '3학년 오전 수업 운영 반영',
@@ -1036,8 +1037,8 @@ function doPost(e) {
 
     // Staff authentication is mandatory for all non-mobile protected actions.
     // Mobile endpoints retain their existing independent password/session checks.
-    if (['staffLogin','staffSession','staffLogout','caseLibrary','caseDocument'].indexOf(action) >= 0) return json_({ ok: true, data: staffAuthAction_(body) });
-    const staffSession = ['health','verifyMobileViewer','getMobileScheduleBundle','getMobileAttendanceRoster'].indexOf(action) < 0 ? staffRequire_(body) : null;
+    if (['staffLogin','staffSession','staffLogout','caseUnlock','caseClose','caseLibrary','caseDocument'].indexOf(action) >= 0) return json_({ ok: true, data: staffAuthAction_(body) });
+    const staffSession = ['health','verifyMobileViewer','logoutMobileViewer','getMobileResource','getMobileScheduleBundle','getMobileAttendanceRoster'].indexOf(action) < 0 ? staffRequire_(body) : null;
 
     // Administrator-only metadata inspection; never runs sheet initialization.
     if (action === 'previewMigrationRequest') return json_({ ok: true, data: migrationPreviewRequest_(body, staffSession) });
@@ -1055,6 +1056,13 @@ function doPost(e) {
       if (sha256_(String(body.password || '')) !== mobileSharedPasswordHash_()) throw new Error('이름 또는 공통 비밀번호가 올바르지 않습니다.');
       return json_({ ok: true, data: mobileCreateSession_(mobileViewer) });
     }
+    if (action === 'logoutMobileViewer') {
+      const viewer = mobileAssertAccess_(body);
+      const key = MOBILE_SESSION_PROPERTY_PREFIX + sha256_(String(body.accessToken)).replace(/[^A-Za-z0-9]/g, '').slice(0,40);
+      PropertiesService.getScriptProperties().setProperty(key, JSON.stringify({viewerName:viewer,expiresAt:0}));
+      return json_({ok:true,data:true});
+    }
+    if (action === 'getMobileResource') return json_({ok:true,data:mobileSingleResource_(body)});
     if (action === 'getMobileScheduleBundle') return json_({ ok: true, data: getMobileScheduleBundle_(body) });
     if (action === 'getMobileAttendanceRoster') return json_({ ok: true, data: getMobileAttendanceRoster_(body) });
     if (action === 'getWidgetAttendanceSummaries') return json_({ ok: true, data: getWidgetAttendanceSummaries_(body) });
@@ -1078,6 +1086,7 @@ function doPost(e) {
       ensureSheets_();
     }
 
+    if (action === 'getSyncManifest' && typeof privateSchoolManifest_==='function') return json_({ok:true,data:privateSchoolManifest_()});
     if (action === 'getSyncManifest') return json_({ ok: true, data: getSyncManifest_() });
     if (action === 'verifyAdmin') {
       requireAdmin_(body.adminPassword);
@@ -1110,6 +1119,10 @@ function doPost(e) {
       requireAdmin_(body.adminPassword);
       deleteRowById_(FEATURE_REQUESTS_SHEET, String(body.id || ''));
       return json_({ ok: true });
+    }
+    if (typeof privateSchoolRoute_==='function' && PropertiesService.getScriptProperties().getProperty('UNG_PRIVATE_REPO')) {
+      const privateResponse=privateSchoolRoute_(action, body);
+      if(privateResponse) return json_({ok:true,data:privateResponse.data});
     }
     if (action === 'getTimetable') return json_({ ok: true, data: getTimetable_() });
     if (action === 'replaceTimetable') {
@@ -3420,7 +3433,7 @@ function mobileAdditionalLoginAllowed_(name) {
 function mobileAssertViewer_(viewerName) {
   const name = clean_(viewerName, 30);
   if (mobileAdditionalLoginAllowed_(name)) return name;
-  const roster = getStaffRoster_();
+  const roster = mobileSchoolData_('staffRoster',getStaffRoster_);
   if (!name || !roster || !Array.isArray(roster.members) || !roster.members.some(function(member) { return String(member.name || '').trim() === name; })) {
     throw new Error('교직원 명렬에 등록된 이름과 일치하지 않습니다.');
   }
@@ -3899,7 +3912,7 @@ function getWidgetAttendanceSummaries_(body) {
   const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
   const date = clean_(body.date, 10);
   if (date !== today) throw new Error('위젯 출결은 오늘 자료만 조회할 수 있습니다.');
-  const attendancePulledLessons = (Array.isArray(body.attendancePulledLessons) ? body.attendancePulledLessons : []).slice(0, 100);
+  const attendancePulledLessons = mobileViewerPulled_(viewerName);
   const attendanceContextVersion = clean_(body.attendanceContextVersion, 100);
   const cacheKey = 'widget-attendance:v' + MOBILE_SERVICE_VERSION + ':' + sha256_(viewerName).slice(0, 12) + ':' + date.replace(/-/g, '') + ':' + sha256_(attendanceContextVersion).slice(0, 8);
   if (!body.force) {
@@ -3930,7 +3943,7 @@ function getMobileAttendanceRoster_(body) {
   const period = Number(body.period);
   if (date !== today) throw new Error('모바일 출결 명렬은 오늘 수업만 조회할 수 있습니다.');
   if (!Number.isInteger(period) || period < 1 || period > 7) throw new Error('조회 교시를 확인해 주세요.');
-  const attendancePulledLessons = (Array.isArray(body.attendancePulledLessons) ? body.attendancePulledLessons : []).slice(0, 100);
+  const attendancePulledLessons = mobileViewerPulled_(viewerName);
   const attendanceContextVersion = clean_(body.attendanceContextVersion, 100);
   const cacheKey = 'mobile-attendance-roster:v' + MOBILE_SERVICE_VERSION + ':' + sha256_(viewerName).slice(0, 12) + ':' + date.replace(/-/g, '') + ':' + period + ':' + sha256_(attendanceContextVersion).slice(0, 8);
   try {
@@ -4074,6 +4087,25 @@ function mobileLoadSource_(sourceStatus, key, emptyValue, loader) {
   }
 }
 
+function mobileSchoolData_(group,fallback){
+  return typeof privateSchoolRevision_==='function' && privateSchoolRevision_(group) ? privateSchoolRead_(group) : fallback();
+}
+function mobileViewerPulled_(name) {
+  const table=mobileSchoolData_('timetable',getTimetable_);
+  return (table && table.pulledLessons || []).filter(function(x){return x.teacherName===name;});
+}
+
+function mobileSingleResource_(body) {
+  const name=mobileAssertAccess_(body), date=clean_(body.date,10), resource=String(body.resource), status={};
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !['meals','attendance'].includes(resource)) throw Error('요청한 자료를 확인해 주세요.');
+  const items=mobileLoadSource_(status,resource,[],function(){
+    if(resource==='meals') return mobileSharedMealsInRange_(date,date);
+    const changes=listTimetableChanges_({viewerName:name,fromDate:date,toDate:date,includeSchool:false}).filter(function(x){return x.status==='approved'||(x.requesterAppliedAt&&x.requesterName===name && x.status!=='cancelled'&&x.status!=='rejected');});
+    return mobileAttendanceSummaries_(name,date,date,listTimetableOverrides_({includeInactive:false}),changes,mobileViewerPulled_(name));
+  });
+  return {items:items,status:status[resource]};
+}
+
 function getMobileScheduleBundle_(body) {
   const viewerName = mobileAssertAccess_(body);
   const fromDate = clean_(body.fromDate, 10);
@@ -4083,8 +4115,7 @@ function getMobileScheduleBundle_(body) {
   if (!Number.isFinite(days) || mobileDate_(new Date(fromDate + 'T00:00:00+09:00')) !== fromDate || mobileDate_(new Date(toDate + 'T00:00:00+09:00')) !== toDate || days < 0 || days > 21) throw new Error('모바일 일정은 올바른 날짜의 최대 22일 범위에서 조회할 수 있습니다.');
   // 오늘 급식 하위 호환 필드가 날짜 변경 때 즉시 달라지도록 한국 날짜를 캐시 키에 포함합니다.
   const todayKey = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd');
-  const attendancePulledLessons = Array.isArray(body.attendancePulledLessons) ? body.attendancePulledLessons.slice(0, 300) : [];
-  const attendanceContextVersion = clean_(body.attendanceContextVersion, 100);
+  const attendanceContextVersion = (typeof privateSchoolRevision_==='function'?privateSchoolRevision_('timetable'):'') + clean_(body.attendanceContextVersion, 100);
   const cacheKey = 'mobile:v' + MOBILE_SERVICE_VERSION + ':' + sha256_(viewerName).slice(0, 12) + ':' + todayKey + ':' + fromDate + ':' + toDate + ':' + sha256_(attendanceContextVersion).slice(0, 8);
   let cached = null;
   try { cached = (sourceCacheEnabled_() && CacheService.getScriptCache().get(cacheKey)); } catch (ignore) {}
@@ -4096,6 +4127,7 @@ function getMobileScheduleBundle_(body) {
           cachedResult.sourceStatus[key].mode = 'response-cache';
         });
         cachedResult.servedAt = new Date().toISOString();
+        if (cachedResult.revision && body.ifRevision===cachedResult.revision) return {notModified:true,revision:cachedResult.revision};
         return cachedResult;
       }
     } catch (ignore) {}
@@ -4117,9 +4149,11 @@ function getMobileScheduleBundle_(body) {
   const seen = {};
   let timetableUpdatedAt = '';
   const teacherTimetable = mobileLoadSource_(sourceStatus, 'timetable', null, function() {
-    const schoolTimetable = getTimetable_();
+    const schoolTimetable = mobileSchoolData_('timetable',getTimetable_);
     timetableUpdatedAt = schoolTimetable && iso_(schoolTimetable.uploadedAt) || '';
-    return schoolTimetable && schoolTimetable.teachers.find(function(teacher) { return String(teacher.name || '').trim() === viewerName; }) || null;
+    const teacher = schoolTimetable && schoolTimetable.teachers.find(function(teacher) { return String(teacher.name || '').trim() === viewerName; }) || null;
+    if (teacher) teacher.pulledLessons = (schoolTimetable.pulledLessons || []).filter(function(lesson){return lesson.teacherName === viewerName;});
+    return teacher;
   });
   if (timetableUpdatedAt && sourceStatus.timetable.state !== 'unavailable') sourceStatus.timetable.dataUpdatedAt = timetableUpdatedAt;
   const committeeEvents = mobileLoadSource_(sourceStatus, 'committee', [], function() {
@@ -4137,7 +4171,7 @@ function getMobileScheduleBundle_(body) {
     }).concat(mobileMorningOnlyOverrides_(fromDate, toDate));
   });
   const attendanceSummaries = mobileLoadSource_(sourceStatus, 'attendance', [], function() {
-    return mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverrides, timetableChanges, attendancePulledLessons);
+    return mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverrides, timetableChanges, teacherTimetable && teacherTimetable.pulledLessons || []);
   });
   const todayIsoDate = todayKey.slice(0, 4) + '-' + todayKey.slice(4, 6) + '-' + todayKey.slice(6, 8);
   const sharedMeals = mobileLoadSource_(sourceStatus, 'meals', [], function() {
@@ -4163,10 +4197,12 @@ function getMobileScheduleBundle_(body) {
     sourceStatus: sourceStatus,
     fetchedAt: new Date().toISOString(),
     servedAt: new Date().toISOString() };
+  result.revision = sha256_(JSON.stringify([viewerName,fromDate,toDate,result.events,teacherTimetable,committeeEvents,timetableChanges,timetableOverrides,attendanceSummaries,meals,todayMeals,Object.keys(sourceStatus).map(function(k){return [k,sourceStatus[k].state];})]));
   const allSourcesAvailable = Object.keys(sourceStatus).every(function(key) { return sourceStatus[key].state !== 'unavailable'; });
   if (allSourcesAvailable) {
     try { if (sourceCacheEnabled_()) CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 60); } catch (ignore) {}
   }
+  if(body.ifRevision===result.revision && allSourcesAvailable) return {notModified:true,revision:result.revision};
   return result;
 }
 

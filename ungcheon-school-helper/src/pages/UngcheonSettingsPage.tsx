@@ -1,3 +1,4 @@
+import { localGradeStore } from '../services/localGradeStore'
 import { useEffect, useState } from 'react'
 import {
   CheckCircle2, KeyRound, Link2, Palette, Save, School,
@@ -37,6 +38,26 @@ export default function UngcheonSettingsPage() {
   const adminPassword = useAdminStore(s => s.adminPassword)
   const [draft, setDraft] = useState(config)
   const [saved, setSaved] = useState(false)
+  const [previewMode,setPreviewMode]=useState(false)
+  const [clearMessage,setClearMessage]=useState('')
+  const [subjects,setSubjects]=useState<{id:string;name:string}[]>([])
+  useEffect(()=>{ void window.electron.getVersion().then(v=>setPreviewMode(v.includes('-preview.'))); try{setSubjects(JSON.parse(localGradeStore.getItem('ungcheon-estimated-split-subjects-v1') || '{}').subjects || [])}catch{setClearMessage('성적 저장소를 열 수 없습니다.')} },[])
+  const clearArea=async(area:string,label:string)=>{
+    if(!window.confirm(label+' 자료를 이 PC에서 삭제할까요? 삭제한 자료는 복구할 수 없습니다.'))return
+    try {
+      if (area==='admission-cases' || area==='average-grade') await window.preview.clearArea(area)
+      else if(area==='grade') localGradeStore.removeItem('ungcheon-grade-preview-v1')
+      else {
+        const registryKey='ungcheon-estimated-split-subjects-v1', registry=JSON.parse(localGradeStore.getItem(registryKey) || '{}')
+        if (!registry.subjects?.some((s:{id:string})=>s.id===area)) throw Error('과목 목록이 변경되었습니다.')
+        localGradeStore.removeItem('ungcheon-estimated-split-helper-v1'+(area==='original'?'':':'+area))
+        if (area==='original') for(const exam of ['first-exam','second-exam']) localGradeStore.removeItem('ungcheon-split-planner-'+exam)
+        const rest=registry.subjects.filter((s:{id:string})=>s.id!==area)
+        localGradeStore.setItem(registryKey,JSON.stringify({subjects:rest,activeId:rest.some((s:{id:string})=>s.id===registry.activeId)?registry.activeId:rest[0]?.id || ''}));setSubjects(rest)
+      }
+      setClearMessage(label+' 자료를 삭제했습니다.')
+    } catch(error){setClearMessage(error instanceof Error ? error.message : '삭제하지 못했습니다.')}
+  }
   const [hubStatus, setHubStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
   const [autoLaunch, setAutoLaunch] = useState(false)
   const [cacheStatus, setCacheStatus] = useState(() => getSchoolHubCacheStatus())
@@ -256,11 +277,11 @@ export default function UngcheonSettingsPage() {
               <h3 className="flex items-center gap-2 text-sm font-bold text-slate-950"><Smartphone size={16} className="text-sky-700" />모바일 일정 PWA</h3>
               <p className="mt-1 text-xs leading-relaxed text-slate-700">스마트폰에서 오늘·이번 주·다음 주 일정과 교사 시간표, 급식을 읽기 전용으로 확인합니다.</p>
             </div>
-            <button type="button" onClick={() => window.electron?.openExternal(MOBILE_SCHEDULE_URL)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-sky-300 bg-white px-4 py-2 text-sm font-bold text-sky-900 transition-colors hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600">
+            <button type="button" onClick={() => previewMode ? window.preview.mobile() : window.electron?.openExternal(MOBILE_SCHEDULE_URL)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-sky-300 bg-white px-4 py-2 text-sm font-bold text-sky-900 transition-colors hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600">
               모바일 일정 열기 <ExternalLink size={14} />
             </button>
           </div>
-          <p className="mt-3 select-text break-all text-xs font-semibold text-sky-900">{MOBILE_SCHEDULE_URL}</p>
+          <p className="mt-3 select-text break-all text-xs font-semibold text-sky-900">{previewMode ? '이 PC의 시험 서버에서 모바일 화면을 엽니다.' : MOBILE_SCHEDULE_URL}</p>
           <ul className="mt-3 list-disc space-y-1.5 pl-4 text-xs leading-relaxed text-slate-700">
             <li>본인 이름과 학교에서 안내받은 공통 비밀번호로 로그인하며, 로그인은 72시간 유지됩니다.</li>
             <li>스마트폰 브라우저에서 위 주소를 연 뒤 ‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택하면 앱처럼 바로 열 수 있습니다.</li>
@@ -270,6 +291,11 @@ export default function UngcheonSettingsPage() {
         </div>
       </Section>
 
+      <Section icon={<Database size={17} />} title="이 PC의 업무 자료 관리">
+        <p className="mb-3 text-sm">삭제할 자료를 선택하세요. 수시 우수사례는 내려받은 PDF만 비웁니다.</p>
+        <div className="flex flex-wrap gap-2">{[...([{id:'grade',name:'등급 미리보기'},{id:'average-grade',name:'평균 내신등급 산출기'},{id:'admission-cases',name:'수시 우수사례 PDF'}]),...subjects.map(s=>({...s,name:'추정분할점수 · '+s.name}))].map(s=><button key={s.id} className="btn-secondary" onClick={()=>void clearArea(s.id,s.name)}>{s.name} 삭제</button>)}</div>
+        {clearMessage && <p role="status" className="mt-2 text-sm">{clearMessage}</p>}
+      </Section>
       <Section icon={<Database size={17} />} title="공유자료 로컬 저장·자동 동기화">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -288,7 +314,7 @@ export default function UngcheonSettingsPage() {
             }}
             className="btn-ghost inline-flex shrink-0 items-center gap-2 text-rose-300"
           >
-            <Trash2 size={14} />로컬 저장자료 모두 삭제
+            <Trash2 size={14} />공유자료 캐시 삭제
           </button>
         </div>
       </Section>

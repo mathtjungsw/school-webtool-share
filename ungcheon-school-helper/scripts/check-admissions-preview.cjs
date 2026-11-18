@@ -21,7 +21,7 @@ async function main(){
  const {startPreviewBackend}=loadTs('electron/main/preview-backend.ts')
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ungcheon-auth-test-'))
  const config=path.join(dir,'config.json'),salt='synthetic-test-salt',password='test-only-secret'
- fs.writeFileSync(config,JSON.stringify({salt,verifier:crypto.scryptSync(password,salt,32).toString('hex'),names:['테스트교사'],documents:[]}))
+ fs.writeFileSync(config,JSON.stringify({salt,verifier:crypto.scryptSync(password,salt,32).toString('hex'),names:['테스트교사'],caseVerifier:crypto.createHash('sha256').update('0000').digest('hex'),documents:[]}))
  const service=await startPreviewBackend(config)
  const req=async payload=>(await fetch(service.url,{method:'POST',body:JSON.stringify(payload)})).json()
  try{
@@ -29,7 +29,9 @@ async function main(){
   assert.equal((await req({action:'staffLogin',name:'테스트교사',password:'wrong'})).ok,false)
   assert.equal((await req({action:'staffLogin',name:'미등록',password})).ok,false)
   const login=await req({action:'staffLogin',name:'테스트교사',password});assert.equal(login.ok,true)
-  assert.equal((await req({action:'caseLibrary',staffToken:login.data.token})).ok,true)
+  assert.equal((await req({action:'caseLibrary',staffToken:login.data.token})).ok,false)
+  const unlock=await req({action:'caseUnlock',staffToken:login.data.token,password:'0000'});assert.ok(unlock.ok)
+  assert.equal((await req({action:'caseLibrary',staffToken:login.data.token,grant:unlock.data.grant})).ok,true)
   await req({action:'staffLogout',staffToken:login.data.token})
   assert.equal((await req({action:'caseLibrary',staffToken:login.data.token})).ok,false)
   console.log('PASS isolated HTTP authentication, wrong/unregistered credentials, protected library and logout revocation')

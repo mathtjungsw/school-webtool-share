@@ -1,5 +1,5 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),asar=require('@electron/asar')
-const base=path.resolve('release/win-unpacked'),archive=path.join(base,'resources/app.asar')
+const base=path.resolve(process.argv[2] || 'release/win-unpacked'),archive=path.join(base,'resources/app.asar')
 const cfgPath=path.join(process.env.LOCALAPPDATA,'Codex/ungcheon-preview/server-config.json')
 const cfg=fs.existsSync(cfgPath)?JSON.parse(fs.readFileSync(cfgPath,'utf8')):{documents:[]}
 const sourcePaths=cfg.documents.map(d=>d.path)

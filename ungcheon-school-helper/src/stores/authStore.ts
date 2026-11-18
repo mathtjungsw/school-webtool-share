@@ -7,6 +7,7 @@ const SESSION_EXPIRES_KEY = 'pilotLogin.expiresAt'
 const SESSION_HOURS = 120
 
 interface AuthState {
+  retryRequired: boolean
   ready: boolean
   authenticated: boolean
   teacherName: string
@@ -35,6 +36,7 @@ function isFuture(value: unknown) {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
+  retryRequired: false,
   ready: false,
   authenticated: false,
   teacherName: '',
@@ -46,7 +48,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   executiveExpiresAt: '',
 
   bootstrap: async () => {
-    try { const result = await window.preview.auth('restore'); if (result.authenticated) await useAppStore.getState().loadConfig(); set({ ready: true, authenticated: result.authenticated, teacherName: result.teacherName, expiresAt: result.expiresAt }) }
+    try { const result = await window.preview.auth('restore'); if (result.authenticated) await useAppStore.getState().loadConfig(); set({ ready: true, retryRequired: !!result.retryRequired, authenticated: result.authenticated, teacherName: result.teacherName, expiresAt: result.expiresAt }) }
     catch { set({ ready: true, authenticated: false, teacherName: '', expiresAt: '' }) }
   },
   login: async (name, password) => {
@@ -100,7 +102,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       window.electron?.configDelete(SESSION_NAME_KEY),
       window.electron?.configDelete(SESSION_EXPIRES_KEY),
     ])
-    set({ authenticated: false, teacherName: '', expiresAt: '', error: '', executiveRole: null, executiveAccessToken: '', executiveExpiresAt: '' })
+    set({ retryRequired: false, authenticated: false, teacherName: '', expiresAt: '', error: '', executiveRole: null, executiveAccessToken: '', executiveExpiresAt: '' })
     window.electron?.notifyAuthChanged()
   },
 }))

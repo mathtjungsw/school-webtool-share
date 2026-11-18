@@ -34,97 +34,46 @@ const OPTIONS: Option[] = [
   { id: 'removeDuplicates', label: '중복 행 제거', desc: '완전히 동일한 행 삭제' },
 ]
 
-function isDateLike(val: string): boolean {
-  return /^\d{8}$/.test(val) || /^\d{4}[.\-\/]\d{1,2}[.\-\/]\d{1,2}$/.test(val)
+function normalizedDate(value: string) {
+  const match = /^(\d{4})(\d{2})(\d{2})$/.exec(value) || /^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/.exec(value)
+  if (!match) return value
+  const [year,month,day] = match.slice(1).map(Number)
+  const date = new Date(year, month - 1, day)
+  if (year < 1900 || year > 2199 || date.getMonth()+1 !== month || date.getDate() !== day) return value
+  return [year,String(month).padStart(2,'0'),String(day).padStart(2,'0')].join('-')
 }
 
-function normalizeDate(val: string): string {
-  const s = val.replace(/[.\-\/]/g, '')
-  if (/^\d{8}$/.test(s)) {
-    return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`
-  }
-  return val
-}
-
-function processSheet(
-  sheet: XLSX.WorkSheet,
-  opts: typeof DEFAULT_OPTIONS,
-  stats: Stats,
-): XLSX.WorkSheet {
+function processSheet(sheet: XLSX.WorkSheet, opts: typeof DEFAULT_OPTIONS, stats: Stats): XLSX.WorkSheet {
   const range = XLSX.utils.decode_range(sheet['!ref'] ?? 'A1')
-  const headerRow = range.s.r
-  stats.totalRows += range.e.r - range.s.r + 1
-
-  const outputRows: (string | number | boolean | null)[][] = []
-  const seenKeys = new Set<string>()
-
-  for (let r = range.s.r; r <= range.e.r; r++) {
-    const rowCells: (string | number | boolean | null)[] = []
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c })
-      const cell = sheet[addr]
+  const merges = sheet['!merges'] || []
+  const output: XLSX.WorkSheet = { ...sheet }
+  const seen = new Set<string>()
+  let dest = range.s.r
+  for (let r=range.s.r; r<=range.e.r; r++) {
+    stats.totalRows++
+    const cells: (XLSX.CellObject | undefined)[] = []
+    for (let c=range.s.c; c<=range.e.c; c++) {
+      const address = XLSX.utils.encode_cell({r,c})
+      const cell = sheet[address]
+      delete output[address]
       stats.totalCells++
-
-      if (!cell || cell.v === undefined || cell.v === null || cell.v === '') {
-        if (opts.fillBlanks) {
-          stats.filledBlanks++
-          rowCells.push('N/A')
-        } else {
-          rowCells.push(null)
-        }
-        continue
+      if (cell?.f || merges.some(m => r>=m.s.r && r<=m.e.r && c>=m.s.c && c<=m.e.c && (r!==m.s.r || c!==m.s.c))) { cells.push(cell); continue }
+      let value = cell?.v
+      if ((value == null || value === '') && opts.fillBlanks) {value='N/A';stats.filledBlanks++}
+      if (typeof value === 'string' && opts.trimSpaces) {const next=value.trim().replace(/\s+/g,' ');if (next!==value) stats.trimmedCells++;value=next}
+      if (opts.normalizeDates && (typeof value === 'string'||typeof value === 'number')) {
+        const next=normalizedDate(String(value));if(next!==String(value)){stats.normalizedDates++;value=next}
       }
-
-      // Preserve numeric/boolean types unless date normalization applies
-      if (typeof cell.v === 'number' || typeof cell.v === 'boolean') {
-        if (opts.normalizeDates && typeof cell.v === 'number' && isDateLike(String(cell.v))) {
-          const normalized = normalizeDate(String(cell.v))
-          stats.normalizedDates++
-          rowCells.push(normalized)
-        } else {
-          rowCells.push(cell.v)
-        }
-        continue
-      }
-
-      let val = String(cell.v)
-
-      if (opts.trimSpaces) {
-        const trimmed = val.trim().replace(/\s+/g, ' ')
-        if (trimmed !== val) {
-          val = trimmed
-          stats.trimmedCells++
-        }
-      }
-
-      if (opts.normalizeDates && isDateLike(val)) {
-        const norm = normalizeDate(val)
-        if (norm !== val) {
-          val = norm
-          stats.normalizedDates++
-        }
-      }
-
-      rowCells.push(val)
+      cells.push(value === cell?.v ? cell : {...cell,t:'s',v:value,w:undefined})
     }
-
-    // Duplicate removal: skip identical rows (preserve header)
-    if (opts.removeDuplicates && r > headerRow) {
-      const key = rowCells.join('\x00')
-      if (seenKeys.has(key)) {
-        stats.removedDuplicates++
-        continue
-      }
-      seenKeys.add(key)
-    }
-
-    outputRows.push(rowCells)
+    const key=JSON.stringify(cells.map(x=>[x?.t,x?.v,x?.f]))
+    if (opts.removeDuplicates && r>range.s.r && seen.has(key)) {stats.removedDuplicates++; continue}
+    if (r>range.s.r) seen.add(key)
+    cells.forEach((cell,index)=>{if(cell)output[XLSX.utils.encode_cell({r:dest,c:index+range.s.c})]=cell})
+    dest++
   }
-
-  // Rebuild sheet so duplicate rows are fully removed (not just emptied)
-  const newSheet = XLSX.utils.aoa_to_sheet(outputRows)
-  if (sheet['!cols']) newSheet['!cols'] = sheet['!cols']
-  return newSheet
+  output['!ref']=XLSX.utils.encode_range(range.s,{r:dest-1,c:range.e.c})
+  return output
 }
 
 export default function ExcelProcessorPage() {
@@ -148,7 +97,7 @@ export default function ExcelProcessorPage() {
     reader.onload = e => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer)
-        const wb = XLSX.read(data, { type: 'array' })
+        const wb = XLSX.read(data, { type: 'array', cellStyles: true, cellNF: true })
         setWorkbook(wb)
         setFileName(f.name)
         setStats(null)
@@ -169,11 +118,16 @@ export default function ExcelProcessorPage() {
       await new Promise(r => setTimeout(r, 50))
       const newStats: Stats = { totalRows: 0, totalCells: 0, trimmedCells: 0, normalizedDates: 0, filledBlanks: 0, removedDuplicates: 0 }
 
+      if (options.removeDuplicates && workbook.SheetNames.some(name => {
+        const sheet = workbook.Sheets[name]
+        return Boolean(sheet['!merges']?.length) || Object.keys(sheet).some(key => sheet[key]?.f)
+      })) throw Error('수식·병합이 있는 파일입니다. 중복 행 제거를 끄면 원래 행 위치를 보존해 저장할 수 있습니다.')
+      const resultBook={...workbook,Sheets:{...workbook.Sheets}}
       for (const name of workbook.SheetNames) {
-        workbook.Sheets[name] = processSheet(workbook.Sheets[name], options, newStats)
+        resultBook.Sheets[name] = processSheet(workbook.Sheets[name], options, newStats)
       }
 
-      const out = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as Uint8Array
+      const out = XLSX.write(resultBook, { type: 'array', bookType: 'xlsx' }) as Uint8Array
       setResultBuffer(out)
       setStats(newStats)
     } catch (e) {
