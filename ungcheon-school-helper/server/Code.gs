@@ -65,78 +65,14 @@ const EXECUTIVE_SESSION_PROPERTY_PREFIX = 'UNG_EXECUTIVE_SESSION_';
 const EXECUTIVE_SESSION_HOURS = 8;
 // 초기 비밀번호는 평문으로 보관하지 않습니다.
 const EXECUTIVE_INITIAL_PASSWORD_HASH = 'mvFbM25qlhmShTffMLLmojdlafz51+dz7M7eZWBlKaA=';
-const INITIAL_TIMETABLE_OVERRIDES_1_1_31 = [
-  ['seed-20260911-g1-p7', '2026-09-11', '1', '', 7, 'copy', '2026-09-23', 7, '9월 23일 수요일 7교시 수업 운영'],
-  ['seed-20260911-g2-p7', '2026-09-11', '2', '', 7, 'copy', '2026-09-23', 7, '9월 23일 수요일 7교시 수업 운영'],
-  ['seed-20260911-g3-p7', '2026-09-11', '3', '', 7, 'move_pulled', '2026-09-23', 7, '9월 23일 7교시 당김수업을 오늘 운영'],
-  ['seed-20260923-all-p1', '2026-09-23', '', '', 1, 'copy', '2026-09-23', 2, '기존 2교시 수업을 1교시에 운영'],
-  ['seed-20260923-all-p2', '2026-09-23', '', '', 2, 'copy', '2026-09-23', 3, '기존 3교시 수업을 2교시에 운영'],
-  ['seed-20260923-all-p3', '2026-09-23', '', '', 3, 'copy', '2026-09-23', 4, '기존 4교시 수업을 3교시에 운영'],
-  ['seed-20260923-all-p4', '2026-09-23', '', '', 4, 'copy', '2026-09-23', 5, '기존 5교시 수업을 4교시에 운영'],
-  ['seed-20260923-all-p5', '2026-09-23', '', '', 5, 'copy', '2026-09-23', 6, '기존 6교시 수업을 5교시에 운영'],
-  ['seed-20260923-all-p6', '2026-09-23', '', '', 6, 'clear', '', 0, '6교시 수업 없음'],
-  ['seed-20260923-all-p7', '2026-09-23', '', '', 7, 'clear', '', 0, '7교시 수업 없음']
-];
+const INITIAL_TIMETABLE_OVERRIDES_1_1_31 = [];
 // 2026학년도 업무분장 원문에서 담임·교과·부서만 선별한 자료입니다.
 // 업무, 세부업무, 부담임 등 나머지 원문 정보는 저장하지 않습니다.
-const STAFF_ASSIGNMENTS_2026 = [
-  ['강수경', '교무기획부', '영어', ''], ['공혜진', '교무기획부', '역사', ''],
-  ['배병희', '교무기획부', '국어', ''], ['이혜원', '교무기획부', '영어', '1-6'],
-  ['김윤미', '교무기획부', '일본어', '3-7'],
-  ['김혜경', '인성안전부', '생명과학', ''], ['박은실', '인성안전부', '수학', ''],
-  ['전종택', '인성안전부', '물리', ''], ['김성혜', '인성안전부', '윤리', '3-4'],
-  ['박선욱', '인성안전부', '음악', '1-4'], ['이찬희', '인성안전부', '', ''],
-  ['정승원', '교육과정부', '수학', ''], ['이송은', '교육과정부', '일반사회', ''],
-  ['김소영', '교육과정부', '수학', ''], ['김해주', '교육과정부', '수학', '2-6'],
-  ['이정용', '교육연구부', '지구과학', ''], ['황수란', '교육연구부', '국어', ''],
-  ['안소정', '교육연구부', '체육', ''],
-  ['이환필', '진로교육부', '진로', ''], ['최희경', '진로교육부', '역사', ''],
-  ['김진영', '진로교육부', '특수', '특수 담임'],
-  ['김민우', '미래정보부', '영어', ''], ['전영희', '미래정보부', '국어', ''],
-  ['이승현', '미래정보부', '정보', '2-2'],
-  ['최경희', '평가혁신부', '지리', ''], ['이미경', '평가혁신부', '수학', ''],
-  ['황혜진', '평가혁신부', '화학', ''],
-  ['박민자', '문화건강부', '국어', ''], ['안효정', '문화건강부', '미술', ''],
-  ['김미주', '문화건강부', '보건', ''],
-  ['이원철', '1학년부', '생명과학', '1-1'], ['조승현', '1학년부', '국어', '1-2'],
-  ['민진호', '1학년부', '미술', '1-7'], ['변수옥', '1학년부', '일반사회', '1-3'],
-  ['표명준', '1학년부', '수학', '1-5'],
-  ['김중오', '2학년부', '윤리', '2-7'], ['박진우', '2학년부', '영어', '2-5'],
-  ['이기성', '2학년부', '체육', '2-3'], ['장규빈', '2학년부', '영어', '2-4'],
-  ['이승언', '2학년부', '지리', '2-1'],
-  ['이영재', '3학년부', '체육', '3-3'], ['전우석', '3학년부', '지구과학', '3-5'],
-  ['이경민', '3학년부', '영어', '3-1'], ['신숙자', '3학년부', '수학', '3-2'],
-  ['정유현', '3학년부', '국어', '3-6']
-];
-const OFFICIAL_NON_TEACHING_STAFF_2026 = [
-  ['김우열', '행정실장'], ['문은희', '행정과장'], ['박정희', '행정주임'], ['정지수', '행정주임'],
-  ['이문원', '시설관리'], ['문소영', '사무행정'], ['오지윤', '교무행정'], ['이선경', '영양사'],
-  ['홍인숙', '조리사'], ['강해선', '조리실무사'], ['고윤경', '조리실무사'], ['김미령', '조리실무사'],
-  ['윤외희', '조리실무사'], ['윤하영', '조리실무사'], ['정현선', '조리실무사'], ['조경염', '조리실무사'],
-  ['최혜진', '조리실무사'], ['전영애', '청소'], ['이정우', '당직']
-];
+const STAFF_ASSIGNMENTS_2026 = [];
+const OFFICIAL_NON_TEACHING_STAFF_2026 = [];
 // User-approved 순번 in 26년 전교직원명렬.xlsx (2026-10-08).
 // Left block 1–33, then right block 34–66. 최대식 remains 전종택.
-const STAFF_ROSTER_FILE_ORDER_20261008 = [
-  ['류희열', '교장'], ['이승훈', '교감'], ['김우열', '행정실장'],
-  ['강수경', '교사'], ['공혜진', '교사'], ['김미주', '교사'], ['김민우', '교사'],
-  ['김성혜', '교사'], ['김소영', '교사'], ['김윤미', '교사'], ['김중오', '교사'],
-  ['김진영', '교사'], ['김해주', '교사'], ['김혜경', '교사'], ['민진호', '교사'],
-  ['박민자', '교사'], ['박선욱', '교사'], ['박은실', '교사'], ['박진우', '교사'],
-  ['배병희', '교사'], ['변수옥', '교사'], ['신숙자', '교사'], ['안소정', '교사'],
-  ['안효정', '교사'], ['이경민', '교사'], ['이기성', '교사'], ['이미경', '교사'],
-  ['이송은', '교사'], ['이승언', '교사'], ['이승현', '교사'], ['이영재', '교사'],
-  ['이원철', '교사'], ['이정용', '교사'], ['이찬희', '교사'], ['이혜원', '교사'],
-  ['이환필', '교사'], ['장규빈', '교사'], ['전영희', '교사'], ['전우석', '교사'],
-  ['정승원', '교사'], ['정유현', '교사'], ['조승현', '교사'], ['최경희', '교사'],
-  ['전종택', '교사'], ['최희경', '교사'], ['표명준', '교사'], ['황수란', '교사'],
-  ['황혜진', '교사'], ['문은희', '행정과장'], ['박정희', '주무관'], ['우가희', '주무관'],
-  ['이문원', '시설관리'], ['문소영', '사무행정'], ['오지윤', '교무행정'],
-  ['이선경', '영양사'], ['홍인숙', '조리사'], ['조경염', '조리실무사'],
-  ['윤외희', '조리실무사'], ['김미령', '조리실무사'], ['강해선', '조리실무사'],
-  ['고윤경', '조리실무사'], ['정현선', '조리실무사'], ['윤하영', '조리실무사'],
-  ['최혜진', '조리실무사'], ['전영애', '청소'], ['이정우', '당직']
-];
+const STAFF_ROSTER_FILE_ORDER_20261008 = [];
 // 시험 운영 중의 변경 기록은 소스 이력으로만 보관하고 공지에는 다시 게시하지 않습니다.
 const LEGACY_RELEASE_NOTES = [
   {
@@ -425,7 +361,13 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
-  {key:'server-v75',title:'통합 시험판 · 일정과 자료 보호',body:'모바일 날짜별 조회, 개별 자료 재확인, 로그아웃과 우수사례 열람 권한을 시험합니다.',date:'2026-11-18'},
+  {key:'server-v75',title:'모바일 일정과 우수사례 열람 개선',body:'모바일 날짜별 조회, 자료별 다시 확인, 로그아웃과 우수사례 열람 확인을 지원합니다.',date:'2026-11-18'},
+  {
+    key: 'v1.1.44',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.44 · PC 자료 보호와 모바일 일정 개선',
+    body: '성적 작업은 PC에서 암호화해 보관하며 환경설정에서 자료별로 비울 수 있습니다. 본창과 위젯은 일정 갱신을 공유합니다. 모바일은 오늘 자료를 먼저 표시하며 이번 주·다음 주 일정과 시간표를 선택할 수 있습니다. 수시모집 우수사례는 로그인 후 추가 확인을 거쳐 열립니다.',
+    date: '2026-11-18'
+  },
   {
     key: 'server-v74',
     title: '3학년 오전 수업 운영 반영',
@@ -1559,7 +1501,7 @@ function ensureTimetableOverrideSheets_(book) {
     'id', 'overrideId', 'operation', 'snapshotJson', 'updatedBy', 'updatedAt'
   ]);
   const properties = PropertiesService.getScriptProperties();
-  if (properties.getProperty(TIMETABLE_OVERRIDE_SEED_KEY) === 'true') return;
+  if (properties.getProperty(TIMETABLE_OVERRIDE_SEED_KEY) === 'true' || !INITIAL_TIMETABLE_OVERRIDES_1_1_31.length) return;
   const sheet = book.getSheetByName(TIMETABLE_OVERRIDES_SHEET);
   const existingIds = {};
   readObjects_(TIMETABLE_OVERRIDES_SHEET).forEach(function(row) { existingIds[String(row.id || '')] = true; });
@@ -1680,7 +1622,7 @@ function deactivateTimetableOverride_(body) {
 
 function ensureStaffAssignments2026_(book) {
   const properties = PropertiesService.getScriptProperties();
-  if (properties.getProperty(STAFF_ASSIGNMENTS_2026_APPLIED_KEY) === 'true') return;
+  if (properties.getProperty(STAFF_ASSIGNMENTS_2026_APPLIED_KEY) === 'true' || !STAFF_ASSIGNMENTS_2026.length) return;
   const sheet = book.getSheetByName(STAFF_ROSTER_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return;
   const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
@@ -2383,7 +2325,7 @@ function compareStaffMembers_(a, b) {
 
 function migrateStaffRoster1_1_31_(book) {
   const properties = PropertiesService.getScriptProperties();
-  if (properties.getProperty(STAFF_ROSTER_MIGRATION_1_1_31_KEY) === 'true') return;
+  if (properties.getProperty(STAFF_ROSTER_MIGRATION_1_1_31_KEY) === 'true' || !OFFICIAL_NON_TEACHING_STAFF_2026.length) return;
   const sheet = book && book.getSheetByName(STAFF_ROSTER_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return;
   const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 6).getValues();
@@ -2425,7 +2367,7 @@ function migrateStaffRoster1_1_31_(book) {
 
 function migrateStaffRosterFileOrder1_1_37_(book) {
   const properties = PropertiesService.getScriptProperties();
-  if (properties.getProperty(STAFF_ROSTER_FILE_ORDER_1_1_37_KEY) === 'true') {
+  if (properties.getProperty(STAFF_ROSTER_FILE_ORDER_1_1_37_KEY) === 'true' || !STAFF_ROSTER_FILE_ORDER_20261008.length) {
     ensureDataSheet_(book, STAFF_ROSTER_SHEET, ['id', 'name', 'position', 'department', 'subject', 'homeroom', 'displayOrder']);
     return;
   }

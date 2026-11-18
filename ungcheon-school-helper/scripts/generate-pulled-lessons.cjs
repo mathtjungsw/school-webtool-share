@@ -2,9 +2,16 @@ const fs = require('fs')
 const path = require('path')
 const XLSX = require('xlsx')
 
-const root = path.resolve(__dirname, '..')
-const input = process.argv[2] || path.join(root, 'resources', 'schedules', '2026.2학기 3학년 당김수업(8.11완성).xlsx')
-const output = process.argv[3] || path.join(root, 'src', 'data', 'pulledLessons2026.ts')
+const [input, destination] = process.argv.slice(2)
+if (!input || !destination || path.extname(destination).toLowerCase() !== '.json') {
+  throw new Error('원본 XLSX 경로와 공개 저장소 밖의 JSON 출력 경로를 입력하세요.')
+}
+const repo = fs.realpathSync(path.resolve(__dirname, '..', '..'))
+const output = path.join(fs.realpathSync(path.dirname(destination)), path.basename(destination))
+const relative = path.relative(repo, output)
+if (relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative)) {
+  throw new Error('당김수업 자료는 공개 소스 폴더에 저장할 수 없습니다.')
+}
 const workbook = XLSX.readFile(input, { cellDates: true })
 const sheet = workbook.Sheets[workbook.SheetNames[0]]
 const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' })
@@ -47,11 +54,5 @@ for (let rowIndex = 3; rowIndex < rows.length; rowIndex += 1) {
   }
 }
 
-const source = `// scripts/generate-pulled-lessons.cjs로 원본 Excel 첫 시트에서 생성합니다.\n` +
-  `export interface PulledLesson {\n` +
-  `  id: string\n  date: string\n  period: number\n  classLabel: string\n  subject: string\n  teacherName: string\n  originalTeacherName: string\n  substituteTeacherName: string\n  originalSlot: string\n  originalDate: string\n  note: string\n  sourceRow: number\n}\n\n` +
-  `export const PULLED_LESSONS_2026: PulledLesson[] = ${JSON.stringify(lessons, null, 2)}\n`
-
-fs.mkdirSync(path.dirname(output), { recursive: true })
-fs.writeFileSync(output, source, 'utf8')
-console.log(`당김수업 ${lessons.length}건 생성: ${output}`)
+fs.writeFileSync(output, JSON.stringify(lessons, null, 2) + '\n', { encoding: 'utf8', flag: 'wx' })
+console.log(`당김수업 ${lessons.length}건 변환 완료`)

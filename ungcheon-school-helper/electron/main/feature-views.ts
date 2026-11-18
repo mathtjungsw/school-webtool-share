@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, readdir
 import { join, basename, resolve } from 'path'
 import { randomBytes, createCipheriv, createDecipheriv, createHash } from 'crypto'
 import { Worker } from 'worker_threads'
+import { CASE_PARSER_VERSION } from './case-layout'
 export const TOOL_SITES: Record<string, string> = {
   mandatory_training_submit: 'https://script.google.com/macros/s/AKfycbxG52rulCO1jtpxtkus-YMkZrhxaTB4bXpP-2TxDtv37MTb9rAJWzspakNIK8U7GdFIWA/exec',
   mandatory_training_excel: 'https://script.google.com/macros/s/AKfycbxG52rulCO1jtpxtkus-YMkZrhxaTB4bXpP-2TxDtv37MTb9rAJWzspakNIK8U7GdFIWA/exec?x=%EC%A0%81%EA%B7%B9%ED%96%89%EC%A0%95',
@@ -105,7 +106,7 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
     if(privateView) throw Error('열려 있는 자료 화면을 먼저 닫아 주세요.')
     const dir = root(area)
     for (const name of readdirSync(dir)) {
-      if (!/^[\\w-]+\\.bin(?:\\.tmp)?$/.test(name) || (area==='admission-cases' && !name.startsWith('book-'))) continue
+      if (!/^[\w-]+\.bin(?:\.tmp)?$/.test(name) || (area==='admission-cases' && !name.startsWith('book-'))) continue
       const file=join(dir,name); if (!lstatSync(file).isFile() || lstatSync(file).isSymbolicLink()) throw Error('자료 경로를 확인해 주세요.')
       unlinkSync(file)
     }
@@ -157,7 +158,7 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
       const id=String(args.id||'');if(!/^[a-z0-9_-]{1,60}$/.test(id))throw new Error('자료 ID 오류')
       const allowed=documents.find(item=>item.id===id); if(!isCases || !allowed)throw Error('자료 열람 권한을 확인해 주세요.')
       const name='book-'+id; let cached=null; try{cached=load(scope,name)}catch{}
-      if(cached && cached.revision===allowed.revision){if(cached.parserVersion===2)return cached;const parsed=await parse(new Uint8Array(Buffer.from(cached.bytes,'base64')),'cases',cached.title);if(epoch!==generation)throw new Error('작업이 취소되었습니다.');const data={...cached,...parsed};save(scope,name,data);return data}
+      if(cached && cached.revision===allowed.revision){if(cached.parserVersion===CASE_PARSER_VERSION)return cached;const parsed=await parse(new Uint8Array(Buffer.from(cached.bytes,'base64')),'cases',cached.title);if(epoch!==generation)throw new Error('작업이 취소되었습니다.');const data={...cached,...parsed};save(scope,name,data);return data}
       const response=await auth.request({action:'caseDocument',id,grant})
       if(epoch!==generation)throw new Error('작업이 취소되었습니다.')
       const bytes=Buffer.from(response.data,'base64');const parsed=await parse(new Uint8Array(bytes),'cases',response.title)

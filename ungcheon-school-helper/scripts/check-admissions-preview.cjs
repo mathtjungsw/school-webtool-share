@@ -36,6 +36,14 @@ async function main(){
   assert.equal((await req({action:'caseLibrary',staffToken:login.data.token})).ok,false)
   console.log('PASS isolated HTTP authentication, wrong/unregistered credentials, protected library and logout revocation')
  }finally{service.close();for(const file of [config,config+'.sessions'])if(fs.existsSync(file))fs.unlinkSync(file);fs.rmdirSync(dir)}
+ const {readPdf}=loadTs('electron/main/pdf-layout.ts')
+ const {applicationTable}=loadTs('electron/main/case-layout.ts')
+ const pages=await readPdf(new Uint8Array(fs.readFileSync('resources/fixtures/admissions-synthetic.pdf')))
+ const application=applicationTable(pages[3])
+ assert.equal(application.length,1)
+ assert.equal(application[0].result,'합격')
+ assert.equal(application[0].grade,'')
+ console.log('PASS packaged casebook-style table with short column headings and no grade column')
  if(process.argv.includes('--samples')){
   for(const [file,kind] of [['C:/MYBOX/검토중/1학년.xlsx','xlsx'],['C:/MYBOX/검토중/2학년.xlsx','xlsx'],['C:/MYBOX/검토중/4세대 나이스 시스템.pdf','grade'],['C:/MYBOX/검토중/4세대 나이스 시스템(1).pdf','grade']]){
    const rows=await parse(file,kind);assert.ok(rows.length>0,'No grade rows: '+path.basename(file));console.log('LOCAL sample shape:',kind,'rows',rows.length,'student groups',new Set(rows.map(r=>r.student)).size,'ranked rows',rows.filter(r=>r.rank!==null).length)

@@ -1,5 +1,5 @@
 import {compact,lines,textIn,type Page,type Cell} from './pdf-layout'
-export const CASE_PARSER_VERSION=2
+export const CASE_PARSER_VERSION=3
 const unique=(values:number[])=>[...values].sort((a,b)=>a-b).filter((v,i,a)=>!i||v-a[i-1]>2)
 export function structuredPage(p:Page){
  const headingYs=lines(p.cells).filter(l=>/학년별성적추이|과목선택|학교생활기록부주요|출결상황|창의적체험|세부능력|면접|후기|조언/.test(compact(l.text))&&l.text.length<95).map(l=>l.y)
@@ -28,7 +28,7 @@ export function structuredPage(p:Page){
 export function applicationTable(first:Page){
  const header=first.cells.filter(c=>/지원대학|지원학과|전형유형|내신등급|합\/불|^합$/.test(compact(c.text)))
  const points=['지원대학','지원학과','전형유형','내신등급','합/불'].map(k=>header.find(c=>compact(c.text).includes(k)||(k==='합/불'&&compact(c.text)==='합')))
- if(!points.every(Boolean))return []
+ if(!points.every(Boolean))return simpleApplicationTable(first)
  const cs=points as Cell[],centres=cs.map(c=>c.x+c.w/2),top=Math.max(...cs.map(c=>c.y))+4
  const bottom=first.cells.find(c=>compact(c.text).includes('학년별성적추이'))?.y||top+180
  const horizontal=(first.segments||[]).filter(s=>Math.abs(s.y1-s.y2)<1&&Math.min(s.x1,s.x2)<centres[3]&&Math.max(s.x1,s.x2)>centres[3]).map(s=>s.y1)
@@ -40,6 +40,30 @@ export function applicationTable(first:Page){
   const values=centres.map((x,k)=>textIn(first,k?(centres[k-1]+x)/2:0,k+1<centres.length?(x+centres[k+1])/2:x+35,y1,y2))
   if(!values[0]&&!values[1])continue
   rows.push({university:values[0],department:values[1],type:values[2],grade:values[3],result:values[4],page:first.page,review:true})
+ }
+ return rows
+}
+
+function simpleApplicationTable(page: Page) {
+ const content = lines(page.cells)
+ const section = content.findIndex(line => compact(line.text) === '지원현황')
+ const header = content[section + 1]
+ const titles = ['대학', '학과', '전형', '결과']
+ if (section < 0 || !header || header.items.length !== titles.length ||
+     !header.items.every((cell, index) => compact(cell.text) === titles[index])) return []
+
+ const centres = header.items.map(cell => cell.x + cell.w / 2)
+ const boundaries = centres.slice(1).map((value, index) => (centres[index] + value) / 2)
+ const rows = []
+ for (const line of content.slice(section + 2)) {
+  if (line.items.length !== titles.length ||
+      !line.items.every((cell, index) => {
+       const middle = cell.x + cell.w / 2
+       return middle >= (boundaries[index - 1] ?? 0) && middle < (boundaries[index] ?? page.width)
+      })) break
+  const [university, department, type, result] = line.items.map(cell => cell.text.trim())
+  if (!/^(?:합|불|합격|불합격|최초합격|충원합격|추가합격|예비\d*|미응시)$/.test(compact(result))) break
+  rows.push({ university, department, type, grade: '', result, page: page.page, review: true })
  }
  return rows
 }

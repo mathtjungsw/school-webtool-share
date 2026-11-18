@@ -1,6 +1,6 @@
 {
-  "name": "ungcheon-school-helper-preview",
-  "version": "1.1.44-preview.1",
+  "name": "ungcheon-school-helper",
+  "version": "1.1.44",
   "description": "웅천고등학교 교직원을 위한 통합 업무 지원 프로그램",
   "main": "out/main/index.js",
   "author": "웅천고등학교",
@@ -14,7 +14,7 @@
     "check:widget-collapse": "node scripts/check-widget-collapse-settings.cjs && node scripts/check-widget-disclosure.cjs",
     "build": "electron-vite build",
     "deploy:apps-script": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-apps-script.ps1",
-    "package": "npm --prefix ../ungcheon-mobile-pwa run build:preview && npm run build && electron-builder --win nsis --publish never",
+    "package": "npm run build && electron-builder --win --dir && node scripts/package-windows.cjs && electron-builder --win nsis --prepackaged release/win-unpacked",
     "package:dir": "npm run build && electron-builder --win --dir",
     "inventory:migration": "node scripts/inventory-firebase-migration.cjs"
   },
@@ -66,10 +66,10 @@
     "vite": "5.3.5"
   },
   "build": {
-    "appId": "kr.hs.ungcheon.schoolhelper.preview20261118",
-    "productName": "웅천고 업무도우미 통합 시험판",
+    "appId": "kr.hs.ungcheon.schoolhelper",
+    "productName": "웅천고 업무도우미",
     "directories": {
-      "output": "release-preview-final"
+      "output": "release"
     },
     "files": [
       "out/**/*",
@@ -79,15 +79,15 @@
     "extraResources": [
       {
         "from": "resources",
-        "filter": ["**/*", "!schedules/**"],
-        "to": "."
-      },
-      {
-        "from": "../ungcheon-mobile-pwa/dist-preview",
-        "to": "mobile-preview"
+        "to": ".",
+        "filter": [
+          "**/*",
+          "!schedules/**",
+          "!fixtures/**"
+        ]
       }
     ],
-    "artifactName": "UngcheonSchoolHelper-Preview-${version}.${ext}",
+    "artifactName": "UngcheonSchoolHelper-Setup-${version}.${ext}",
     "win": {
       "icon": "resources/icon.ico",
       "signAndEditExecutable": false,
@@ -108,7 +108,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "웅천고 업무도우미 통합 시험판"
+      "shortcutName": "웅천고 업무도우미"
     },
     "publish": {
       "provider": "github",

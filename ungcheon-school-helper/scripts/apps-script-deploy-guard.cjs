@@ -14,7 +14,8 @@ const APPROVED_RELEASE_FUNCTIONS = new Map([
   ['getSyncManifest_', 'ad3c4cf9d48e2ff3534f898def4cf1bfc64490abe06af34b652a4b647fc73b5d'],
   ['ensureSheets_', 'a641bb55fce9687b1dd47bd8820d3ca2551eff96d0c374bdc57bd25812a53de0'],
   ['ensureStaffChecklistSheets_', '9754956e3fd8fb24ad7620e73fd5e23e574f96821e3916334a3c3bd6cfae09f5'],
-  ['ensureTimetableOverrideSheets_', 'ebd9db1c563e4881a0e41c2e88e2e832f0e52fa54b54d0ab09509e5322d1cecc'],
+  ['ensureTimetableOverrideSheets_', '8772db8d7908e320ed082bfd56565c144d795d029931b38573f8e7e3d8a15cde'],
+  ['ensureStaffAssignments2026_', '1dfcccdf90a8e39d636035c300265ee4442ca383bd69132370023a62266b5a56'],
   ['timetableOverrideRevision_', '503ad9030ecd87f0bc04e60311d39cb7ed8b4b7877f366788fd0ebd63ff876ed'],
   ['normalizeTimetableOverride_', '6fc55458b7791283ecac057ecf2d41de310abc65d90ed85e137a6fcb7b6336d8'],
   ['listTimetableOverrides_', 'f42eff01515259f79b2f7649c6072ab91da4571d9f067f22e05e7384a9b2d879'],
@@ -25,8 +26,11 @@ const APPROVED_RELEASE_FUNCTIONS = new Map([
   ['getStaffRoster_', 'a9ced411c7a426b4c082e26c5adca69552b5e2a3c40a7a0112bf3dea98afadcb'],
   ['replaceStaffRoster_', '13ef8adf7bbeeebd81a1e04fb0b61dc2ceb9221f5aa59a22dc2826e5361884a7'],
   ['compareStaffMembers_', '4fbaf01726c660c252346f77f1d4dfdcea50cd743543666a8eeb3d5ff7798b92'],
-  ['migrateStaffRosterFileOrder1_1_37_', '54fa9652934363430091a204916d7c51fe1efe0ba77f1e2e5d0a99eb9c830fad'],
-  ['migrateStaffRoster1_1_31_', 'df75a529c16fc6a6952cb5a30199a0a88ca783725fe5c9a196555cfabaf21afc'],
+  ['migrateStaffRosterFileOrder1_1_37_', [
+    'dc927ddb15cd84af5db967cf49639c804f28a5848792c6beb8e495a80edf48a0',
+    'c2fa5b44ab23d1e9d5ff0ed1ea31f9a0150a16185c8421b27931f816ec394780',
+  ]],
+  ['migrateStaffRoster1_1_31_', '96e6cb0b402ea42935a1b7f103202c81d70d249843c92ee48d0e7de28603f4ff'],
   ['listStaffChecklists_', 'df440585cd2a49f60930b88fe03adab9ece289b33e29701aca3664155bc19447'],
   ['addStaffChecklist_', 'c4792bf0fcc2177a36578c266782b6b2438ff76db4603a3e102063972eae3f95'],
   ['updateStaffChecklist_', '106b5908781794bd204aecde427417376f66b1094f3271477708877019cfb9f3'],
@@ -34,22 +38,22 @@ const APPROVED_RELEASE_FUNCTIONS = new Map([
 ])
 const APPROVED_RELEASE_CONSTANTS = new Map([
   ['STAFF_ROSTER_FILE_ORDER_1_1_37_KEY', '200f7799f6423132f87081c774ca96da8f32077b94e0a3d559496c2bd5defb1a'],
-  ['STAFF_ROSTER_FILE_ORDER_20261008', '89d43baa8c87c4c6c03b72a0053f8a80b844dffc9cd6207d56e5dd670fbe32b2'],
+  ['STAFF_ROSTER_FILE_ORDER_20261008', '6c5595bf4667ee1dbd3135bd49b9ea0fa8ee7cdbf15a43413f941c98d5fd0103'],
   ['STAFF_NAME_MIGRATION_1_1_30_KEY', 'f12ca58e4a42dbe9223711be35c2062c4efbf37b1f65e52526c1de94fccbbbb9'],
-  ['STAFF_ASSIGNMENTS_2026', 'de5d7c481216a980c3215a6b2f17bb5aeaa6d12fd112afac2ef19238fef91850'],
+  ['STAFF_ASSIGNMENTS_2026', '101fd74efd0bbbb3f66492b30a105dcd6ae841774cdf8a703d6e5257b47b157d'],
   ['TIMETABLE_OVERRIDES_SHEET', '8effda14c7665cfa3b3a8c8658f16412e953d724ed01f13e1eb4705be46f69a0'],
   ['TIMETABLE_OVERRIDE_HISTORY_SHEET', '6cc0bec73e3a7756e4d6543fd8100119001c9aefc1d6be4eb107a179afd0e1ff'],
   ['STAFF_ROSTER_MIGRATION_1_1_31_KEY', '1763f436a1ad1161c9954fc6aacb2438a1cd6a27c738408f6ac7008684d30804'],
   ['TIMETABLE_OVERRIDE_SEED_KEY', '5ffc2cb372e23e04f63fa30a615dc5c18eba5709f9b5ff04568965b228a93fdc'],
-  ['INITIAL_TIMETABLE_OVERRIDES_1_1_31', 'e6e660f720ecc08ef2d588df821ab0127b0e6aabc3c58e0faa3c0e4f321a486e'],
-  ['OFFICIAL_NON_TEACHING_STAFF_2026', 'c130c10e1f5a7ffbb20f00838d3e69990462c3236f2f0c5055c59844cccd210e'],
+  ['INITIAL_TIMETABLE_OVERRIDES_1_1_31', 'f9d06ec65d916e28063b86bbeb8ca2ce0d0e87dd5f849b5d0bc9aefe4edf7b1e'],
+  ['OFFICIAL_NON_TEACHING_STAFF_2026', '591eb9819aaf8941fb807477065080c9feb9fa1949f0908ec5a5a599ce95c479'],
   ['GET_READ_ACTIONS', 'cc5278385fc98c92d928b8b2d34e214773d53423870749e6ffaef400f982c8ea'],
 ])
 function sha256(value) { return crypto.createHash('sha256').update(String(value || '')).digest('hex') }
 function isApprovedReleaseDefinition(info, name, kind) {
   const approved = kind === 'function' ? APPROVED_RELEASE_FUNCTIONS : APPROVED_RELEASE_CONSTANTS
   const definitions = kind === 'function' ? info.functionDefinitions : info.constantDefinitions
-  return approved.get(name) === sha256(definitions.get(name))
+  return [].concat(approved.get(name) || []).includes(sha256(definitions.get(name)))
 }
 
 function blocked(message) { throw new Error(`Deployment blocked: ${message}`) }

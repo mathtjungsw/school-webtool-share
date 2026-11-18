@@ -12,3 +12,4 @@ src/**/*.d.ts
 .clasp.json
 .DS_Store
 release-preview*/
+resources/schedules/

@@ -15,6 +15,7 @@ if(process.env.UNGCHEON_PRIVATE_HASH_RECEIPT){
 }
 let count=0
 const check=(name,buffer)=>{
+ assert.ok(!/(?:^|[/\\])schedules[/\\].+\.xlsx$/i.test(name),'Private timetable workbook found in package')
  assert.ok(!forbiddenNames.includes(path.basename(name)),'Private source filename found in package')
  assert.ok(!/(?:우수.?사례.*\.pdf|(?:^|[/\\])[12]학년\.xlsx|4세대.*나이스.*\.pdf)$/i.test(name),'Confidential example file found in package')
  assert.ok(!/(?:server-config\.json|staff-session\.bin|\.sessions)$/.test(name),'Private configuration/session file found in package')
@@ -37,6 +38,10 @@ const packed=JSON.parse(asar.extractFile(archive,'package.json').toString())
 const expected=JSON.parse(fs.readFileSync('package.json','utf8'))
 assert.equal(packed.version,expected.version)
 if(packed.build)assert.equal(packed.build.appId,expected.build.appId)
+if(!packed.version.includes('-preview.')){
+ assert.equal(fs.existsSync(path.join(base,'resources','fixtures')),false,'Trial documents found in production package')
+ assert.equal(fs.existsSync(path.join(base,'resources','mobile-preview')),false,'Trial mobile site found in production package')
+}
 assert.ok(entries.some(name=>name.replace(/\\/g,'/').endsWith('/out/main/privacyParser.js')))
 assert.ok(entries.some(name=>name.replace(/\\/g,'/').endsWith('/out/renderer/private.html')))
 console.log('PASS package inspection:',count,'files; private PDF/XLSX sources/configuration/password not bundled; package identity and local entrypoints present')

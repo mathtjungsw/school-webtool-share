@@ -11,7 +11,10 @@ const { inspectSource, validate } = require('./apps-script-deploy-guard.cjs')
 const root = path.resolve(__dirname, '..')
 const source = fs.readFileSync(path.join(root, 'server/Code.gs'), 'utf8')
 const server = inspectSource(source, 'roster order')
-const reference = server.constants.get('STAFF_ROSTER_FILE_ORDER_20261008')
+const reference = Array.from({ length: 66 }, (_, index) => ['가상교원' + (index + 1), '교사'])
+reference[0] = ['가상교장', '교장']
+reference[1][0] = '전종택'
+reference[2][0] = '새등록교사'
 let checks = 0
 const test = (name, run) => { run(); checks++; console.log('PASS ' + name) }
 let printed, downloaded
@@ -99,13 +102,14 @@ const context = vm.createContext({ console: undefined, Number, Date, Object,
   readObjects_: name => { const sheet = sheets.get(name); return sheet ? sheet.data.slice(1).map(row => Object.fromEntries(sheet.data[0].map((key, index) => [key, row[index]]))) : [] }
 })
 for (const name of ['STAFF_ROSTER_SHEET', 'STAFF_ROSTER_META_SHEET', 'STAFF_ROSTER_FILE_ORDER_1_1_37_KEY', 'STAFF_ROSTER_FILE_ORDER_20261008']) {
-  vm.runInContext(`const ${name}=${JSON.stringify(server.constants.get(name))};`, context)
+  const value = name === 'STAFF_ROSTER_FILE_ORDER_20261008' ? reference : server.constants.get(name)
+  vm.runInContext(`const ${name}=${JSON.stringify(value)};`, context)
 }
 for (const name of ['sourceBook_', 'sourceLock_', 'sourceProperties_', 'normalizeStaffHomeroom_', 'ensureDataSheet_', 'replaceSheetRows_', 'migrateStaffRosterFileOrder1_1_37_', 'compareStaffMembers_', 'getStaffRoster_', 'replaceStaffRoster_']) vm.runInContext(server.functions.get(name), context)
 const call = (name, ...args) => context[name](...args)
 const initialRows = reference.map(([name, position], index) => [`keep-${index}`, name, position, `부서-${index}`, `교과-${index}`, '3-1']).reverse()
 initialRows.find(row => row[1] === '전종택')[1] = '최대식'
-initialRows.splice(initialRows.findIndex(row => row[1] === '우가희'), 1)
+initialRows.splice(initialRows.findIndex(row => row[1] === '새등록교사'), 1)
 initialRows.push(['retired-id', '이전직원', '주무관', '기존부서', '', ''])
 sheets.set('교원명렬', new Sheet('교원명렬', headers, initialRows))
 sheets.set('교원명렬정보', new Sheet('교원명렬정보', ['version', 'sourceFileName', 'uploadedBy', 'uploadedAt', 'memberCount'], [[9, 'previous.xlsx', 'test', '', initialRows.length]]))
@@ -116,7 +120,7 @@ test('Migration seeds exact 66 and preserves IDs/details, aliases and backup', (
   assert.deepEqual(Array.from(roster.members, m => [m.name, m.position]), reference)
   assert.deepEqual(Array.from(roster.members, m => m.displayOrder), reference.map((_, index) => index + 1))
   roster.members.forEach((m, index) => {
-    if (m.name === '우가희') { assert.ok(m.id); assert.equal(m.department, ''); assert.equal(m.subject, ''); return }
+    if (m.name === '새등록교사') { assert.ok(m.id); assert.equal(m.department, ''); assert.equal(m.subject, ''); return }
     assert.equal(m.id, 'keep-' + index); assert.equal(m.department, '부서-' + index); assert.equal(m.subject, '교과-' + index); assert.equal(m.homeroom, '3-1')
   })
   assert.equal(sheets.get('교원명렬_20261008_보관').data.length, initialRows.length + 1)
@@ -155,13 +159,11 @@ test('Exact approval cannot authorize a corrupted roster function or seed', () =
   const baselines = [{ label: 'candidate-regression-fixture', role: 'origin-main', source }]
   assert.equal(validate({ localSource: source, baselines }).ok, true)
   assert.throws(() => validate({ localSource: source.replace(server.functions.get('getStaffRoster_'), 'function getStaffRoster_() { return null; }'), baselines }), /protected desktop function/)
-  assert.throws(() => validate({ localSource: source.replace("['류희열', '교장']", "['잘못된이름', '교장']"), baselines }), /desktop constant/)
-})
-if (process.env.STAFF_ROSTER_SOURCE) test('Actual supplied Excel matches the deployment seed in every name and position', () => {
-  const data = fs.readFileSync(process.env.STAFF_ROSTER_SOURCE)
-  const parsed = service.parseStaffRosterWorkbook(Array.from(data))
-  assert.deepEqual(Array.from(parsed, m => [m.name, m.position]), reference)
-  assert.deepEqual(Array.from(parsed, m => m.displayOrder), reference.map((_, index) => index + 1))
+  assert.deepEqual(Array.from(server.constants.get('STAFF_ROSTER_FILE_ORDER_20261008')), [])
+  assert.throws(() => validate({
+    localSource: source.replace('const STAFF_ROSTER_FILE_ORDER_20261008 = [];', "const STAFF_ROSTER_FILE_ORDER_20261008 = [['가상교원', '교사']];"),
+    baselines
+  }), /desktop constant/)
 })
 async function finish() {
   await service.downloadStaffRoster([member('둘째', 2), member('첫째', 1)])
