@@ -4030,7 +4030,7 @@ function mobileLoadSource_(sourceStatus, key, emptyValue, loader) {
 }
 
 function mobileSchoolData_(group,fallback){
-  return typeof privateSchoolRevision_==='function' && privateSchoolRevision_(group) ? privateSchoolRead_(group) : fallback();
+  return typeof privateSchoolServe_==='function' ? privateSchoolServe_(group,fallback) : fallback();
 }
 function mobileViewerPulled_(name) {
   const table=mobileSchoolData_('timetable',getTimetable_);

@@ -64,7 +64,9 @@ function migrationPrimaryDispatch_(body,callback) {
     c=migrationPrimaryConfig_();
     if(c.phase==='DRAINING'||c.phase==='RETURNING')throw migrationPrimaryMaintenance_();
     if(c.phase!=='FIRESTORE')return callback();
-    return migrationPrimaryWrite_(migrationPrimaryRepository_(c),c,body,callback);
+    var repo=migrationPrimaryRepository_(c),response=migrationPrimaryWrite_(repo,c,body,callback);
+    if(typeof privateSchoolMirrorAfterWrite_==='function')privateSchoolMirrorAfterWrite_(repo,c,body,response);
+    return response;
   });
   if(!migrationPrimaryServing_(c))return callback();
   if(['previewMigrationRequest','runMigrationReplica','setMigrationReplicaPaused','prepareMigrationReview','confirmMigrationReview'].indexOf(body.action)>=0)throw migrationError_('MIGRATION_PRIMARY_OPERATION_FORBIDDEN');
