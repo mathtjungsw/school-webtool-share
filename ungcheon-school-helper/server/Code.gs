@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 73;
+const MOBILE_SERVICE_VERSION = 74;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -425,6 +425,18 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {
+    key: 'server-v74',
+    title: '3학년 오전 수업 운영 반영',
+    body: '2026년 11월 18일부터 이번 학년도 말까지 3학년 5·6·7교시는 수업 없음으로 처리합니다. 모바일 일정에도 날짜별 운영 기준을 함께 전달합니다.',
+    date: '2026-11-18'
+  },
+  {
+    key: 'v1.1.43',
+    title: '[업데이트] 웅천고 업무도우미 v1.1.43 · 3학년 오후 수업 종료 반영',
+    body: '11월 18일부터 3학년 5·6·7교시 수업을 시간표에서 제외합니다. 교사·학급·학생 시간표, 대시보드, 위젯, 관리자 시간표, 공강 찾기와 학생 위치 조회에 반영하며, 모바일 일정에도 같은 날짜별 기준을 적용합니다. 오전 수업과 변경 전 날짜는 해당 날짜의 시간표로 확인할 수 있습니다.',
+    date: '2026-11-18'
+  },
   {
     key: 'server-v73',
     title: '업무도우미 1.1.42 안내 추가',
@@ -3625,6 +3637,7 @@ function mobileAttendanceNumber_(value) {
 }
 
 function mobileAttendanceSourceSlot_(date, period, timetableOverrides) {
+  if (mobileCancelledGradePeriod_(date, '3', period)) return null;
   const overrides = Array.isArray(timetableOverrides) ? timetableOverrides : listTimetableOverrides_({ includeInactive: false });
   const applicable = overrides.filter(function(item) {
     return item.active && item.date === date && Number(item.targetPeriod) === Number(period) &&
@@ -3666,6 +3679,7 @@ function mobileAttendanceSheetSnapshot_(expectedDate) {
 }
 
 function mobileAttendanceContext_(viewerName, date, period, timetableOverrides, timetableChanges, pulledLessons) {
+  if (mobileCancelledGradePeriod_(date, '3', period)) return null;
   const pulled = (Array.isArray(pulledLessons) ? pulledLessons : []).find(function(item) {
     // 클라이언트가 보내는 최소 색인은 로그인 교사 본인의 원수업 이동만 허용합니다.
     return clean_(item.teacherName, 30) === viewerName && clean_(item.originalTeacherName, 30) === viewerName && clean_(item.date, 10) === date && Number(item.period) === Number(period);
@@ -3990,6 +4004,51 @@ function mobileSourceCount_(value) {
   return value ? 1 : 0;
 }
 
+function mobileCancelledGradePeriod_(date, gradeOrClass, period) {
+  const firstLine = String(gradeOrClass || '').trim().split(/\r?\n/)[0];
+  return date >= '2026-11-18' && date <= '2027-02-05' && Number(period) >= 5 && Number(period) <= 7 &&
+    /^(?:3|3학년|3[-_]0?\d{1,2}(?:반)?|30?\d{1,2})$/.test(firstLine);
+}
+
+// 구버전 모바일도 같은 날짜별 clear 계약을 읽으므로 사이트를 다시 설치하지 않아도 적용됩니다.
+function mobileMorningOnlyOverrides_(fromDate, toDate) {
+  const rules = [];
+  const start = fromDate > '2026-11-18' ? fromDate : '2026-11-18';
+  const end = toDate < '2027-02-05' ? toDate : '2027-02-05';
+  for (let cursor = new Date(start + 'T12:00:00+09:00'); mobileDate_(cursor) <= end; cursor.setDate(cursor.getDate() + 1)) {
+    const date = mobileDate_(cursor);
+    if (cursor.getDay() === 0 || cursor.getDay() === 6) continue;
+    [5, 6, 7].forEach(function(period) {
+      rules.push({
+        id: 'grade3-morning-only-' + date + '-' + period,
+        date: date, targetGrade: '3', targetClass: '', targetPeriod: period,
+        action: 'clear', sourceDate: '', sourcePeriod: 0,
+        note: '3학년 오전 수업 운영 · 오후 수업 없음', active: true,
+        createdBy: '학교 운영', createdAt: '2026-11-18T00:00:00+09:00', updatedAt: '2026-11-18T00:00:00+09:00'
+      });
+    });
+  }
+  return rules;
+}
+
+// 기존 모바일의 교환 반영도 취소된 수업을 다시 표시하지 않도록 운영되는 쪽만 전달합니다.
+function mobileMorningOnlyChanges_(changes) {
+  return changes.flatMap(function(change) {
+    const originalCancelled = mobileCancelledGradePeriod_(change.originalDate, change.originalClass, Number(change.originalSlotIndex) % 7 + 1);
+    if (change.kind !== 'exchange') return originalCancelled ? [] : [change];
+    const replacementCancelled = mobileCancelledGradePeriod_(change.replacementDate, change.replacementClass, Number(change.replacementSlotIndex) % 7 + 1);
+    if (!originalCancelled && !replacementCancelled) return [change];
+    if (originalCancelled && replacementCancelled) return [];
+    if (originalCancelled) return [Object.assign({}, change, {
+      id: change.id + ':operating-replacement', kind: 'substitution',
+      originalDate: change.replacementDate, originalSlotIndex: change.replacementSlotIndex,
+      originalTeacher: change.replacementTeacher, replacementTeacher: change.originalTeacher,
+      originalClass: change.replacementClass, originalSubject: change.replacementSubject
+    })];
+    return [Object.assign({}, change, { id: change.id + ':operating-original', kind: 'substitution' })];
+  });
+}
+
 function mobileLoadSource_(sourceStatus, key, emptyValue, loader) {
   const attemptedAt = new Date().toISOString();
   try {
@@ -4067,15 +4126,15 @@ function getMobileScheduleBundle_(body) {
     return listCommitteeState_().events.filter(function(event) { return event.date >= fromDate && event.date <= toDate && event.memberNames.indexOf(viewerName) >= 0; });
   });
   const timetableChanges = mobileLoadSource_(sourceStatus, 'changes', [], function() {
-    return listTimetableChanges_({ viewerName: viewerName, fromDate: fromDate, toDate: toDate, includeSchool: false }).filter(function(change) {
+    return mobileMorningOnlyChanges_(listTimetableChanges_({ viewerName: viewerName, fromDate: fromDate, toDate: toDate, includeSchool: false }).filter(function(change) {
       if (change.status === 'cancelled' || change.status === 'rejected') return false;
       return change.status === 'approved' || Boolean(change.requesterAppliedAt && change.requesterName === viewerName);
-    });
+    }));
   });
   const timetableOverrides = mobileLoadSource_(sourceStatus, 'overrides', [], function() {
     return listTimetableOverrides_({ includeInactive: false }).filter(function(item) {
       return item.date >= fromDate && item.date <= toDate || item.sourceDate >= fromDate && item.sourceDate <= toDate;
-    });
+    }).concat(mobileMorningOnlyOverrides_(fromDate, toDate));
   });
   const attendanceSummaries = mobileLoadSource_(sourceStatus, 'attendance', [], function() {
     return mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverrides, timetableChanges, attendancePulledLessons);

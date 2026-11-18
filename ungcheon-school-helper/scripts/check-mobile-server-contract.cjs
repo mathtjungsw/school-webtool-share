@@ -559,4 +559,30 @@ test('additional login identity can use mobile schedules without a staff roster 
   assert.equal(h.post(request).ok, false);
 });
 
+test('morning-only third-grade schedule uses existing mobile override contract and blocks afternoon attendance', () => {
+  const h = harness();
+  const before = h.context.mobileMorningOnlyOverrides_('2026-11-16', '2026-11-17');
+  assert.equal(before.length, 0);
+  const rules = h.context.mobileMorningOnlyOverrides_('2026-11-17', '2026-11-23');
+  assert.equal(rules.length, 12);
+  assert.ok(rules.every(rule => rule.active && rule.targetGrade === '3' && rule.action === 'clear' && [5, 6, 7].includes(rule.targetPeriod)));
+  assert.ok(rules.every(rule => rule.date >= '2026-11-18' && rule.date !== '2026-11-21' && rule.date !== '2026-11-22'));
+  for (const period of [5, 6, 7]) {
+    assert.equal(h.context.mobileAttendanceContext_('테스트교사', '2026-11-23', period, [], [], []), null);
+  }
+  assert.ok(h.context.mobileAttendanceSourceSlot_('2026-11-17', 5, []));
+  assert.ok(h.context.mobileAttendanceSourceSlot_('2026-11-23', 4, []));
+  const bundle = h.post(h.request({ fromDate: '2026-11-17', toDate: '2026-11-23' }));
+  assert.equal(bundle.ok, true);
+  assert.equal(bundle.data.timetableOverrides.filter(rule => rule.id.startsWith('grade3-morning-only-')).length, 12);
+  const mixed = { id: 'mixed', kind: 'exchange', originalDate: '2026-11-23', originalSlotIndex: 4, originalClass: '301', originalSubject: '국어', originalTeacher: '교사1', replacementDate: '2026-11-24', replacementSlotIndex: 0, replacementClass: '201', replacementSubject: '영어', replacementTeacher: '교사2' };
+  const remaining = h.context.mobileMorningOnlyChanges_([mixed]);
+  assert.equal(remaining.length, 1);
+  assert.equal(remaining[0].kind, 'substitution');
+  assert.equal(remaining[0].originalClass, '201');
+  assert.equal(remaining[0].originalDate, '2026-11-24');
+  assert.equal(remaining[0].replacementTeacher, '교사1');
+  assert.equal(mixed.kind, 'exchange');
+});
+
 console.log(`Mobile Apps Script contract: ${passed} tests passed. No live services or secrets used.`);

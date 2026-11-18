@@ -7,6 +7,7 @@ import type { MealInfo, ScheduleEvent, TimetableEntry, SchoolInfo, ClassEntry, D
 import { format, addMonths, subMonths, addDays, subDays } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import clsx from 'clsx'
+import { isCancelledGradePeriod } from '../services/specialTimetableDays'
 
 interface ViewSchool {
   officeCode: string
@@ -148,7 +149,9 @@ export default function NeisPage() {
     setTimetableLoading(true); setTimetableError('')
     try {
       const data = await getTimetable(neisKey, activeOffice, activeSchool, schoolType, config.grade, config.classNm, date)
-      setTimetable(data)
+      setTimetable(activeSchool === config.schoolCode
+        ? data.filter(item => !isCancelledGradePeriod(format(date, 'yyyy-MM-dd'), config.grade, Number(item.period)))
+        : data)
     } catch { setTimetableError('시간표를 불러오지 못했습니다.') }
     finally { setTimetableLoading(false) }
   }
@@ -199,7 +202,11 @@ export default function NeisPage() {
     let cancelled = false
     setTimetableLoading(true); setTimetableError('')
     getTimetable(neisKey, activeOffice, activeSchool, schoolType, config.grade, config.classNm, timetableDate)
-      .then(data => { if (!cancelled) setTimetable(data) })
+      .then(data => {
+        if (!cancelled) setTimetable(activeSchool === config.schoolCode
+          ? data.filter(item => !isCancelledGradePeriod(format(timetableDate, 'yyyy-MM-dd'), config.grade, Number(item.period)))
+          : data)
+      })
       .catch(() => { if (!cancelled) setTimetableError('시간표를 불러오지 못했습니다.') })
       .finally(() => { if (!cancelled) setTimetableLoading(false) })
     return () => { cancelled = true }

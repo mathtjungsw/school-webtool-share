@@ -5,6 +5,15 @@ import { describe, expect, it } from 'vitest'
 const teacher: TeacherTimetable = { name: '홍길동', label: '홍길동', load: '', slots: Array.from({ length: 35 }, (_, index) => ({ value: index === 0 ? '101\n국어' : '', locked: false })) }
 
 describe('모바일 일정 도메인', () => {
+  it('11월 18일부터 3학년 오후 기본·대강수업을 비우고 오전과 다른 학년은 유지한다', () => {
+    const source = { ...teacher, slots: Array.from({ length: 35 }, (_, i) => ({ value: i % 7 === 5 ? '201\n수학' : '301\n국어', locked: false })) }
+    const change: TimetableChange = { id:'afternoon', kind:'substitution', status:'approved', requesterName:'원교사', targetTeacherName:'홍길동', requesterAppliedAt:'', originalSlotIndex:4, replacementSlotIndex:4, originalDate:'2026-11-23', replacementDate:'2026-11-23', originalTeacher:'원교사', replacementTeacher:'홍길동', originalClass:'3-1', replacementClass:'', originalSubject:'대강', replacementSubject:'' }
+    const result = timetableForDate(source, '2026-11-23', [change], '홍길동')
+    expect(result.slice(0, 4).every(lesson => lesson.value)).toBe(true)
+    expect(result.slice(4).map(lesson => lesson.value)).toEqual(['', '201\n수학', ''])
+    expect(timetableForDate(source, '2026-11-17', [], '홍길동')[4].value).toBe('301\n국어')
+    expect(source.slots[4].value).toBe('301\n국어')
+  })
   it.each([
     ['2026-08-11', 0], ['2026-10-13', 4], ['2026-11-09', 4], ['2026-11-17', 4],
     ['2026-10-14', 2],

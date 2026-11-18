@@ -1,5 +1,5 @@
 import type { PulledLesson } from '../data/pulledLessons2026'
-import { getTimetableDayIndex } from './specialTimetableDays'
+import { getTimetableDayIndex, isCancelledGradePeriod } from './specialTimetableDays'
 import type { TeacherTimetable } from './schoolTimetable'
 
 export type TimetableOverrideAction = 'copy' | 'clear' | 'move_pulled'
@@ -64,7 +64,7 @@ export function applyDailyTimetableOverridesToTeacher(
       lessons[targetIndex] = sourceValue
     }
   })
-  return lessons
+  return lessons.map((value, index) => isCancelledGradePeriod(date, value, index + 1) ? '' : value)
 }
 
 export function effectivePulledLessons(

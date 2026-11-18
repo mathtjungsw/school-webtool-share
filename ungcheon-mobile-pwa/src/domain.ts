@@ -2,7 +2,7 @@ import { addDays, format, startOfWeek } from 'date-fns'
 import type { DailyTimetableOverride, DashboardPayload, LessonView, MealInfo, MobileEvent, ScheduleSource, TeacherTimetable, TimetableChange } from './types'
 import { PULLED_LESSONS_2026 } from './shared/pulledLessons2026'
 import { UNGCHEON_PERIOD_PLAN } from './shared/ungcheonSchedule'
-import { getTimetableDayIndex } from './shared/specialTimetableDays'
+import { getTimetableDayIndex, isCancelledGradePeriod } from './shared/specialTimetableDays'
 import { applyTeacherOverrides, effectiveMobilePulledLessons } from './timetableOverrides'
 
 export const DAYS = ['월', '화', '수', '목', '금']
@@ -189,7 +189,9 @@ export function timetableForDate(teacher: TeacherTimetable | null, date: string,
     Object.assign(cell, { value: `${item.classLabel}\n${item.subject}`, changed: true, note: item.substituteTeacherName ? `당김 · ${item.substituteTeacherName} 보강` : '당김수업' })
     if (!lessons[item.period - 1]) lessons.push(cell)
   })
-  return lessons
+  return lessons.map(lesson => isCancelledGradePeriod(date, lesson.value, lesson.period)
+    ? { period: lesson.period, value: '', changed: true, note: '3학년 오후 수업 없음' }
+    : lesson)
 }
 export function collectEvents(data: DashboardPayload, name: string): MobileEvent[] {
   const events: MobileEvent[] = (data.bundle?.events ?? []).map((item, index) => ({ ...item, id: `bundle-${item.source}-${item.date}-${index}` }))
@@ -198,7 +200,7 @@ export function collectEvents(data: DashboardPayload, name: string): MobileEvent
     const title = item.kind === 'exchange' ? `수업 교환 · ${item.originalClass} ↔ ${item.replacementClass}` : `대강 · ${item.originalClass} ${item.originalSubject}`
     ;[...new Set([item.originalDate, item.replacementDate])].forEach(date => events.push({ id: `change-${item.id}-${date}`, date, title, source: 'timetableChange', label: item.status === 'approved' ? '승인된 수업 변경' : '우선 반영' }))
   })
-  effectiveMobilePulledLessons(PULLED_LESSONS_2026, data.bundle?.timetableOverrides ?? []).filter(item => item.teacherName.trim() === name.trim()).forEach(item => events.push({ id: item.id, date: item.date, title: `${item.period}교시 ${item.classLabel} ${item.subject}`, source: 'pulledLesson', label: '당김수업' }))
+  effectiveMobilePulledLessons(PULLED_LESSONS_2026, data.bundle?.timetableOverrides ?? []).filter(item => item.teacherName.trim() === name.trim() && !isCancelledGradePeriod(item.date, item.classLabel, item.period)).forEach(item => events.push({ id: item.id, date: item.date, title: `${item.period}교시 ${item.classLabel} ${item.subject}`, source: 'pulledLesson', label: '당김수업' }))
   return events.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
 }
 

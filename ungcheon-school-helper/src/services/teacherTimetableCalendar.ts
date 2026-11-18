@@ -1,6 +1,6 @@
 import { addDays, endOfWeek, format, parseISO, startOfMonth, startOfWeek } from 'date-fns'
 import type { PulledLesson } from './pulledLessons'
-import { getTimetableDayIndex, getSpecialTimetableDay } from './specialTimetableDays'
+import { getTimetableDayIndex, getSpecialTimetableDay, isCancelledGradePeriod } from './specialTimetableDays'
 import { PERIODS_PER_DAY, type SchoolTimetable } from './schoolTimetable'
 import { isTimetableChangeAppliedForTeacher, type TimetableChangeRequest } from './timetableChanges'
 import { applyDailyTimetableOverridesToTeacher, effectivePulledLessons, type DailyTimetableOverride } from './timetableOverrides'
@@ -200,7 +200,13 @@ export function buildCompositeTeacherDay(
     }
   })
 
-  return { date, rule, lessons, outOfRangeLessons }
+  return {
+    date, rule,
+    lessons: lessons.map(lesson => isCancelledGradePeriod(date, lesson.value, lesson.period)
+      ? { period: lesson.period, value: '', source: 'override', badge: '3학년 오후 수업 없음', originalValue: lesson.value }
+      : lesson),
+    outOfRangeLessons,
+  }
 }
 
 export function monthCalendarDates(monthKey: string) {

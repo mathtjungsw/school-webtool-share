@@ -25,6 +25,7 @@ import {
   type SharedStudentTimetable,
 } from '../services/studentTimetable'
 import { studentIdsMatch } from '../services/studentId'
+import { isCancelledGradePeriod, localDateKey, THIRD_GRADE_MORNING_ONLY } from '../services/specialTimetableDays'
 
 interface ImportMessage {
   fileName: string
@@ -51,7 +52,8 @@ const escapeHtml = (value: string) =>
 function timetablePrintBlock(personal: PersonalTimetable) {
   const rows = UNGCHEON_PERIOD_PLAN.slice(0, 7).map(period => {
     const cells = STUDENT_TIMETABLE_DAYS.map(day => {
-      const slot = personal.slots[`${day}${period.period}`]
+      const slot = isCancelledGradePeriod(localDateKey(), personal.student.grade, Number(period.period))
+        ? undefined : personal.slots[`${day}${period.period}`]
       const details = [slot?.classroom, slot?.teacher].filter(Boolean).join(' · ')
       return `
         <td class="${slot?.selectedCourse ? 'selected' : ''}">
@@ -85,6 +87,7 @@ function timetablePrintBlock(personal: PersonalTimetable) {
         <tbody>${rows}</tbody>
       </table>
       <p class="legend"><i></i> 선택과목 수업 · 강의실과 담당교사가 함께 표시됩니다.</p>
+      ${isCancelledGradePeriod(localDateKey(), personal.student.grade, 5) ? `<p class="legend">${escapeHtml(THIRD_GRADE_MORNING_ONLY.message)}</p>` : ''}
     </section>
   `
 }
@@ -489,6 +492,9 @@ export default function StudentTimetablePage() {
                     </div>
                   </div>
 
+                  {isCancelledGradePeriod(localDateKey(), personal.student.grade, 5) && (
+                    <p className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-950">{THIRD_GRADE_MORNING_ONLY.message}</p>
+                  )}
                   <div className="overflow-x-auto">
                     <table className="w-full table-fixed border-separate border-spacing-1 min-w-[720px]">
                       <thead>
@@ -507,27 +513,28 @@ export default function StudentTimetablePage() {
                               <span className="block text-[9px] text-slate-600 mt-0.5">{period.start}~{period.end}</span>
                             </th>
                             {STUDENT_TIMETABLE_DAYS.map(day => {
-                              const slot = personal.slots[`${day}${period.period}`]
+                              const slot = isCancelledGradePeriod(localDateKey(), personal.student.grade, Number(period.period))
+                                ? undefined : personal.slots[`${day}${period.period}`]
                               return (
                                 <td key={day} className="p-0.5">
                                   <div className={clsx(
                                     'min-h-[68px] rounded-xl border px-2 py-2 flex flex-col justify-center text-center transition-colors',
-                                    slot.selectedCourse
+                                    slot?.selectedCourse
                                       ? 'bg-emerald-500/14 border-emerald-400/35'
-                                      : slot.subject
+                                      : slot?.subject
                                         ? 'bg-sky-500/8 border-sky-400/15'
                                         : 'bg-white/[0.02] border-white/5',
                                   )}>
-                                    {slot.group && (
+                                    {slot?.group && (
                                       <span className="text-[8px] font-black text-emerald-400/80 mb-0.5">{slot.group}군</span>
                                     )}
                                     <span className={clsx(
                                       'text-[11px] font-semibold leading-snug',
-                                      slot.selectedCourse ? 'text-emerald-200' : slot.subject ? 'text-slate-300' : 'text-slate-700',
+                                      slot?.selectedCourse ? 'text-emerald-200' : slot?.subject ? 'text-slate-300' : 'text-slate-700',
                                     )}>
-                                      {slot.subject || '·'}
+                                      {slot?.subject || '·'}
                                     </span>
-                                    {(slot.classroom || slot.teacher) && (
+                                    {(slot?.classroom || slot?.teacher) && (
                                       <span className="text-[9px] text-slate-500 mt-1 truncate" title={[slot.classroom, slot.teacher].filter(Boolean).join(' · ')}>
                                         {[slot.classroom, slot.teacher].filter(Boolean).join(' · ')}
                                       </span>

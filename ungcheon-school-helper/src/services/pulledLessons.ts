@@ -1,4 +1,5 @@
 import { PULLED_LESSONS_2026, type PulledLesson } from '../data/pulledLessons2026'
+import { isCancelledGradePeriod } from './specialTimetableDays'
 
 function normalizeName(value: string) { return value.replace(/\s+/g, '').trim() }
 
@@ -9,6 +10,7 @@ export function listPulledLessonsForTeacher(teacherName: string, fromDate = '', 
     .filter(lesson => normalizeName(lesson.teacherName) === teacher)
     .filter(lesson => !fromDate || lesson.date >= fromDate)
     .filter(lesson => !toDate || lesson.date <= toDate)
+    .filter(lesson => !isCancelledGradePeriod(lesson.date, lesson.classLabel, lesson.period))
     .sort((a, b) => a.date.localeCompare(b.date) || a.period - b.period || a.classLabel.localeCompare(b.classLabel, 'ko', { numeric: true }))
 }
 

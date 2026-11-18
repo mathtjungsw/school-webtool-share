@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { isCancelledGradePeriod } from './specialTimetableDays'
 
 export const TIMETABLE_DAYS = ['월', '화', '수', '목', '금'] as const
 export const PERIODS_PER_DAY = 7
@@ -36,6 +37,18 @@ export interface ParsedTimetable {
   title: string
   sourceFileName: string
   teachers: TeacherTimetable[]
+}
+
+export function operatingSchoolTimetable(timetable: SchoolTimetable | null, date: string): SchoolTimetable | null {
+  if (!timetable) return null
+  return {
+    ...timetable,
+    teachers: timetable.teachers.map(teacher => ({
+      ...teacher,
+      slots: teacher.slots.map((slot, index) => isCancelledGradePeriod(date, slot.value, index % PERIODS_PER_DAY + 1)
+        ? { value: '', locked: false } : slot),
+    })),
+  }
 }
 
 export interface SwapCandidate {

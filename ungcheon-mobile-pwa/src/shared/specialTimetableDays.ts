@@ -48,6 +48,21 @@ function localDate(value: string) {
   return new Date(year, month - 1, day)
 }
 
+export const THIRD_GRADE_MORNING_ONLY = {
+  start: '2026-11-18',
+  end: '2027-02-05',
+  message: '11월 18일부터 3학년은 오전 수업만 운영합니다. 5·6·7교시는 수업이 없습니다.',
+}
+
+/** 날짜는 실제 수업일, 학년은 학생 학년 또는 교사 시간표 첫 줄의 학급 코드입니다. */
+export function isCancelledGradePeriod(date: string, gradeOrClass: string | number | undefined, period: number) {
+  const key = normalizeDate(date)
+  const grade = String(gradeOrClass).trim().split(/\r?\n/)[0]
+  return key >= THIRD_GRADE_MORNING_ONLY.start && key <= THIRD_GRADE_MORNING_ONLY.end
+    && period >= 5 && period <= 7
+    && /^(?:3|3학년|3[-_]0?\d{1,2}(?:반)?|30?\d{1,2})$/.test(grade)
+}
+
 function formatLike(date: Date, source: string) {
   const year = String(date.getFullYear())
   const month = String(date.getMonth() + 1).padStart(2, '0')

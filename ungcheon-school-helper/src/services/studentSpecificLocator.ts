@@ -8,6 +8,7 @@ import type { SchoolTimetable } from './schoolTimetable'
 import { schoolTimetableSlotIndex, TIMETABLE_DAYS } from './schoolTimetable'
 import type { SharedNeisSnapshot } from './sharedNeis'
 import { getAcademicDayRule } from './teacherTimetableCalendar'
+import { isCancelledGradePeriod, THIRD_GRADE_MORNING_ONLY } from './specialTimetableDays'
 import type { PersonalTimetable, PersonalTimetableSlot, SharedStudentTimetable, StudentTimetableDay } from './studentTimetable'
 import { canonicalStudentId, studentIdsMatch } from './studentId'
 import type { TimetableChangeRequest } from './timetableChanges'
@@ -233,6 +234,9 @@ function pulledFor(classLabel: string, date: string, day: StudentTimetableDay, p
 }
 
 function locateStudent(entry: StudentDirectoryEntry, date: string, period: number, school: SchoolTimetable | null, neis: SharedNeisSnapshot | null, changes: TimetableChangeRequest[], overrides: DailyTimetableOverride[]) {
+  if (isCancelledGradePeriod(date, entry.roster.grade, period)) {
+    return { day: '', subject: '', classroom: '', teacher: '', source: '3학년 오전 수업 운영', state: 'no_lesson' as const, label: '수업 없음', message: THIRD_GRADE_MORNING_ONLY.message }
+  }
   const rule = getAcademicDayRule(date)
   const targetDay = rule.sourceDayIndex >= 0 ? TIMETABLE_DAYS[rule.sourceDayIndex] : undefined
   const baseSource = entry.timetable ? '학생 개인시간표' : 'NEIS 학급시간표'

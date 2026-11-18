@@ -71,6 +71,34 @@ try {
   }
 
   const search = fs.readFileSync(path.join(root, 'src/services/workAssistantSearch.ts'), 'utf8')
+  const third = structuredClone(dataset.students[0])
+  third.student = { ...third.student, studentId: '3101', grade: '3', className: '1', classLabel: '3-1' }
+  third.slots['월4'] = { ...third.slots['월5'], period: 4 }
+  const thirdDataset = { ...dataset, students: [third] }
+  const queryThird = date => service.buildStudentSpecificLocationRows({
+    ...base, date, dataset: thirdDataset, roster: null,
+    inputs: [{ rowNumber: 2, studentId: '3101', name: '' }], periods: [4, 5, 6, 7],
+  })
+  assert.ok(queryThird('2026-11-16').every(row => row.subject))
+  const after = queryThird('2026-11-23')
+  assert.ok(after[0].subject)
+  assert.ok(after.slice(1).every(row => row.subject === '수업 없음' && row.scheduleState === 'no_lesson'))
+  console.log('PASS 3학년 오전 수업 유지, 오후 위치 없음, 변경 전 날짜 보존')
+
+  const calendarBundle = path.join(tempDir, 'teacherTimetableCalendar.cjs')
+  buildSync({ entryPoints: [path.join(root, 'src/services/teacherTimetableCalendar.ts')], outfile: calendarBundle, bundle: true, platform: 'node', format: 'cjs', target: 'node18', logLevel: 'silent' })
+  const { buildCompositeTeacherDay } = require(calendarBundle)
+  const slots = Array.from({ length: 35 }, (_, index) => ({ value: index % 7 === 5 ? '201\n수학' : '301\n국어', locked: false }))
+  const school = { teachers: [{ name: '합성교사', slots }] }
+  const approved = { ...change, originalDate: '2026-11-23', originalTeacher: '원교사', replacementTeacher: '합성교사', originalClass: '3-1', originalSubject: '승인수업' }
+  const pulled = [{ teacherName: '합성교사', date: '2026-11-23', period: 7, classLabel: '3-2', subject: '당김수업' }]
+  const day = buildCompositeTeacherDay(school, '합성교사', '2026-11-23', [approved], pulled)
+  assert.ok(day.lessons.slice(0, 4).every(lesson => lesson.value))
+  assert.deepEqual(day.lessons.slice(4).map(lesson => lesson.value), ['', '201\n수학', ''])
+  assert.ok(buildCompositeTeacherDay(school, '합성교사', '2026-11-16').lessons[4].value)
+  assert.equal(slots[4].value, '301\n국어')
+  console.log('PASS 최종 교사 시간표에서 대강·당김 3학년 오후 제외, 다른 학년과 원본 보존')
+
   for (const keyword of ['여러 학생 위치 찾기', '특정 날짜 학생 위치', '학생 위치 엑셀', '학생 위치 일괄 조회']) assert.ok(search.includes(keyword), `검색도우미 누락: ${keyword}`)
   console.log('PASS 학생 특정 시간 위치찾기 · 학번 정규화 · 동명이인 · 불일치 · 변경상태 · Excel 왕복')
 } finally {

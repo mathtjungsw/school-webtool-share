@@ -1,6 +1,6 @@
 import type { PulledLesson } from './shared/pulledLessons2026'
 import type { DailyTimetableOverride, TeacherTimetable } from './types'
-import { getTimetableDayIndex } from './shared/specialTimetableDays'
+import { getTimetableDayIndex, isCancelledGradePeriod } from './shared/specialTimetableDays'
 
 const compact = (value: unknown) => String(value ?? '').replace(/\s+/g, '').trim()
 function classCode(value: string) {
@@ -30,7 +30,7 @@ export function applyTeacherOverrides(teacher: TeacherTimetable, date: string, b
         ? teacher.slots[sourceDay * 7 + rule.sourcePeriod - 1]?.value ?? '' : ''
       if ((!rule.targetGrade && !rule.targetClass) || matches(source, rule) || matches(lessons[index] ?? '', rule)) lessons[index] = source
     })
-  return lessons
+  return lessons.map((value, index) => isCancelledGradePeriod(date, value, index + 1) ? '' : value)
 }
 
 export function effectiveMobilePulledLessons(pulled: PulledLesson[], overrides: DailyTimetableOverride[]) {

@@ -10,7 +10,7 @@ import { UNGCHEON_PERIOD_PLAN } from '../services/ungcheonSchedule'
 import { listTimetableChanges, type TimetableChangeRequest } from '../services/timetableChanges'
 import { applyStudentLessonOverride } from '../services/effectiveTimetable'
 import { useAppStore } from '../stores/appStore'
-import { getSpecialTimetableDay, getTimetableDayIndex, localDateKey } from '../services/specialTimetableDays'
+import { getSpecialTimetableDay, getTimetableDayIndex, localDateKey, isCancelledGradePeriod } from '../services/specialTimetableDays'
 import { canonicalStudentId, studentIdsMatch } from '../services/studentId'
 import { PULLED_LESSONS_2026 } from '../data/pulledLessons2026'
 import { effectivePulledLessons, findStudentTimetableOverride, type DailyTimetableOverride } from '../services/timetableOverrides'
@@ -170,6 +170,7 @@ export default function StudentLocatorPage() {
 
   const resolveSlot = (periodNumber: number) => {
     if (!selected || !day) return undefined
+    if (isCancelledGradePeriod(dateKey, selected.student.grade, periodNumber)) return undefined
     const dailyOverride = findStudentTimetableOverride(timetableOverrides, dateKey, selected.student.grade, selected.student.className, periodNumber)
     const sourceDate = dailyOverride?.action === 'copy' ? dailyOverride.sourceDate : dateKey
     const sourceDayIndex = getTimetableDayIndex(sourceDate)

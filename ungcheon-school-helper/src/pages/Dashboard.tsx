@@ -66,7 +66,7 @@ import {
 import { UNGCHEON_LUNCH, UNGCHEON_PERIOD_PLAN, UNGCHEON_PERIOD_RANGES } from '../services/ungcheonSchedule'
 import {
   getSpecialTimetableDay, getTimetableDayIndex, getTimetableSourceDate,
-  SPECIAL_TIMETABLE_DAYS,
+  SPECIAL_TIMETABLE_DAYS, isCancelledGradePeriod,
 } from '../services/specialTimetableDays'
 import type { CreativeScheduleResult, DutyScheduleResult, MealInfo, ScheduleEvent, TimetableEntry, WeeklyPlanNote, WeeklyPlanResult } from '../types'
 import { isTimetableChangeAppliedForTeacher, listTimetableChanges, timetableChangeSummary, type TimetableChangeRequest } from '../services/timetableChanges'
@@ -459,7 +459,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const periodRanges = UNGCHEON_PERIOD_RANGES
   const hasTeacher = !!(config.teacherClasses?.length)
   const pulledLessons = useMemo(() => listPulledLessonsForTeacher(config.teacherName?.trim() ?? ''), [config.teacherName])
-  const effectiveTeacherPulledLessons = useMemo(() => effectivePulledLessons(pulledLessons, timetableOverrides), [pulledLessons, timetableOverrides])
+  const effectiveTeacherPulledLessons = useMemo(() => effectivePulledLessons(pulledLessons, timetableOverrides).filter(item => !isCancelledGradePeriod(item.date, item.classLabel, item.period)), [pulledLessons, timetableOverrides])
 
   useEffect(() => {
     if (!config.schoolHubUrl || !config.teacherName?.trim()) {
@@ -819,12 +819,13 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
             t.date === getTimetableSourceDate(toYmd(timetableDate)) &&
             t.grade?.trim() === tc.grade &&
             t.classNm?.trim() === tc.classNm &&
-            t.subject?.trim() === tc.subject?.trim()
+            t.subject?.trim() === tc.subject?.trim() &&
+            !isCancelledGradePeriod(timetableDate, tc.grade, Number(t.period))
           )
           .forEach(t => { todaySubjects[String(t.period)] = `${tc.grade}-${tc.classNm}반 ${tc.subject}` })
       })
     } else if (config.grade && config.classNm) {
-      timetable.filter(t => t.date === getTimetableSourceDate(toYmd(timetableDate)))
+      timetable.filter(t => t.date === getTimetableSourceDate(toYmd(timetableDate)) && !isCancelledGradePeriod(timetableDate, config.grade, Number(t.period)))
         .forEach(t => { todaySubjects[String(t.period)] = t.subject })
     }
     effectiveTeacherPulledLessons.filter(item => item.date === timetableDate).forEach(item => {
@@ -1733,7 +1734,7 @@ function TimetableSection({
   const hasTeacher = !!(config.teacherClasses?.length)
   const selectedYmd = toYmd(selectedDate)
   const [showClassTimetable, setShowClassTimetable] = useState(true)
-  const effectivePulled = useMemo(() => effectivePulledLessons(pulledLessons, timetableOverrides), [pulledLessons, timetableOverrides])
+  const effectivePulled = useMemo(() => effectivePulledLessons(pulledLessons, timetableOverrides).filter(item => !isCancelledGradePeriod(item.date, item.classLabel, item.period)), [pulledLessons, timetableOverrides])
 
   useEffect(() => {
     void window.electron.configGet('dashboard.classTimetable.visible.v1').then(value => {
@@ -1792,6 +1793,7 @@ function TimetableSection({
       const assignedTeacher = firstSide ? change.replacementTeacher : change.originalTeacher
       const className = firstSide ? change.originalClass : change.replacementClass
       const subject = firstSide ? change.originalSubject : change.replacementSubject
+      if (isCancelledGradePeriod(isoDate, className, Number(period))) return null
       if (assignedTeacher === sharedTeacher.name) return { text: className || subject, sub: `${subject} · 승인 반영`, colorClass: 'bg-fuchsia-50 text-fuchsia-900 ring-1 ring-fuchsia-200', isNow: date === todayYmd && period === currentPeriod }
       if (change.originalTeacher === sharedTeacher.name || change.replacementTeacher === sharedTeacher.name) return { text: slot?.value.split(/\r?\n/)[0] || className, sub: `변경 담당 · ${assignedTeacher}`, colorClass: 'bg-amber-50 text-amber-900 ring-1 ring-amber-200', isNow: false }
     }
@@ -1848,6 +1850,7 @@ function TimetableSection({
                 const assignedTeacher = firstSide ? change.replacementTeacher : change.originalTeacher
                 const className = firstSide ? change.originalClass : change.replacementClass
                 const subject = firstSide ? change.originalSubject : change.replacementSubject
+                if (isCancelledGradePeriod(isoDate, className, Number(period))) return null
                 if (assignedTeacher === sharedTeacher.name) return { text: className || subject, sub: `${subject} · 승인 반영`, colorClass: 'bg-fuchsia-500/20 text-fuchsia-200 ring-1 ring-fuchsia-400/30', isNow: date === todayYmd && period === currentPeriod }
                 if (change.originalTeacher === sharedTeacher.name || change.replacementTeacher === sharedTeacher.name) return { text: slot?.value.split(/\r?\n/)[0] || className, sub: `변경 담당 · ${assignedTeacher}`, colorClass: 'bg-amber-500/15 text-amber-200', isNow: false }
               }
@@ -1898,7 +1901,8 @@ function TimetableSection({
                   String(t.period) === period &&
                   t.grade?.trim() === tc.grade &&
                   t.classNm?.trim() === tc.classNm &&
-                  t.subject?.trim() === tc.subject?.trim()
+                  t.subject?.trim() === tc.subject?.trim() &&
+                  !isCancelledGradePeriod(date, tc.grade, Number(period))
                 )
                 return found ? { label: `${tc.grade}-${tc.classNm}반`, subject: tc.subject, colorIdx: idx % TC_COLORS.length } : null
               }, null)
@@ -1943,6 +1947,7 @@ function TimetableSection({
             periodRanges={periodRanges}
             lunch={lunch}
             renderCell={(date, period) => {
+              if (isCancelledGradePeriod(date, config.grade, Number(period))) return null
               const entry = timetable.find(t => t.date === getTimetableSourceDate(date) && String(t.period) === period)
               if (!entry) return null
               const isNow = date === todayYmd && period === currentPeriod
