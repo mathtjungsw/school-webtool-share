@@ -9,7 +9,7 @@
 - 고정 deployment: `AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w`.
 - Apps Script URL: <https://script.google.com/macros/s/AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w/exec>.
 - 모바일 기본 주소는 <https://ungcheon-school-helper-mobile.web.app/>이며 GitHub 안내 주소 <https://mathtjungsw.github.io/school-webtool-share/mobile/>도 같은 화면을 연다. 기존 <https://ungcheon-mobile-schedule.jsw890122.chatgpt.site>는 전환 기간에 같은 인증·조회 API를 사용한다. 학교에서 종료일을 결정할 때까지 병행한다.
-- 현재 통합 기준은 데스크톱 v1.1.36, 모바일 PWA v1.1.38, Apps Script `MOBILE_SERVICE_VERSION = 53`이다. 모바일은 PC의 `specialTimetableDays.ts`를 정적 동기화해 10월 13일·11월 9일·11월 17일 금요일 운영 및 8월 11일 월요일 운영을 같은 기준으로 적용한다. 서버의 모바일 출결도 해당 운영 요일의 수강생을 사용하되 출결 시트 날짜는 실제 수업일을 유지한다. PC 기준과 서버 운영 요일 목록 일치 검사를 계약 테스트에 포함한다. 기존 교체·대강·당김·일일 예외 우선순위 및 데이터·로그인 계약은 유지한다. 실제 공개 배포 확인 결과는 각 릴리스 검증 문서에 기록한다.
+- 현재 통합 기준은 데스크톱·모바일 소스 v1.1.45, Apps Script `MOBILE_SERVICE_VERSION = 76`이다. Firebase 전용 모바일 주소는 이 소스를 사용하며 기존 챗사이트의 게시 상태는 별도로 점검한다. 모바일은 PC의 `specialTimetableDays.ts`를 정적 동기화해 10월 13일·11월 9일·11월 17일 금요일 운영 및 8월 11일 월요일 운영을 같은 기준으로 적용한다. 서버의 모바일 출결도 해당 운영 요일의 수강생을 사용하되 출결 시트 날짜는 실제 수업일을 유지한다. PC 기준과 서버 운영 요일 목록 일치 검사를 계약 테스트에 포함한다. 기존 교체·대강·당김·일일 예외 우선순위 및 데이터·로그인 계약은 유지한다. 실제 공개 배포 확인 결과는 각 릴리스 검증 문서에 기록한다.
 
 ## 로그인과 응답
 
