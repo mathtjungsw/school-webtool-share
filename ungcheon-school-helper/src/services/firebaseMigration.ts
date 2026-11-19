@@ -1,5 +1,18 @@
 import { hubRequest } from './schoolHub'
 
+export type PrivateSchoolGroup = 'staffRoster' | 'studentRoster' | 'timetable' | 'studentTimetable'
+export interface PrivateSchoolMirrorStatus {
+  group: PrivateSchoolGroup
+  state: 'current' | 'pending' | 'unchecked' | 'disabled'
+  checkedAt?: string | null
+}
+export function getPrivateSchoolMirrorStatus(adminPassword: string) {
+  return hubRequest<PrivateSchoolMirrorStatus[]>({ action: 'getPrivateSchoolMirrorStatus', adminPassword })
+}
+export function retryPrivateSchoolMirror(adminPassword: string, group: PrivateSchoolGroup) {
+  return hubRequest<{ state: 'current' | 'pending' }>({ action: 'retryPrivateSchoolMirror', adminPassword, group })
+}
+
 export interface MigrationResource {
   resource: string
   sheetName: string

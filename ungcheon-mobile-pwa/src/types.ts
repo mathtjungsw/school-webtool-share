@@ -17,7 +17,21 @@ export interface MobileEvent {
 export interface StaffMember { name: string }
 export interface SharedStaffRoster { version: number; members: StaffMember[] }
 export interface TimetableSlot { value: string; locked: boolean }
-export interface TeacherTimetable { pulledLessons?:import('./shared/pulledLessons2026').PulledLesson[]; name: string; label: string; load: string; slots: TimetableSlot[] }
+export interface PulledLesson {
+  id: string
+  date: string
+  period: number
+  classLabel: string
+  subject: string
+  teacherName: string
+  originalTeacherName: string
+  substituteTeacherName: string
+  originalSlot: string
+  originalDate: string
+  note: string
+  sourceRow: number
+}
+export interface TeacherTimetable { pulledLessons?:PulledLesson[]; name: string; label: string; load: string; slots: TimetableSlot[] }
 export interface SchoolTimetable { version: number; title: string; uploadedAt: string; teachers: TeacherTimetable[] }
 export interface CommitteeEvent { id: string; committeeName: string; title: string; date: string; startTime: string; endTime: string; location: string; memberNames: string[] }
 export interface CommitteeState { events: CommitteeEvent[] }
@@ -34,6 +48,8 @@ export interface MobileAttendanceSummary {
   period: number
   state: AttendanceState
   flaggedCount: number
+  attendanceCount?: number
+  selfStudyCount?: number
   enrolledCount: number
   courseNames: string[]
   classrooms: string[]

@@ -1,6 +1,5 @@
 import { addDays, format, startOfWeek } from 'date-fns'
 import type { DailyTimetableOverride, DashboardPayload, LessonView, MealInfo, MobileEvent, ScheduleSource, TeacherTimetable, TimetableChange } from './types'
-import { PULLED_LESSONS_2026 } from './shared/pulledLessons2026'
 import { UNGCHEON_PERIOD_PLAN } from './shared/ungcheonSchedule'
 import { getTimetableDayIndex, isCancelledGradePeriod } from './shared/specialTimetableDays'
 import { applyTeacherOverrides, effectiveMobilePulledLessons } from './timetableOverrides'
@@ -92,8 +91,9 @@ export function buildMobileTimelineRows(lessons: LessonView[], events: MobileEve
       events: [item.event],
     }))
   }
-  const first = UNGCHEON_PERIOD_PLAN[0]
-  const last = UNGCHEON_PERIOD_PLAN[6]
+  const periods = UNGCHEON_PERIOD_PLAN.slice(0, Math.max(7, lessons.length))
+  const first = periods[0]
+  const last = periods[periods.length - 1]
   const overlaps = (start: string, end: string, period?: number) => timed.filter(item => {
     if (item.range.periodStart) {
       return period !== undefined && period >= item.range.periodStart && period <= item.range.periodEnd
@@ -105,10 +105,10 @@ export function buildMobileTimelineRows(lessons: LessonView[], events: MobileEve
   const rows: MobileTimelineRow[] = []
   const before = timed.filter(item => item.range.start < first.start)
   if (before.length) rows.push({ id: 'before', kind: 'before', label: '수업 전', start: before.map(item => item.range.start).sort()[0], end: first.start, events: before.map(item => item.event) })
-  UNGCHEON_PERIOD_PLAN.slice(0, 7).forEach((period, index) => {
+  periods.forEach((period, index) => {
     rows.push({ id: `period-${period.period}`, kind: 'period', label: `${period.period}교시`, start: period.start, end: period.end, lesson: lessons[index], events: overlaps(period.start, period.end, Number(period.period)) })
-    const next = UNGCHEON_PERIOD_PLAN[index + 1]
-    if (!next || index >= 6) return
+    const next = periods[index + 1]
+    if (!next) return
     const gapEvents = overlaps(period.end, next.start)
     if (index === 3 || gapEvents.length) rows.push({ id: `gap-${period.period}`, kind: index === 3 ? 'lunch' : 'break', label: index === 3 ? '점심' : '쉬는 시간', start: period.end, end: next.start, events: gapEvents })
   })
@@ -167,7 +167,7 @@ export function isApplied(change: TimetableChange, name: string) {
 export function timetableForDate(teacher: TeacherTimetable | null, date: string, changes: TimetableChange[], teacherName: string, overrides: DailyTimetableOverride[] = []): LessonView[] {
   const dayIndex = getTimetableDayIndex(date)
   if (!teacher || dayIndex < 0 || dayIndex > 4) return []
-  const pulledLessons = effectiveMobilePulledLessons(teacher.pulledLessons ?? PULLED_LESSONS_2026, overrides)
+  const pulledLessons = effectiveMobilePulledLessons(teacher.pulledLessons ?? [], overrides)
   const hasEighth = pulledLessons.some(item => item.date === date && item.teacherName.trim() === teacherName.trim() && item.period === 8)
   const rawBase = Array.from({ length: 7 }, (_, index) => teacher.slots[dayIndex * 7 + index]?.value ?? '')
   const overrideBase = applyTeacherOverrides(teacher, date, rawBase, overrides)
@@ -200,7 +200,7 @@ export function collectEvents(data: DashboardPayload, name: string): MobileEvent
     const title = item.kind === 'exchange' ? `수업 교환 · ${item.originalClass} ↔ ${item.replacementClass}` : `대강 · ${item.originalClass} ${item.originalSubject}`
     ;[...new Set([item.originalDate, item.replacementDate])].forEach(date => events.push({ id: `change-${item.id}-${date}`, date, title, source: 'timetableChange', label: item.status === 'approved' ? '승인된 수업 변경' : '우선 반영' }))
   })
-  effectiveMobilePulledLessons(findTeacher(data.timetable,name)?.pulledLessons ?? PULLED_LESSONS_2026, data.bundle?.timetableOverrides ?? []).filter(item => item.teacherName.trim() === name.trim() && !isCancelledGradePeriod(item.date, item.classLabel, item.period)).forEach(item => events.push({ id: item.id, date: item.date, title: `${item.period}교시 ${item.classLabel} ${item.subject}`, source: 'pulledLesson', label: '당김수업' }))
+  effectiveMobilePulledLessons(findTeacher(data.timetable,name)?.pulledLessons ?? [], data.bundle?.timetableOverrides ?? []).filter(item => item.teacherName.trim() === name.trim() && !isCancelledGradePeriod(item.date, item.classLabel, item.period)).forEach(item => events.push({ id: item.id, date: item.date, title: `${item.period}교시 ${item.classLabel} ${item.subject}`, source: 'pulledLesson', label: '당김수업' }))
   return events.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
 }
 

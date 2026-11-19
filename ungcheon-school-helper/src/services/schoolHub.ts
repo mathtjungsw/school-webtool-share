@@ -189,10 +189,18 @@ function revisionFromData(data: unknown) {
   return ''
 }
 
+function hasTimetableSupplement(resource: HubResource, data: unknown, revision: string) {
+  if (!/:[0-9a-f]{40}$/.test(revision)) return true
+  const table = data as { pulledLessons?: unknown; helpClassSchedules?: unknown } | null
+  if (resource === 'timetable') return Array.isArray(table?.pulledLessons)
+  if (resource === 'studentTimetable') return Array.isArray(table?.helpClassSchedules)
+  return true
+}
+
 function normalizeHubResourceData(resource: HubResource, data: unknown) {
   const extras = data as { pulledLessons?: typeof PULLED_LESSONS_2026; helpClassSchedules?: typeof HELP_CLASS_SCHEDULES } | null
-  if (resource === 'timetable') PULLED_LESSONS_2026.splice(0, PULLED_LESSONS_2026.length, ...(extras?.pulledLessons || []))
-  if (resource === 'studentTimetable') HELP_CLASS_SCHEDULES.splice(0, HELP_CLASS_SCHEDULES.length, ...(extras?.helpClassSchedules || []))
+  if (resource === 'timetable' && Array.isArray(extras?.pulledLessons)) PULLED_LESSONS_2026.splice(0, PULLED_LESSONS_2026.length, ...extras.pulledLessons)
+  if (resource === 'studentTimetable' && Array.isArray(extras?.helpClassSchedules)) HELP_CLASS_SCHEDULES.splice(0, HELP_CLASS_SCHEDULES.length, ...extras.helpClassSchedules)
   if (resource === 'studentRoster') {
     return normalizeSharedStudentRoster(data as SharedStudentRoster | null)
   }
@@ -230,6 +238,7 @@ async function hydratePersistentSchoolHubCache() {
       for (const rawEntry of entries) {
         const resource = rawEntry.resource as HubResource
         if (!BACKGROUND_INTERVAL_MS[resource] || !rawEntry.cacheKey) continue
+        if (!hasTimetableSupplement(resource, rawEntry.data, rawEntry.revision || '')) continue
         const data = normalizeHubResourceData(resource, rawEntry.data)
         sessionCache.set(rawEntry.cacheKey, {
           resource,
@@ -375,6 +384,8 @@ export async function hubRequest<T>(request: Record<string, unknown>): Promise<T
       'getNeisSnapshot',
       'replaceNeisSnapshot',
       'getMigrationStatus',
+      'getPrivateSchoolMirrorStatus',
+      'retryPrivateSchoolMirror',
       'getMigrationInventory',
       'runMigrationReplica',
       'setMigrationReplicaPaused',
@@ -431,6 +442,7 @@ async function fetchAndStore<T>(
   let requestPromise: Promise<T>
   requestPromise = hubRequest<T>(request).then(rawData => {
     if (cacheGeneration !== generation || (resourceEpoch.get(resource) ?? 0) !== epoch) throw Error('로그인 또는 자료 버전이 변경되었습니다.')
+    if (!hasTimetableSupplement(resource, rawData, knownRevision)) throw Error('시간표 추가 편성 자료를 다시 확인해 주세요.')
     const data = normalizeHubResourceData(resource, rawData) as T
     const revision = knownRevision || revisionFromData(data)
     const signature = revision || dataSignature(data)

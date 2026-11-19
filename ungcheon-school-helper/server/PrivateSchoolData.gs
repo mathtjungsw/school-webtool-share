@@ -61,14 +61,18 @@ function privateSchoolVersionMatches_(data, meta) {
 }
 function privateSchoolServe_(group, fallback) {
   if(!privateSchoolRevision_(group)) return fallback();
+  const supplement = {timetable:'pulledLessons',studentTimetable:'helpClassSchedules'}[group];
   let saved;
   try { saved=privateSchoolRead_(group); }
-  catch (_) { return fallback(); }
+  catch (_) {
+    if (supplement) throw Error('시간표의 추가 편성 자료를 확인하지 못했습니다. 잠시 뒤 다시 동기화해 주세요.');
+    return fallback();
+  }
+  if (supplement && !Array.isArray(saved[supplement])) throw Error('시간표의 추가 편성 자료가 누락되었습니다. 관리자에게 동기화를 요청해 주세요.');
   if(privateSchoolVersionMatches_(saved,privateSchoolMetadata_(group))) return saved;
   const current=fallback();
   if(!current) return current;
-  if(group==='timetable' && Array.isArray(saved.pulledLessons)) current.pulledLessons=saved.pulledLessons;
-  if(group==='studentTimetable' && Array.isArray(saved.helpClassSchedules)) current.helpClassSchedules=saved.helpClassSchedules;
+  if(supplement) current[supplement]=saved[supplement];
   return current;
 }
 function privateSchoolValidateInput_(body) {
@@ -78,14 +82,28 @@ function privateSchoolValidateInput_(body) {
 function privateSchoolPublish_(group,data) {
   const props=PropertiesService.getScriptProperties();if(!props.getProperty('UNG_PRIVATE_REPO')) return;
   const previous=privateSchoolRevision_(group);
-  if (privateSchoolGit_('',true).private!==true) throw Error('학교 자료는 비공개 저장소에만 게시할 수 있습니다.');
+  const target=privateSchoolGit_('',true);
+  if (target.private!==true) throw Error('학교 자료는 비공개 저장소에만 게시할 수 있습니다.');
   const file='/contents/school/'+group+'.json';
   const previousFile=previous ? privateSchoolGit_(file+'?ref='+previous,false) : null;
-  if(previous && (group==='timetable'||group==='studentTimetable')){const old=privateSchoolRead_(group);for(const prop of ['pulledLessons','helpClassSchedules'])if(old[prop] && !data[prop])data[prop]=old[prop];}
+  const supplement = {timetable:'pulledLessons',studentTimetable:'helpClassSchedules'}[group];
+  if(previous && supplement){
+    const old=privateSchoolRead_(group);
+    if(!Array.isArray(old[supplement])) throw Error('기존 시간표의 추가 편성 자료를 확인해 주세요.');
+    data[supplement]=old[supplement];
+  }
   privateSchoolValidateInput_({timetable:data});
   const content={message:'Update school '+group,content:Utilities.base64Encode(JSON.stringify(data),Utilities.Charset.UTF_8)};
   if(previousFile)content.sha=previousFile.sha;
-  const receipt=privateSchoolGit_(file,true,content);
+  let receipt;
+  try { receipt=privateSchoolGit_(file,true,content); }
+  catch (error) {
+    // The previous PUT may have committed before its response reached Apps Script.
+    const head=privateSchoolGit_('/git/ref/heads/'+encodeURIComponent(target.default_branch),false).object.sha;
+    const published=privateSchoolReadAt_(group,head);
+    if(migrationHash_(published)!==migrationHash_(data)) throw error;
+    receipt={commit:{sha:head}};
+  }
   if(!receipt.commit || !/^[a-f0-9]{40}$/.test(receipt.commit.sha))throw Error('학교 자료 게시 결과를 확인할 수 없습니다.');
   props.setProperty('UNG_PRIVATE_REV_'+group,receipt.commit.sha);
 }
@@ -167,9 +185,61 @@ function privateSchoolMirrorAfterWrite_(repo,config,body,response) {
       return privateSchoolReaders_()[group]();
     }).response;
     if(!privateSchoolVersionMatches_(current,committed.data)) return;
-    if(privateSchoolVersionMatches_(privateSchoolRead_(group),current)) return;
-    privateSchoolPublish_(group,current);
-  } catch (_) {}
+    privateSchoolSyncCurrent_(group,current);
+  } catch (_) {
+    // Keep the successful source receipt even during a Script Properties outage.
+    // Status compares the last confirmed source version on its next read.
+    try { privateSchoolRecordMirror_(group,'pending',null); } catch (propertyError) {}
+  }
+}
+
+function privateSchoolRecordMirror_(group,state,data) {
+  const status={state:state,checkedAt:new Date().toISOString(),version:data ? data.version : null,uploadedAt:data ? data.uploadedAt : null};
+  PropertiesService.getScriptProperties().setProperty('UNG_PRIVATE_MIRROR_'+group,JSON.stringify(status));
+}
+
+function privateSchoolSyncCurrent_(group,current,verifyContents) {
+  if(!current) throw Error('동기화할 운영 원본을 확인할 수 없습니다.');
+  const copy=privateSchoolRead_(group);
+  const supplement={timetable:'pulledLessons',studentTimetable:'helpClassSchedules'}[group];
+  if(supplement && !Array.isArray(copy[supplement])) throw Error('시간표의 추가 편성 자료를 확인해 주세요.');
+  let matches=privateSchoolVersionMatches_(copy,current);
+  if(matches && verifyContents) {
+    const comparable=Object.assign({},copy);
+    if(supplement) delete comparable[supplement];
+    matches=migrationHash_(comparable)===migrationHash_(current);
+  }
+  if(!matches) privateSchoolPublish_(group,current);
+  privateSchoolRecordMirror_(group,'current',current);
+}
+
+function privateSchoolMirrorStatus_(body) {
+  requireAdmin_(body.adminPassword);
+  const props=PropertiesService.getScriptProperties();
+  return PRIVATE_SCHOOL_GROUPS_.map(function(group) {
+    if(!privateSchoolRevision_(group)) return {group:group,state:'disabled'};
+    const saved=JSON.parse(props.getProperty('UNG_PRIVATE_MIRROR_'+group) || 'null');
+    const state=!saved ? 'unchecked' : saved.state==='current' && privateSchoolVersionMatches_(saved,privateSchoolMetadata_(group)) ? 'current' : 'pending';
+    return {group:group,state:state,checkedAt:saved && saved.checkedAt};
+  });
+}
+
+function privateSchoolRetryMirror_(body) {
+  requireAdmin_(body.adminPassword);
+  const group=body.group;
+  if(PRIVATE_SCHOOL_GROUPS_.indexOf(group)<0) throw Error('허용되지 않은 자료입니다.');
+  return migrationWithSourceLock_(function() {
+    const config=migrationPrimaryConfig_();
+    if(!config || config.phase!=='FIRESTORE' || !privateSchoolRevision_(group)) throw Error('비공개 저장소와 운영 원본의 연결을 확인해 주세요.');
+    const repo=migrationPrimaryRepository_(config);
+    const current=migrationWithBackend_(migrationPrimaryReader_(repo,config),config.sourceBookId,false,function(){
+      staffRequire_(body);
+      requireAdmin_(body.adminPassword);
+      return privateSchoolReaders_()[group]();
+    }).response;
+    try { privateSchoolSyncCurrent_(group,current,true); return {state:'current'}; }
+    catch (_) { privateSchoolRecordMirror_(group,'pending',null); return {state:'pending'}; }
+  });
 }
 function privateSchoolRoute_(action,body){
   if(action==='getSyncManifest')return {data:privateSchoolManifest_()};

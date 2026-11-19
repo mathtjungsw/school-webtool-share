@@ -458,11 +458,12 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   const hasNeisApiKey = Boolean(config.schoolHubUrl?.trim())
   const periodRanges = UNGCHEON_PERIOD_RANGES
   const hasTeacher = !!(config.teacherClasses?.length)
-  const pulledLessons = useMemo(() => listPulledLessonsForTeacher(config.teacherName?.trim() ?? ''), [config.teacherName])
+  const [pulledLessons, setPulledLessons] = useState<PulledLesson[]>([])
   const effectiveTeacherPulledLessons = useMemo(() => effectivePulledLessons(pulledLessons, timetableOverrides).filter(item => !isCancelledGradePeriod(item.date, item.classLabel, item.period)), [pulledLessons, timetableOverrides])
 
   useEffect(() => {
     if (!config.schoolHubUrl || !config.teacherName?.trim()) {
+      setPulledLessons([])
       setSharedTeacher(null)
       setTimetableOverrides([])
       setCommitteeEvents([])
@@ -479,6 +480,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
       .then(([shared, committeeState, tasks, overrides]) => {
         if (cancelled) return
         const name = config.teacherName!.trim()
+        setPulledLessons(listPulledLessonsForTeacher(name))
         setSharedTeacher(shared?.teachers.find(teacher =>
           teacher.name === name || teacher.label.startsWith(name),
         ) ?? null)
@@ -509,6 +511,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     const name = config.teacherName?.trim()
     if (!config.schoolHubUrl || !name) return
     const unsubscribeTimetable = subscribeHubResource<SchoolTimetable | null>('timetable', shared => {
+      setPulledLessons(listPulledLessonsForTeacher(name))
       setSharedTeacher(shared?.teachers.find(teacher =>
         teacher.name === name || teacher.label.startsWith(name),
       ) ?? null)

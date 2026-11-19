@@ -8,7 +8,7 @@ import { schoolClock } from './domain'
 import type { DashboardPayload } from './types'
 
 vi.mock('./api', async importOriginal => ({ ...await importOriginal<typeof import('./api')>(), loadDashboard: vi.fn(), verifyViewer: vi.fn() }))
-vi.mock('./cache', () => ({ readUserCache: vi.fn(), writeUserCache: vi.fn(), deleteUserCache: vi.fn() }))
+vi.mock('./cache', () => ({ readUserCache: vi.fn(), writeUserCache: vi.fn(), deleteUserCache: vi.fn(), upgradeDashboardCache: vi.fn() }))
 
 const SESSION_KEY = 'ungcheon.mobile.session.v1'
 const NAME = '검증교사'
@@ -40,6 +40,16 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe('모바일 연결 안정화 통합', () => {
+  it('일정 상세를 열어 둔 상태에서 다른 탭이 계정을 바꾸면 이전 계정의 팝업을 닫는다', async () => {
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name:'연결 검증 일정' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    const next = { name:'교체 검증', accessToken:'different-synthetic-session', expiresAt:Date.now() + 60_000 }
+    localStorage.setItem(SESSION_KEY, JSON.stringify(next))
+    fireEvent(window, new StorageEvent('storage', { key: SESSION_KEY }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(deleteUserCache).toHaveBeenCalledWith(NAME)
+  })
   it('10월 13일 날짜별·주간 화면은 금요일 수업과 운영 안내를 표시한다', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-10-13T03:00:00Z'))

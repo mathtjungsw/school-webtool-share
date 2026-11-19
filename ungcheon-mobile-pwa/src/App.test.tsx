@@ -26,7 +26,7 @@ describe('로그인 화면', () => {
     const view = render(<Login onLogin={vi.fn()} />)
     const password = screen.getByLabelText('공통 비밀번호') as HTMLInputElement
 
-    expect(screen.getByRole('img', { name: '웅천고등학교 로고' })).toHaveAttribute('src', '/icon-192.png')
+    expect(screen.getByRole('img', { name: '웅천고등학교 로고' })).toHaveAttribute('src', './icon-192.png')
     expect(password.type).toBe('password')
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 보이기' }))
     expect(password.type).toBe('text')

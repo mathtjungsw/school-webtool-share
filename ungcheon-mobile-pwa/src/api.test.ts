@@ -70,7 +70,7 @@ describe('로그인 오류 안내', () => {
     const previous = payload({ events:[], teacherTimetable:null, committeeEvents:[], timetableChanges:[], attendanceSummaries:[summary], todayMeals:[], fetchedAt:'2026-09-14T00:36:00Z' })
     const fresh = payload({ events:[], teacherTimetable:null, committeeEvents:[], timetableChanges:[], attendanceSummaries:[], todayMeals:[], fetchedAt:'2026-09-14T00:41:00Z', sourceStatus:{ attendance:{ state:'unavailable', mode:'live', lastAttemptAt:'2026-09-14T00:41:00Z', itemCount:0, errorCode:'READ_FAILED' } } })
     const merged = mergeDashboardWithCache(fresh, previous)
-    expect(merged.bundle?.attendanceSummaries).toEqual([summary])
+    expect(merged.bundle?.attendanceSummaries).toEqual([{ ...summary, attendanceCount: 1, selfStudyCount: 0, entries: [] }])
     expect(merged.bundle?.sourceStatus?.attendance?.state).toBe('cached')
   })
 })

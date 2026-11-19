@@ -143,7 +143,7 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
     if(action==='importGrades'){
       if(isCases)throw new Error('허용되지 않은 요청입니다.')
       const choice=await dialog.showOpenDialog(main()!,{properties:['openFile','multiSelections'],filters:[{name:args.format==='pdf'?'학생부 PDF':'나이스 XLSX DATA',extensions:[args.format==='pdf'?'pdf':'xlsx']}]})
-      if(choice.canceled)return { rows: [], epoch }
+      if(choice.canceled)return { rows: [], epoch, canceled:true }
       if(choice.filePaths.length>10)throw new Error('한 번에 10개까지 선택해 주세요.')
       const result:any[]=[]
       for(const path of choice.filePaths){const b=readFileSync(path);if(b.length>100*1024*1024)throw new Error('파일이 너무 큽니다.');const parsed=await parse(new Uint8Array(b),args.format==='pdf'?'grade':'xlsx',basename(path));if(epoch!==generation)throw new Error('작업이 취소되었습니다.');if(args.format==='pdf'&&parsed.length)save(scope,'source-'+createHash('sha256').update(b).digest('hex'),{id:createHash('sha256').update(b).digest('hex'),bytes:b.toString('base64'),title:basename(path)});result.push(...parsed)}

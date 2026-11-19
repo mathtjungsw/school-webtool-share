@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Database, Loader2, RefreshCw } from 'lucide-react'
+import PrivateSchoolMirrorPanel from './PrivateSchoolMirrorPanel'
 import { useAdminStore } from '../../stores/adminStore'
 import { confirmMigrationReview, getMigrationInventory, getMigrationStatus, prepareMigrationReview, runMigrationReplica, setMigrationReplicaPaused, type MigrationInventory, type MigrationReview, type MigrationRunResult, type MigrationStatus } from '../../services/firebaseMigration'
 
@@ -64,6 +65,7 @@ export default function FirebaseMigrationPanel() {
 
   return <section className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900" aria-label="Firebase 서버 이전">
     <h2 className="flex items-center gap-2 text-base font-bold"><Database size={17} />Firebase 서버 이전</h2>
+    <PrivateSchoolMirrorPanel key={adminPassword} adminPassword={adminPassword} />
     <p className="mt-2 text-sm leading-relaxed text-slate-700">PC와 모바일의 저장소와 백업 현황을 확인합니다. 현황은 수동으로 갱신하며, 저장소 전환과 복귀는 담당자가 자료를 검증한 뒤 진행합니다.</p>
     <div className="mt-4 flex flex-wrap gap-2">
       <button type="button" onClick={() => void perform()} disabled={busy || !adminPassword} className={buttonClass}>

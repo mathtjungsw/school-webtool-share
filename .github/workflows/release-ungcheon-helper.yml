@@ -65,6 +65,8 @@ jobs:
         run: npm test
       - name: 모바일 PWA 빌드
         run: npm run build
+      - name: Firebase Hosting 정적 화면과 공개 파일 검사
+        run: npm run build:hosting
 
   release:
     name: Windows 설치본 빌드 및 GitHub Release 게시

@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('preview', {
   checkSchedule: () => ipcRenderer.invoke('notifier:check'),
   scheduleAlerts: () => ipcRenderer.invoke('notifier:list'),
   onScheduleAlerts: (cb:()=>void) => {ipcRenderer.on('notifier:changed',cb);return ()=>ipcRenderer.removeListener('notifier:changed',cb)},
+  saveGradeWork: (key: string, value: string) => ipcRenderer.invoke('grade:queueSave', key, value),
   gradeVault: (action: string, key: string, value?: string) => ipcRenderer.sendSync('grade:vault', action, key, value),
   auth: (action: string, args?: unknown) => ipcRenderer.invoke('staff:auth', action, args),
   view: (payload: unknown) => ipcRenderer.invoke('feature:view', payload),

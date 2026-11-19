@@ -2,7 +2,7 @@ export {}
 
 declare global {
   interface Window {
-    preview: { clearArea:(area:string)=>Promise<void>; checkSchedule:()=>Promise<{neisPending:number;edufaiPending:number;timestamp:string}>; scheduleAlerts:()=>Promise<import('./features/futureOperations/types').OperationsNotification[]>; onScheduleAlerts:(cb:()=>void)=>()=>void; onSync: (cb:()=>void)=>()=>void; filePath: (file: File) => string; loginHint: () => Promise<{name:string;password:string}|null>; mobile: () => Promise<void>; gradeVault: (action: string, key: string, value?: string) => {ok:boolean;value:string|null}; auth: (action: string, args?: unknown) => Promise<any>; view: (p: any) => Promise<any>; update: (action: string) => Promise<any>; onUpdate: (cb: (s: any) => void) => () => void }
+    preview: { clearArea:(area:string)=>Promise<void>; checkSchedule:()=>Promise<{neisPending:number;edufaiPending:number;timestamp:string}>; scheduleAlerts:()=>Promise<import('./features/futureOperations/types').OperationsNotification[]>; onScheduleAlerts:(cb:()=>void)=>()=>void; onSync: (cb:()=>void)=>()=>void; filePath: (file: File) => string; loginHint: () => Promise<{name:string;password:string}|null>; mobile: () => Promise<void>; saveGradeWork: (key:string, value:string) => Promise<boolean>; gradeVault: (action: string, key: string, value?: string) => {ok:boolean;value:string|null}; auth: (action: string, args?: unknown) => Promise<any>; view: (p: any) => Promise<any>; update: (action: string) => Promise<any>; onUpdate: (cb: (s: any) => void) => () => void }
     privateTool: { call: (action: string, args?: unknown) => Promise<any>; progress: (cb: (p: number) => void) => () => void }
 
     electron: {

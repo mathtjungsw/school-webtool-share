@@ -1,11 +1,13 @@
 {
   "name": "ungcheon-mobile-schedule-pwa",
   "private": true,
-  "version": "1.1.44",
+  "version": "1.1.45",
   "type": "module",
   "scripts": {
     "dev": "vinext dev",
     "build:preview": "node scripts/sync-shared-data.mjs --check && vite build --mode preview --config vite.preview.config.ts",
+    "build:hosting": "node scripts/sync-shared-data.mjs --check && vite build --mode production --config vite.hosting.config.ts && node scripts/check-public-build.mjs dist-hosting",
+    "postbuild": "node scripts/check-public-build.mjs dist/client",
     "sync:shared": "node scripts/sync-shared-data.mjs --write",
     "prebuild": "node scripts/sync-shared-data.mjs --check",
     "build": "vinext build",

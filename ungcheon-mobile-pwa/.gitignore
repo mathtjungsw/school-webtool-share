@@ -9,3 +9,6 @@ dist/
 !.env.example
 *.log
 dist-preview/
+dist-hosting/
+.firebase/
+firebase-debug*.log

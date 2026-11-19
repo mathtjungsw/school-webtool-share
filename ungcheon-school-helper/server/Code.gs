@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 75;
+const MOBILE_SERVICE_VERSION = 76;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -361,6 +361,8 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {key:'server-v76',title:'출결 개인정보와 학교 자료 동기화 개선',body:'모바일 일정에는 출결 인원수를 제공하고, 학생별 비고는 해당 교시에서 조회합니다. 관리자는 명렬·시간표 사본의 갱신 상태를 확인하고 다시 동기화할 수 있습니다.',date:'2026-11-20'},
+  {key:'v1.1.45',title:'[업데이트] 웅천고 업무도우미 v1.1.45 · 내신 합산과 모바일 일정',body:'여러 성적 파일의 동일 학생과 중복 과목을 확인해 합산할 수 있습니다. 추정분할점수 입력 저장과 시간표 동기화, 위젯 업데이트 확인을 개선했습니다. 새 모바일 일정 주소는 환경설정에서 열 수 있으며 출결 상세는 해당 교시를 열 때 조회합니다.',date:'2026-11-20'},
   {key:'server-v75',title:'모바일 일정과 우수사례 열람 개선',body:'모바일 날짜별 조회, 자료별 다시 확인, 로그아웃과 우수사례 열람 확인을 지원합니다.',date:'2026-11-18'},
   {
     key: 'v1.1.44',
@@ -972,6 +974,9 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
 
+    // The mirror retry takes its own lock and reads the latest committed Firestore snapshot.
+    if (action === 'retryPrivateSchoolMirror') return json_({ok:true,data:privateSchoolRetryMirror_(body)});
+
     // Select the data source before roster-based authentication as well as reads.
     if (typeof migrationPrimaryDispatchNeeded_ === 'function' && migrationPrimaryDispatchNeeded_(action)) {
       return migrationPrimaryDispatch_(body, function() { return doPost(e); });
@@ -985,6 +990,7 @@ function doPost(e) {
     // Administrator-only metadata inspection; never runs sheet initialization.
     if (action === 'previewMigrationRequest') return json_({ ok: true, data: migrationPreviewRequest_(body, staffSession) });
     if (action === 'getMigrationStatus') return json_({ ok: true, data: migrationAdminStatus_(body) });
+    if (action === 'getPrivateSchoolMirrorStatus') return json_({ok:true,data:privateSchoolMirrorStatus_(body)});
     if (action === 'getMigrationInventory') return json_({ ok: true, data: migrationAdminInventory_(body) });
     if (action === 'runMigrationReplica') return json_({ ok: true, data: migrationAdminRunReplica_(body) });
     if (action === 'setMigrationReplicaPaused') return json_({ ok: true, data: migrationAdminPauseReplica_(body) });
@@ -3388,6 +3394,14 @@ function mobileSharedPasswordHash_() {
   return saved;
 }
 
+function mobileSessionAuthVersion_(properties) {
+  const current = sha256_('mobile-session:' + mobileSharedPasswordHash_());
+  const key = 'UNG_MOBILE_LEGACY_AUTH_VERSION';
+  const legacy = properties.getProperty(key);
+  if (!legacy) properties.setProperty(key, current);
+  return { current: current, legacy: legacy || current };
+}
+
 function mobileCreateSession_(viewerName) {
   const expiresAt = Date.now() + MOBILE_SESSION_HOURS * 60 * 60 * 1000;
   const accessToken = Utilities.getUuid() + Utilities.getUuid();
@@ -3400,7 +3414,8 @@ function mobileCreateSession_(viewerName) {
       if (Number(JSON.parse(all[key]).expiresAt) <= Date.now()) properties.deleteProperty(key);
     } catch (error) { properties.deleteProperty(key); }
   });
-  properties.setProperty(tokenKey, JSON.stringify({ viewerName: viewerName, expiresAt: expiresAt }));
+  const version = mobileSessionAuthVersion_(properties);
+  properties.setProperty(tokenKey, JSON.stringify({ viewerName: viewerName, expiresAt: expiresAt, authVersion: version.current }));
   return { verified: true, accessToken: accessToken, expiresAt: new Date(expiresAt).toISOString() };
 }
 
@@ -3415,11 +3430,14 @@ function mobileAssertAccess_(body) {
   const token = clean_(body.accessToken, 500);
   if (!token) throw mobileSessionExpired_();
   const tokenKey = MOBILE_SESSION_PROPERTY_PREFIX + sha256_(token).replace(/[^A-Za-z0-9]/g, '').slice(0, 40);
-  const saved = PropertiesService.getScriptProperties().getProperty(tokenKey);
+  const properties = PropertiesService.getScriptProperties();
+  const saved = properties.getProperty(tokenKey);
   let session;
   try { session = JSON.parse(saved || '{}'); }
   catch (error) { session = {}; }
   if (session.viewerName !== viewerName || !Number.isFinite(Number(session.expiresAt)) || Number(session.expiresAt) <= Date.now()) throw mobileSessionExpired_();
+  const version = mobileSessionAuthVersion_(properties);
+  if ((session.authVersion || version.legacy) !== version.current) throw mobileSessionExpired_();
   return viewerName;
 }
 
@@ -4037,13 +4055,21 @@ function mobileViewerPulled_(name) {
   return (table && table.pulledLessons || []).filter(function(x){return x.teacherName===name;});
 }
 
+function mobileAttendanceCounts_(summary) {
+  const selfStudyCount = summary.entries.filter(function(entry) {
+    const remark = String(entry.remark || '');
+    return remark.includes('자습') && !/(결석|지각|조퇴|결과|병결|미인정|출석\s*인정|공결|체험학습|위탁교육)/.test(remark);
+  }).length;
+  return Object.assign({}, summary, { entries: [], selfStudyCount: selfStudyCount, attendanceCount: summary.flaggedCount - selfStudyCount });
+}
+
 function mobileSingleResource_(body) {
   const name=mobileAssertAccess_(body), date=clean_(body.date,10), resource=String(body.resource), status={};
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !['meals','attendance'].includes(resource)) throw Error('요청한 자료를 확인해 주세요.');
   const items=mobileLoadSource_(status,resource,[],function(){
     if(resource==='meals') return mobileSharedMealsInRange_(date,date);
     const changes=listTimetableChanges_({viewerName:name,fromDate:date,toDate:date,includeSchool:false}).filter(function(x){return x.status==='approved'||(x.requesterAppliedAt&&x.requesterName===name && x.status!=='cancelled'&&x.status!=='rejected');});
-    return mobileAttendanceSummaries_(name,date,date,listTimetableOverrides_({includeInactive:false}),changes,mobileViewerPulled_(name));
+    return mobileAttendanceSummaries_(name,date,date,listTimetableOverrides_({includeInactive:false}),changes,mobileViewerPulled_(name)).map(mobileAttendanceCounts_);
   });
   return {items:items,status:status[resource]};
 }
@@ -4113,7 +4139,8 @@ function getMobileScheduleBundle_(body) {
     }).concat(mobileMorningOnlyOverrides_(fromDate, toDate));
   });
   const attendanceSummaries = mobileLoadSource_(sourceStatus, 'attendance', [], function() {
-    return mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverrides, timetableChanges, teacherTimetable && teacherTimetable.pulledLessons || []);
+    if (sourceStatus.timetable.state === 'unavailable') throw Error('수업 시간표를 확인한 뒤 출결을 조회할 수 있습니다.');
+    return mobileAttendanceSummaries_(viewerName, fromDate, toDate, timetableOverrides, timetableChanges, teacherTimetable && teacherTimetable.pulledLessons || []).map(mobileAttendanceCounts_);
   });
   const todayIsoDate = todayKey.slice(0, 4) + '-' + todayKey.slice(4, 6) + '-' + todayKey.slice(6, 8);
   const sharedMeals = mobileLoadSource_(sourceStatus, 'meals', [], function() {
@@ -4139,7 +4166,12 @@ function getMobileScheduleBundle_(body) {
     sourceStatus: sourceStatus,
     fetchedAt: new Date().toISOString(),
     servedAt: new Date().toISOString() };
-  result.revision = sha256_(JSON.stringify([viewerName,fromDate,toDate,result.events,teacherTimetable,committeeEvents,timetableChanges,timetableOverrides,attendanceSummaries,meals,todayMeals,Object.keys(sourceStatus).map(function(k){return [k,sourceStatus[k].state];})]));
+  const attendanceContent = attendanceSummaries.map(function(summary) {
+    const content = Object.assign({}, summary);
+    delete content.checkedAt;
+    return content;
+  });
+  result.revision = sha256_(JSON.stringify([viewerName,fromDate,toDate,result.events,teacherTimetable,committeeEvents,timetableChanges,timetableOverrides,attendanceContent,meals,todayMeals,Object.keys(sourceStatus).map(function(k){return [k,sourceStatus[k].state];})]));
   const allSourcesAvailable = Object.keys(sourceStatus).every(function(key) { return sourceStatus[key].state !== 'unavailable'; });
   if (allSourcesAvailable) {
     try { if (sourceCacheEnabled_()) CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), 60); } catch (ignore) {}

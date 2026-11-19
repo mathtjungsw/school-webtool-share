@@ -98,6 +98,15 @@ describe('모바일 일정 도메인', () => {
     expect(timetableForDate(teacher, '2026-09-23', [], '가상교사', [move])[6].value).toBe('')
   })
 
+  it('8교시 당김수업과 같은 시간의 일정을 마지막 수업 행에 표시한다', () => {
+    const lessons = Array.from({ length: 8 }, (_, index) => ({ period: index + 1, value: index === 7 ? '2-1\n시험과목' : '' }))
+    const event = { id:'test-8', date:'2026-09-03', title:'검증 일정', label:'주간계획', source:'weekly' as const, startTime:'16:45' }
+    const rows = buildMobileTimelineRows(lessons, [event])
+    expect(rows.find(row => row.id === 'period-8')).toMatchObject({ start:'16:40', end:'17:30', lesson:lessons[7], events:[event] })
+    expect(rows.some(row => row.kind === 'after')).toBe(false)
+    expect(buildMobileTimelineRows(lessons.slice(0, 7), [event]).at(-1)?.kind).toBe('after')
+  })
+
   it('시간 지정 일정은 교시 오른쪽에 놓고 수업 변경은 중복하지 않는다', () => {
     const lessons = Array.from({ length: 7 }, (_, index) => ({ period: index + 1, value: index === 6 ? '301\n물리' : '' }))
     const rows = buildMobileTimelineRows(lessons, [

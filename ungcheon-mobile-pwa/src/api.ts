@@ -6,7 +6,7 @@ import type {
   MobileAttendanceRoster,
   MobileScheduleBundle,
 } from './types'
-import { PULLED_LESSONS_2026 } from './shared/pulledLessons2026'
+import { summaryOnly } from './attendanceSummary'
 
 export const SCHOOL_HUB_URL = import.meta.env.MODE === 'preview' ? '/mobile-api' : 'https://script.google.com/macros/s/AKfycbwFiXk0fxkJSy2Mk17BPKblEARQZYdAUzP6JDtpbV_Qj203xHGWqxnBqSaWaWJYDOyu4w/exec'
 
@@ -78,22 +78,9 @@ export function verifyViewer(name: string, password: string) {
   })
 }
 
-function attendanceContextFor(name: string) {
-  const attendancePulledLessons = PULLED_LESSONS_2026
-    .filter(item => item.teacherName.trim() === name.trim() && item.originalTeacherName.trim() === name.trim())
-    .map(item => ({
-      id: item.id, date: item.date, period: item.period, classLabel: item.classLabel, subject: item.subject,
-      teacherName: item.teacherName, originalTeacherName: item.originalTeacherName,
-      originalSlot: item.originalSlot, originalDate: item.originalDate,
-    }))
-  const attendanceContextVersion = attendancePulledLessons.map(item => [item.id, item.date, item.period, item.originalDate, item.originalSlot].join(':')).join('|')
-  return { attendancePulledLessons, attendanceContextVersion }
-}
-
 export function loadAttendanceRoster(name: string, accessToken: string, date: string, period: number, signal?: AbortSignal) {
-  const context = attendanceContextFor(name)
   return secureReadAction<MobileAttendanceRoster>('getMobileAttendanceRoster', {
-    viewerName: name, accessToken, date, period, ...context,
+    viewerName: name, accessToken, date, period,
   }, signal)
 }
 
@@ -128,7 +115,7 @@ function normalizeBundle(bundle: MobileScheduleBundle): MobileScheduleBundle {
     committeeEvents: bundle.committeeEvents ?? [],
     timetableChanges: bundle.timetableChanges ?? [],
     timetableOverrides: bundle.timetableOverrides ?? [],
-    attendanceSummaries: bundle.attendanceSummaries ?? [],
+    attendanceSummaries: (bundle.attendanceSummaries ?? []).map(summaryOnly),
     todayMeals: bundle.todayMeals ?? [],
     meals: bundle.meals ?? bundle.todayMeals ?? [],
   }
@@ -137,13 +124,18 @@ function normalizeBundle(bundle: MobileScheduleBundle): MobileScheduleBundle {
 }
 
 export async function loadDashboard(name: string, accessToken: string, fromDate: string, toDate: string, signal?: AbortSignal, previous?:DashboardPayload|null): Promise<DashboardPayload> {
-  const { attendancePulledLessons, attendanceContextVersion } = attendanceContextFor(name)
   const received = await secureReadAction<MobileScheduleBundle | {notModified:true;revision:string}>('getMobileScheduleBundle', {
-    viewerName: name, accessToken, fromDate, toDate, attendancePulledLessons, attendanceContextVersion, ifRevision:previous?.bundle?.revision,
+    viewerName: name, accessToken, fromDate, toDate, ifRevision:previous?.bundle?.revision,
   }, signal)
   if ('notModified' in received) {
     if (!previous?.bundle?.revision || previous.bundle.revision !== received.revision) throw Error('자료 버전을 다시 확인해 주세요.')
-    return {...previous,cachedAt:new Date().toISOString()}
+    const checkedAt = new Date().toISOString()
+    const bundle = normalizeBundle(previous.bundle)
+    for (const key of MOBILE_RESOURCE_KEYS) {
+      const status = bundle.sourceStatus?.[key]
+      if (status) bundle.sourceStatus![key] = { ...status, state: status.itemCount ? 'fresh' : 'empty', mode: 'live', lastSuccessAt: checkedAt, lastAttemptAt: checkedAt }
+    }
+    return { ...previous, bundle, cachedAt: checkedAt }
   }
   const bundle = normalizeBundle(received)
   return {

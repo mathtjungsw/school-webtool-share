@@ -1,5 +1,4 @@
-import type { PulledLesson } from './shared/pulledLessons2026'
-import type { DailyTimetableOverride, TeacherTimetable } from './types'
+import type { DailyTimetableOverride, PulledLesson, TeacherTimetable } from './types'
 import { getTimetableDayIndex, isCancelledGradePeriod } from './shared/specialTimetableDays'
 
 const compact = (value: unknown) => String(value ?? '').replace(/\s+/g, '').trim()

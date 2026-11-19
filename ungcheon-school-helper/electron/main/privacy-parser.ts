@@ -17,10 +17,10 @@ export function parseXlsx(bytes: Uint8Array, source: string, sourceId=source): G
     if (maxRow > 200000 || cells.length > 1000000) throw new Error('XLSX 처리 한도를 초과했습니다.')
     const rows = new Map<number, Record<number, any>>()
     for (const key of cells) { const c = XLSX.utils.decode_cell(key); const row = rows.get(c.r) || {}; row[c.c] = sheet[key]; rows.set(c.r, row) }
-    let info:StudentInfo|undefined; let currentGrade='';let className='';let map: Record<string, number> = {}; let student = ''; let year = ''; let semester = ''; let group = '';let previousPerson='';const people=new Map<string,StudentInfo>()
+    let info:StudentInfo|undefined; let currentGrade='';let className='';let schoolYear='';let map: Record<string, number> = {}; let student = ''; let year = ''; let semester = ''; let group = '';let previousPerson='';const people=new Map<string,StudentInfo>()
     for (const [index, row] of [...rows].sort((a, b) => a[0] - b[0])) {
       const vals = Object.entries(row).map(([k, v]) => [Number(k), clean(v.v)] as const)
-      if(!Object.keys(map).length){const heading=vals.map(([,v])=>v).join(' '),m=heading.match(/([1-3])학년\s*(\d{1,2})반/);if(m){currentGrade=m[1];className=m[2]}}
+      if(!Object.keys(map).length){const heading=vals.map(([,v])=>v).join(' '),m=heading.match(/([1-3])학년\s*(\d{1,2})반/);if(m){currentGrade=m[1];className=m[2]}schoolYear=heading.match(/(20\d{2})\s*학년도/)?.[1]||schoolYear}
       if (vals.some(([, v]) => v === '과목') && vals.some(([, v]) => ['학점', '단위수', '이수단위'].includes(v))) {
         map = Object.fromEntries(vals.map(([k, v]) => [v, k])); group = ''; continue
       }
@@ -29,7 +29,7 @@ export function parseXlsx(bytes: Uint8Array, source: string, sourceId=source): G
       const subject = clean(value('과목')); const name = clean(value('성명', '이름'))
       const identifier=(key:string)=>map[key]===undefined?'':clean(row[map[key]]?.w??row[map[key]]?.v)
       const person=[currentGrade,className,identifier('번호'),identifier('학번'),name].join('|')
-      if (name && !/성명|학교생활/.test(name)&&person!==previousPerson) {previousPerson=person;info=people.get(person);if(!info){student = `${sourceId}:${sheetName}:student:${people.size+1}`;info={id:student,name:String(value('성명','이름')||'').trim(),studentNumber:identifier('학번'),currentGrade,className,number:identifier('번호'),schoolYear:''};people.set(person,info)}student=info.id;year = ''; semester = ''; group = '' }
+      if (name && !/성명|학교생활/.test(name)&&person!==previousPerson) {previousPerson=person;info=people.get(person);if(!info){student = `${sourceId}:${sheetName}:student:${people.size+1}`;info={id:student,name:String(value('성명','이름')||'').trim(),studentNumber:identifier('학번'),currentGrade,className,number:identifier('번호'),schoolYear};people.set(person,info)}student=info.id;year = ''; semester = ''; group = '' }
       if (value('학년')) year = clean(value('학년'))
       if (value('학기')) semester = clean(value('학기'))
       if (value('교과', '교과(군)', '교과군')) group = clean(value('교과', '교과(군)', '교과군'))

@@ -3,7 +3,8 @@ const handlers=new Map(),windows=[[],[]],notifications=[]
 class Notice{static isSupported(){return true}constructor(options){this.options=options}on(){return this}show(){notifications.push(this.options)}}
 const electron={app:{getVersion:()=>'1.1.38'},ipcMain:{handle:(name,handler)=>handlers.set(name,handler)},BrowserWindow:{getAllWindows:()=>windows.map(messages=>({webContents:{send:(_channel,state)=>messages.push({...state})}}))},Notification:Notice}
 const js=ts.transpileModule(fs.readFileSync('electron/main/update-manager.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText
-const moduleObject={exports:{}};new Function('require','exports','module',js)(name=>{if(name==='electron')return electron;throw Error('Unexpected dependency')},moduleObject.exports,moduleObject)
+let tick, now=0
+const moduleObject={exports:{}};new Function('require','exports','module','setInterval','Date',js)(name=>{if(name==='electron')return electron;throw Error('Unexpected dependency')},moduleObject.exports,moduleObject,fn=>{tick=fn;return {unref(){}}},{now:()=>now})
 ;(async()=>{
  const updater=new EventEmitter();let checks=0,resolveCheck
  const installs=[]
@@ -29,5 +30,27 @@ const moduleObject={exports:{}};new Function('require','exports','module',js)(na
  updater.emit('update-downloaded',{version:'1.1.39'})
  await invoke('install')
  assert.deepEqual(installs,[[true,true],[]])
+ const clockUpdater=new EventEmitter(); let calls=0; let fail=false
+ clockUpdater.checkForUpdates=async()=>{
+   calls++;clockUpdater.emit('checking-for-update')
+   if(fail){clockUpdater.emit('error',Error());throw Error()}
+   clockUpdater.emit('update-not-available')
+ }
+ const clockManager=moduleObject.exports.registerUpdateManager(clockUpdater,()=>{},()=>true)
+ await clockManager.check()
+ const advance=async minutes=>{now+=minutes*60000;tick();await new Promise(resolve=>setImmediate(resolve))}
+ await advance(59);assert.equal(calls,1)
+ fail=true
+ await advance(1);assert.equal(calls,2)
+ await advance(4);assert.equal(calls,2)
+ await advance(1);assert.equal(calls,3)
+ await advance(29);assert.equal(calls,3)
+ fail=false
+ await advance(1);assert.equal(calls,4)
+ await advance(59);assert.equal(calls,4)
+ await advance(1);assert.equal(calls,5)
+ clockUpdater.emit('update-downloaded',{version:'1.1.39'})
+ await advance(65);assert.equal(calls,5);assert.equal(clockManager.snapshot().phase,'ready')
+ console.log('PASS hourly automatic update checks, 5/30 minute retry, reset on recovery and preservation of install-ready status')
  console.log('PASS updater: concurrent checks, download progress, shared state, direct widget install and restart flags, duplicate prevention, and retry after install error.')
 })().catch(error=>{console.error(error.message);process.exitCode=1})

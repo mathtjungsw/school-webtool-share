@@ -6,7 +6,9 @@ import { addDays, format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { friendlyLoginError, isSessionExpiredError, loadAttendanceRoster, loadDashboard, markDashboardCached, mergeDashboardWithCache, MobileRequestTimeoutError, SESSION_EXPIRED_MESSAGE, verifyViewer } from './api'
 import { secureReadAction } from './api'
-import { deleteUserCache, readUserCache, writeUserCache } from './cache'
+import { deleteUserCache, readUserCache, writeUserCache, upgradeDashboardCache } from './cache'
+import { attendanceEntryCounts, isSelfStudyEntry, summaryOnly } from './attendanceSummary'
+import { registerScheduleWorker } from './serviceWorker'
 import { DAYS, DEFAULT_VISIBILITY, SOURCE_LABELS, buildMobileTimelineRows, collectEvents, eventFingerprint, findTeacher, lessonFocus, newEventFingerprints, parseSlot, rangeForToday, schoolClock, sortMealsByType, timetableForDate, ymd } from './domain'
 import type { DashboardPayload, LessonView, MealInfo, MobileAttendanceRoster, MobileAttendanceSummary, MobileEvent, MobileResourceKey, ScheduleSource } from './types'
 import { formatCheckedAt, RESOURCE_LABELS, resourceStatus, summarizeStatus, type StatusSummary } from './dataStatus'
@@ -63,20 +65,6 @@ export function MealPanel({ meals, status, isToday = true }: { meals: MealInfo[]
       : `${isToday ? '오늘' : '선택한 날짜에'} 공유된 급식 정보가 없습니다.`
   const orderedMeals = sortMealsByType(meals)
   return <section className="panel meal-panel"><div className="panel-title"><div className="panel-icon meal"><UtensilsCrossed size={17} /></div><div><p>{isToday ? 'TODAY MEAL' : 'DAY PREVIEW'}</p><h2>{title}</h2></div>{status ? <StatusBadge status={status} /> : <span>{meals.length ? `${meals.length}식` : '없음'}</span>}</div><div className="meal-list">{orderedMeals.map((meal, index) => <article className="meal-block" key={`${meal.date}-${meal.mealType}-${index}`}><div className="meal-heading"><strong>{meal.mealType || '급식'}</strong>{meal.calories && <span>{meal.calories}</span>}</div><div className="meal-dishes">{meal.dishNames.map((dish, dishIndex) => <span key={`${dish}-${dishIndex}`}>{dish}</span>)}</div></article>)}{!meals.length && <div className="empty">{emptyText}</div>}</div></section>
-}
-
-const ATTENDANCE_EXCEPTION_PATTERN = /(결석|지각|조퇴|결과|병결|미인정|출석\s*인정|공결|체험학습|위탁교육)/
-
-function isSelfStudyEntry(entry: MobileAttendanceSummary['entries'][number]) {
-  const remark = String(entry.remark ?? '').trim()
-  return remark.includes('자습') && !ATTENDANCE_EXCEPTION_PATTERN.test(remark)
-}
-
-function attendanceEntryCounts(summary: MobileAttendanceSummary) {
-  const selfStudyCount = summary.entries.filter(isSelfStudyEntry).length
-  const listedAttendanceCount = summary.entries.length - selfStudyCount
-  const attendanceCount = Math.max(listedAttendanceCount, summary.flaggedCount - selfStudyCount, 0)
-  return { attendanceCount, selfStudyCount }
 }
 
 function attendanceButtonLabel(summary: MobileAttendanceSummary) {
@@ -232,7 +220,7 @@ export function Login({ onLogin, notice = '' }: { onLogin: (name: string, passwo
   }
   return <main className="login-shell">
     <section className="login-card">
-      <div className="school-mark"><img className="school-logo" src="/icon-192.png" alt="웅천고등학교 로고" /></div>
+      <div className="school-mark"><img className="school-logo" src="./icon-192.png" alt="웅천고등학교 로고" /></div>
       <p className="eyebrow">UNG CHEON HIGH SCHOOL</p>
       <h1>웅천고<br />모바일 일정</h1>
       <p className="login-lead">오늘 필요한 학교 일정과 내 시간표를 빠르게 확인하세요.</p>
@@ -244,12 +232,16 @@ export function Login({ onLogin, notice = '' }: { onLogin: (name: string, passwo
         <button className="primary-button" disabled={loading || !name.trim() || !password}>{loading ? '로그인 확인 중…' : <>내 일정 확인 <ChevronRight size={18} /></>}</button>
       </form>
       <p className="session-note"><Clock3 size={14} /> 이 기기에서 72시간 로그인 상태가 유지됩니다.</p>
-      <a className="guide-link" href="/ungcheon-mobile-install-guide.pdf" target="_blank" rel="noreferrer"><Download size={15} /> 홈 화면 설치 안내서 PDF</a>
+      <a className="guide-link" href="./ungcheon-mobile-install-guide.pdf" target="_blank" rel="noreferrer"><Download size={15} /> 홈 화면 설치 안내서 PDF</a>
     </section>
   </main>
 }
 
 export default function App() {
+  useEffect(() => {
+    void upgradeDashboardCache()
+    if (import.meta.env.PROD) return registerScheduleWorker()
+  }, [])
   const initialDate = schoolClock().date
   const [initialAuth] = useState(() => visualMode ? { session: { name: VISUAL_NAME, accessToken: 'visual-test-token', expiresAt: Date.now() + SESSION_MS }, notice: '' } : readSession())
   const [session, setSession] = useState<MobileSession | null>(initialAuth.session)
@@ -323,6 +315,7 @@ export default function App() {
     dataRef.current = null
     try { if(removeStored) localStorage.removeItem(SESSION_KEY) } catch { /* 저장소가 막혀도 화면의 세션은 종료한다. */ }
     setSession(null); setData(null); setNewKeys([]); setSelectedAttendancePeriod(null); setAttendanceRoster(null); setAttendanceRosterLoading(false); setAttendanceRosterError(''); setLoading(false)
+    setEventDetail(null); setFilterOpen(false)
     setMessage(''); setCacheWarning(''); setSessionNotice(notice)
     if (name) void deleteUserCache(name)
   }, [])
@@ -353,7 +346,7 @@ export default function App() {
       if (sequence!==requestSequence.current || sessionRef.current!==active || !dataRef.current?.bundle) return
       if(!Array.isArray(response.items) || !['fresh','empty'].includes(response.status?.state)) throw Error('해당 자료를 확인할 수 없습니다.')
       const prev=dataRef.current, bundle={...prev.bundle!,revision:undefined,sourceStatus:{...prev.bundle!.sourceStatus,[resource]:response.status}}
-      if(resource==='meals') {bundle.meals=response.items as MealInfo[];if(selectedDate===today)bundle.todayMeals=bundle.meals} else bundle.attendanceSummaries=response.items as MobileAttendanceSummary[]
+      if(resource==='meals') {bundle.meals=response.items as MealInfo[];if(selectedDate===today)bundle.todayMeals=bundle.meals} else bundle.attendanceSummaries=(response.items as MobileAttendanceSummary[]).map(summaryOnly)
       const next={...prev,bundle};dataRef.current=next;setData(next);await writeUserCache(active.name,next,selectedDate+'/'+selectedDate)
     } catch(error){if(sequence===requestSequence.current){if(isSessionExpiredError(error))clearSession(SESSION_EXPIRED_MESSAGE);else setMessage('자료를 다시 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.')}}
     finally{retryInFlight.current=false;setRetrying('')}
@@ -528,8 +521,8 @@ export default function App() {
 
   return <div className="app-shell">
     <header className="topbar">
-      <div className="brand-lockup"><span><img className="school-logo" src="/icon-192.png" alt="웅천고등학교 로고" /></span><div><p>웅천고등학교</p><strong>모바일 일정</strong></div></div>
-      <div className="header-actions"><a href="/ungcheon-mobile-install-guide.pdf" target="_blank" rel="noreferrer" aria-label="홈 화면 설치 안내서"><Download /></a><button aria-label="테마 전환" onClick={() => setTheme(value => value === 'light' ? 'dark' : 'light')}>{theme === 'light' ? <Moon /> : <Sun />}</button><button aria-label="로그아웃" onClick={logout}><LogOut /></button></div>
+      <div className="brand-lockup"><span><img className="school-logo" src="./icon-192.png" alt="웅천고등학교 로고" /></span><div><p>웅천고등학교</p><strong>모바일 일정</strong></div></div>
+      <div className="header-actions"><a href="./ungcheon-mobile-install-guide.pdf" target="_blank" rel="noreferrer" aria-label="홈 화면 설치 안내서"><Download /></a><button aria-label="테마 전환" onClick={() => setTheme(value => value === 'light' ? 'dark' : 'light')}>{theme === 'light' ? <Moon /> : <Sun />}</button><button aria-label="로그아웃" onClick={logout}><LogOut /></button></div>
     </header>
     <details className="pc-only-note"><summary>이용 안내 · 개인 업무·일정은 PC에서</summary><p>개인 업무와 개인 일정은 <strong>PC용 웅천고 업무도우미</strong>에서만 확인할 수 있습니다.</p></details>
     {(offline || message) && <div className="offline-note" aria-live="polite"><CloudOff size={16} /><span>{message || '오프라인 상태입니다. 마지막 조회 자료를 표시합니다.'}</span></div>}

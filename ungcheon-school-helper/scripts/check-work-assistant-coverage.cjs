@@ -42,7 +42,11 @@ console.log(`PASS 사이드바·검색도우미 공통 메뉴 레지스트리 ($
 console.log(`PASS 기존 전문 안내 ${detailedPages.length}개 유지 + 새 메뉴 자동 기본 안내`)
 
 const settingsSource = fs.readFileSync(path.join(projectRoot, 'src/pages/UngcheonSettingsPage.tsx'), 'utf8')
-const mobileUrl = 'https://ungcheon-mobile-schedule.jsw890122.chatgpt.site'
+const mobileUrl = 'https://ungcheon-school-helper-mobile.web.app/'
+const githubEntry = fs.readFileSync(path.join(projectRoot, '../mobile/index.html'), 'utf8')
+if (!githubEntry.includes('url=' + mobileUrl) || !githubEntry.includes('href="' + mobileUrl + '"')) {
+  throw new Error('GitHub 안내 주소가 공식 모바일 일정으로 연결되어야 합니다.')
+}
 if (!settingsSource.includes(`const MOBILE_SCHEDULE_URL = '${mobileUrl}'`) || !settingsSource.includes('openExternal(MOBILE_SCHEDULE_URL)')) {
   throw new Error('환경설정의 모바일 일정 연결이 공식 고정 주소를 사용하지 않습니다.')
 }

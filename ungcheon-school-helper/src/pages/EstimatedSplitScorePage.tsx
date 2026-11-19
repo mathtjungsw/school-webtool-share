@@ -1,5 +1,5 @@
 import { localGradeStore } from '../services/localGradeStore'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle, BarChart3, Calculator, CheckCircle2, ChevronDown, Download,
   Copy, FileSpreadsheet, FolderOpen, Info, Plus, RotateCcw, Save, ShieldCheck, Trash2, Upload,
@@ -257,18 +257,17 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
   const [query, setQuery] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('class')
   const storageKey = subjectStorageKey(subject.id)
-  const persist = (state: GradePreviewState) => {
-    try {
-      localGradeStore.setItem(storageKey, JSON.stringify(state))
-      setSaveError(false)
-      return true
-    } catch {
-      setSaveError(true)
-      return false
-    }
+  const saveRevision = useRef(0)
+  const persist = async (value: GradePreviewState) => {
+    const revision = ++saveRevision.current
+    let ok = false
+    try { ok = await window.preview.saveGradeWork(storageKey, JSON.stringify(value)) } catch { /* report below */ }
+    if (mounted.current && revision === saveRevision.current) setSaveError(!ok)
+    return ok
   }
 
-  useEffect(() => { persist(state) }, [storageKey, state])
+  // Hand the committed edit to the main process before a tab switch or logout.
+  useLayoutEffect(() => { void persist(state) }, [storageKey, state])
   useEffect(() => {
     mounted.current = true
     const requests = imports.current
@@ -279,8 +278,8 @@ function SplitScoreSubject({ subject, setToast, setUploading, busy, restoring, s
   }, [])
 
   const [exportMode, setExportMode] = useState<'settings' | 'full'>('settings')
-  const saveNow = () => {
-    if (persist(state)) setToast(`${subject.name} 작업을 이 PC에 저장했습니다.`)
+  const saveNow = async () => {
+    if (await persist(state) && mounted.current) setToast(`${subject.name} 작업을 이 PC에 저장했습니다.`)
   }
   const updatePlanning = (patch: Partial<SplitPlanning>) => {
     setState(current => ({ ...current, splitPlanning: { ...current.splitPlanning, ...patch } }))

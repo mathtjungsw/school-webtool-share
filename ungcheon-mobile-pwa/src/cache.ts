@@ -1,4 +1,5 @@
 import type { DashboardPayload } from './types'
+import { withoutAttendanceDetails } from './attendanceSummary'
 
 const LEGACY_DB_NAME = 'ungcheon-mobile-read-cache-v1'
 const DB_NAME = 'ungcheon-mobile-read-cache-v2'
@@ -26,17 +27,34 @@ async function openDb() {
     const fail = () => { if (!settled) { settled = true; clearTimeout(timeout); reject(new Error('기기 저장소를 열 수 없습니다.')) } }
     const timeout = setTimeout(fail, CACHE_TIMEOUT_MS)
     try {
-      const request = indexedDB.open(DB_NAME, 1)
+      const request = indexedDB.open(DB_NAME, 2)
       request.onupgradeneeded = () => {
-        if (!request.result.objectStoreNames.contains(STORE)) request.result.createObjectStore(STORE)
+        if (!request.result.objectStoreNames.contains(STORE)) {
+          request.result.createObjectStore(STORE)
+          return
+        }
+        // Upgrade every account and date range in one transaction, including signed-out accounts.
+        const records = request.transaction!.objectStore(STORE).openCursor()
+        records.onsuccess = () => {
+          const cursor = records.result
+          if (!cursor) return
+          const payload = cursor.value as DashboardPayload
+          if (payload?.bundle?.attendanceSummaries?.length) cursor.update(withoutAttendanceDetails(payload))
+          cursor.continue()
+        }
       }
       request.onsuccess = () => {
         if (settled) { request.result.close(); return }
+        request.result.onversionchange = () => request.result.close()
         settled = true; clearTimeout(timeout); resolve(request.result)
       }
       request.onerror = request.onblocked = fail
     } catch { fail() }
   })
+}
+
+export async function upgradeDashboardCache() {
+  try { (await openDb()).close() } catch { /* Cached data is optional. A later open retries the migration. */ }
 }
 
 const pendingKey=(key:string)=>'ungcheon.cache.wipe.'+key
@@ -87,7 +105,7 @@ export async function writeUserCache(name: string, payload: DashboardPayload, sc
     await cleanupPending(db,key)
     // 로그아웃 이후 뒤늦게 열린 저장 작업이 개인정보 캐시를 되살리지 않는다.
     if (generation !== (userGenerations.get(normalizedName) ?? 0)) return
-    await transact(db, 'readwrite', store => store.put(payload, scope ? key + ':' + scope : key))
+    await transact(db, 'readwrite', store => store.put(withoutAttendanceDetails(payload), scope ? key + ':' + scope : key))
   } finally { db.close() }
 }
 

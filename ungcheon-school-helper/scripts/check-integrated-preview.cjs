@@ -42,6 +42,60 @@ async function run(){
  assert.equal(published?.next.version,2)
  ctx.privateSchoolPublish_=save
  console.log('PASS private-repository visibility, split credentials, pinned version, fresh Firestore fallback and post-commit mirroring')
+ const pinnedRead=ctx.privateSchoolRead_
+ ctx.privateSchoolRead_=()=>{throw Error('synthetic repository outage')}
+ for(const group of ['timetable','studentTimetable']){
+   let fallbackCalled=false
+   assert.throws(()=>ctx.privateSchoolServe_(group,()=>{fallbackCalled=true;return {version:2}}),/추가 편성/)
+   assert.equal(fallbackCalled,false)
+ }
+ assert.equal(ctx.privateSchoolServe_('staffRoster',()=>newer).version,2)
+ ctx.privateSchoolRead_=()=>({...data,pulledLessons:[]})
+ assert.ok(Array.isArray(ctx.privateSchoolServe_('timetable',()=>({...newer})).pulledLessons))
+ assert.throws(()=>ctx.privateSchoolServe_('studentTimetable',()=>({...newer})),/누락/)
+ ctx.privateSchoolRead_=pinnedRead
+ let mirrorWrites=0,copy=data,available=false
+ ctx.migrationWithSourceLock_=callback=>callback()
+ ctx.migrationPrimaryConfig_=()=>({phase:'FIRESTORE',sourceBookId:'fixture'})
+ ctx.migrationPrimaryRepository_=()=>({})
+ ctx.migrationWithBackend_=(_reader,_id,_write,callback)=>({response:callback()})
+ ctx.privateSchoolReaders_=()=>({staffRoster:()=>newer})
+ ctx.requireAdmin_=value=>assert.equal(value,'fixture-admin')
+ ctx.staffRequire_=body=>assert.equal(body.staffToken,'fixture-staff')
+ ctx.privateSchoolRead_=()=>copy
+ ctx.migrationHash_=value=>JSON.stringify(value)
+ ctx.privateSchoolPublish_=(_group,current)=>{if(!available)throw Error('synthetic unavailable');mirrorWrites++;copy=current}
+ const admin={adminPassword:'fixture-admin',staffToken:'fixture-staff',group:'staffRoster'}
+ assert.throws(()=>ctx.privateSchoolRetryMirror_({...admin,adminPassword:''}))
+ assert.throws(()=>ctx.privateSchoolRetryMirror_({...admin,staffToken:''}))
+ assert.throws(()=>ctx.privateSchoolRetryMirror_({...admin,group:'unknown'}))
+ assert.throws(()=>ctx.privateSchoolMirrorStatus_({adminPassword:''}))
+ assert.equal(ctx.privateSchoolRetryMirror_(admin).state,'pending')
+ assert.equal(ctx.privateSchoolMirrorStatus_(admin)[0].state,'pending')
+ available=true
+ assert.equal(ctx.privateSchoolRetryMirror_(admin).state,'current')
+ assert.equal(ctx.privateSchoolRetryMirror_(admin).state,'current')
+ assert.equal(mirrorWrites,1)
+ assert.equal(ctx.privateSchoolMirrorStatus_(admin)[0].state,'current')
+ copy={...newer,members:[]}
+ assert.equal(ctx.privateSchoolRetryMirror_(admin).state,'current')
+ assert.equal(mirrorWrites,2)
+ ctx.privateSchoolMetadata_=()=>({...newer,version:3})
+ assert.equal(ctx.privateSchoolMirrorStatus_(admin)[0].state,'pending')
+ const head='2'.repeat(40)
+ ctx.privateSchoolPublish_=save
+ ctx.privateSchoolGit_=(endpoint,_writer,payload)=>{
+   if(!endpoint)return {private:true,default_branch:'main'}
+   if(payload)throw Error('synthetic lost write response')
+   if(endpoint==='/git/ref/heads/main')return {object:{sha:head}}
+   return {sha:'3'.repeat(40)}
+ }
+ ctx.privateSchoolReadAt_=(_group,commit)=>{assert.equal(commit,head);return newer}
+ ctx.migrationHash_=value=>JSON.stringify(value)
+ ctx.privateSchoolPublish_('staffRoster',newer)
+ assert.equal(ctx.privateSchoolRevision_('staffRoster'),head)
+ assert.throws(()=>ctx.privateSchoolPublish_('staffRoster',{...newer,version:3}),/lost write/)
+ console.log('PASS complete supplemental data, administrator-only source retry, pending state, duplicate retry and lost GitHub acknowledgment')
  const path=require('node:path'),os=require('node:os'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'ung-auth-state-test-'));let restoreMode='ok',handler;const deadline=new Date(Date.now()+20000).toISOString();const electron={app:{getPath:()=>dir},safeStorage:{isEncryptionAvailable:()=>true,encryptString:v=>Buffer.from(v),decryptString:b=>b.toString()},BrowserWindow:{getAllWindows:()=>[]},ipcMain:{handle:(_,fn)=>{handler=fn}}};
  const mod={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync('electron/main/staff-auth.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{exports:mod.exports,module:mod,require:name=>name==='electron'?electron:name==='./staff-transport'?{fetchStaffJson:async(_,req)=>{if(req.action==='staffSession' && restoreMode==='offline')throw Error('offline');if(restoreMode==='revoked')return {ok:false,code:'AUTH_REQUIRED'};return {ok:true,data:{name:'테스트교사',token:'test-session',expiresAt:deadline}}}}:require(name)});
  const create=()=>mod.exports.createStaffAuth(()=>'',()=>true);create();await handler({},'login',{name:'테스트교사',password:'test'});const sessionFile=path.join(dir,'staff-session.bin'),initial=fs.readFileSync(sessionFile);const restarted=create();restoreMode='offline';assert.equal((await handler({},'restore')).retryRequired,true);assert.equal(restarted.snapshot().authenticated,false);assert.deepEqual(fs.readFileSync(sessionFile),initial);restoreMode='ok';assert.equal((await handler({},'restore')).expiresAt,deadline);assert.equal(restarted.snapshot().authenticated,true);create();restoreMode='revoked';assert.equal((await handler({},'restore')).authenticated,false);assert.equal(fs.existsSync(sessionFile),false);fs.rmdirSync(dir);console.log('PASS blocked access during temporary disconnect, retry within original expiry and explicit server revocation')

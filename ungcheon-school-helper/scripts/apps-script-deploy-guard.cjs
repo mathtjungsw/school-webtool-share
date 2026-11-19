@@ -148,8 +148,9 @@ function assertSessionPreservation(info) {
     deleteAllProperties: () => blocked('session initialization deleted all properties'),
     setProperties: () => blocked('session initialization replaced properties')
   }
-  const sandbox = { PropertiesService: { getScriptProperties: () => api }, Utilities: { getUuid: () => 'guard-session' }, sha256_: () => 'new-session-hash' }
-  const code = `const MOBILE_SESSION_PROPERTY_PREFIX=${JSON.stringify(prefix)}; const MOBILE_SESSION_HOURS=72;\n${requireFunction(info, 'mobileCreateSession_')}\nmobileCreateSession_('guard-viewer');`
+  const sandbox = { PropertiesService: { getScriptProperties: () => api }, Utilities: { getUuid: () => 'guard-session' }, sha256_: sha256, mobileSharedPasswordHash_: () => properties.get(passwordKey) }
+  const versionHelper = info.functions.has('mobileSessionAuthVersion_') ? requireFunction(info, 'mobileSessionAuthVersion_') : ''
+  const code = `const MOBILE_SESSION_PROPERTY_PREFIX=${JSON.stringify(prefix)}; const MOBILE_SESSION_HOURS=72;\n${versionHelper}\n${requireFunction(info, 'mobileCreateSession_')}\nmobileCreateSession_('guard-viewer');`
   let result
   try { result = vm.runInNewContext(code, sandbox, { timeout: 1000 }) } catch { blocked('72-hour session lifecycle check failed') }
   if (properties.get(passwordKey) !== 'guard-hash' || properties.get(prefix + 'active') !== activeValue || properties.get('unrelated') !== 'keep') blocked('session creation removed existing credentials or active sessions')

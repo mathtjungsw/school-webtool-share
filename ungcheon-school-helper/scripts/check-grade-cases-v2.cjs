@@ -40,3 +40,48 @@ assert.equal(formatStudentNumber({...one,className:'11'},4),'');assert.equal(par
 assert.equal(studentsFromRows([{student:'x',studentInfo:{...one,studentNumber:'1102',currentGrade:'',className:'',number:''}}])[0].className,'1')
 assert.equal(filterStudents([one,{...one,id:'b',studentNumber:'20102',currentGrade:'2'}],'가상학생','1','','').length,1)
 console.log('PASS attachment curriculum groups, Roman/space aliases, weighted core scope, explicit override, 4/5-digit equivalents, no class-11 substring collision, inferred metadata and preserved source IDs')
+
+const {reconcileGrades} = require('../src/features/private/reconcileGrades.ts')
+const XLSX = require('xlsx')
+function semesterFixture(number, semester, rank, label = '가상학생') {
+  const book = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([['1학년 1반'],
+    ['번호','성명','학번','학년','학기','교과','과목','학점','석차등급'],
+    [2,label,number,1,semester,'국어','공통국어'+semester,3,rank]]), '학기')
+  const buffer = XLSX.write(book, {type:'buffer',bookType:'xlsx'})
+  return parseXlsx(buffer, '합성자료.xlsx', crypto.createHash('sha256').update(buffer).digest('hex'))[0]
+}
+const fall=semesterFixture('10102',2,4), spring=semesterFixture('1102',1,2)
+const same = {...spring,id:'pdf:1',sourceId:'pdf',student:'pdf:student:1',
+  studentInfo:{...spring.studentInfo,id:'pdf:student:1',studentNumber:''}}
+const termRows=[spring,fall,same]
+let merged=reconcileGrades(termRows)
+assert.equal(merged.students.length,1)
+assert.equal(merged.duplicates,1)
+assert.equal(gradeResult(merged.byStudent.get(spring.student),false,5).average,'3.00')
+const changed={...same,rank:3}
+merged=reconcileGrades([spring,fall,changed])
+const conflict=merged.conflicts.get(spring.student)[0]
+assert.equal(gradeResult(merged.byStudent.get(spring.student),false,5).pending.length,1)
+merged=reconcileGrades([spring,fall,{...changed,courseChoice:conflict.signature}])
+assert.equal(gradeResult(merged.byStudent.get(spring.student),false,5).average,'3.50')
+assert.equal(merged.conflicts.get(spring.student)[0].selected,changed.id)
+assert.equal(reconcileGrades([spring,fall,{...changed,rank:1,courseChoice:conflict.signature}]).conflicts.get(spring.student)[0].selected,'')
+const withSchoolYear=(row,schoolYear)=>({...row,studentInfo:{...row.studentInfo,schoolYear}})
+assert.equal(reconcileGrades([withSchoolYear(spring,'2025'),withSchoolYear(fall,'2026'),same]).students.length,3)
+assert.equal(reconcileGrades([spring,semesterFixture('1102',2,4,'다른학생')]).students.length,2)
+assert.equal(reconcileGrades([spring,{...same,studentInfo:{...same.studentInfo,number:''}}]).students.length,2)
+const repeated = {...spring,id:spring.id+':second',rank:3}
+let repeatedRows = reconcileGrades([same,spring,repeated])
+assert.deepEqual(repeatedRows.byStudent.get(same.student).map(row=>row.rank), [2,3])
+assert.equal(repeatedRows.duplicates,1)
+const inconsistent = {...same,rank:5}
+repeatedRows = reconcileGrades([inconsistent,spring,repeated])
+const sourceChoice = repeatedRows.conflicts.get(same.student)[0]
+assert.equal(sourceChoice.sources.length,2)
+assert.equal(sourceChoice.sources[1].length,2)
+repeatedRows = reconcileGrades([inconsistent,{...spring,courseChoice:sourceChoice.signature},repeated])
+assert.deepEqual(repeatedRows.byStudent.get(same.student).map(row=>row.rank),[2,3])
+assert.equal(gradeResult(repeatedRows.byStudent.get(same.student),false,5).average,'2.50')
+assert.deepEqual(reconcileGrades([same,spring,{...repeated,rank:2}]).byStudent.get(same.student).map(r=>r.rank),[2,2])
+console.log('PASS historical and new semester files, 4/5-digit identity, same-source safeguards, cross-source duplicate/conflict selection and cohort ambiguity')

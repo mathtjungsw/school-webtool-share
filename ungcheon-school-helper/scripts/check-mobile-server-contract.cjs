@@ -199,6 +199,17 @@ test('login credentials are not treated as expired sessions or echoed in errors'
   }
 });
 
+test('rotating the common password expires both legacy and versioned mobile sessions', () => {
+  const h = harness();
+  const oldLogin = h.login().data.accessToken;
+  assert.equal(h.post(h.request()).ok, true);
+  h.properties.set('UNG_MOBILE_SHARED_PASSWORD_HASH', digest('fixture-next-password'));
+  assert.equal(h.post(h.request()).code, 'MOBILE_SESSION_EXPIRED');
+  assert.equal(h.post(h.request({ accessToken: oldLogin })).code, 'MOBILE_SESSION_EXPIRED');
+  const next = h.login({ password: 'fixture-next-password' }).data.accessToken;
+  assert.equal(h.post(h.request({ accessToken: next })).ok, true);
+});
+
 test('missing, mismatched and expired sessions provide a machine-readable expiry code', () => {
   const h = harness();
   for (const request of [h.request({ accessToken: '' }), h.request({ accessToken: crypto.randomBytes(32).toString('hex') }), h.request({ viewerName: '다른교사' })]) {
@@ -303,9 +314,17 @@ test('attendance uses the actual third-grade course roster and reports partial h
   assert.equal(summary.flaggedCount, 1);
   assert.equal(summary.enrolledCount, 2);
   assert.deepEqual(summary.classStatus, [{ className: '1', complete: false }, { className: '2', complete: true }]);
-  assert.deepEqual(summary.entries, [{ className: '2', number: '2', name: '수강학생2', remark: '조퇴' }]);
+  assert.deepEqual(summary.entries, []);
+  assert.equal(summary.attendanceCount, 1);
+  assert.equal(summary.selfStudyCount, 0);
+  const day = h.post(h.request({action:'getMobileResource',resource:'attendance',date:'2026-08-31'})).data;
+  assert.deepEqual(day.items[0].entries, []);
+  assert.equal(JSON.stringify(day).includes('수강학생2'), false);
+  h.cache.clear();
+  h.advance(61000);
+  assert.deepEqual(h.post(h.request({ifRevision:bundle.revision})).data, {notModified:true,revision:bundle.revision});
   const text = JSON.stringify(bundle);
-  for (const forbidden of ['studentId', 'payloadJson', 'selections', '비수강학생', '다른교사학생']) assert.equal(text.includes(forbidden), false, forbidden);
+  for (const forbidden of ['studentId', 'payloadJson', 'selections', '비수강학생', '다른교사학생', '수강학생2', '조퇴']) assert.equal(text.includes(forbidden), false, forbidden);
   assert.ok(h.readNames.includes('학생시간표'));
 });
 
@@ -363,7 +382,8 @@ test('third-grade class and movement lessons accept co-teachers and safely disam
   const summaries = h.post(h.request()).data.attendanceSummaries;
   assert.equal(summaries.length, 1);
   assert.equal(summaries[0].enrolledCount, 2);
-  assert.deepEqual(summaries[0].entries.map(entry => entry.name), ['공동수강생', '축약수강생']);
+  assert.deepEqual(summaries[0].entries, []);
+  assert.deepEqual(h.post(h.request({action:'getMobileAttendanceRoster',date:'2026-08-31',period:1})).data.entries.map(entry => entry.name), ['공동수강생', '축약수강생']);
   assert.equal(JSON.stringify(summaries).includes('다른과목학생'), false);
 });
 
@@ -385,6 +405,10 @@ test('desktop widget receives the same minimal third-grade attendance without a 
   assert.equal(result.ok, true);
   assert.equal(result.data.attendanceSummaries.length, 1);
   assert.deepEqual(result.data.attendanceSummaries[0].entries, [{ className: '2', number: '8', name: '자습학생', remark: '도서관 자습' }]);
+  const mobile = h.post(h.request()).data.attendanceSummaries[0];
+  assert.deepEqual(mobile.entries, []);
+  assert.equal(mobile.selfStudyCount, 1);
+  assert.equal(mobile.attendanceCount, 0);
   const responseText = JSON.stringify(result.data);
   for (const forbidden of ['studentId', 'payloadJson', 'slots', 'selections', 'accessToken', 'password']) assert.equal(responseText.includes(forbidden), false, forbidden);
 });
@@ -410,7 +434,8 @@ test('attendance follows an approved exchange course roster instead of the displ
   assert.equal(summaries.length, 1);
   assert.equal(summaries[0].period, 1);
   assert.equal(summaries[0].changeType, 'exchange');
-  assert.equal(summaries[0].entries[0].name, '교체수강생');
+  assert.deepEqual(summaries[0].entries, []);
+  assert.equal(h.post(h.request({action:'getMobileAttendanceRoster',date:'2026-08-31',period:1})).data.entries[0].name, '교체수강생');
 });
 
 test('attendance moves with a pulled course and disappears from its original slot', () => {
@@ -433,7 +458,8 @@ test('attendance moves with a pulled course and disappears from its original slo
   const summaries = h.post(h.request({ attendancePulledLessons: [], attendanceContextVersion: 'pulled-test-v1' })).data.attendanceSummaries;
   assert.deepEqual(summaries.map(item => item.period), [3]);
   assert.equal(summaries[0].changeType, 'pulled');
-  assert.equal(summaries[0].entries[0].name, '당김수강생');
+  assert.deepEqual(summaries[0].entries, []);
+  assert.equal(h.post(h.request({action:'getMobileAttendanceRoster',date:'2026-08-31',period:3})).data.entries[0].name, '당김수강생');
 });
 
 test('one failing source does not fail other data or cache the partial result', () => {
@@ -524,8 +550,8 @@ test('Friday operation on Tuesday queries Friday students but the actual attenda
   const result = h.post(h.request({ fromDate: '2026-10-12', toDate: '2026-10-23' }));
   assert.equal(result.ok, true);
   const summary = result.data.attendanceSummaries.find(item => item.period === 1);
-  assert.equal(summary.entries.length, 1);
-  assert.equal(summary.entries[0].name, '금요수강생');
+  assert.deepEqual(summary.entries, []);
+  assert.equal(summary.attendanceCount, 1);
   const detail = h.post({ action: 'getMobileAttendanceRoster', viewerName: '테스트교사', accessToken: h.existingToken, date: '2026-10-13', period: 1 });
   assert.equal(detail.ok, true);
   assert.equal(detail.data.date, '2026-10-13');

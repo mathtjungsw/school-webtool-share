@@ -14,7 +14,7 @@ from reportlab.pdfgen import canvas
 from pypdf import PdfReader
 
 
-APP_URL = "https://ungcheon-mobile-schedule.jsw890122.chatgpt.site"
+APP_URL = "https://ungcheon-school-helper-mobile.web.app/"
 CHROME_GUIDE = "https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid&hl=ko"
 CHROME_SHORTCUT = "https://support.google.com/chrome/answer/15085120?co=GENIE.Platform%3DAndroid&hl=ko"
 APPLE_GUIDE = "https://support.apple.com/ko-kr/guide/iphone/iphea86e5236/ios"
@@ -171,7 +171,7 @@ def make_android_steps() -> Path:
         x1, y1, x2, y2 = draw_phone_base(draw, x, 45, 520, 760, title)
         if x == 55:
             draw.rounded_rectangle((x1, y1, x2, y1 + 64), radius=14, fill=hex_rgb("#EEF2F0"))
-            draw.text((x1 + 24, y1 + 18), "ungcheon-mobile-schedule…", font=font(16), fill=hex_rgb(INK))
+            draw.text((x1 + 24, y1 + 18), "ungcheon-school-helper-mobile…", font=font(16), fill=hex_rgb(INK))
             draw.text((x2 - 38, y1 + 11), "⋮", font=font(32, True), fill=hex_rgb(RED))
             draw.ellipse((x2 - 56, y1 - 4, x2 - 4, y1 + 52), outline=hex_rgb(RED), width=5)
             draw.rounded_rectangle((x1 + 18, y1 + 95, x2 - 18, y1 + 420), radius=24, fill=hex_rgb(GREEN_DARK))

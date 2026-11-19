@@ -111,11 +111,11 @@ let previewLogin: {name:string;password:string} | null = null
 const trustedApp = (event: Electron.IpcMainInvokeEvent) => [mainWindow?.webContents, widgetWindow?.webContents].includes(event.sender) && event.senderFrame === event.sender.mainFrame
 const staffAuth = createStaffAuth(() => previewEndpoint || UNGCHEON_SCHOOL_HUB_URL, trustedApp)
 bindHubCacheOwner(()=>staffAuth.snapshot().authenticated ? staffAuth.snapshot().teacherName : '')
-registerGradeVault(() => mainWindow, () => staffAuth.snapshot().authenticated ? staffAuth.snapshot().teacherName : '')
+const flushGradeWork = registerGradeVault(() => mainWindow, () => staffAuth.snapshot().authenticated ? staffAuth.snapshot().teacherName : '')
 ipcMain.handle('preview:loginHint', event => IS_PREVIEW && trustedApp(event) ? previewLogin : null)
 ipcMain.handle('preview:mobile', event => { if (trustedApp(event) && IS_PREVIEW && previewEndpoint) return shell.openExternal(previewEndpoint + '/'); })
 const featureViews = registerFeatureViews(() => mainWindow, staffAuth)
-const updateManager = registerUpdateManager(autoUpdater, () => { showMainWindow(); mainWindow?.webContents.send('navigate:request', 'help'); mainWindow?.webContents.executeJavaScript("window.dispatchEvent(new Event('update:open'))").catch(() => undefined) }, trustedApp)
+const updateManager = registerUpdateManager(autoUpdater, () => { showMainWindow(); mainWindow?.webContents.send('navigate:request', 'help'); mainWindow?.webContents.executeJavaScript("window.dispatchEvent(new Event('update:open'))").catch(() => undefined) }, trustedApp, flushGradeWork)
 
 type WidgetPreset = 'glass-light' | 'solid-light' | 'dark-glass' | 'school-yellow' | 'minimal'
 interface WidgetSettings extends WidgetProductivitySettings {
@@ -282,7 +282,7 @@ app.on('window-all-closed', () => {
   if (process.platform === 'darwin' && isQuitting) app.quit()
 })
 
-app.on('before-quit', () => { isQuitting = true; featureViews.close() })
+app.on('before-quit', event => { isQuitting = !event.defaultPrevented; if (isQuitting) featureViews.close() })
 app.on('second-instance', (_, argv) => {
   if (argv.includes('--widget')) createWidgetWindow()
   else showMainWindow()
@@ -517,7 +517,7 @@ autoUpdater.on('error', (error: Error, message?: string) => {
 })
 ipcMain.on('update:install', () => {
   if (app.getVersion().includes('-preview.')) return
-  autoUpdater.quitAndInstall()
+  if (flushGradeWork()) autoUpdater.quitAndInstall()
 })
 ipcMain.handle('update:check', async () => {
   if (process.env['ELECTRON_RENDERER_URL'] || app.getVersion().includes('-preview.')) {
@@ -1093,6 +1093,8 @@ const HUB_ACTIONS = new Set([
   'replaceNeisSnapshot',
   // Administrator credentials must stay in POST bodies, never GET URLs.
   'getMigrationStatus',
+  'getPrivateSchoolMirrorStatus',
+  'retryPrivateSchoolMirror',
   'getMigrationInventory',
   'runMigrationReplica',
   'setMigrationReplicaPaused',
@@ -1123,6 +1125,8 @@ const HUB_READ_ACTIONS = new Set([
 
 const HUB_LARGE_DATA_ACTIONS = new Set([
   'getMigrationStatus',
+  'getPrivateSchoolMirrorStatus',
+  'retryPrivateSchoolMirror',
   'getMigrationInventory',
   'runMigrationReplica',
   'setMigrationReplicaPaused',

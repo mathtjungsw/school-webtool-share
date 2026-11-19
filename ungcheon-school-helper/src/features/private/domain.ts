@@ -1,6 +1,6 @@
 import {curriculumGroup} from './curriculum2022'
 export type StudentInfo={id:string;name:string;studentNumber:string;currentGrade:string;className:string;number:string;schoolYear:string}
-export type GradeRow = { id:string;student:string;year:string;semester:string;group:string;groupOverride?:boolean;subject:string;credit:number|null;rank:number|null;scale:number|null;source:string;studentInfo?:StudentInfo;sourceId?:string;page?:number;bounds?:{x:number;y:number;width:number;height:number};readState?:'parsed'|'unranked'|'review';issues?:string[];reviewed?:boolean;original?:Record<string,unknown> }
+export type GradeRow = { id:string;student:string;year:string;semester:string;group:string;groupOverride?:boolean;subject:string;credit:number|null;rank:number|null;scale:number|null;source:string;studentInfo?:StudentInfo;sourceId?:string;page?:number;bounds?:{x:number;y:number;width:number;height:number};readState?:'parsed'|'unranked'|'review';issues?:string[];reviewed?:boolean;courseChoice?:string;original?:Record<string,unknown> }
 export function normalizeGroup(group:string){const g=group.replace(/\s/g,'');return g.startsWith('사회(')?'사회':g}
 export function subjectGroup(row:GradeRow){const manual=row.groupOverride||(row.original&&'group' in row.original&&row.group!==row.original.group);return manual?normalizeGroup(row.group):curriculumGroup(row.subject)||normalizeGroup(row.group)}
 export function gradeResult(rows:GradeRow[],mainOnly:boolean,scale:number){

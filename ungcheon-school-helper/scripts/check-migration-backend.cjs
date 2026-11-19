@@ -14,6 +14,7 @@ function setup(seed){
 const normalize=value=>JSON.parse(JSON.stringify(value,(key,val)=>key==='generatedAt'?'<time>':val))
 test('actual mobile session checks and minimal schedule contract also use the pinned Firestore reader',()=>{
   const f=setup(g=>{g.book.getSheetByName('교원명렬').appendRow(['teacher-1','Synthetic Teacher','교사','Test','Math','']);g.book.getSheetByName('교원명렬정보').appendRow([1,'Synthetic','Synthetic','2026-11-13',1])})
+  f.ctx.PropertiesService.getScriptProperties().setProperty('UNG_MOBILE_SHARED_PASSWORD_HASH', f.ctx.sha256_('synthetic-mobile-fixture'))
   const token=f.ctx.mobileCreateSession_('Synthetic Teacher').accessToken
   f.ctx.Utilities.formatDate=(date,zone,format)=>{assert.equal(zone,'Asia/Seoul');const day=new Date(date.getTime()+9*3600000).toISOString().slice(0,10);return format==='yyyyMMdd'?day.replaceAll('-',''):day}
   // External input sources remain separate Sheets. Empty synthetic external

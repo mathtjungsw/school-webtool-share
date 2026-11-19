@@ -1,11 +1,24 @@
 import { webcrypto } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DashboardPayload } from './types'
+import { withoutAttendanceDetails } from './attendanceSummary'
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.resetModules() })
 const payload = { timetable: null, committees: { events: [] }, changes: [], bundle: null, cachedAt: '' } satisfies DashboardPayload
 
 describe('기기 저장소 실패 경계', () => {
+  it('기존 출결 응답의 이름과 비고를 지우고 새 서버의 집계는 보존한다', () => {
+    const summary = { date:'2026-11-20', period:2, state:'complete' as const, flaggedCount:2, enrolledCount:3, courseNames:[], classrooms:[], classStatus:[], entries:[
+      { name:'캐시검증학생1', number:'12', className:'3', remark:'합성 자습' },
+      { name:'캐시검증학생2', number:'13', className:'3', remark:'합성 조퇴' },
+    ], mismatchCount:0, sourceDate:'2026-11-20', checkedAt:'', rosterBasis:'course-enrollment' as const }
+    const old = { ...payload, bundle:{ todayMeals:[], timetableChanges:[], committeeEvents:[], teacherTimetable:null, events:[], fetchedAt:'', attendanceSummaries:[summary] } }
+    const safe = withoutAttendanceDetails(old)
+    expect(safe.bundle?.attendanceSummaries?.[0]).toMatchObject({ entries:[], attendanceCount:1, selfStudyCount:1 })
+    expect(JSON.stringify(safe)).not.toMatch(/캐시검증학생|합성 자습|합성 조퇴/)
+    expect(withoutAttendanceDetails(safe)).toEqual(safe)
+    expect(old.bundle.attendanceSummaries[0].entries).toHaveLength(2)
+  })
   it('저장소 사용이 차단되면 읽기는 null, 쓰기는 독립 오류로 종료한다', async () => {
     vi.stubGlobal('indexedDB', { deleteDatabase() { throw new Error('blocked') }, open() { throw new Error('blocked') } })
     const { readUserCache, writeUserCache } = await import('./cache')

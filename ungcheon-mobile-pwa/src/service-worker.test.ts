@@ -4,6 +4,33 @@ import vm from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
 
 describe('서비스 워커 전송 경계', () => {
+  it('하위 경로의 앱 셸을 준비하고 새 버전 활성화 시 다른 앱의 저장소를 보존한다', async () => {
+    const scope = 'https://example.invalid/school/'
+    const listeners: Record<string, (event: any) => void> = {}
+    const keys = ['other-app', 'ungcheon-mobile-static-v13', 'ungcheon-mobile-static-%2Fother%2F-v14', 'ungcheon-mobile-static-%2Fschool%2F-v14']
+    const markup = '<script src="./assets/app.js"></script><link rel="stylesheet" href="./assets/style.css"><script src="/other/tool.js"></script>'
+    const shellResponse = { ok:true, clone:() => ({ text:async () => markup }) }
+    const fetcher = vi.fn().mockResolvedValue(shellResponse)
+    const cache = { addAll:vi.fn(), put:vi.fn(), match:vi.fn().mockResolvedValue(shellResponse) }
+    const deletion = vi.fn()
+    vm.runInNewContext(readFileSync(resolve('public/sw.js'), 'utf8'), {
+      URL, fetch:fetcher, caches:{ open:async () => cache, keys:async () => keys, delete:deletion },
+      self:{ registration:{scope}, skipWaiting:vi.fn(), clients:{ claim:vi.fn() }, addEventListener:(key:string, cb:(event:unknown)=>void) => { listeners[key]=cb } },
+    })
+    let job: Promise<unknown> | undefined
+    const waitUntil = (value:Promise<unknown>) => { job = value }
+    listeners.install({waitUntil}); await job
+    expect(cache.addAll.mock.calls[0][0]).toEqual([scope+'manifest.webmanifest', scope+'icon-192.png', scope+'icon-512.png', scope+'assets/app.js', scope+'assets/style.css'])
+    listeners.activate({waitUntil}); await job
+    expect(deletion.mock.calls).toEqual([['ungcheon-mobile-static-v13']])
+    fetcher.mockRejectedValue(new TypeError('offline'))
+    listeners.fetch({request:{method:'GET',url:scope,mode:'navigate'}, respondWith:waitUntil})
+    expect(await job).toBe(shellResponse)
+    expect(cache.match).toHaveBeenCalledWith(scope)
+    const respondWith = vi.fn()
+    listeners.fetch({request:{method:'GET',url:'https://example.invalid/other/app.js',mode:'cors'}, respondWith})
+    expect(respondWith).not.toHaveBeenCalled()
+  })
   it('Apps Script POST와 외부 GET을 캐시하거나 가로채지 않는다', () => {
     const listeners: Record<string, (event: unknown) => void> = {}
     const origin = 'https://ungcheon-mobile-schedule.jsw890122.chatgpt.site'

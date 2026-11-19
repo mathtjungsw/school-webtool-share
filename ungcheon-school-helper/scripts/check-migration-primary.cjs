@@ -83,7 +83,9 @@ test('all real staff authentication uses the primary roster and retains existing
   assert.equal(f.post({action:'staffSession',staffToken:'bad'}).ok,false)
 })
 test('mobile token and contract 3 still work through the production switch without full student data',()=>{
-  const f=setup();const token=f.ctx.mobileCreateSession_('Synthetic Teacher').accessToken
+  const f=setup()
+  f.ctx.PropertiesService.getScriptProperties().setProperty('UNG_MOBILE_SHARED_PASSWORD_HASH', f.ctx.sha256_('synthetic-mobile-fixture'))
+  const token=f.ctx.mobileCreateSession_('Synthetic Teacher').accessToken
   f.ctx.Utilities.formatDate=(date,zone,format)=>{assert.equal(zone,'Asia/Seoul');const day=new Date(date.getTime()+9*3600000).toISOString().slice(0,10);return format==='yyyyMMdd'?day.replaceAll('-',''):day}
   const empty={getName:()=> '2026.11.13',getDataRange:()=>({getValues:()=>[['']],getDisplayValues:()=>[['']],getMergedRanges:()=>[],getRow:()=>1,getColumn:()=>1})}
   f.ctx.SpreadsheetApp.openById=()=>({getSheets:()=>[empty],getSheetByName:()=>empty})

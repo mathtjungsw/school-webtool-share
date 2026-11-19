@@ -8,7 +8,6 @@ const desktop = path.resolve(root, '../ungcheon-school-helper')
 const output = path.join(root, 'src/shared')
 const manifestPath = path.join(output, 'source-manifest.json')
 const files = [
-  ['src/data/pulledLessons2026.ts', 'pulledLessons2026.ts'],
   ['src/services/ungcheonSchedule.ts', 'ungcheonSchedule.ts'],
   ['src/services/specialTimetableDays.ts', 'specialTimetableDays.ts'],
 ]
@@ -16,6 +15,9 @@ const files = [
 // Validate content, not checkout-specific newline bytes, on both build hosts.
 const sha256 = content => crypto.createHash('sha256').update(content.toString('utf8').replace(/\r\n/g, '\n')).digest('hex')
 const hasDesktop = fs.existsSync(path.join(desktop, 'package.json'))
+if (fs.existsSync(path.join(output, 'pulledLessons2026.ts'))) {
+  throw new Error('당김수업 자료는 인증한 교사의 일정 응답으로만 받습니다. 모바일 배포 폴더의 당김수업 파일을 확인하세요.')
+}
 if (process.argv.includes('--write')) {
   if (!hasDesktop) throw new Error('최신 데스크톱 소스가 있는 통합 저장소에서만 동기화할 수 있습니다.')
   fs.mkdirSync(output, { recursive: true })
