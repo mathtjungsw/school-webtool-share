@@ -97,6 +97,7 @@ describe('모바일 2주 자료 미리 받기', () => {
     expect(periodRequests()).toHaveLength(1)
     await act(async () => fortnight.resolve(periodFixture()))
     await waitFor(() => expect(periodWrites()).toHaveLength(1))
+    expect(await screen.findByText(/오프라인 일정 저장 완료/)).toHaveTextContent('11.21~12.04')
     expect(loadDashboard).toHaveBeenCalledTimes(2)
     expect(store.has(NAME + '/' + lastDay + '/' + lastDay)).toBe(false)
     view.unmount()
@@ -115,6 +116,30 @@ describe('모바일 2주 자료 미리 받기', () => {
     expect(await screen.findByText('마지막 날 검증 급식')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '연결 검증 일정' })).not.toBeInTheDocument()
     expect(periodRequests()).toHaveLength(1)
+  })
+
+  it('단일 날짜 캐시가 먼저 열려도 더 최근에 받은 14일 자료와 이후의 실제 조회를 차례로 표시한다', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const older = fixture()
+    older.cachedAt = '2026-11-21T01:30:00Z'
+    older.bundle!.events[0].title = '예전 날짜별 일정'
+    const complete = periodFixture()
+    complete.bundle!.events[0].title = '더 최근에 내려받은 일정'
+    const saved = deferred<DashboardPayload>()
+    vi.mocked(readUserCache).mockImplementation(async (_, key) => key === scope ? saved.promise : older)
+    render(<App />)
+    expect(await screen.findByRole('button', { name: '예전 날짜별 일정' })).toBeInTheDocument()
+    await act(async () => saved.resolve({ ...complete, offlineRange: { from: today, to: lastDay } }))
+    expect(await screen.findByRole('button', { name: '더 최근에 내려받은 일정' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '예전 날짜별 일정' })).not.toBeInTheDocument()
+    expect(loadDashboard).not.toHaveBeenCalled()
+
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    const fresh = fixture()
+    fresh.bundle!.events[0].title = '새로고침으로 확인한 일정'
+    vi.mocked(loadDashboard).mockResolvedValue(fresh)
+    fireEvent.click(screen.getByRole('button', { name: '새로고침' }))
+    expect(await screen.findByRole('button', { name: '새로고침으로 확인한 일정' })).toBeInTheDocument()
   })
 
   it('백그라운드 다운로드가 중단되면 오늘 자료를 유지하고 재연결할 때 한 번 이어받는다', async () => {

@@ -239,6 +239,21 @@ export function Login({ onLogin, notice = '' }: { onLogin: (name: string, passwo
   </main>
 }
 
+type OfflineProjection = ReturnType<typeof projectOfflineRange>
+
+function completeProjection(prepared: OfflineProjection) {
+  return prepared && !prepared.partial && !Object.values(prepared.data.bundle?.sourceStatus ?? {})
+    .some(status => status.state === 'unavailable' || status.errorCode)
+}
+
+function preferredSnapshot(exact: DashboardPayload | null, fromDevice: boolean, prepared: OfflineProjection) {
+  if (!exact) return prepared?.data ?? null
+  if (fromDevice && prepared && completeProjection(prepared) && Date.parse(prepared.data.cachedAt) > Date.parse(exact.cachedAt)) {
+    return prepared.data
+  }
+  return exact
+}
+
 export default function App() {
   useEffect(() => {
     void upgradeDashboardCache()
@@ -280,6 +295,7 @@ export default function App() {
   const sessionRef = useRef(session)
   sessionRef.current = session
   const dataRef = useRef(exactData)
+  const exactFromDevice = useRef(false)
   const previousToday = useRef(initialDate)
   const clock = schoolClock(now)
   const today = clock.date
@@ -351,7 +367,7 @@ export default function App() {
   const preparedRef = useRef(prepared)
   preparedRef.current = prepared
   const currentExact = visualMode || loadedRange.current === rangeKey ? exactData : null
-  const data = currentExact ?? prepared?.data ?? null
+  const data = preferredSnapshot(currentExact, exactFromDevice.current, prepared)
   const missingDay = (date: string) => !currentExact && !!prepared && (date < prepared.from || date > prepared.to)
 
   const [retrying,setRetrying]=useState('')
@@ -364,9 +380,9 @@ export default function App() {
       const response=await secureReadAction<{items: (MealInfo|MobileAttendanceSummary)[];status:import('./types').MobileResourceStatus}>('getMobileResource',{viewerName:active.name,accessToken:active.accessToken,date:selectedDate,resource})
       if (sequence!==requestSequence.current || sessionRef.current!==active) return
       if(!Array.isArray(response.items) || !['fresh','empty'].includes(response.status?.state)) throw Error('해당 자료를 확인할 수 없습니다.')
-      const prev=dataRef.current ?? current, bundle={...prev.bundle!,revision:undefined,sourceStatus:{...prev.bundle!.sourceStatus,[resource]:response.status}}
+      const prev=preferredSnapshot(dataRef.current, exactFromDevice.current, preparedRef.current) ?? current, bundle={...prev.bundle!,revision:undefined,sourceStatus:{...prev.bundle!.sourceStatus,[resource]:response.status}}
       if(resource==='meals') {bundle.meals=response.items as MealInfo[];if(selectedDate===today)bundle.todayMeals=bundle.meals} else bundle.attendanceSummaries=(response.items as MobileAttendanceSummary[]).map(summaryOnly)
-      const next={...prev,bundle};loadedRange.current=rangeKey;dataRef.current=next;setData(next);await writeUserCache(active.name,next,selectedDate+'/'+selectedDate)
+      const next={...prev,bundle};loadedRange.current=rangeKey;exactFromDevice.current=false;dataRef.current=next;setData(next);await writeUserCache(active.name,next,selectedDate+'/'+selectedDate)
     } catch(error){if(sequence===requestSequence.current){if(isSessionExpiredError(error))clearSession(SESSION_EXPIRED_MESSAGE);else setMessage('자료를 다시 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.')}}
     finally{retryInFlight.current=false;setRetrying('')}
   }
@@ -386,17 +402,15 @@ export default function App() {
     activeRequest.current = key
     lastRequest.current = { key, at: Date.now() }
     const copy = preparedRef.current
-    const useRecentCopy = navigating && start !== today && copy && !copy.partial &&
-      Date.now() - Date.parse(copy.data.cachedAt) < 5 * 60 * 1000 &&
-      !Object.values(copy.data.bundle?.sourceStatus ?? {}).some(status => status.state === 'unavailable' || status.errorCode)
+    const useRecentCopy = navigating && start !== today && copy && completeProjection(copy) &&
+      Date.now() - Date.parse(copy.data.cachedAt) < 5 * 60 * 1000
     const useLocalOnly = !!useRecentCopy || !navigator.onLine
     setLoading(!useLocalOnly)
     // IndexedDB가 느리거나 차단되어도 API 요청은 즉시 시작한다.
     const scope = start + '/' + end
     void readUserCache(name, scope).then(cached => {
       if (cached && (!dataRef.current || loadedRange.current !== key) && sequence === requestSequence.current && !controller.signal.aborted) {
-        if (copy && !copy.partial && Date.parse(cached.cachedAt) < Date.parse(copy.data.cachedAt)) return
-        loadedRange.current = key; const marked = markDashboardCached(cached); dataRef.current = marked; setData(marked)
+        loadedRange.current = key; exactFromDevice.current = true; const marked = markDashboardCached(cached); dataRef.current = marked; setData(marked)
       }
     }).catch(() => undefined)
     if (useLocalOnly) {
@@ -405,15 +419,20 @@ export default function App() {
       if (!navigator.onLine) setOffline(true)
       return
     }
+    const previousForRange = () => {
+      const snapshot = preparedRef.current
+      const coveringSnapshot = snapshot?.from === start && snapshot.to === end ? snapshot : null
+      return preferredSnapshot(loadedRange.current === key ? dataRef.current : null, exactFromDevice.current, coveringSnapshot)
+    }
     try {
-      const fresh = await loadDashboard(name, currentSession.accessToken, start, end, controller.signal, loadedRange.current===key ? dataRef.current : null)
+      const fresh = await loadDashboard(name, currentSession.accessToken, start, end, controller.signal, previousForRange())
       if (sequence !== requestSequence.current) return
-      const previous = (loadedRange.current === key ? dataRef.current : null) ?? (copy && !copy.partial ? copy.data : null)
+      const previous = previousForRange()
       loadedRange.current = key
       const merged = mergeDashboardWithCache(fresh, previous)
       const additions = newEventFingerprints(previous, merged, name, today)
       if (additions.length) setNewKeys(current => [...new Set([...current, ...additions])])
-      setData(merged); dataRef.current = merged
+      exactFromDevice.current = false; setData(merged); dataRef.current = merged
       setReadyToken(currentSession.accessToken)
       const partial = Object.values(merged.bundle?.sourceStatus ?? {}).some(status => status.state === 'cached' || status.state === 'unavailable')
       setMessage(partial ? '일부 자료는 마지막 정상 조회 자료를 표시합니다.' : '')
