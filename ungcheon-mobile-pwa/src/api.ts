@@ -166,7 +166,7 @@ export function markDashboardCached(payload: DashboardPayload): DashboardPayload
   const fallbackAt = result.cachedAt || result.bundle.fetchedAt
   MOBILE_RESOURCE_KEYS.forEach(key => {
     const current = result.bundle?.sourceStatus?.[key]
-    if (!current || !result.bundle?.sourceStatus) return
+    if (!current || current.state === 'unavailable' || !result.bundle?.sourceStatus) return
     result.bundle.sourceStatus[key] = {
       ...current,
       state: 'cached',
@@ -193,7 +193,7 @@ export function mergeDashboardWithCache(freshPayload: DashboardPayload, previous
   MOBILE_RESOURCE_KEYS.forEach(key => {
     const status = freshStatus[key]
     const previousStatus = previousStatusMap[key]
-    if (status?.state !== 'unavailable' || !previousStatus) return
+    if (status?.state !== 'unavailable' || !previousStatus || previousStatus.state === 'unavailable') return
 
     if (key === 'weekly' || key === 'creative' || key === 'gateDuty' || key === 'mealDuty') replaceEventResource(freshBundle, previousBundle, key)
     if (key === 'timetable') {

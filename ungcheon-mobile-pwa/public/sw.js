@@ -1,7 +1,7 @@
 const scope = self.registration.scope
 const shell = new URL('./', scope).href
 const cachePrefix = 'ungcheon-mobile-static-' + encodeURIComponent(new URL(scope).pathname) + '-'
-const cacheName = cachePrefix + 'v14'
+const cacheName = cachePrefix + 'v15'
 const shellFiles = ['manifest.webmanifest', 'icon-192.png', 'icon-512.png'].map(path => new URL(path, scope).href)
 
 function isCode(url) {

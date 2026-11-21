@@ -118,6 +118,7 @@ export interface MobileScheduleBundle {
   servedAt?: string
 }
 export interface DashboardPayload {
+  offlineRange?: { from: string; to: string }
   timetable: SchoolTimetable | null
   committees: CommitteeState
   changes: TimetableChange[]

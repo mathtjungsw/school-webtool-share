@@ -9,6 +9,8 @@ import { secureReadAction } from './api'
 import { deleteUserCache, readUserCache, writeUserCache, upgradeDashboardCache } from './cache'
 import { attendanceEntryCounts, isSelfStudyEntry, summaryOnly } from './attendanceSummary'
 import { registerScheduleWorker } from './serviceWorker'
+import { projectOfflineRange } from './offlineRange'
+import { useOfflineFortnight } from './useOfflineFortnight'
 import { DAYS, DEFAULT_VISIBILITY, SOURCE_LABELS, buildMobileTimelineRows, collectEvents, eventFingerprint, findTeacher, lessonFocus, newEventFingerprints, parseSlot, rangeForToday, schoolClock, sortMealsByType, timetableForDate, ymd } from './domain'
 import type { DashboardPayload, LessonView, MealInfo, MobileAttendanceRoster, MobileAttendanceSummary, MobileEvent, MobileResourceKey, ScheduleSource } from './types'
 import { formatCheckedAt, RESOURCE_LABELS, resourceStatus, summarizeStatus, type StatusSummary } from './dataStatus'
@@ -246,7 +248,9 @@ export default function App() {
   const [initialAuth] = useState(() => visualMode ? { session: { name: VISUAL_NAME, accessToken: 'visual-test-token', expiresAt: Date.now() + SESSION_MS }, notice: '' } : readSession())
   const [session, setSession] = useState<MobileSession | null>(initialAuth.session)
   const [sessionNotice, setSessionNotice] = useState(initialAuth.notice)
-  const [data, setData] = useState<DashboardPayload | null>(() => visualMode ? visualFixture(initialDate) : null)
+  const [exactData, setData] = useState<DashboardPayload | null>(() => visualMode ? visualFixture(initialDate) : null)
+  const [readyToken, setReadyToken] = useState('')
+  const cancelFortnight = useRef<() => void>(() => {})
   const [view, setView] = useState<View>('today')
   const [weekOffset, setWeekOffset] = useState(0)
   const [eventDetail, setEventDetail] = useState<MobileEvent | null>(null)
@@ -275,14 +279,13 @@ export default function App() {
   const lastRequest = useRef({ key: '', at: 0 })
   const sessionRef = useRef(session)
   sessionRef.current = session
-  const dataRef = useRef(data)
+  const dataRef = useRef(exactData)
   const previousToday = useRef(initialDate)
   const clock = schoolClock(now)
   const today = clock.date
   const range = useMemo(() => rangeForToday(new Date(`${today}T12:00:00`)), [today])
-  const previewDates = useMemo(() => [...range.thisWeek, ...range.nextWeek].filter(date => date >= today), [range, today])
+  const previewDates = useMemo(() => Array.from({ length: 14 }, (_, index) => ymd(addDays(new Date(today + 'T12:00:00'), index))), [today])
 
-  useEffect(() => { dataRef.current = data }, [data])
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem(THEME_KEY, theme) }, [theme])
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000)
@@ -305,6 +308,8 @@ export default function App() {
 
   const clearSession = useCallback((notice = '', removeStored = true) => {
     const name = sessionRef.current?.name ?? ''
+    cancelFortnight.current()
+    setReadyToken('')
     ++requestSequence.current
     requestController.current?.abort()
     attendanceRosterController.current?.abort()
@@ -319,6 +324,9 @@ export default function App() {
     setMessage(''); setCacheWarning(''); setSessionNotice(notice)
     if (name) void deleteUserCache(name)
   }, [])
+
+  const fortnight = useOfflineFortnight(visualMode ? null : session, today, !!session && readyToken === session.accessToken, () => clearSession(SESSION_EXPIRED_MESSAGE))
+  cancelFortnight.current = fortnight.cancel
 
   useEffect(() => {
     if (!session || visualMode) return
@@ -335,57 +343,78 @@ export default function App() {
     activeRequest.current = null
   }, [])
 
+  const loadedRange = useRef('')
+  const start = view === 'today' ? selectedDate : view === 'next' ? range.nextWeek[0] : view === 'timetable' ? ymd(addDays(new Date(range.thisWeek[0]+'T12:00:00'), 7*weekOffset)) : range.thisWeek[0]
+  const end = view === 'today' ? selectedDate : ymd(addDays(new Date(start+'T12:00:00'), 6))
+  const rangeKey = session ? [session.name, session.expiresAt, start, end].join('|') : ''
+  const prepared = useMemo(() => projectOfflineRange(fortnight.snapshot, start, end, today), [fortnight.snapshot, start, end, today])
+  const preparedRef = useRef(prepared)
+  preparedRef.current = prepared
+  const currentExact = visualMode || loadedRange.current === rangeKey ? exactData : null
+  const data = currentExact ?? prepared?.data ?? null
+  const missingDay = (date: string) => !currentExact && !!prepared && (date < prepared.from || date > prepared.to)
+
   const [retrying,setRetrying]=useState('')
   const retryInFlight=useRef(false)
   const retrySource = async (resource:'meals'|'attendance')=>{
-    const active=sessionRef.current, current=dataRef.current, sequence=requestSequence.current
+    const active=sessionRef.current, current=data, sequence=requestSequence.current
     if (retryInFlight.current || !active || !current?.bundle || active.expiresAt<=Date.now()) return
     retryInFlight.current=true;setRetrying(resource)
     try {
       const response=await secureReadAction<{items: (MealInfo|MobileAttendanceSummary)[];status:import('./types').MobileResourceStatus}>('getMobileResource',{viewerName:active.name,accessToken:active.accessToken,date:selectedDate,resource})
-      if (sequence!==requestSequence.current || sessionRef.current!==active || !dataRef.current?.bundle) return
+      if (sequence!==requestSequence.current || sessionRef.current!==active) return
       if(!Array.isArray(response.items) || !['fresh','empty'].includes(response.status?.state)) throw Error('해당 자료를 확인할 수 없습니다.')
-      const prev=dataRef.current, bundle={...prev.bundle!,revision:undefined,sourceStatus:{...prev.bundle!.sourceStatus,[resource]:response.status}}
+      const prev=dataRef.current ?? current, bundle={...prev.bundle!,revision:undefined,sourceStatus:{...prev.bundle!.sourceStatus,[resource]:response.status}}
       if(resource==='meals') {bundle.meals=response.items as MealInfo[];if(selectedDate===today)bundle.todayMeals=bundle.meals} else bundle.attendanceSummaries=(response.items as MobileAttendanceSummary[]).map(summaryOnly)
-      const next={...prev,bundle};dataRef.current=next;setData(next);await writeUserCache(active.name,next,selectedDate+'/'+selectedDate)
+      const next={...prev,bundle};loadedRange.current=rangeKey;dataRef.current=next;setData(next);await writeUserCache(active.name,next,selectedDate+'/'+selectedDate)
     } catch(error){if(sequence===requestSequence.current){if(isSessionExpiredError(error))clearSession(SESSION_EXPIRED_MESSAGE);else setMessage('자료를 다시 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.')}}
     finally{retryInFlight.current=false;setRetrying('')}
   }
-  const loadedRange = useRef('')
-  const start = view === 'today' ? selectedDate : view === 'next' ? range.nextWeek[0] : view === 'timetable' ? ymd(addDays(new Date(range.thisWeek[0]+'T12:00:00'), 7*weekOffset)) : range.thisWeek[0]
-  const end = view === 'today' ? selectedDate : ymd(addDays(new Date(start+'T12:00:00'), 6))
-  const refresh = useCallback(async (name: string, silent = false) => {
+  const refresh = useCallback(async (name: string, silent = false, navigating = false) => {
     const currentSession = sessionRef.current
     if (!currentSession || currentSession.name !== name) return
     if (currentSession.expiresAt <= Date.now()) { clearSession(SESSION_EXPIRED_MESSAGE); return }
-    const key = `${name}|${currentSession.expiresAt}|${start}|${end}`
+    const key = rangeKey
     // pageshow/visibilitychange/online는 같은 요청을 취소하거나 중복 실행하지 않는다.
     if (activeRequest.current === key) return
     if (silent && lastRequest.current.key === key && Date.now() - lastRequest.current.at < RESUME_COALESCE_MS) return
-    if (loadedRange.current !== key) { dataRef.current = null; setData(null) }
+    if (loadedRange.current !== key) { dataRef.current = null; setData(null); setMessage('') }
     const sequence = ++requestSequence.current
     requestController.current?.abort()
     const controller = new AbortController()
     requestController.current = controller
     activeRequest.current = key
     lastRequest.current = { key, at: Date.now() }
-    setLoading(true)
+    const copy = preparedRef.current
+    const useRecentCopy = navigating && start !== today && copy && !copy.partial &&
+      Date.now() - Date.parse(copy.data.cachedAt) < 5 * 60 * 1000 &&
+      !Object.values(copy.data.bundle?.sourceStatus ?? {}).some(status => status.state === 'unavailable' || status.errorCode)
+    const useLocalOnly = !!useRecentCopy || !navigator.onLine
+    setLoading(!useLocalOnly)
     // IndexedDB가 느리거나 차단되어도 API 요청은 즉시 시작한다.
     const scope = start + '/' + end
     void readUserCache(name, scope).then(cached => {
       if (cached && (!dataRef.current || loadedRange.current !== key) && sequence === requestSequence.current && !controller.signal.aborted) {
+        if (copy && !copy.partial && Date.parse(cached.cachedAt) < Date.parse(copy.data.cachedAt)) return
         loadedRange.current = key; const marked = markDashboardCached(cached); dataRef.current = marked; setData(marked)
       }
     }).catch(() => undefined)
+    if (useLocalOnly) {
+      activeRequest.current = null; requestController.current = null
+      lastRequest.current = { key: '', at: 0 }
+      if (!navigator.onLine) setOffline(true)
+      return
+    }
     try {
       const fresh = await loadDashboard(name, currentSession.accessToken, start, end, controller.signal, loadedRange.current===key ? dataRef.current : null)
       if (sequence !== requestSequence.current) return
-      const previous = loadedRange.current === key ? dataRef.current : null
+      const previous = (loadedRange.current === key ? dataRef.current : null) ?? (copy && !copy.partial ? copy.data : null)
       loadedRange.current = key
       const merged = mergeDashboardWithCache(fresh, previous)
       const additions = newEventFingerprints(previous, merged, name, today)
       if (additions.length) setNewKeys(current => [...new Set([...current, ...additions])])
       setData(merged); dataRef.current = merged
+      setReadyToken(currentSession.accessToken)
       const partial = Object.values(merged.bundle?.sourceStatus ?? {}).some(status => status.state === 'cached' || status.state === 'unavailable')
       setMessage(partial ? '일부 자료는 마지막 정상 조회 자료를 표시합니다.' : '')
       setOffline(false)
@@ -408,9 +437,9 @@ export default function App() {
         activeRequest.current = null; requestController.current = null; setLoading(false)
       }
     }
-  }, [clearSession, start, end, today])
+  }, [clearSession, start, end, today, rangeKey])
 
-  useEffect(() => { if (session && !visualMode) void refresh(session.name) }, [session, refresh])
+  useEffect(() => { if (session && !visualMode) void refresh(session.name, false, true) }, [session, refresh])
   useEffect(() => {
     if (!session || visualMode) return
     const timer = window.setInterval(() => {
@@ -503,7 +532,7 @@ export default function App() {
   const selectedEvents = allEvents.filter(event => event.date === selectedDate)
   const sharedMeals = data?.bundle?.meals ?? data?.bundle?.todayMeals ?? []
   const selectedMeals = sharedMeals.filter(meal => meal.date === selectedDate)
-  const selectedAttendanceSummaries = data?.bundle?.attendanceSummaries?.filter(item => item.date === selectedDate) ?? []
+  const selectedAttendanceSummaries = selectedDate === today ? data?.bundle?.attendanceSummaries?.filter(item => item.date === selectedDate) ?? [] : []
   const selectedAttendance = selectedAttendanceSummaries.find(item => item.period === selectedAttendancePeriod) ?? null
   const teacher = data ? findTeacher(data.timetable, session.name) : null
   const selectedLessons = data ? timetableForDate(teacher, selectedDate, data.changes, session.name, data.bundle?.timetableOverrides ?? []) : []
@@ -518,6 +547,8 @@ export default function App() {
   const weeklyPeriodCount = data ? Math.max(7, ...displayedWeek.map(date => timetableForDate(teacher, date, data.changes, session.name, data.bundle?.timetableOverrides ?? []).length)) : 7
   const isNew = (event: MobileEvent) => newKeys.includes(eventFingerprint(event))
   const visibleNewCount = allEvents.filter(isNew).length
+  const savedRange = fortnight.snapshot?.offlineRange
+  const offlineLabels = { idle: '', loading: '14일치 일정을 기기에 저장하는 중…', ready: '오프라인 일정 저장 완료', partial: '오프라인 일정 저장을 마치지 못했습니다.', unavailable: '14일치 일정을 아직 저장하지 못했습니다.' }
 
   return <div className="app-shell">
     <header className="topbar">
@@ -525,8 +556,9 @@ export default function App() {
       <div className="header-actions"><a href="./ungcheon-mobile-install-guide.pdf" target="_blank" rel="noreferrer" aria-label="홈 화면 설치 안내서"><Download /></a><button aria-label="테마 전환" onClick={() => setTheme(value => value === 'light' ? 'dark' : 'light')}>{theme === 'light' ? <Moon /> : <Sun />}</button><button aria-label="로그아웃" onClick={logout}><LogOut /></button></div>
     </header>
     <details className="pc-only-note"><summary>이용 안내 · 개인 업무·일정은 PC에서</summary><p>개인 업무와 개인 일정은 <strong>PC용 웅천고 업무도우미</strong>에서만 확인할 수 있습니다.</p></details>
-    {(offline || message) && <div className="offline-note" aria-live="polite"><CloudOff size={16} /><span>{message || '오프라인 상태입니다. 마지막 조회 자료를 표시합니다.'}</span></div>}
+    {(offline || message) && <div className="offline-note" aria-live="polite"><CloudOff size={16} /><span>{offline && data ? '연결이 불안정해 마지막 정상 조회 자료를 표시합니다.' : message || '오프라인입니다. 이 기간의 저장 자료를 확인해 주세요.'}</span></div>}
     {cacheWarning && <div className="offline-note" role="status"><AlertTriangle size={16} /><span>{cacheWarning}</span></div>}
+    {fortnight.status !== 'idle' && <div className="offline-download" role="status"><Download size={15} /><span>{offlineLabels[fortnight.status]}{savedRange && <> · {savedRange.from.slice(5).replace('-', '.')}~{savedRange.to.slice(5).replace('-', '.')}</>}</span>{(fortnight.status === 'partial' || fortnight.status === 'unavailable') && <button onClick={fortnight.retry}>다시 받기</button>}</div>}
     {data && <details className="data-health"><summary>자료 상태 · 시간표 <StatusBadge status={timetableStatus} /> <span>출처별 확인</span></summary><div className="resource-status-list">{(Object.keys(RESOURCE_LABELS) as MobileResourceKey[]).map(key => {
       const status = resourceStatus(data, key)
       return <div key={key}><b>{RESOURCE_LABELS[key]}</b><span className={`resource-state status-${status.state}`}>{status.state === 'fresh' ? '정상 조회' : status.state === 'empty' ? '등록 자료 없음' : status.state === 'cached' ? '이전 자료' : '확인 필요'}</span><small>정상 확인 {formatCheckedAt(status.lastSuccessAt)}{status.dataUpdatedAt && ` · 원본 갱신 ${formatCheckedAt(status.dataUpdatedAt)}`}{status.state === 'unavailable' && ` · 조회 시도 ${formatCheckedAt(status.lastAttemptAt)}`}</small></div>
@@ -537,19 +569,21 @@ export default function App() {
       <div className="section-heading"><div><p>{view === 'today' ? `${session.name} 선생님` : 'SCHEDULE'}</p><h1>{heading}</h1>{view === 'today' && <div className="today-stats"><span><b>{selectedClassCount}</b> 수업</span><span><b>{selectedEvents.length}</b> 일정</span>{visibleNewCount > 0 && <span className="new-stat"><b>{visibleNewCount}</b> 새 소식</span>}</div>}</div><div className="section-tools"><button className="icon-button" aria-label="일정 종류 설정" aria-expanded={filterOpen} onClick={() => setFilterOpen(value => !value)}><Filter size={18} /></button><button className="icon-button refresh-button" aria-label={loading ? `자료 조회 중 ${refreshElapsed}초` : '새로고침'} aria-busy={loading} onClick={() => refresh(session.name)} disabled={loading}><RefreshCw className={loading ? 'spin' : ''} size={18} />{loading && <small className="refresh-elapsed">{refreshElapsed}초</small>}</button></div></div>
       {filterOpen && <section className="filter-panel"><h2>표시할 일정</h2><div className="filter-grid">{(Object.keys(SOURCE_LABELS) as ScheduleSource[]).map(source => <button key={source} className={visibility[source] ? 'selected' : ''} aria-pressed={visibility[source]} onClick={() => toggleSource(source)}><span>{visibility[source] && <Check size={13} />}</span>{SOURCE_LABELS[source]}</button>)}</div></section>}
       {!data && loading && <div className="loading-card">마지막 일정과 시간표를 확인하고 있습니다…</div>}
+      {view === 'today' && <DateNavigator dates={previewDates} selected={selectedDate} today={today} onSelect={setSelectedDate} />}
+      {!data && offline && !loading && <div className="empty">이 기간에 저장된 자료가 없습니다. 인터넷 연결 후 다시 확인해 주세요.</div>}
       {data && view === 'today' && <>
-        <DateNavigator dates={previewDates} selected={selectedDate} today={today} onSelect={setSelectedDate} />
         {selectedDate === today && <details className="focus-disclosure"><summary>현재·다음 수업 요약</summary><NowNextCard lessons={selectedLessons} events={selectedEvents} minuteOfDay={clock.minutes} /></details>}
         <section className="panel timetable-primary"><div className="panel-title"><div className="panel-icon"><Clock3 size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘의 교사 시간표' : '선택한 날의 교사 시간표'}</h2></div><StatusBadge status={timetableStatus} /></div>{selectedSpecialDay && <p className="special-timetable-note" role="note">{selectedSpecialDay.message}</p>}<DailyTimeline lessons={selectedLessons} events={selectedEvents} attendance={selectedAttendanceSummaries} onOpenAttendance={openAttendance} onOpenEvent={setEventDetail} teacherFound={Boolean(teacher)} isNew={isNew} /></section>
         <section className="panel"><div className="panel-title"><div className="panel-icon secondary"><CalendarDays size={17} /></div><div><p>{selectedDate === today ? 'TODAY' : 'DAY PREVIEW'}</p><h2>{selectedDate === today ? '오늘 일정' : '선택한 날의 일정'}</h2></div><StatusBadge status={scheduleStatus} /></div><div className="event-list">{selectedEvents.map(event => <EventCard key={event.id} event={event} onOpen={setEventDetail} isNew={isNew(event)} />)}{!selectedEvents.length && <div className="empty">표시할 일정이 없습니다.</div>}</div></section>
-        <div className="week-switch">{(['meals','attendance'] as const).filter(key=>['cached','unavailable'].includes(data.bundle?.sourceStatus?.[key]?.state ?? '')).map(key=><button key={key} disabled={!!retrying || loading} onClick={()=>void retrySource(key)}>{key==='meals'?'급식':'출결 요약'} 다시 확인</button>)}</div>
+        <div className="week-switch">{(['meals','attendance'] as const).filter(key=>(key==='meals' || selectedDate===today) && ['cached','unavailable'].includes(data.bundle?.sourceStatus?.[key]?.state ?? '')).map(key=><button key={key} disabled={!!retrying || loading || !navigator.onLine} onClick={()=>void retrySource(key)}>{key==='meals'?'급식':'출결 요약'} 다시 확인</button>)}</div>
         <MealPanel meals={selectedMeals} status={mealStatus} isToday={selectedDate === today} />
       </>}
       {data && (view === 'week' || view === 'next') && <div className="day-stack">{dateSet.map(date => {
         const dayEvents = allEvents.filter(event => event.date === date)
-        return <section className={`day-panel ${date === today ? 'today' : ''}`} key={date}><div className="day-heading"><strong>{format(new Date(`${date}T12:00:00`), 'M.d')}</strong><span>{format(new Date(`${date}T12:00:00`), 'EEE', { locale: ko })}</span><i>{dayEvents.length}</i></div><div className="event-list">{dayEvents.map(event => <EventCard key={event.id} event={event} onOpen={setEventDetail} isNew={isNew(event)} />)}{!dayEvents.length && <div className="empty compact">일정 없음</div>}</div></section>
+        return <section className={`day-panel ${date === today ? 'today' : ''}`} key={date}><div className="day-heading"><strong>{format(new Date(`${date}T12:00:00`), 'M.d')}</strong><span>{format(new Date(`${date}T12:00:00`), 'EEE', { locale: ko })}</span><i>{missingDay(date) ? '—' : dayEvents.length}</i></div><div className="event-list">{dayEvents.map(event => <EventCard key={event.id} event={event} onOpen={setEventDetail} isNew={isNew(event)} />)}{!dayEvents.length && <div className="empty compact">{missingDay(date) ? '오프라인 저장 범위 밖' : '일정 없음'}</div>}</div></section>
       })}</div>}
       {data && view === 'timetable' && <section className="weekly-table"><div className="week-navigation"><button aria-label="이전 주 시간표" disabled={weekOffset <= -1} onClick={() => setWeekOffset(value => value - 1)}><ChevronLeft size={17} /></button><strong>{weekOffset === -1 ? '지난주' : weekOffset === 1 ? '다음 주' : '이번 주'} · {displayedWeek[0].slice(5)}~{displayedWeek[4].slice(5)}</strong><button aria-label="다음 주 시간표" disabled={weekOffset >= 1} onClick={() => setWeekOffset(value => value + 1)}><ChevronRight size={17} /></button><button onClick={() => setWeekOffset(0)}>이번 주</button></div><div className="week-grid header"><span>교시</span>{displayedWeek.map((date, index) => <strong key={date}>{DAYS[index]}<small>{date.slice(5)}</small>{getSpecialTimetableDay(date) && <small className="special-weekday">{getSpecialTimetableDay(date)!.sourceWeekday} 시간표</small>}</strong>)}</div>{Array.from({ length: weeklyPeriodCount }, (_, periodIndex) => <div className="week-grid" key={periodIndex}><span>{periodIndex + 1}</span>{displayedWeek.map(date => {
+          if (missingDay(date)) return <div key={date} aria-label="오프라인 저장 범위 밖">{periodIndex === 0 ? '미저장' : '·'}</div>
           const lesson = timetableForDate(teacher, date, data.changes, session.name, data.bundle?.timetableOverrides ?? [])[periodIndex]
           const parsed = parseSlot(lesson?.value ?? '')
           return <div key={date} className={lesson?.changed ? 'changed' : ''}><strong>{parsed.subject || (lesson?.value ? parsed.className : '—')}</strong>{parsed.subject && <small>{parsed.className}</small>}{lesson?.note && <em>{lesson.note}</em>}</div>

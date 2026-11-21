@@ -111,6 +111,9 @@ input:focus { border-color: #28624e; box-shadow: 0 0 0 3px rgba(40, 98, 78, .12)
 .header-actions svg { width: 18px; }
 .pc-only-note { padding: 10px 16px; background: #f6dc9a; color: #463511; text-align: center; font-size: 11px; line-height: 1.45; }
 .offline-note { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #6b4825; color: #fff2d9; font-size: 11px; }
+.offline-download { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: var(--surface); color: var(--text); border-bottom: 1px solid var(--line); font-size: .875rem; }
+.offline-download svg { flex: none; }
+.offline-download button { margin-left: auto; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: inherit; white-space: nowrap; }
 .data-health { min-height: 38px; padding: 7px 14px; display: flex; align-items: center; justify-content: center; gap: 6px; overflow-x: auto; background: var(--surface); border-bottom: 1px solid var(--line); scrollbar-width: none; }
 .data-health::-webkit-scrollbar { display: none; }
 .data-health > span:first-child { flex: none; margin-right: 2px; color: var(--muted); font-size: 9px; font-weight: 850; }
