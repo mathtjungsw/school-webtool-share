@@ -8,7 +8,7 @@ function migrationError_(code, retryable) {
 
 function migrationTransportError_(error) {
   var message = String(error && error.message || '');
-  if (/one day|daily quota|daily limit/i.test(message)) return migrationError_('MIGRATION_URLFETCH_DAILY_QUOTA');
+  if (/one day|daily quota|daily limit|하루에.*urlfetch.*(?:너무 많이|초과)/i.test(message)) return migrationError_('MIGRATION_URLFETCH_DAILY_QUOTA');
   if (/not permitted by your admin|blocked by your administrator/i.test(message)) return migrationError_('MIGRATION_URLFETCH_ADMIN_BLOCK');
   if (/authorization is required|do not have permission to call|insufficient authentication scopes/i.test(message)) return migrationError_('MIGRATION_URLFETCH_AUTHORIZATION_REQUIRED');
   if (/timed out|timeout/i.test(message)) return migrationError_('MIGRATION_URLFETCH_TIMEOUT', true);
@@ -114,18 +114,34 @@ function migrationRepository_(config, transport) {
   }
 
   function request(method, suffix, body, allowMissing) {
+    var quotaKey = 'ung-firestore-urlfetch-quota-v1';
+    var quotaCache, quotaPaused;
+    try {
+      if (!emulator && config.projectId === 'ungcheon-school-helper') {
+        quotaCache = CacheService.getScriptCache();
+        quotaPaused = quotaCache.get(quotaKey);
+      }
+    } catch (_) {}
+    if (quotaPaused) throw migrationError_('MIGRATION_URLFETCH_DAILY_QUOTA');
+    function connectionFailure(error) {
+      var failure = migrationTransportError_(error);
+      if (quotaCache && failure.code === 'MIGRATION_URLFETCH_DAILY_QUOTA') {
+        try { quotaCache.put(quotaKey, '1', 120); } catch (_) {}
+      }
+      return failure;
+    }
     var response;
     try {
       response = fetchResponse(origin, method, suffix, body);
     } catch (error) {
-      var failure = migrationTransportError_(error);
+      var failure = connectionFailure(error);
       var readOnly = method === 'get' || suffix === ':batchGet';
       if (!failure.retryable || config.projectId !== 'ungcheon-school-helper' || origin === globalOrigin || !readOnly) throw failure;
       try {
         response = fetchResponse(globalOrigin, method, suffix, body);
         // Retain the working host for the remainder of this repository instance.
         if (response.status >= 200 && response.status < 300 || response.status === 404 && allowMissing) origin = globalOrigin;
-      } catch (fallbackError) { throw migrationTransportError_(fallbackError); }
+      } catch (fallbackError) { throw connectionFailure(fallbackError); }
     }
     if (response.status === 404 && allowMissing) return null;
     if (response.status < 200 || response.status >= 300) {

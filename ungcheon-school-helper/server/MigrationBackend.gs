@@ -78,7 +78,7 @@ function migrationWithBackend_(reader,bookId,writable,callback) {
   if(migrationBackendContext_ || migrationTrackingContext_)throw migrationError_('MIGRATION_BACKEND_NESTED');
   if(reader.root && reader.root.sourceBookHash!==migrationHash_(bookId))throw migrationError_('MIGRATION_SOURCE_MISMATCH');
   var facade=migrationSnapshotBook_(reader,bookId,writable),previousRoute=migrationRouteActive_;
-  migrationBackendContext_={book:facade.book,properties:migrationBackendVersionProperties_(reader.root && reader.root.properties)};migrationRouteActive_=true;
+  migrationBackendContext_={book:facade.book,quotaBackup:reader.quotaBackup===true,properties:migrationBackendVersionProperties_(reader.root && reader.root.properties)};migrationRouteActive_=true;
   try{return {response:callback(),captures:facade.changed(),loaded:facade.loaded(),properties:migrationBackendVersionProperties_(migrationBackendContext_.properties)};}
   finally{migrationBackendContext_=null;migrationRouteActive_=previousRoute;}
 }

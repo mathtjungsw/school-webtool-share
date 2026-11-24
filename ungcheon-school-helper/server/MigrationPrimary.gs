@@ -52,6 +52,54 @@ function migrationPrimaryReader_(repo,config,document) {
     return migrationDecode_(migrationEncode_(loaded[name]));
   }};
 }
+function migrationQuotaBackupKey_() {return 'UNG_MIGRATION_VERIFIED_QUOTA_READ_V1';}
+function migrationQuotaBackupValid_(config,attestation,now) {
+  return !!(config && config.phase==='FIRESTORE' && attestation && attestation.schemaVersion===1 &&
+    attestation.epoch===config.epoch && Number.isSafeInteger(attestation.revision) && attestation.revision>=0 &&
+    Number.isSafeInteger(attestation.confirmedAt) && now>=attestation.confirmedAt &&
+    Number.isSafeInteger(attestation.expiresAt) && now<attestation.expiresAt &&
+    attestation.expiresAt-attestation.confirmedAt<=24*3600000 && attestation.digests &&
+    migrationCatalog_().every(function(item){return /^[a-f0-9]{64}$/.test(attestation.digests[item.resource]||'');}));
+}
+// An owner verifies Firestore and the private backup out of band during a confirmed quota outage.
+function migrationEnableQuotaBackup_(attestation) {
+  return migrationWithSourceLock_(function(){
+    var config=migrationPrimaryConfig_(),now=Date.now();
+    if(!migrationQuotaBackupValid_(config,attestation,now) || now-attestation.confirmedAt>10*60000)throw migrationError_('MIGRATION_QUOTA_ATTESTATION_INVALID');
+    migrationBackendVersionProperties_(attestation.properties);
+    // If Firestore is reachable, the out-of-band snapshot must not replace it.
+    try {migrationPrimaryRoot_(migrationPrimaryRepository_(config),config);}
+    catch(error){
+      if(error.code!=='MIGRATION_URLFETCH_DAILY_QUOTA')throw error;
+      PropertiesService.getScriptProperties().setProperty(migrationQuotaBackupKey_(),JSON.stringify(attestation));
+      return {status:'VERIFIED_READ_BACKUP',revision:attestation.revision,expiresAt:new Date(attestation.expiresAt).toISOString()};
+    }
+    return {status:'PRIMARY_REACHABLE'};
+  });
+}
+function migrationQuotaBackupReader_(config,action) {
+  if(GET_READ_ACTIONS.indexOf(action)<0 && ['staffLogin','staffSession','staffLogout','verifyMobileViewer','logoutMobileViewer',
+    'getMobileResource','getMobileScheduleBundle','getMobileAttendanceRoster'].indexOf(action)<0)return null;
+  var text=PropertiesService.getScriptProperties().getProperty(migrationQuotaBackupKey_());
+  if(!text)return null;
+  var attestation=JSON.parse(text);
+  if(!migrationQuotaBackupValid_(config,attestation,Date.now()))return null;
+  var book=SpreadsheetApp.openById(config.sourceBookId);
+  if(!book || book.getId()!==config.sourceBookId)throw migrationError_('MIGRATION_SOURCE_MISMATCH');
+  // Source IDs do not enter the content digest. Rebuilding them requires no journal writes.
+  var readOnlyIdentities={identityMap:function(_,keys){
+    var ids=Object.create(null);
+    keys.forEach(function(key){ids[key]=key;});
+    return ids;
+  }};
+  return {quotaBackup:true,revision:attestation.revision,
+    root:{sourceBookHash:migrationHash_(config.sourceBookId),properties:attestation.properties},
+    resource:function(name){
+      var capture=migrationCaptureResource_(book,readOnlyIdentities,name);
+      if(migrationContentDigest_(capture)!==attestation.digests[name])throw migrationError_('MIGRATION_QUOTA_BACKUP_MISMATCH');
+      return capture;
+    }};
+}
 function migrationPrimaryServing_(config){return config&&['FIRESTORE','RETURNING'].indexOf(config.phase)>=0;}
 function migrationPrimaryMaintenance_(){var e=migrationError_('MIGRATION_WRITE_PAUSED',true);e.message='자료 저장소를 전환하고 있습니다. 잠시 뒤 다시 저장해 주세요.';return e;}
 function migrationPrimaryDispatchNeeded_(action) {
@@ -70,7 +118,14 @@ function migrationPrimaryDispatch_(body,callback) {
   });
   if(!migrationPrimaryServing_(c))return callback();
   if(['previewMigrationRequest','runMigrationReplica','setMigrationReplicaPaused','prepareMigrationReview','confirmMigrationReview'].indexOf(body.action)>=0)throw migrationError_('MIGRATION_PRIMARY_OPERATION_FORBIDDEN');
-  return migrationWithBackend_(migrationPrimaryReader_(migrationPrimaryRepository_(c),c),c.sourceBookId,false,callback).response;
+  var reader;
+  try {reader=migrationPrimaryReader_(migrationPrimaryRepository_(c),c);}
+  catch(error) {
+    if(error.code!=='MIGRATION_URLFETCH_DAILY_QUOTA')throw error;
+    reader=migrationQuotaBackupReader_(c,body.action);
+    if(!reader)throw error;
+  }
+  return migrationWithBackend_(reader,c.sourceBookId,false,callback).response;
 }
 function migrationPrimaryWrite_(repo,c,body,callback) {
   var root=migrationPrimaryRoot_(repo,c);if(root.data.phase!=='PRIMARY')throw migrationPrimaryMaintenance_();
@@ -97,6 +152,10 @@ function migrationPrimaryWrite_(repo,c,body,callback) {
   var receipt={schemaVersion:1,intent:intent,accessMode:authorization.accessMode,revision:revision,responseText:text};
   var writes=[{path:path,data:next,updateTime:root.updateTime},{path:receiptPath,data:receipt,createOnly:true},
     {path:path+'/primaryCommits/'+String(revision),data:{schemaVersion:1,revision:revision,previousRevision:root.data.revision,resources:heads,properties:output.properties,operationKey:intent.operationKey},createOnly:true}];
+  // A new authoritative revision invalidates any previous read-only attestation,
+  // even when the commit succeeds and its response is lost.
+  var properties=PropertiesService.getScriptProperties(),backupKey=migrationQuotaBackupKey_();
+  if(properties.getProperty(backupKey))properties.deleteProperty(backupKey);
   try{repo.commit(writes);}catch(error){
     // A lost acknowledgement may follow a successful atomic commit. Read only
     // this receipt; never rerun the business write or guess which backend won.

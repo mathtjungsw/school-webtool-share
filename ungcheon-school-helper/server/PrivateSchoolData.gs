@@ -35,6 +35,9 @@ function privateSchoolReadAt_(group,rev,credentials) {
       }
     }
   }catch(_){}
+  // An exhausted URL Fetch service also blocks GitHub. Preserve the existing
+  // missing-supplement behavior and use only a pinned cache hit or verified sheet.
+  if(migrationBackendContext_ && migrationBackendContext_.quotaBackup)throw migrationError_('MIGRATION_URLFETCH_DAILY_QUOTA');
   const blob=privateSchoolGit_('/contents/school/'+group+'.json?ref='+rev,false,null,credentials);
   const payload=(blob.content && blob.encoding==='base64') ? blob : privateSchoolGit_('/git/blobs/'+blob.sha,false,null,credentials);
   const raw=Utilities.newBlob(Utilities.base64Decode(payload.content.replace(/\s/g,''))).getDataAsString('UTF-8');

@@ -82,6 +82,38 @@ test('all real staff authentication uses the primary roster and retains existing
   assert.equal(f.post({action:'staffLogin',name:'Stale Shadow Teacher',password:'SYNTHETIC_SHARED_ONLY'}).ok,false)
   assert.equal(f.post({action:'staffSession',staffToken:'bad'}).ok,false)
 })
+test('daily quota recovery authenticates against the verified backup and rejects changed cells or writes',()=>{
+  const f=setup()
+  new vm.Script(fs.readFileSync(path.join(__dirname,'../server/StaffAuth.gs'),'utf8')).runInContext(f.ctx)
+  f.ctx.SpreadsheetApp.openById=id=>{assert.equal(id,f.book.getId());return f.book}
+  f.properties.set('UNG_MOBILE_SHARED_PASSWORD_HASH',f.ctx.sha256_('synthetic-quota-fixture'))
+  f.activate();f.backup()
+  const c=f.ctx.migrationPrimaryConfig_(),root=f.root()
+  const state=f.repo.get(f.ctx.migrationPrimaryPath_(c)+'/sheetBackups/current').data
+  const now=Date.now()
+  const attestation={schemaVersion:1,epoch:c.epoch,revision:root.revision,confirmedAt:now,expiresAt:now+3600000,properties:root.properties,
+    digests:Object.fromEntries(Object.entries(state.resources).map(([name,saved])=>[name,saved.contentDigest]))}
+  assert.equal(f.ctx.migrationEnableQuotaBackup_(attestation).status,'PRIMARY_REACHABLE')
+  const pause=()=>f.repo.setFault(when=>{if(when==='get')throw f.ctx.migrationError_('MIGRATION_URLFETCH_DAILY_QUOTA')})
+  pause()
+  assert.equal(f.ctx.migrationEnableQuotaBackup_(attestation).status,'VERIFIED_READ_BACKUP')
+  const mobile={action:'verifyMobileViewer',viewerName:'Synthetic Teacher',password:'synthetic-quota-fixture'}
+  assert.equal(f.post({...mobile,password:'wrong'}).ok,false)
+  assert.equal(f.post(mobile).ok,true)
+  const login=f.post({action:'staffLogin',name:'Synthetic Teacher',password:mobile.password})
+  assert.equal(login.ok,true,login.error)
+  assert.equal(f.post({action:'staffSession',staffToken:login.data.token}).ok,true)
+  assert.equal(f.post({...create,staffToken:login.data.token}).ok,false)
+  assert.equal(f.post({action:'caseUnlock',staffToken:login.data.token}).ok,false)
+  f.book.getSheetByName('교원명렬').getRange(2,2).setValue('Unverified Change')
+  assert.equal(f.post({...mobile,viewerName:'Unverified Change'}).ok,false)
+  assert.equal(f.post({action:'staffSession',staffToken:login.data.token}).ok,false)
+  f.book.getSheetByName('교원명렬').getRange(2,2).setValue('Synthetic Teacher')
+  f.repo.setFault(null)
+  assert.equal(f.post({...create,staffToken:login.data.token}).ok,true)
+  pause()
+  assert.equal(f.post(mobile).ok,false)
+})
 test('mobile token and contract 3 still work through the production switch without full student data',()=>{
   const f=setup()
   f.ctx.PropertiesService.getScriptProperties().setProperty('UNG_MOBILE_SHARED_PASSWORD_HASH', f.ctx.sha256_('synthetic-mobile-fixture'))
