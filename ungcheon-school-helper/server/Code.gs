@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 76;
+const MOBILE_SERVICE_VERSION = 77;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -361,6 +361,7 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {key:'server-v77',title:'공용 로그인 서버 연결 개선',body:'학교의 Firestore 서울 리전으로 우선 연결합니다. 읽기 연결이 끊기면 기존 주소로 한 번 다시 확인합니다.',date:'2026-11-25'},
   {key:'server-v76',title:'출결 개인정보와 학교 자료 동기화 개선',body:'모바일 일정에는 출결 인원수를 제공하고, 학생별 비고는 해당 교시에서 조회합니다. 관리자는 명렬·시간표 사본의 갱신 상태를 확인하고 다시 동기화할 수 있습니다.',date:'2026-11-20'},
   {key:'v1.1.45',title:'[업데이트] 웅천고 업무도우미 v1.1.45 · 내신 합산과 모바일 일정',body:'여러 성적 파일의 동일 학생과 중복 과목을 확인해 합산할 수 있습니다. 추정분할점수 입력 저장과 시간표 동기화, 위젯 업데이트 확인을 개선했습니다. 새 모바일 일정 주소는 환경설정에서 열 수 있으며 출결 상세는 해당 교시를 열 때 조회합니다.',date:'2026-11-20'},
   {key:'server-v75',title:'모바일 일정과 우수사례 열람 개선',body:'모바일 날짜별 조회, 자료별 다시 확인, 로그아웃과 우수사례 열람 확인을 지원합니다.',date:'2026-11-18'},

@@ -6,6 +6,16 @@ function migrationError_(code, retryable) {
   return error;
 }
 
+function migrationTransportError_(error) {
+  var message = String(error && error.message || '');
+  if (/one day|daily quota|daily limit/i.test(message)) return migrationError_('MIGRATION_URLFETCH_DAILY_QUOTA');
+  if (/not permitted by your admin|blocked by your administrator/i.test(message)) return migrationError_('MIGRATION_URLFETCH_ADMIN_BLOCK');
+  if (/authorization is required|do not have permission to call|insufficient authentication scopes/i.test(message)) return migrationError_('MIGRATION_URLFETCH_AUTHORIZATION_REQUIRED');
+  if (/timed out|timeout/i.test(message)) return migrationError_('MIGRATION_URLFETCH_TIMEOUT', true);
+  if (/address unavailable|dns|could not resolve host/i.test(message)) return migrationError_('MIGRATION_URLFETCH_ADDRESS_UNAVAILABLE', true);
+  return migrationError_('MIGRATION_TRANSPORT_FAILED', true);
+}
+
 function migrationCanonical_(value) {
   if (value === null) return 'null';
   if (value instanceof Date) {
@@ -84,7 +94,9 @@ function migrationRepository_(config, transport) {
   if (!emulator && (!(config.environment === 'MIRROR' && config.sourceOfTruth === 'SHEETS' || config.environment === 'PRIMARY' && config.sourceOfTruth === 'FIRESTORE') || transport)) throw migrationError_('MIGRATION_INVALID_CONFIG');
   var root = 'projects/' + config.projectId + '/databases/(default)/documents';
   var prefix = 'schools/' + config.schoolId + '/';
-  var origin = emulator ? 'http://127.0.0.1:8185' : 'https://firestore.googleapis.com';
+  var globalOrigin = 'https://firestore.googleapis.com';
+  var origin = emulator ? 'http://127.0.0.1:8185' : globalOrigin;
+  if (config.projectId === 'ungcheon-school-helper') origin = 'https://firestore.asia-northeast3.rep.googleapis.com';
   var metrics = { requests: 0, documentsRead: 0, documentsWritten: 0 };
 
   function documentName(path, collection) {
@@ -92,18 +104,29 @@ function migrationRepository_(config, transport) {
     if (parts.some(function(part) { return !/^[A-Za-z0-9_-]{1,128}$/.test(part); }) || parts.length % 2 !== (collection ? 1 : 0)) throw migrationError_('MIGRATION_INVALID_PATH');
     return root + '/' + prefix + path;
   }
-  function request(method, suffix, body, allowMissing) {
+  function fetchResponse(host, method, suffix, body) {
     metrics.requests++;
+    if (transport) return transport(method, host + '/v1/' + root + suffix, body);
+    var options = { method: method, muteHttpExceptions: true, followRedirects: false, headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() } };
+    if (body) { options.contentType = 'application/json'; options.payload = JSON.stringify(body); }
+    var fetched = UrlFetchApp.fetch(host + '/v1/' + root + suffix, options);
+    return { status: fetched.getResponseCode(), text: fetched.getContentText() };
+  }
+
+  function request(method, suffix, body, allowMissing) {
     var response;
     try {
-      if (transport) response = transport(method, origin + '/v1/' + root + suffix, body);
-      else {
-        var options = { method: method, muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() } };
-        if (body) { options.contentType = 'application/json'; options.payload = JSON.stringify(body); }
-        var fetched = UrlFetchApp.fetch(origin + '/v1/' + root + suffix, options);
-        response = { status: fetched.getResponseCode(), text: fetched.getContentText() };
-      }
-    } catch (error) { throw migrationError_('MIGRATION_TRANSPORT_FAILED', true); }
+      response = fetchResponse(origin, method, suffix, body);
+    } catch (error) {
+      var failure = migrationTransportError_(error);
+      var readOnly = method === 'get' || suffix === ':batchGet';
+      if (!failure.retryable || config.projectId !== 'ungcheon-school-helper' || origin === globalOrigin || !readOnly) throw failure;
+      try {
+        response = fetchResponse(globalOrigin, method, suffix, body);
+        // Retain the working host for the remainder of this repository instance.
+        if (response.status >= 200 && response.status < 300 || response.status === 404 && allowMissing) origin = globalOrigin;
+      } catch (fallbackError) { throw migrationTransportError_(fallbackError); }
+    }
     if (response.status === 404 && allowMissing) return null;
     if (response.status < 200 || response.status >= 300) {
       var code = response.status === 409 || response.status === 412 ? 'CONFLICT' : response.status === 401 || response.status === 403 ? 'PERMISSION_DENIED' : 'HTTP_' + response.status;

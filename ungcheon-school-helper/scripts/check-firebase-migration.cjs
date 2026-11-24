@@ -23,6 +23,53 @@ function test(name, callback) { callback(); passed++; console.log(`PASS ${name}`
 function plain(value) { return JSON.parse(JSON.stringify(value)) }
 function record(sourceId, sortOrder, payload, isDeleted = false) { return { sourceId, sortOrder, payload, isDeleted } }
 function errorCode(fn, code) { assert.throws(fn, error => error.code === code) }
+
+test('school Firestore reads use the Seoul endpoint and retry only transport failures', () => {
+  const calls = []
+  const config = { enabled: true, projectId: 'ungcheon-school-helper', schoolId: 'ungcheon', environment: 'PRIMARY', sourceOfTruth: 'FIRESTORE' }
+  const response = (status, data) => ({ getResponseCode: () => status, getContentText: () => JSON.stringify(data) })
+  const host = 'firestore.asia-northeast3.rep.googleapis.com'
+  const globalHost = 'firestore.googleapis.com'
+  const root = 'projects/ungcheon-school-helper/databases/(default)/documents'
+  const path = 'primaryEpochs/sample'
+  const name = root + '/schools/ungcheon/' + path
+  const doc = { name, fields: { phase: { stringValue: 'PRIMARY' } }, updateTime: '2026-11-25T00:00:00Z' }
+  context.ScriptApp = { getOAuthToken: () => 'synthetic-oauth' }
+  let fail = host
+  let fault = 'Address unavailable: synthetic URL'
+  context.UrlFetchApp = {
+    fetch(url, options) {
+      const endpoint = new URL(url)
+      assert.equal(options.followRedirects, false)
+      assert.equal(options.headers.Authorization, 'Bearer synthetic-oauth')
+      calls.push([endpoint.hostname, options.method])
+      if (endpoint.hostname === fail) throw new Error(fault)
+      if (fault === 'permission-denied') return response(403, {})
+      if (endpoint.pathname.endsWith(':batchGet')) return response(200, [{ found: doc }])
+      return response(200, doc)
+    },
+  }
+  try {
+    const repo = context.migrationRepository_(config)
+    assert.equal(repo.get(path).data.phase, 'PRIMARY')
+    assert.equal(repo.get(path).data.phase, 'PRIMARY')
+    assert.deepEqual(calls.splice(0), [[host, 'get'], [globalHost, 'get'], [globalHost, 'get']])
+    assert.equal(context.migrationRepository_(config).batchGet([path])[0].data.phase, 'PRIMARY')
+    assert.deepEqual(calls.splice(0), [[host, 'post'], [globalHost, 'post']])
+    errorCode(() => context.migrationRepository_(config).commit([{ path, data: { phase: 'PRIMARY' }, updateTime: doc.updateTime }]), 'MIGRATION_URLFETCH_ADDRESS_UNAVAILABLE')
+    assert.deepEqual(calls.splice(0), [[host, 'post']])
+    fault = 'Service invoked too many times for one day: urlfetch'
+    errorCode(() => context.migrationRepository_(config).get(path), 'MIGRATION_URLFETCH_DAILY_QUOTA')
+    assert.deepEqual(calls.splice(0), [[host, 'get']])
+    fail = ''; fault = 'permission-denied'
+    errorCode(() => context.migrationRepository_(config).get(path), 'MIGRATION_FIRESTORE_PERMISSION_DENIED')
+    assert.deepEqual(calls, [[host, 'get']])
+  } finally {
+    delete context.UrlFetchApp
+    delete context.ScriptApp
+  }
+})
+
 function memoryRepository() {
   const docs = new Map()
   let clock = 0
