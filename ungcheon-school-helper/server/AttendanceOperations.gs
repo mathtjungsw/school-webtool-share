@@ -1,3 +1,18 @@
+const ATTENDANCE_FIRST_DATE_ = '2026-11-25';
+const ATTENDANCE_EXPORT_BATCH_DAYS_ = 31;
+
+function attendanceEarliestDate_(today) {
+  const year = Number(today.slice(0, 4)) - (today.slice(5) < '03-01' ? 1 : 0);
+  const academicYearStart = year + '-03-01';
+  return academicYearStart > ATTENDANCE_FIRST_DATE_ ? academicYearStart : ATTENDANCE_FIRST_DATE_;
+}
+
+function attendanceDateMillis_(date) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return NaN;
+  const time = Date.parse(date + 'T00:00:00Z');
+  return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === date ? time : NaN;
+}
+
 function attendanceAction_(body) {
   const viewer = body.staffToken ? staffRequire_(body).name : mobileAssertAccess_(body);
   const config = migrationPrimaryConfig_();
@@ -16,7 +31,8 @@ function attendanceAction_(body) {
     try { return Boolean(executiveIdentity_(viewer)); } catch (_) { return false; }
   })();
   const leadership = executiveName || ['교장','교감'].indexOf(clean_(member.position, 15)) >= 0;
-  const date = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+  const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+  const earliestDate = attendanceEarliestDate_(today);
   if (body.action === 'attendanceLeadership') {
     if (!leadership) throw Error('교장·교감 보호 메뉴 권한이 필요합니다.');
     return executiveVerify_({ viewerName: viewer, password: body.password });
@@ -34,14 +50,19 @@ function attendanceAction_(body) {
     const teaches = Boolean(timetable && timetable.teachers && timetable.teachers.some(function(teacher) {
       return clean_(teacher.name, 30) === viewer;
     }));
-    const substitute = !leadership && !teaches && listTimetableChanges_({ viewerName: viewer, includeSchool: true, fromDate: date, toDate: date })
-      .some(function(item) { return item.kind === 'substitution' && item.originalDate === date && item.replacementTeacher === viewer; });
+    const substitute = !leadership && !teaches && listTimetableChanges_({ viewerName: viewer, includeSchool: true, fromDate: earliestDate, toDate: today })
+      .some(function(item) { return item.kind === 'substitution' && item.originalDate >= earliestDate && item.originalDate <= today && item.replacementTeacher === viewer; });
     const roles = elevated ? ['homeroom', 'subject'] : leadership ? [] : [homeClass ? 'homeroom' : '', teaches || substitute ? 'subject' : ''].filter(Boolean);
-    return { dates: [date], access: { roles: roles, readOnly: leadership, requiresExecutive: leadership && !elevated } };
+    return { dates: [today], earliestDate: earliestDate, access: { roles: roles, readOnly: leadership, requiresExecutive: leadership && !elevated } };
   }
   if (leadership && !elevated) throw Error('교장·교감 보호 메뉴 인증을 먼저 해 주세요.');
   const period = Number(body.period), role = String(body.role || ''), group = String(body.group || '');
-  if (body.date !== date || !Number.isInteger(period) || period < 1 || period > 7) throw Error('오늘 날짜와 교시를 확인해 주세요.');
+  if (body.action === 'attendanceExport') {
+    if (leadership || !homeClass || group !== homeClass) throw Error('담임 교사만 담당 학급 출결을 내려받을 수 있습니다.');
+    return attendanceExport_(migrationPrimaryRepository_(config), homeClass, body.fromDate, body.toDate, earliestDate, today);
+  }
+  const date = body.date;
+  if (!Number.isFinite(attendanceDateMillis_(date)) || date < earliestDate || date > today || !Number.isInteger(period) || period < 1 || period > 7) throw Error('조회할 날짜와 교시를 확인해 주세요.');
   if (body.action === 'attendanceRecord' && elevated) throw Error('교장·교감 출결 화면은 읽기 전용입니다.');
   if (body.action !== 'attendanceOptions' && (role !== 'homeroom' && role !== 'subject' || !/^[a-zA-Z0-9-]{1,48}$/.test(group))) throw Error('학급 또는 수업을 확인해 주세요.');
   if (role === 'homeroom' && !elevated && group !== homeClass) throw Error('담당 학급만 열 수 있습니다.');
@@ -86,6 +107,38 @@ function attendanceRecordPath_(date, period, row, field) {
   const base = 'attendanceDays/' + date;
   if (field === 'note') return base + '/notes/' + row.classId;
   return base + '/periods/' + period + '/checks/' + (field === 'homeroom' ? 'home-' + row.classId : 'class-' + row.lesson.id);
+}
+
+function attendanceExport_(repo, classId, fromDate, toDate, earliestDate, today) {
+  const from = attendanceDateMillis_(fromDate), to = attendanceDateMillis_(toDate), dayMillis = 86400000;
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to < from || fromDate < earliestDate || toDate > today ||
+      (to - from) / dayMillis >= ATTENDANCE_EXPORT_BATCH_DAYS_) throw Error('내려받을 날짜 범위를 확인해 주세요.');
+  const roster = mobileSchoolData_('studentRoster', getStudentRoster_);
+  if (!Array.isArray(roster && roster.students)) throw Error('학생 명렬을 확인할 수 없습니다.');
+  const dates = [], paths = [];
+  for (let time = from; time <= to; time += dayMillis) {
+    const date = new Date(time).toISOString().slice(0, 10);
+    dates.push(date);
+    for (let period = 1; period <= 7; period++) paths.push(attendanceRecordPath_(date, period, { classId: classId }, 'homeroom'));
+  }
+  const documents = new Map();
+  for (let index = 0; index < paths.length; index += 100) repo.batchGet(paths.slice(index, index + 100)).forEach(function(doc) {
+    if (doc) documents.set(doc.path, doc.data.values || {});
+  });
+  const byYear = new Map(), rows = [];
+  dates.forEach(function(date, index) {
+    const year = date.slice(0, 4);
+    if (!byYear.has(year)) byYear.set(year, attendanceRosterRows_(date, roster.students).rows.filter(function(row) { return row.classId === classId; }));
+    const records = paths.slice(index * 7, (index + 1) * 7).map(function(path) { return documents.get(path); });
+    byYear.get(year).forEach(function(row) {
+      const values = records.map(function(record) {
+        const entry = record && record[row.id];
+        return entry && typeof entry.value === 'string' ? entry.value : '';
+      });
+      if (values.some(Boolean)) rows.push({ date: date, number: row.number, name: row.name, values: values });
+    });
+  });
+  return { rows: rows };
 }
 
 function attendanceBoardDocuments_(repo, date, boards) {

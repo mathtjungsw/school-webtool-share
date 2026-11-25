@@ -119,7 +119,7 @@ ipcMain.handle('preview:mobile', event => { if (trustedApp(event) && IS_PREVIEW 
 ipcMain.handle('preview:attendanceLab', event => {
   if (!trustedApp(event) || !staffAuth.snapshot().authenticated) return ''
   const origin = IS_PREVIEW ? previewEndpoint : 'https://ungcheon-school-helper-mobile.web.app'
-  return origin ? `${origin}/attendance-lab.html?layout=desktop` : ''
+  return origin ? `${origin}/attendance-lab.html?layout=desktop${IS_PREVIEW ? '' : '&download=xlsx'}` : ''
 })
 ipcMain.handle('preview:attendanceLabAccess', async event => {
   if (!IS_PREVIEW || !previewEndpoint || event.sender !== mainWindow?.webContents || !trustedApp(event)) return ''
@@ -128,7 +128,7 @@ ipcMain.handle('preview:attendanceLabAccess', async event => {
 })
 ipcMain.handle('preview:attendanceLabRequest', async (event, action: string, payload: Record<string, unknown>) => {
   if (IS_PREVIEW || event.sender !== mainWindow?.webContents || !trustedApp(event) ||
-      !['attendanceInfo','attendanceOptions','attendanceBoard','attendanceRecord'].includes(action)) throw Error('허용되지 않는 출결 요청입니다.')
+      !['attendanceInfo','attendanceOptions','attendanceBoard','attendanceRecord','attendanceExport'].includes(action)) throw Error('허용되지 않는 출결 요청입니다.')
   return staffAuth.request({ ...payload, action })
 })
 const featureViews = registerFeatureViews(() => mainWindow, staffAuth)

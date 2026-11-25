@@ -6,6 +6,7 @@ import type {
 } from '../../../ungcheon-school-helper/electron/main/attendance-lab-data'
 import { attendanceRequest, IS_ATTENDANCE_PREVIEW, listenAttendance, useAttendanceToken } from './connection'
 import { latestAttendanceEdit, useAttendanceDraft, type AttendanceEdit } from './draft'
+import { AttendanceExport, shiftAttendanceDate } from './AttendanceExport'
 import './styles.css'
 
 const labels = { homeroom: '담임 출결', subject: '교과 출결' }
@@ -50,8 +51,8 @@ function AttendanceCell({ row, field, value, editable, available, onAdvance, bus
   </div>
 }
 
-function Note({ row, value, editable, available, save }: {
-  row: LabRow; value?: string; editable: boolean; available: boolean; save: (value: string) => Promise<boolean>
+function Note({ row, value, editable, available, save, historical = false }: {
+  row: LabRow; value?: string; editable: boolean; available: boolean; save: (value: string) => Promise<boolean>; historical?: boolean
 }) {
   const [draft, setDraft] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -67,7 +68,7 @@ function Note({ row, value, editable, available, save }: {
     if (draft !== null) void saveNote(draft)
   }
   return <div className="lab-note" role="cell">
-    <span className="lab-mobile-label">오늘 비고</span>
+    <span className="lab-mobile-label">{historical ? '비고' : '오늘 비고'}</span>
     {editable && <div className="lab-note-actions" role="group" aria-label={`${row.name} 비고 빠른 입력`} aria-busy={saving}>
       {noteOptions.map(option => <button key={option} type="button" aria-label={`${row.name} 비고 ${option}`} aria-pressed={value === option && draft === null}
         disabled={!available || saving || draft !== null} onClick={() => { if (value !== option) void saveNote(option) }}>{option}</button>)}
@@ -83,7 +84,9 @@ function Note({ row, value, editable, available, save }: {
   </div>
 }
 
-export function Board({ token, selection, role, readOnly, executiveToken }: { token: string; selection: string; role: LabRole; readOnly: boolean; executiveToken: string }) {
+export function Board({ token, selection, role, readOnly, executiveToken, historical = false }: {
+  token: string; selection: string; role: LabRole; readOnly: boolean; executiveToken: string; historical?: boolean
+}) {
   const { snapshot: board, edits, current, updateSnapshot, send } = useAttendanceDraft<LabBoard>()
   const [err, setErr] = useState('')
   const [saveError, setSaveError] = useState('')
@@ -166,7 +169,7 @@ export function Board({ token, selection, role, readOnly, executiveToken }: { to
   return <section className="lab-board" aria-label="학생 출결 기록">
     <header className="lab-board-header">
       <div><h2>학생 출결 <span>{board ? `${rows.length}명` : ''}</span></h2>
-        <p>{readOnly ? '교장·교감 전체 조회 · 읽기 전용' : role === 'homeroom' ? '담임 출결과 오늘 비고를 입력합니다.' : '담임 기록을 참고해 교과 출결을 입력합니다.'}</p></div>
+        <p>{readOnly ? '교장·교감 전체 조회 · 읽기 전용' : role === 'homeroom' ? '담임 출결과 비고를 입력합니다.' : '담임 기록을 참고해 교과 출결을 입력합니다.'}</p></div>
       {board && <div className="lab-counts">
         {!IS_ATTENDANCE_PREVIEW && !readOnly && rows.some(row => row.exception !== '수업 없음') && (
           <>
@@ -191,7 +194,7 @@ export function Board({ token, selection, role, readOnly, executiveToken }: { to
     {!!rows.length && <div className="lab-table" role="table" aria-label="교시별 출결 비교">
       <div className="lab-column-head lab-row" role="row">
         <span role="columnheader">학생</span><span role="columnheader">수업 · 담당 교사</span>
-        <span role="columnheader">담임 출결</span><span role="columnheader">교과 출결</span><span role="columnheader">오늘 비고</span>
+        <span role="columnheader">담임 출결</span><span role="columnheader">교과 출결</span><span role="columnheader">{historical ? '비고' : '오늘 비고'}</span>
       </div>
       {rows.map(row => {
         const record: LabRecord = board?.records[row.id] ?? {}
@@ -201,7 +204,7 @@ export function Board({ token, selection, role, readOnly, executiveToken }: { to
           <div className="lab-course" role="cell">{row.lesson ? <Lesson lesson={row.lesson} /> : <span className="lab-badge neutral">{row.exception}</span>}</div>
           {(['homeroom', 'subject'] as const).map(field => <AttendanceCell key={field} row={row} field={field} value={statusOf(row, field)} editable={!readOnly && role === field}
             available={row.exception !== '수업 없음'} busy={Boolean(pendingFor(row, field))} onAdvance={() => advance(row, field)} />)}
-          <Note row={row} value={record.note} editable={!readOnly && role === 'homeroom'} available={Boolean(board)} save={value => save(row, 'note', value)} />
+          <Note row={row} value={record.note} editable={!readOnly && role === 'homeroom'} available={Boolean(board)} save={value => save(row, 'note', value)} historical={historical} />
         </div>
       })}
     </div>}
@@ -217,7 +220,9 @@ function hasDayLesson(slot: DaySlot | undefined): slot is DaySlot {
   return Boolean(slot && slot.exception !== '수업 없음')
 }
 
-export function DayBoard({ token, selection, readOnly, executiveToken }: { token: string; selection: string; readOnly: boolean; executiveToken: string }) {
+export function DayBoard({ token, selection, readOnly, executiveToken, historical = false }: {
+  token: string; selection: string; readOnly: boolean; executiveToken: string; historical?: boolean
+}) {
   const { snapshot, edits, current, updateSnapshot, send } = useAttendanceDraft<DaySnapshot>()
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -364,13 +369,13 @@ export function DayBoard({ token, selection, readOnly, executiveToken }: { token
             </div>
           </div>
         })}
-        <div className="lab-day-note"><span>오늘 비고</span><Note row={student} value={student.note} editable={!readOnly} available={Boolean(snapshot)} save={value => saveNote(student, value)} /></div>
+        <div className="lab-day-note"><span>{historical ? '비고' : '오늘 비고'}</span><Note row={student} value={student.note} editable={!readOnly} available={Boolean(snapshot)} save={value => saveNote(student, value)} /></div>
       </article>
     })}
   </section>
 }
 
-function Attendance({ token }: { token: string }) {
+export function Attendance({ token, canDownload = true }: { token: string; canDownload?: boolean }) {
   const [requestedRole, setRole] = useState<LabRole | null>(null)
   const [access, setAccess] = useState<LabAccess | null>(null)
   const [executiveToken, setExecutiveToken] = useState('')
@@ -378,6 +383,7 @@ function Attendance({ token }: { token: string }) {
   const [executivePassword, setExecutivePassword] = useState('')
   const [unlocking, setUnlocking] = useState(false)
   const [dates, setDates] = useState<string[]>([])
+  const [earliestDate, setEarliestDate] = useState('')
   const [date, setDate] = useState('')
   const [period, setPeriod] = useState(2)
   const [grade, setGrade] = useState('')
@@ -395,13 +401,19 @@ function Attendance({ token }: { token: string }) {
   const selectedClass = classes.find(item => item.id === classId) ?? classes[0]
   const course = lessons.find(lesson => lesson.id === lessonId) ?? lessons[0]
   const group = role === 'homeroom' ? selectedClass?.id : course?.id
+  const today = dates[1] ?? dates[0] ?? ''
+  const historical = Boolean(earliestDate && date && date < today)
 
   useEffect(() => {
     const controller = new AbortController()
     setAccess(null)
-    attendanceRequest<{ dates: string[]; access: LabAccess }>(token, 'dates', { signal: controller.signal }, executiveToken).then(result => {
+    attendanceRequest<{ dates: string[]; earliestDate?: string; access: LabAccess }>(token, 'dates', { signal: controller.signal }, executiveToken).then(result => {
+      if (controller.signal.aborted) return
       setDates(result.dates)
-      setDate(result.dates[1] ?? result.dates[0] ?? '')
+      setEarliestDate(result.earliestDate ?? '')
+      const latest = result.dates[1] ?? result.dates[0] ?? ''
+      const earliest = result.earliestDate
+      setDate(previous => (earliest && previous >= earliest && previous <= latest) || result.dates.includes(previous) ? previous : latest)
       setAccess(result.access)
       setError('')
     }).catch(error => { if (!controller.signal.aborted) setError(error instanceof Error ? error.message : '출결 날짜를 불러오지 못했습니다.') })
@@ -420,7 +432,7 @@ function Attendance({ token }: { token: string }) {
     setError('')
     const query = new URLSearchParams({ date, period: String(period) })
     attendanceRequest<LabOptions>(token, `options?${query}`, { signal: controller.signal }, executiveToken).then(result => {
-      setLoaded({ key: optionsKey, options: result })
+      if (!controller.signal.aborted) setLoaded({ key: optionsKey, options: result })
     }).catch(error => { if (!controller.signal.aborted) setError(error instanceof Error ? error.message : '수업을 불러오지 못했습니다.') })
     return () => controller.abort()
   }, [token, date, period, optionsKey, retry, canLoadOptions, executiveToken])
@@ -462,9 +474,19 @@ function Attendance({ token }: { token: string }) {
       {access?.roles.includes('subject') && <button type="button" aria-pressed={role === 'subject'} onClick={() => setRole('subject')}><GraduationCap size={19} />교과 교사 확인창</button>}
     </div>
     <section className={IS_ATTENDANCE_PREVIEW ? 'lab-filters' : `lab-filters lab-filters-all-grades${daily ? ' lab-filters-day' : ''}`} aria-label="출결 조회 조건">
-      <label className="lab-date"><span><CalendarDays size={15} /> 날짜</span><select value={date} onChange={event => setDate(event.target.value)}>
+      {earliestDate ? <div className="lab-date">
+        <span><CalendarDays size={15} /> 조회 날짜</span>
+        <div className="lab-date-controls">
+          <button type="button" aria-label="이전 날짜" disabled={!date || date <= earliestDate} onClick={() => setDate(shiftAttendanceDate(date, -1))}><ArrowLeft size={15} /></button>
+          <input type="date" aria-label="출결 조회 날짜" min={earliestDate} max={today} value={date} onChange={event => {
+            const next = event.target.value
+            if (!next || (next >= earliestDate && next <= today)) setDate(next)
+          }} />
+          <button type="button" aria-label="다음 날짜" disabled={!date || date >= today} onClick={() => setDate(shiftAttendanceDate(date, 1))}><ArrowRight size={15} /></button>
+        </div>
+      </div> : <label className="lab-date"><span><CalendarDays size={15} /> 날짜</span><select value={date} onChange={event => setDate(event.target.value)}>
         {dates.map(day => <option key={day}>{day}</option>)}
-      </select></label>
+      </select></label>}
       {!IS_ATTENDANCE_PREVIEW && <label className="lab-grade"><span>학년</span><select value={grade} onChange={event => setGrade(event.target.value)}>
         <option value="">전체 학년</option>
         {attendanceGrades.map(value => <option key={value} value={value}>{value}학년</option>)}
@@ -480,19 +502,28 @@ function Attendance({ token }: { token: string }) {
         </select>}
       </label>
     </section>
+    {historical && <p className="lab-notice lab-history-notice" role="status">
+      <strong>{access?.readOnly ? '지난 날짜 조회 중' : '지난 날짜 수정 중'} · {date}</strong>
+      {!access?.readOnly && <span>입력하면 선택한 날짜의 출결 기록에 저장됩니다.</span>}
+    </p>}
+    {canDownload && daily && earliestDate && selectedClass && !access?.readOnly && (
+      <AttendanceExport key={selectedClass.id} token={token} classId={selectedClass.id} classLabel={selectedClass.label} selectedDate={date} today={today} earliestDate={earliestDate} />
+    )}
     {grade && options?.electiveRosterGrades && !options.electiveRosterGrades.includes(grade) && (
       <p className="lab-notice" role="status">{grade}학년 이동수업 수강 명단이 아직 등록되지 않았습니다.</p>
     )}
     {role === 'subject' && course && <div className="lab-selected-course"><Lesson lesson={course} /></div>}
     {error ? <div className="lab-notice" role="alert">{error} <button type="button" onClick={() => { setError(''); setRetry(value => value + 1) }}><RefreshCw size={14} /> 다시 시도</button></div>
-      : options && group && daily ? <DayBoard key={boardQuery} token={token} selection={boardQuery} readOnly={Boolean(access?.readOnly)} executiveToken={executiveToken} />
-      : options && group ? <Board key={boardQuery} token={token} selection={boardQuery} role={role} readOnly={Boolean(access?.readOnly)} executiveToken={executiveToken} />
-      : <p className="lab-empty" role="status">{options ? (role === 'homeroom' ? '선택한 학년에 담당 학급이 없습니다.' : '선택한 학년과 교시에 담당 수업이 없습니다.') : '출결에 필요한 시간표를 불러오는 중입니다.'}</p>}
+      : options && group && daily ? <DayBoard key={boardQuery} token={token} selection={boardQuery} readOnly={Boolean(access?.readOnly)} executiveToken={executiveToken} historical={historical} />
+      : options && group ? <Board key={boardQuery} token={token} selection={boardQuery} role={role} readOnly={Boolean(access?.readOnly)} executiveToken={executiveToken} historical={historical} />
+      : <p className="lab-empty" role="status">{!date ? '조회할 날짜를 선택해 주세요.' : options ? (role === 'homeroom' ? '선택한 학년에 담당 학급이 없습니다.' : '선택한 학년과 교시에 담당 수업이 없습니다.') : '출결에 필요한 시간표를 불러오는 중입니다.'}</p>}
   </>
 }
 
 function App() {
-  const desktop = new URLSearchParams(location.search).get('layout') === 'desktop'
+  const query = new URLSearchParams(location.search)
+  const desktop = query.get('layout') === 'desktop'
+  const canDownload = !desktop || query.get('download') === 'xlsx'
   const [opened, setOpened] = useState(desktop)
   const token = useAttendanceToken(desktop)
   return <main className="lab-shell">
@@ -501,9 +532,9 @@ function App() {
       <div className="lab-brand"><FlaskConical size={17} />{opened ? <button type="button" onClick={() => setOpened(false)}>웅천고 도우미 실험실</button> : <span>웅천고 도우미 실험실</span>}</div>
       <h1>{opened ? '수업 출결' : '실험실'}</h1>
       <p>{opened ? '교시별로 담임과 교과의 출결을 확인합니다.' : IS_ATTENDANCE_PREVIEW ? '개발 중인 기능을 예시 자료로 사용해 볼 수 있습니다.' : '교직원 업무 기능을 확인합니다.'}</p>
-      {opened && <span className="lab-demo">{IS_ATTENDANCE_PREVIEW ? '시험용 자료 · 3학년' : '1~3학년 · 오늘 출결'}</span>}
+      {opened && <span className="lab-demo">{IS_ATTENDANCE_PREVIEW ? '시험용 자료 · 3학년' : '1~3학년 · 수업 출결'}</span>}
     </header>
-    {opened ? token ? <Attendance key={token} token={token} /> : <p className="lab-empty" role="status">
+    {opened ? token ? <Attendance key={token} token={token} canDownload={canDownload} /> : <p className="lab-empty" role="status">
       {token === null ? '로그인 상태를 확인하는 중입니다.' : '업무도우미 또는 모바일 일정에 로그인한 뒤 다시 열어 주세요.'}
     </p> : <section className="lab-feature" aria-labelledby="lab-feature-title">
       <div className="lab-feature-icon"><ClipboardCheck size={25} /></div>

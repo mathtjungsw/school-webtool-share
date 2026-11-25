@@ -4,7 +4,7 @@ import { SCHOOL_HUB_URL } from '../api'
 
 export const IS_ATTENDANCE_PREVIEW = import.meta.env.MODE === 'preview'
 const API = import.meta.env.MODE === 'preview' ? './attendance-lab-api/' : ''
-const productionActions: Record<string, string> = { dates: 'attendanceInfo', options: 'attendanceOptions', board: 'attendanceBoard', record: 'attendanceRecord', leadership: 'attendanceLeadership' }
+const productionActions: Record<string, string> = { dates: 'attendanceInfo', options: 'attendanceOptions', board: 'attendanceBoard', record: 'attendanceRecord', leadership: 'attendanceLeadership', export: 'attendanceExport' }
 
 function mobileToken() {
   try {

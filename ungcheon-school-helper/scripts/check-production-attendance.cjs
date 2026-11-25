@@ -60,8 +60,9 @@ const repo = {
   },
 }
 let sequence = 0
+let currentDate = today
 const context = vm.createContext({
-  Utilities: { formatDate: () => today },
+  Utilities: { formatDate: () => currentDate },
   migrationHash_: value => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex'),
   migrationPrimaryConfig_: () => ({ phase: 'FIRESTORE' }), migrationBackendContext_: { revision: 1 },
   migrationPrimaryRepository_: () => repo,
@@ -75,6 +76,7 @@ for (const file of ['Code.gs','AttendanceAssignments.gs','AttendanceOperations.g
   vm.runInContext(fs.readFileSync(path.join(__dirname,'../server',file), 'utf8'), context, { filename: file })
 }
 context.getTimetable_ = () => timetable
+context.getStudentRoster_ = () => ({ students: roster })
 context.listTimetableChanges_ = () => changes
 context.attendanceStaffMembers_ = () => staff
 context.mobileAssertAccess_ = body => {
@@ -227,3 +229,45 @@ for (const name of ['시험교장','시험교감']) {
   assert.equal(bulk({ ...daily, ...elevated, staffToken:undefined },'homeroom','미확인').ok,false)
 }
 console.log('PASS all grade assignments, daily homeroom and class or student bulk attendance with atomic scoped writes')
+
+currentDate = '2026-11-26'
+const info = post({ ...home, action:'attendanceInfo' }).data
+assert.equal(info.dates[0],currentDate)
+assert.equal(info.earliestDate,today)
+assert.equal(context.attendanceEarliestDate_('2027-02-15'),today)
+assert.equal(context.attendanceEarliestDate_('2027-03-01'),'2027-03-01')
+assert.equal(post({ ...daily, action:'attendanceBoard' }).data.students[0].periods[2].homeroom,'미확인')
+assert.equal(post({ ...course, action:'attendanceBoard' }).data.records[row.id].subject,'미확인')
+for (const date of ['2026-11-24','2026-11-27','2026-11-31','2026-11-25T00:00']) {
+  assert.equal(post({ ...home, date, action:'attendanceBoard' }).ok,false)
+}
+
+const exportClass = (who, extra = {}) => post({ ...who, action:'attendanceExport', group:'3-1', fromDate:today, toDate:currentDate, ...extra })
+const history = normalized(exportClass(home).data.rows)
+assert.equal(history.length,2)
+assert.deepEqual(history[0], { date:today, number:1, name:row.name, values:['미확인','미확인','미확인','미확인','','',''] })
+assert.ok(history.every(record => Object.keys(record).sort().join(',') === 'date,name,number,values'))
+assert.equal(exportClass(mobile('시험교과')).ok,false)
+assert.equal(exportClass(mobile('다른담임')).ok,false)
+assert.equal(exportClass(home, {group:'3-2'}).ok,false)
+assert.equal(exportClass({}).ok,false)
+assert.equal(exportClass({ ...mobile('시험교장'), executiveToken:'test-protected' }).ok,false)
+assert.equal(exportClass(home, {fromDate:'2026-11-27'}).ok,false)
+assert.equal(exportClass(home, {toDate:'2026-11-27'}).ok,false)
+assert.equal(exportClass(home, {fromDate:'2026-11-24'}).ok,false)
+assert.equal(exportClass(home, {fromDate:'2026-11-2x'}).ok,false)
+assert.deepEqual(normalized(exportClass(home, {fromDate:currentDate}).data.rows),[])
+
+assert.equal(postRecord(home,'homeroom','출석').ok,true)
+assert.equal(postRecord(course,'subject','결석').ok,true)
+assert.equal(bulk(daily,'homeroom','결석',row.id).ok,true)
+const amended = post({ ...daily, action:'attendanceBoard' }).data
+assert.equal(amended.students[0].periods[2].homeroom,'결석')
+assert.equal(amended.students[0].periods[2].subject,'결석')
+assert.equal(amended.students[1].periods[2].homeroom,'미확인')
+assert.equal(exportClass(home).data.rows[0].values[1],'결석')
+assert.equal(post({ ...daily, date:currentDate, action:'attendanceBoard' }).data.students[0].periods[2].homeroom,undefined)
+assert.equal(postRecord({ ...home, group:'3-2' },'homeroom','출석').ok,false)
+assert.equal(postRecord({ ...mobile('다른교과'), date:today, group:course.group, role:'subject' },'subject','출석').ok,false)
+assert.equal(postRecord({ ...mobile('시험교장'), date:today, group:home.group, role:'homeroom', executiveToken:'test-protected' },'homeroom','출석').ok,false)
+console.log('PASS authorized prior-date updates, unchanged current date and class-range export')

@@ -26,9 +26,9 @@ function attendanceRosterId_(student) {
   return String(student && student.studentId || '').replace(/^([1-3])0(\d{3})$/, '$1$2');
 }
 
-function attendanceBuildScope_(date, period, data) {
-  const rows = [], byStudent = new Map(), rosterIds = new Map(), disputed = new Set();
-  data.roster.forEach(function(student) {
+function attendanceRosterRows_(date, roster) {
+  const byStudent = new Map(), rosterIds = new Map(), disputed = new Set();
+  roster.forEach(function(student) {
     const key = attendanceStudentKey_(student);
     if (!key) return;
     const name = clean_(student.name, 30);
@@ -40,8 +40,13 @@ function attendanceBuildScope_(date, period, data) {
     byStudent.set(key, { id: 's-' + migrationHash_([date.slice(0, 4), key, rosterId, name]).slice(0, 40), name: name, classId: classId, grade: grade, number: Number(student.number), exception: '명단 확인 필요' });
   });
   disputed.forEach(function(key) { byStudent.delete(key); });
-  byStudent.forEach(function(row) { rows.push(row); });
+  const rows = Array.from(byStudent.values());
   rows.sort(function(a, b) { return Number(a.grade) - Number(b.grade) || Number(a.classId.slice(2)) - Number(b.classId.slice(2)) || a.number - b.number; });
+  return { rows: rows, byStudent: byStudent, rosterIds: rosterIds };
+}
+
+function attendanceBuildScope_(date, period, data) {
+  const { rows, byStudent, rosterIds } = attendanceRosterRows_(date, data.roster);
   const classLists = {};
   rows.forEach(function(row) { (classLists[row.classId] || (classLists[row.classId] = [])).push(row); });
   const classes = Object.keys(classLists).map(function(id) { return { id: id, label: attendanceClassLabel_(id) }; });

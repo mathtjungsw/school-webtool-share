@@ -160,7 +160,10 @@ function AttendanceLabFrame({ url }: { url: string }) {
     window.addEventListener('message', grantAccess)
     return () => { mounted = false; window.removeEventListener('message', grantAccess) }
   }, [url])
-  return <iframe ref={frame} src={url} title="웅천고 도우미 실험실" sandbox="allow-scripts allow-same-origin allow-forms" className="block h-full w-full border-0" />
+  const sandbox = new URL(url).origin === 'https://ungcheon-school-helper-mobile.web.app'
+    ? 'allow-scripts allow-same-origin allow-forms allow-downloads'
+    : 'allow-scripts allow-same-origin allow-forms'
+  return <iframe ref={frame} src={url} title="웅천고 도우미 실험실" sandbox={sandbox} className="block h-full w-full border-0" />
 }
 
 export default function Layout() {
