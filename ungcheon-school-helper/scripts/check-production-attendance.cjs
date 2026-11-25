@@ -45,15 +45,19 @@ const timetable = { teachers: [
 ], pulledLessons: [] }
 const changes = [{ kind:'substitution',status:'approved',originalTeacher:'다른교과',replacementTeacher:'시험대강',originalDate:today,originalSlotIndex:16,originalClass:'사회실',originalSubject:'사회문화' }]
 const documents = new Map()
+let commitCount = 0
 const repo = {
   get: key => documents.get(key) || null,
   batchGet: keys => keys.map(key => documents.get(key) || null),
-  commit: changes => changes.forEach(change => {
-    const before = documents.get(change.path)
-    assert.equal(Boolean(before), !change.createOnly)
-    if (before) assert.equal(change.updateTime, before.updateTime)
-    documents.set(change.path, { path: change.path, data: change.data, updateTime: String(++sequence) })
-  }),
+  commit: changes => {
+    commitCount++
+    changes.forEach(change => {
+      const before = documents.get(change.path)
+      assert.equal(Boolean(before), !change.createOnly)
+      if (before) assert.equal(change.updateTime, before.updateTime)
+      documents.set(change.path, { path: change.path, data: change.data, updateTime: String(++sequence) })
+    })
+  },
 }
 let sequence = 0
 const context = vm.createContext({
@@ -124,6 +128,41 @@ assert.deepEqual(normalized(post({ ...course, action:'attendanceBoard' }).data.r
 assert.equal(post({ ...course, date:'2026-11-24', action:'attendanceBoard' }).ok,false)
 const fresh = post({ ...course, action:'attendanceBoard' }).data
 assert.equal(post({ ...course, action:'attendanceBoard', ifRevision:fresh.revision }).data.notModified,true)
+const whole = (where, field, extra = {}) => post({ ...where, action:'attendanceRecord', allPresent:true, field, ...extra })
+assert.equal(whole(course,'homeroom').ok,false)
+assert.equal(whole({ ...home, group:'3-2' },'homeroom').ok,false)
+assert.equal(whole(course,'subject',{allPeriods:true}).ok,false)
+const beforeCourse = commitCount
+assert.equal(whole(course,'subject').data.students.length,2)
+assert.equal(commitCount,beforeCourse + 1)
+assert.equal(whole(course,'subject').ok,true)
+assert.equal(commitCount,beforeCourse + 1)
+assert.deepEqual(normalized(post({ ...course, action:'attendanceBoard' }).data.records[row.id]), { note:'시험 비고',homeroom:'출석',subject:'출석' })
+
+const daily = { ...home, allPeriods:'true' }
+const initialDay = post({ ...daily, action:'attendanceBoard' }).data
+assert.equal(initialDay.students.length,2)
+assert.ok(initialDay.students.every(student => Object.keys(student.periods).length === 7))
+assert.equal(initialDay.students[0].note,'시험 비고')
+assert.equal(initialDay.students[0].periods[2].subject,'출석')
+assert.equal(initialDay.students[0].periods[5].exception,'수업 없음')
+assert.equal(post({ ...daily, action:'attendanceBoard', ifRevision:initialDay.revision }).data.notModified,true)
+const beforeStudent = commitCount
+assert.deepEqual(normalized(whole(daily,'homeroom',{student:row.id}).data.updates.map(item => item.period)),[1,2,3,4])
+assert.equal(commitCount,beforeStudent + 1)
+const studentDay = post({ ...daily, action:'attendanceBoard' }).data
+assert.equal(studentDay.students[0].periods[1].homeroom,'출석')
+assert.equal(studentDay.students[1].periods[1].homeroom,undefined)
+assert.equal(whole(daily,'homeroom',{student:'outside-class'}).ok,false)
+const beforeClass = commitCount
+assert.ok(whole(daily,'homeroom').data.updates.every(item => item.students.length === 2))
+assert.equal(commitCount,beforeClass + 1)
+assert.equal(whole(daily,'homeroom').ok,true)
+assert.equal(commitCount,beforeClass + 1)
+const finishedDay = post({ ...daily, action:'attendanceBoard' }).data
+assert.ok(finishedDay.students.every(student => student.periods[4].homeroom === '출석' && student.periods[5].homeroom === undefined))
+assert.equal(finishedDay.students[0].periods[2].subject,'출석')
+assert.equal(finishedDay.students[0].note,'시험 비고')
 
 for (const [grade, name] of [['1','일학년담임'],['2','이학년담임']]) {
   const teacher = mobile(name)
@@ -163,5 +202,7 @@ for (const name of ['시험교장','시험교감']) {
   assert.deepEqual(options(elevated).classes.map(item => item.id), ['1-1','2-1','3-1','3-2'])
   assert.equal(options(elevated).lessons.length,4)
   assert.equal(postRecord({ ...home, ...elevated, staffToken:undefined },'note','수정 시도').ok,false)
+  assert.equal(post({ ...daily, ...elevated, staffToken:undefined, action:'attendanceBoard' }).data.students.length,2)
+  assert.equal(whole({ ...daily, ...elevated, staffToken:undefined },'homeroom').ok,false)
 }
-console.log('PASS production attendance assignments, protected leadership, minimal reads and independent Firestore writes')
+console.log('PASS all grade assignments, daily homeroom and class or student bulk attendance with atomic scoped writes')

@@ -557,8 +557,8 @@ const attendanceLabEntry: WorkAssistantEntry = {
   page: ATTENDANCE_LAB_MENU.id,
   category: ATTENDANCE_LAB_MENU.assistantCategory,
   summary: ATTENDANCE_LAB_MENU.description,
-  steps: ['왼쪽 내 바로가기 아래의 웅천고 도우미 실험실에서 수업 출결을 엽니다.', '담임 또는 교과 확인창에서 학년과 교시를 선택합니다.', '미입력 버튼을 한 번 누르면 출석, 두 번 누르면 결석으로 바뀝니다.'],
-  keywords: ['웅천고 도우미 실험실', '이동수업 출결', '학급수업 출결', '전 학년 출결', '담임 출결', '교과 출결', '교시별 출결'],
+  steps: ['왼쪽 내 바로가기 아래의 웅천고 도우미 실험실에서 수업 출결을 엽니다.', '담임 확인창에서 학급과 학생의 하루 출결을 확인합니다. 교과 확인창은 교시와 수업을 선택합니다.', '전체 출석으로 한 번에 입력하고 학생별 출결을 조정합니다.'],
+  keywords: ['웅천고 도우미 실험실', '이동수업 출결', '학급수업 출결', '전 학년 출결', '담임 출결', '교과 출결', '교시별 출결', '하루 출결', '전체 출석'],
 }
 
 export function searchWorkAssistant(query: string, limit = 5, attendanceLabEnabled = false): WorkAssistantResult[] {

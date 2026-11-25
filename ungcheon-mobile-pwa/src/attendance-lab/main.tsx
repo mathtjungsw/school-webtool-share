@@ -11,6 +11,7 @@ const labels = { homeroom: '담임 출결', subject: '교과 출결' }
 const tones: Record<AttendanceStatus, string> = { 미확인: 'pending', 출석: 'present', 지각: 'late', 조퇴: 'early', 결석: 'absent' }
 const noteOptions = ['지각', '결과', '결석']
 const attendanceGrades = ['1', '2', '3']
+const periods = [1, 2, 3, 4, 5, 6, 7]
 
 const statusText = (status: AttendanceStatus) => status === '미확인' ? '미입력' : status
 
@@ -30,8 +31,8 @@ function Lesson({ lesson }: { lesson: LabLesson }) {
   </div>
 }
 
-function AttendanceCell({ row, field, value, editable, available, save }: {
-  row: LabRow; field: LabRole; value: AttendanceStatus; editable: boolean; available: boolean; save: (value: AttendanceStatus) => Promise<boolean>
+function AttendanceCell({ row, field, value, editable, available, save, period }: {
+  row: LabRow; field: LabRole; value: AttendanceStatus; editable: boolean; available: boolean; save: (value: AttendanceStatus) => Promise<boolean>; period?: number
 }) {
   const desired = useRef<AttendanceStatus | null>(null)
   const [pending, setPending] = useState<AttendanceStatus | null>(null)
@@ -54,10 +55,10 @@ function AttendanceCell({ row, field, value, editable, available, save }: {
     setPending(null)
   }
 
-  return <div className="lab-record" role="cell">
+  return <div className="lab-record" role={period ? undefined : 'cell'}>
     <span className="lab-mobile-label">{labels[field]}</span>
     {field === 'subject' && !row.lesson ? <span className="lab-state unavailable">해당 없음</span> : editable ? (
-      <button type="button" aria-label={`${row.name} ${labels[field]} ${statusText(displayed)}`} aria-describedby="lab-attendance-help"
+      <button type="button" aria-label={`${row.name} ${period ? period + '교시 ' : ''}${labels[field]} ${statusText(displayed)}`} aria-describedby="lab-attendance-help"
         aria-busy={pending !== null} disabled={!available} className={`lab-state ${tones[displayed]}`} onClick={() => void advance()}>
         {statusText(displayed)} <RefreshCw size={12} aria-hidden="true" />
       </button>
@@ -102,6 +103,9 @@ function Board({ token, selection, role, readOnly, executiveToken }: { token: st
   const [board, setBoard] = useState<LabBoard | null>(null)
   const [err, setErr] = useState('')
   const [saveError, setSaveError] = useState('')
+  const [pendingWrites, setPendingWrites] = useState(0)
+  const [savingAll, setSavingAll] = useState(false)
+  const [bulkMessage, setBulkMessage] = useState('')
   const [retry, setRetry] = useState(0)
   const lastSaveAt = useRef(0)
   useEffect(() => {
@@ -130,6 +134,8 @@ function Board({ token, selection, role, readOnly, executiveToken }: { token: st
 
   async function save(row: LabRow, field: LabField, value: string) {
     setSaveError('')
+    setBulkMessage('')
+    setPendingWrites(count => count + 1)
     try {
       const updated = await attendanceRequest<LabChange>(token, `record?${selection}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student: row.id, field, value }),
@@ -143,7 +149,26 @@ function Board({ token, selection, role, readOnly, executiveToken }: { token: st
     } catch {
       setSaveError(`${row.name} 학생 기록의 저장을 확인하지 못했습니다. 다시 시도해 주세요.`)
       return false
-    }
+    } finally { setPendingWrites(count => count - 1) }
+  }
+
+  async function markAllPresent() {
+    setSavingAll(true)
+    setSaveError('')
+    setBulkMessage('')
+    try {
+      const updated = await attendanceRequest<{ students: string[]; field: LabRole; value: AttendanceStatus }>(token, `record?${selection}`, {
+        method: 'POST', body: JSON.stringify({ field: role, allPresent: true }),
+      }, executiveToken)
+      lastSaveAt.current = performance.now()
+      setBoard(current => current && { ...current, records: {
+        ...current.records,
+        ...Object.fromEntries(updated.students.map(id => [id, { ...current.records[id], [updated.field]: updated.value }])),
+      } })
+      setBulkMessage(`${updated.students.length}명 출석 처리 완료`)
+    } catch {
+      setSaveError('전체 출석 저장을 확인하지 못했습니다. 새로고침 후 다시 시도해 주세요.')
+    } finally { setSavingAll(false) }
   }
 
   const rows = board?.rows ?? []
@@ -154,7 +179,13 @@ function Board({ token, selection, role, readOnly, executiveToken }: { token: st
     <header className="lab-board-header">
       <div><h2>학생 출결 <span>{board ? `${rows.length}명` : ''}</span></h2>
         <p>{readOnly ? '교장·교감 전체 조회 · 읽기 전용' : role === 'homeroom' ? '담임 출결과 오늘 비고를 입력합니다.' : '담임 기록을 참고해 교과 출결을 입력합니다.'}</p></div>
-      {board && <div className="lab-counts"><span>확인 <b>{checked}</b> / {rows.length}</span><span className="mismatch">기록 다름 <b>{rows.filter(needsComparison).length}</b></span>
+      {board && <div className="lab-counts">
+        {!IS_ATTENDANCE_PREVIEW && !readOnly && rows.some(row => row.exception !== '수업 없음') && (
+          <button type="button" className="lab-bulk-present" disabled={Boolean(err) || savingAll || pendingWrites > 0} aria-busy={savingAll} onClick={() => void markAllPresent()}>
+            <ClipboardCheck size={16} aria-hidden="true" />{savingAll ? '출석 처리 중…' : '전체 출석'}
+          </button>
+        )}
+        <span>확인 <b>{checked}</b> / {rows.length}</span><span className="mismatch">기록 다름 <b>{rows.filter(needsComparison).length}</b></span>
         {!IS_ATTENDANCE_PREVIEW && <button type="button" className="lab-refresh" onClick={() => setRetry(value => value + 1)}><RefreshCw size={13} /> 새로고침</button>}
       </div>}
     </header>
@@ -165,6 +196,7 @@ function Board({ token, selection, role, readOnly, executiveToken }: { token: st
     </div>}
     {err && <div className="lab-notice" role="alert">{err} <button type="button" onClick={() => { setErr(''); setBoard(null); setRetry(x => x + 1) }}><RefreshCw size={14} /> 다시 연결</button></div>}
     {saveError && <p className="lab-notice" role="alert">{saveError}</p>}
+    {bulkMessage && <p className="lab-bulk-message" role="status">{bulkMessage}</p>}
     {!board && !err && <p className="lab-empty" role="status">학생 명단과 출결을 불러오는 중입니다.</p>}
     {board && !rows.length && <p className="lab-empty">표시할 학생이 없습니다.</p>}
     {!!rows.length && <div className="lab-table" role="table" aria-label="교시별 출결 비교">
@@ -179,11 +211,127 @@ function Board({ token, selection, role, readOnly, executiveToken }: { token: st
             {needsComparison(row) && <span className="lab-badge mismatch">기록 다름</span>}</div>
           <div className="lab-course" role="cell">{row.lesson ? <Lesson lesson={row.lesson} /> : <span className="lab-badge neutral">{row.exception}</span>}</div>
           {(['homeroom', 'subject'] as const).map(field => <AttendanceCell key={field} row={row} field={field} value={statusOf(row, field)} editable={!readOnly && role === field}
-            available={!err && row.exception !== '수업 없음'} save={value => save(row, field, value)} />)}
-          <Note row={row} value={record.note} editable={!readOnly && role === 'homeroom'} available={!err} save={value => save(row, 'note', value)} />
+            available={!err && !savingAll && row.exception !== '수업 없음'} save={value => save(row, field, value)} />)}
+          <Note row={row} value={record.note} editable={!readOnly && role === 'homeroom'} available={!err && !savingAll} save={value => save(row, 'note', value)} />
         </div>
       })}
     </div>}
+  </section>
+}
+
+type DaySlot = Pick<LabRow, 'lesson' | 'exception'> & Pick<LabRecord, 'homeroom' | 'subject'>
+type DayStudent = Omit<LabRow, 'lesson' | 'exception'> & { periods: Record<number, DaySlot>; note?: string }
+type DaySnapshot = { students: DayStudent[] }
+
+function DayBoard({ token, selection, readOnly, executiveToken }: { token: string; selection: string; readOnly: boolean; executiveToken: string }) {
+  const [snapshot, setSnapshot] = useState<DaySnapshot | null>(null)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [retry, setRetry] = useState(0)
+  const [pending, setPending] = useState(0)
+  const [bulk, setBulk] = useState<string | null>(null)
+  const lastSaveAt = useRef(0)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setError('')
+    void listenAttendance(token, selection, controller.signal, (event, value) => {
+      if (event !== 'board') return
+      const next = value as DaySnapshot & { requestedAt: number }
+      if (next.requestedAt >= lastSaveAt.current) setSnapshot(next)
+    }, executiveToken).catch(cause => {
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '하루 출결을 불러오지 못했습니다.')
+    })
+    return () => controller.abort()
+  }, [token, selection, retry, executiveToken])
+
+  async function save(student: DayStudent, period: number, field: 'homeroom' | 'note', value: string) {
+    setNotice('')
+    setPending(count => count + 1)
+    const query = new URLSearchParams(selection)
+    query.delete('allPeriods')
+    query.set('period', String(period))
+    try {
+      const updated = await attendanceRequest<LabChange>(token, `record?${query}`, {
+        method: 'POST', body: JSON.stringify({ student: student.id, field, value }),
+      }, executiveToken)
+      lastSaveAt.current = performance.now()
+      setSnapshot(current => current && { students: current.students.map(item => {
+        if (item.id !== student.id) return item
+        if (field === 'note') return { ...item, note: updated.value }
+        return { ...item, periods: { ...item.periods, [period]: { ...item.periods[period], homeroom: updated.value as AttendanceStatus } } }
+      }) })
+      return true
+    } catch {
+      setNotice(`${student.name} 학생 기록의 저장을 확인하지 못했습니다.`)
+      return false
+    } finally { setPending(count => count - 1) }
+  }
+
+  async function markPresent(student?: DayStudent) {
+    setBulk(student?.id ?? 'class')
+    setNotice('')
+    try {
+      const { updates } = await attendanceRequest<{ updates: { period: number; students: string[] }[] }>(token, `record?${selection}`, {
+        method: 'POST', body: JSON.stringify({ allPresent: true, field: 'homeroom', student: student?.id }),
+      }, executiveToken)
+      lastSaveAt.current = performance.now()
+      const updatedByPeriod = new Map(updates.map(item => [item.period, new Set(item.students)]))
+      const students = new Set(updates.flatMap(item => item.students))
+      setSnapshot(current => current && { students: current.students.map(item => {
+        if (!students.has(item.id)) return item
+        const slots = { ...item.periods }
+        periods.forEach(period => {
+          if (updatedByPeriod.get(period)?.has(item.id)) slots[period] = { ...slots[period], homeroom: '출석' }
+        })
+        return { ...item, periods: slots }
+      }) })
+      setNotice(student ? `${student.name} 학생 ${updates.length}개 교시 출석 처리 완료` : `${students.size}명 전체 출석 처리 완료`)
+    } catch {
+      setNotice('전체 출석 저장을 확인하지 못했습니다. 새로고침 후 다시 시도해 주세요.')
+    } finally { setBulk(null) }
+  }
+
+  const students = snapshot?.students ?? []
+  const hasLesson = (student: DayStudent) => periods.some(period => student.periods[period] && student.periods[period].exception !== '수업 없음')
+  const canEdit = !readOnly && !error && !bulk
+  return <section className="lab-board lab-day" aria-label="담임 하루 출결">
+    <header className="lab-board-header">
+      <div><h2>하루 출결 <span>{snapshot ? `${students.length}명` : ''}</span></h2>
+        <p>{readOnly ? '교장·교감 전체 조회 · 읽기 전용' : '수업 아래에서 담임 출결을 입력하고 교과 기록을 함께 확인합니다.'}</p></div>
+      {snapshot && <div className="lab-counts">
+        {!readOnly && students.some(hasLesson) && <button type="button" className="lab-bulk-present" disabled={!canEdit || pending > 0} aria-busy={bulk === 'class'} onClick={() => void markPresent()}>
+          <ClipboardCheck size={16} aria-hidden="true" />{bulk === 'class' ? '출석 처리 중…' : '학급 전체 출석'}
+        </button>}
+        <button type="button" className="lab-refresh" disabled={Boolean(bulk) || pending > 0} onClick={() => setRetry(value => value + 1)}><RefreshCw size={13} /> 새로고침</button>
+      </div>}
+    </header>
+    {!readOnly && <div className="lab-attendance-help" id="lab-attendance-help"><strong>출결 입력 방법</strong><span>한 번 <b>출석</b> · 두 번 <b>결석</b> · 세 번 <b>미입력</b>입니다.</span></div>}
+    {error && <div className="lab-notice" role="alert">{error} <button type="button" onClick={() => setRetry(value => value + 1)}>다시 시도</button></div>}
+    {notice && <p className="lab-bulk-message" role="status">{notice}</p>}
+    {!snapshot && !error && <p className="lab-empty" role="status">학급의 하루 출결을 불러오는 중입니다.</p>}
+    {snapshot && !students.length && <p className="lab-empty">표시할 학생이 없습니다.</p>}
+    {students.map(student => <article className="lab-day-student" key={student.id} aria-label={`${student.name} 학생 하루 출결`}>
+      <div className="lab-day-identity"><small>{student.number}번</small><strong>{student.name}</strong>
+        {!readOnly && hasLesson(student) && <button type="button" className="lab-refresh" aria-label={`${student.name} 학생 전체 출석`} disabled={!canEdit || pending > 0} onClick={() => void markPresent(student)}>
+          {bulk === student.id ? '처리 중…' : '학생 전체 출석'}
+        </button>}
+      </div>
+      {periods.map(period => {
+        const slot = student.periods[period]
+        const row = { ...student, ...slot }
+        return <div className="lab-day-slot" key={period} aria-label={`${period}교시`}>
+          <strong className="lab-day-period">{period}교시</strong>
+          {slot?.lesson ? <Lesson lesson={slot.lesson} /> : <span className="lab-day-exception">{slot?.exception ?? '수업 없음'}</span>}
+          {slot && slot.exception !== '수업 없음' && <div className="lab-day-check">
+            <AttendanceCell row={row} field="homeroom" period={period} value={slot.homeroom ?? '미확인'} editable={!readOnly} available={canEdit}
+              save={value => save(student, period, 'homeroom', value)} />
+            {slot.lesson && <span className="lab-day-subject">교과 <b className={`lab-state ${tones[slot.subject ?? '미확인']}`}>{statusText(slot.subject ?? '미확인')}</b></span>}
+          </div>}
+        </div>
+      })}
+      <div className="lab-day-note"><span>오늘 비고</span><Note row={student} value={student.note} editable={!readOnly} available={canEdit} save={value => save(student, 1, 'note', value)} /></div>
+    </article>)}
   </section>
 }
 
@@ -269,13 +417,16 @@ function Attendance({ token }: { token: string }) {
     {error || (access ? (access.requiresExecutive ? '업무도우미에서 보호 메뉴 인증을 완료해 주세요.' : '배정된 학급이나 수업이 없습니다.') : '로그인과 출결 권한을 확인하는 중입니다.')}
     {error && <button type="button" onClick={() => { setError(''); setRetry(value => value + 1) }}>다시 확인</button>}
   </div>
-  const selection = new URLSearchParams({ date, period: String(period), role, group: group ?? '' }).toString()
+  const daily = !IS_ATTENDANCE_PREVIEW && role === 'homeroom'
+  const selection = new URLSearchParams({ date, period: String(period), role, group: group ?? '' })
+  if (daily) selection.set('allPeriods', 'true')
+  const boardQuery = selection.toString()
   return <>
     <div className="lab-roles" role="group" aria-label="교사 확인창">
       {access?.roles.includes('homeroom') && <button type="button" aria-pressed={role === 'homeroom'} onClick={() => setRole('homeroom')}><UsersRound size={18} />담임 교사 확인창</button>}
       {access?.roles.includes('subject') && <button type="button" aria-pressed={role === 'subject'} onClick={() => setRole('subject')}><GraduationCap size={19} />교과 교사 확인창</button>}
     </div>
-    <section className={IS_ATTENDANCE_PREVIEW ? 'lab-filters' : 'lab-filters lab-filters-all-grades'} aria-label="출결 조회 조건">
+    <section className={IS_ATTENDANCE_PREVIEW ? 'lab-filters' : `lab-filters lab-filters-all-grades${daily ? ' lab-filters-day' : ''}`} aria-label="출결 조회 조건">
       <label className="lab-date"><span><CalendarDays size={15} /> 날짜</span><select value={date} onChange={event => setDate(event.target.value)}>
         {dates.map(day => <option key={day}>{day}</option>)}
       </select></label>
@@ -283,9 +434,9 @@ function Attendance({ token }: { token: string }) {
         <option value="">전체 학년</option>
         {attendanceGrades.map(value => <option key={value} value={value}>{value}학년</option>)}
       </select></label>}
-      <div className="lab-period"><span>교시</span><div role="group" aria-label="교시">
-        {Array.from({ length: 7 }, (_, i) => i + 1).map(p => <button type="button" key={p} aria-label={`${p}교시`} aria-pressed={p === period} onClick={() => setPeriod(p)}>{p}<small>교시</small></button>)}
-      </div></div>
+      {!daily && <div className="lab-period"><span>교시</span><div role="group" aria-label="교시">
+        {periods.map(p => <button type="button" key={p} aria-label={`${p}교시`} aria-pressed={p === period} onClick={() => setPeriod(p)}>{p}<small>교시</small></button>)}
+      </div></div>}
       <label className="lab-group"><span>{role === 'homeroom' ? '학급' : '수업'}</span>
         {role === 'homeroom' ? <select value={selectedClass?.id ?? ''} disabled={classes.length < 2} onChange={event => setClassId(event.target.value)}>
           {classes.length ? classes.map(item => <option value={item.id} key={item.id}>{item.label}</option>) : <option>선택할 학급 없음</option>}
@@ -299,7 +450,8 @@ function Attendance({ token }: { token: string }) {
     )}
     {role === 'subject' && course && <div className="lab-selected-course"><Lesson lesson={course} /></div>}
     {error ? <div className="lab-notice" role="alert">{error} <button type="button" onClick={() => { setError(''); setRetry(value => value + 1) }}><RefreshCw size={14} /> 다시 시도</button></div>
-      : options && group ? <Board key={selection} token={token} selection={selection} role={role} readOnly={Boolean(access?.readOnly)} executiveToken={executiveToken} />
+      : options && group && daily ? <DayBoard key={boardQuery} token={token} selection={boardQuery} readOnly={Boolean(access?.readOnly)} executiveToken={executiveToken} />
+      : options && group ? <Board key={boardQuery} token={token} selection={boardQuery} role={role} readOnly={Boolean(access?.readOnly)} executiveToken={executiveToken} />
       : <p className="lab-empty" role="status">{options ? (role === 'homeroom' ? '선택한 학년에 담당 학급이 없습니다.' : '선택한 학년과 교시에 담당 수업이 없습니다.') : '출결에 필요한 시간표를 불러오는 중입니다.'}</p>}
   </>
 }

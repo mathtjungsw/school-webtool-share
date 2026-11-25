@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 83;
+const MOBILE_SERVICE_VERSION = 84;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -361,6 +361,7 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {key:'server-v84',title:'공용 서버 · 담임 하루 출결과 전체 출석',body:'담임 화면에서 학생별 1~7교시 출결을 한 화면에 표시하고, 학급 전체 또는 학생 한 명의 출결을 한 번에 출석으로 입력합니다. 교과 화면에는 현재 수업 전체 출석을 추가했습니다.',date:'2026-11-25'},
   {key:'server-v83',title:'공용 서버 · 1~3학년 수업 출결',body:'1~3학년 학급수업과 이동수업의 교시별 출결을 조회하고 입력할 수 있습니다.',date:'2026-11-25'},
   {key:'v1.1.49',title:'PC v1.1.49 · 전 학년 수업 출결',body:'웅천고 도우미 실험실의 수업 출결에서 학년과 교시를 고를 수 있습니다. 1~3학년 학급수업과 등록된 이동수업의 담임·교과 출결을 확인합니다.',date:'2026-11-25'},
   {key:'server-v82',title:'공용 서버 · 이동수업 출결',body:'3학년 담임 학급과 담당 수업의 출결·비고를 Firebase에 저장합니다. 교장·교감 전체 조회에는 기존 보호 메뉴 인증을 사용합니다.',date:'2026-11-25'},

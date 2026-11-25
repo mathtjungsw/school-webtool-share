@@ -155,7 +155,7 @@ function attendanceBuildScope_(date, period, data) {
   return { classes: classes, lessons: lessons, rows: rows, electiveRosterGrades: Array.from(electiveRosterGrades).sort() };
 }
 
-function attendanceScope_(date, period, staff, viewer) {
+function attendanceScope_(date, period, staff, viewer, loadData) {
   const revision = migrationBackendContext_ && migrationBackendContext_.revision;
   if (!Number.isSafeInteger(revision) || migrationBackendContext_.quotaBackup) throw Error('현재 시간표를 확인할 수 없습니다. 잠시 뒤 다시 시도해 주세요.');
   const sources = ['staffRoster','studentRoster','timetable','studentTimetable'].map(function(group) { return privateSchoolRevision_(group); });
@@ -165,18 +165,22 @@ function attendanceScope_(date, period, staff, viewer) {
     const saved = cache.get(key);
     if (saved) return JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(saved), 'application/x-gzip')).getDataAsString('UTF-8'));
   } catch (_) {}
-  const roster = mobileSchoolData_('studentRoster', getStudentRoster_);
-  const timetable = mobileSchoolData_('timetable', getTimetable_);
-  const personal = mobileSchoolData_('studentTimetable', getStudentTimetable_);
-  if (!Array.isArray(roster && roster.students) || !Array.isArray(timetable && timetable.teachers)) throw Error('학교 명렬과 시간표를 확인해 주세요.');
-  const scope = attendanceBuildScope_(date, period, {
-    staff: staff, roster: roster.students, personal: Array.isArray(personal && personal.students) ? personal.students : [], timetable: timetable, pulled: timetable.pulledLessons || [],
-    changes: listTimetableChanges_({ viewerName: viewer, includeSchool: true, fromDate: date, toDate: date }),
-    overrides: listTimetableOverrides_({ includeInactive: false }).filter(function(item) { return item.date === date || item.sourceDate === date; })
-  });
+  const scope = attendanceBuildScope_(date, period, loadData ? loadData() : attendanceScopeData_(date, staff, viewer));
   try {
     const archive = Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(scope), 'application/json')).getBytes());
     if (archive.length < 95000) cache.put(key, archive, 240);
   } catch (_) {}
   return scope;
+}
+
+function attendanceScopeData_(date, staff, viewer) {
+  const roster = mobileSchoolData_('studentRoster', getStudentRoster_);
+  const timetable = mobileSchoolData_('timetable', getTimetable_);
+  const personal = mobileSchoolData_('studentTimetable', getStudentTimetable_);
+  if (!Array.isArray(roster && roster.students) || !Array.isArray(timetable && timetable.teachers)) throw Error('학교 명렬과 시간표를 확인해 주세요.');
+  return {
+    staff: staff, roster: roster.students, personal: Array.isArray(personal && personal.students) ? personal.students : [], timetable: timetable, pulled: timetable.pulledLessons || [],
+    changes: listTimetableChanges_({ viewerName: viewer, includeSchool: true, fromDate: date, toDate: date }),
+    overrides: listTimetableOverrides_({ includeInactive: false }).filter(function(item) { return item.date === date || item.sourceDate === date; })
+  };
 }

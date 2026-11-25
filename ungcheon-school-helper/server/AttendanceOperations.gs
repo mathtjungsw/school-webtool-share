@@ -45,6 +45,23 @@ function attendanceAction_(body) {
   if (body.action === 'attendanceRecord' && elevated) throw Error('교장·교감 출결 화면은 읽기 전용입니다.');
   if (body.action !== 'attendanceOptions' && (role !== 'homeroom' && role !== 'subject' || !/^[a-zA-Z0-9-]{1,48}$/.test(group))) throw Error('학급 또는 수업을 확인해 주세요.');
   if (role === 'homeroom' && !elevated && group !== homeClass) throw Error('담당 학급만 열 수 있습니다.');
+  if (body.allPeriods === true || body.allPeriods === 'true') {
+    if (role !== 'homeroom' || attendanceClassId_(group) !== group) throw Error('담임 학급의 하루 출결을 확인해 주세요.');
+    if (body.action === 'attendanceRecord' && (body.allPresent !== true || body.field !== role)) throw Error('담당 출결만 입력할 수 있습니다.');
+    if (body.action !== 'attendanceBoard' && body.action !== 'attendanceRecord') throw Error('허용되지 않는 출결 요청입니다.');
+    let data;
+    const boards = Array.from({ length: 7 }, function(_, index) {
+      const period = index + 1;
+      const scope = attendanceScope_(date, period, members, viewer, function() {
+        if (!data) data = attendanceScopeData_(date, members, viewer);
+        return data;
+      });
+      return { period: period, rows: scope.rows.filter(function(row) { return row.classId === group; }) };
+    });
+    const repo = migrationPrimaryRepository_(config);
+    if (body.action === 'attendanceBoard') return attendanceReadDay_(repo, date, boards, body.ifRevision);
+    return attendancePresentDay_(repo, date, boards, staffId, body.student);
+  }
   const scope = attendanceScope_(date, period, members, viewer);
   const classes = scope.classes.filter(function(item) { return elevated || item.id === homeClass; });
   const lessons = scope.lessons.filter(function(item) { return elevated || item.teacherIds.indexOf(staffId) >= 0; });
@@ -71,12 +88,14 @@ function attendanceRecordPath_(date, period, row, field) {
   return base + '/periods/' + period + '/checks/' + (field === 'homeroom' ? 'home-' + row.classId : 'class-' + row.lesson.id);
 }
 
-function attendanceReadBoard_(repo, date, period, rows, ifRevision) {
+function attendanceBoardDocuments_(repo, date, boards) {
   const paths = new Set();
-  rows.forEach(function(row) {
-    paths.add(attendanceRecordPath_(date, period, row, 'note'));
-    paths.add(attendanceRecordPath_(date, period, row, 'homeroom'));
-    if (row.lesson) paths.add(attendanceRecordPath_(date, period, row, 'subject'));
+  boards.forEach(function(board) {
+    board.rows.forEach(function(row) {
+      paths.add(attendanceRecordPath_(date, board.period, row, 'note'));
+      paths.add(attendanceRecordPath_(date, board.period, row, 'homeroom'));
+      if (row.lesson) paths.add(attendanceRecordPath_(date, board.period, row, 'subject'));
+    });
   });
   const keys = Array.from(paths).sort(), stored = {
     docs: new Map(), revision: []
@@ -86,16 +105,26 @@ function attendanceReadBoard_(repo, date, period, rows, ifRevision) {
     stored.docs.set(record.path, record.data.values || {});
     stored.revision.push([record.path, record.updateTime]);
   });
+  return stored;
+}
+
+function attendanceBoardValue_(stored, date, period, row, field) {
+  if (field === 'subject' && !row.lesson) return;
+  const group = stored.docs.get(attendanceRecordPath_(date, period, row, field));
+  const entry = group && group[row.id];
+  if (entry && typeof entry.value === 'string') return entry.value;
+}
+
+function attendanceReadBoard_(repo, date, period, rows, ifRevision) {
+  const stored = attendanceBoardDocuments_(repo, date, [{ period: period, rows: rows }]);
   const revision = migrationHash_([rows, stored.revision]);
   if (revision === ifRevision) return { notModified: true, revision: revision };
   const records = {};
   const detail = rows.map(function(row) {
     const current = {};
     ['note','homeroom','subject'].forEach(function(field) {
-      if (field === 'subject' && !row.lesson) return;
-      const group = stored.docs.get(attendanceRecordPath_(date, period, row, field));
-      const entry = group && group[row.id];
-      if (entry && typeof entry.value === 'string') current[field] = entry.value;
+      const value = attendanceBoardValue_(stored, date, period, row, field);
+      if (value !== undefined) current[field] = value;
     });
     records[row.id] = current;
     const publicRow = { id: row.id, name: row.name, classId: row.classId, number: row.number };
@@ -106,19 +135,79 @@ function attendanceReadBoard_(repo, date, period, rows, ifRevision) {
   return { rows: detail, records: records, revision: revision };
 }
 
+function attendanceReadDay_(repo, date, boards, ifRevision) {
+  const stored = attendanceBoardDocuments_(repo, date, boards);
+  const revision = migrationHash_([boards, stored.revision]);
+  if (revision === ifRevision) return { notModified: true, revision: revision };
+  const students = new Map();
+  boards.forEach(function(board) {
+    board.rows.forEach(function(row) {
+      if (!students.has(row.id)) {
+        students.set(row.id, {
+          id: row.id, name: row.name, classId: row.classId, number: row.number, periods: {},
+          note: attendanceBoardValue_(stored, date, board.period, row, 'note')
+        });
+      }
+      students.get(row.id).periods[board.period] = {
+        lesson: row.lesson ? attendancePublicLesson_(row.lesson) : undefined,
+        exception: row.exception,
+        homeroom: attendanceBoardValue_(stored, date, board.period, row, 'homeroom'),
+        subject: attendanceBoardValue_(stored, date, board.period, row, 'subject')
+      };
+    });
+  });
+  return { students: Array.from(students.values()), revision: revision };
+}
+
+function attendancePresentDay_(repo, date, boards, staffId, student) {
+  if (student !== undefined && (typeof student !== 'string' || !student)) throw Error('학생 명단을 확인해 주세요.');
+  const eligible = boards.map(function(board) {
+    return { period: board.period, rows: board.rows.filter(function(row) {
+      return row.exception !== '수업 없음' && (student === undefined || student === row.id);
+    }) };
+  }).filter(function(board) { return board.rows.length; });
+  if (!eligible.length) throw Error('출석을 입력할 학생이 없습니다.');
+  attendanceUpdateRecords_(repo, date, eligible, staffId, 'homeroom', '출석');
+  return { updates: eligible.map(function(board) {
+    return { period: board.period, students: board.rows.map(function(row) { return row.id; }) };
+  }) };
+}
+
 function attendanceSaveRecord_(repo, date, period, role, rows, staffId, body) {
-  const field = body.field, row = rows.find(function(item) { return item.id === body.student; });
+  const field = body.field;
+  if (body.allPresent === true) {
+    if (field !== role) throw Error('담당 출결만 입력할 수 있습니다.');
+    const eligible = rows.filter(function(row) { return row.exception !== '수업 없음'; });
+    if (!eligible.length) throw Error('출석을 입력할 학생이 없습니다.');
+    attendanceUpdateRecords_(repo, date, [{ period: period, rows: eligible }], staffId, field, '출석');
+    return { students: eligible.map(function(row) { return row.id; }), field: field, value: '출석' };
+  }
+  const row = rows.find(function(item) { return item.id === body.student; });
   if (!row || !(field === role || field === 'note' && role === 'homeroom') || field === 'subject' && !row.lesson || typeof body.value !== 'string') throw Error('수정할 수 없는 기록입니다.');
   if (row.exception === '수업 없음' && field !== 'note') throw Error('수업이 없는 교시에는 출결을 입력할 수 없습니다.');
   if (field === 'note' ? body.value.length > 160 : ['미확인', '출석', '결석'].indexOf(body.value) < 0) throw Error('입력한 출결 내용을 확인해 주세요.');
-  const value = body.value.trim(), path = attendanceRecordPath_(date, period, row, field);
+  const value = body.value.trim();
+  attendanceUpdateRecords_(repo, date, [{ period: period, rows: [row] }], staffId, field, value);
+  return { student: row.id, field: field, value: value };
+}
+
+function attendanceUpdateRecords_(repo, date, boards, staffId, field, value) {
+  const paths = boards.map(function(board) { return attendanceRecordPath_(date, board.period, board.rows[0], field); });
+  const entry = { value: value, actor: staffId, updatedAt: new Date().toISOString() };
   for (let attempt = 0; attempt < 3; attempt++) {
-    const current = repo.get(path), values = Object.assign({}, current && current.data.values);
-    if (values[row.id] && values[row.id].value === value) return { student: row.id, field: field, value: value };
-    values[row.id] = { value: value, actor: staffId, updatedAt: new Date().toISOString() };
+    const current = paths.length === 1 ? [repo.get(paths[0])] : repo.batchGet(paths);
+    const changes = [];
+    boards.forEach(function(board, index) {
+      const existing = current[index], values = Object.assign({}, existing && existing.data.values);
+      const changed = board.rows.filter(function(row) { return !values[row.id] || values[row.id].value !== value; });
+      if (!changed.length) return;
+      changed.forEach(function(row) { values[row.id] = entry; });
+      changes.push({ path: paths[index], data: { values: values }, updateTime: existing && existing.updateTime, createOnly: !existing });
+    });
+    if (!changes.length) return;
     try {
-      repo.commit([{ path: path, data: { values: values }, updateTime: current && current.updateTime, createOnly: !current }]);
-      return { student: row.id, field: field, value: value };
+      repo.commit(changes);
+      return;
     } catch (error) {
       if (error.code !== 'MIGRATION_FIRESTORE_CONFLICT') throw error;
     }
