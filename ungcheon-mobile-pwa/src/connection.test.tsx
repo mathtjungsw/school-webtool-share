@@ -205,6 +205,7 @@ describe('모바일 연결 안정화 통합', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-11-21T02:00:00Z'))
     seedSession()
+    vi.mocked(loadDashboard).mockResolvedValue(fixture())
     render(<App />)
     await screen.findByText('연결 검증 일정')
     fireEvent.click(screen.getByRole('tab', { name: '주간 시간표' }))
