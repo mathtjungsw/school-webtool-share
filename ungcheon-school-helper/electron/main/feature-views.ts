@@ -1,4 +1,4 @@
-import { app, BrowserWindow, WebContentsView, session, ipcMain, dialog, shell, safeStorage } from 'electron'
+import { app, BrowserWindow, WebContentsView, session, ipcMain, dialog, shell, safeStorage, screen } from 'electron'
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, readdirSync, unlinkSync, realpathSync, lstatSync } from 'fs'
 import { join, basename, resolve } from 'path'
 import { randomBytes, createCipheriv, createDecipheriv, createHash } from 'crypto'
@@ -12,11 +12,29 @@ export const TOOL_SITES: Record<string, string> = {
   snu: 'https://snuarori.snu.ac.kr/', skku: 'https://webzine.skku.edu/skkuzine/', korea: 'https://www.korea.ac.kr/ko/562/subview.do',
   hanyang: 'https://www.hanyang.ac.kr/web/www/official_magazine', ajou: 'https://www.ajou.ac.kr/kr/ajou/webzine.do', dankook: 'https://webzine.dankook.ac.kr/',
   erica: 'https://www.hanyang.ac.kr/web/www/official_magazine', knu: 'https://webzine.knu.ac.kr/', pusan: 'https://www.pusan.ac.kr/kor/CMS/PdfViwerMgr/MoonList.do?mCode=MN126', jnu: 'https://ile.jnu.ac.kr/',
+  admission_results: 'https://www.adiga.kr/uct/acd/ade/criteriaAndResultView.do?menuId=PCUCTACD2000',
+  gyeongnam_curriculum_list: 'https://www.gne.go.kr/h-creditsystem/education/schul/BD_selectSchulBbsList.do',
+  gyeongnam_curriculum_map: 'https://www.gne.go.kr/h-creditsystem/education/schul/BD_selectSchulBbsMap.do',
 }
+
+const ADMISSIONS_BROWSER_LINKS: Record<string, string> = {
+  adiga_teacher_portal: 'https://sam.adiga.kr/',
+  gyeongnam_course_guide: 'https://www.hscredit.kr/dataDetail?post_seq=415',
+  university_course_requirements: 'https://www.adiga.kr/uct/ces/archiveView.do?menuId=PCUCTCES1000&prtlBbsId=26239',
+  performance_assessment_guide: 'https://ipsi.dongguk.edu/admission/html/counsel/noticeView.asp?BOARD_IDX=36946&s_cate=BBS0408',
+}
+
+const admissionResultsUrl = new URL(TOOL_SITES.admission_results)
+const admissionPopupPath = '/uct/acd/ade/criteriaAndResultPopup.do'
+
 export function registerFeatureViews(main: () => BrowserWindow | null, auth: { snapshot: () => any; request: (p: any) => Promise<any> }) {
   const external = new Map<string, WebContentsView>()
   const loadedSites = new Map<string,string>()
-  const slotFor = (id:string) => ['saenggibu_generator','ungcheon_library','mandatory_training_submit','mandatory_training_excel'].includes(id) ? id : 'university_webzines'
+  const slotFor = (id: string) => {
+    if (id === 'gyeongnam_curriculum_list' || id === 'gyeongnam_curriculum_map') return 'gyeongnam_curriculum'
+    return ['saenggibu_generator', 'ungcheon_library', 'mandatory_training_submit', 'mandatory_training_excel', 'admission_results'].includes(id)
+      ? id : 'university_webzines'
+  }
   let privateView: WebContentsView | null = null; let privateKind = ''; let active = ''; let epoch = 0; let caseUnlocked = false
   let grant = ''
   let documents: Array<{id:string;revision:string;title:string}> = []
@@ -60,7 +78,11 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
     if(!auth.snapshot().authenticated){hide();closePrivate();throw new Error('로그인이 필요합니다.')}
     if(p.action==='hide'){hide();return true}
     const id=String(p.id||''); const isPrivate=['average_grade_calculator','admission_success_cases'].includes(id)
-    if(!isPrivate && !TOOL_SITES[id])throw new Error('등록되지 않은 도구입니다.')
+    if (p.action === 'external' && Object.hasOwn(ADMISSIONS_BROWSER_LINKS, id)) {
+      await shell.openExternal(ADMISSIONS_BROWSER_LINKS[id])
+      return true
+    }
+    if(!isPrivate && !Object.hasOwn(TOOL_SITES,id))throw new Error('등록되지 않은 도구입니다.')
     if(p.action==='external'){if(!isPrivate)await shell.openExternal(TOOL_SITES[id]);return true}
     if(p.action==='reload'){external.get(slotFor(id))?.webContents.reload();return true}
     const rect=p.rect; const window=main(); if(!window || !rect || !['x','y','width','height'].every(k=>Number.isFinite(rect[k])))return false
@@ -89,7 +111,42 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
         ses.setPermissionRequestHandler((_w,_p,cb)=>cb(false))
         view=new WebContentsView({webPreferences:{session:ses,sandbox:true,nodeIntegration:false,contextIsolation:true,webSecurity:true}})
         external.set(slot,view);loadedSites.set(slot,id);window.contentView.addChildView(view)
-        view.webContents.setWindowOpenHandler(({url})=>{if(url.startsWith('https://'))void shell.openExternal(url);return{action:'deny'}})
+        const contents = view.webContents
+        if (id === 'admission_results') {
+          contents.on('did-create-window', popup => {
+            const restrictNavigation = (event: Electron.Event, url: string) => {
+              const destination = new URL(url)
+              if (destination.origin !== admissionResultsUrl.origin || destination.pathname !== admissionPopupPath) {
+                event.preventDefault()
+              }
+            }
+            popup.webContents.on('will-navigate', restrictNavigation)
+            popup.webContents.on('will-redirect', restrictNavigation)
+            popup.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+          })
+        }
+        contents.setWindowOpenHandler(({ url, frameName }) => {
+          // 어디가는 빈 이름 있는 창을 연 뒤 공식 비교 화면으로 검색 폼을 전송한다.
+          if (id === 'admission_results' && url === 'about:blank' && frameName === 'criteriaAndResultPopup') {
+            const opener = new URL(contents.getURL())
+            if (opener.origin === admissionResultsUrl.origin && opener.pathname === admissionResultsUrl.pathname) {
+              const area = screen.getDisplayMatching(window.getBounds()).workArea
+              const width = Math.min(1320, area.width)
+              const height = Math.min(800, area.height)
+              return {
+                action: 'allow',
+                overrideBrowserWindowOptions: {
+                  parent: window, width, height, autoHideMenuBar: true,
+                  x: area.x + Math.floor((area.width - width) / 2),
+                  y: area.y + Math.floor((area.height - height) / 2),
+                  webPreferences: { sandbox: true, nodeIntegration: false, contextIsolation: true, webSecurity: true },
+                },
+              }
+            }
+          }
+          if (url.startsWith('https://')) void shell.openExternal(url)
+          return { action: 'deny' }
+        })
         void view.webContents.loadURL(TOOL_SITES[id]).catch(()=>undefined)
       }
       view=external.get(slot)!

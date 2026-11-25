@@ -133,6 +133,7 @@
     "src/services/printing/**/*",
     "src/services/fileParser/**/*",
     "src/pages/ExternalToolPage.tsx",
+    "src/pages/AdmissionsResourcePage.tsx",
     "src/pages/RecommendedBooksPage.tsx",
     "src/data/recommendedBooks.json"
   ]

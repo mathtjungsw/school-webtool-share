@@ -68,6 +68,7 @@ const ExecutiveTeacherSchedulePage = lazy(() => import('../pages/ExecutiveSchedu
 const FutureOperationsPage = lazy(() => import('../features/futureOperations/FutureOperationsPage'))
 
 const ExternalTool = lazy(() => import('../pages/ExternalToolPage'))
+const AdmissionsResourcePage = lazy(() => import('../pages/AdmissionsResourcePage'))
 const PrivateSurface = lazy(() => import('../pages/ExternalToolPage').then(m => ({ default: m.FeatureSurface })))
 const RecommendedBooks = lazy(() => import('../pages/RecommendedBooksPage'))
 const PAGES: Record<string, React.ComponentType> = {
@@ -75,6 +76,9 @@ const PAGES: Record<string, React.ComponentType> = {
   saenggibu_generator: () => <ExternalTool kind="saenggibu_generator" />,
   ungcheon_library: () => <ExternalTool kind="ungcheon_library" />,
   university_webzines: () => <ExternalTool kind="university_webzines" />,
+  admission_results: () => <AdmissionsResourcePage kind="admission_results" />,
+  gyeongnam_curriculum: () => <AdmissionsResourcePage kind="gyeongnam_curriculum" />,
+  performance_assessment_guide: () => <AdmissionsResourcePage kind="performance_assessment_guide" />,
   average_grade_calculator: () => <div className="flex h-full flex-col"><PrivateSurface id="average_grade_calculator" /></div>,
   admission_success_cases: () => <div className="flex h-full flex-col"><PrivateSurface id="admission_success_cases" /></div>,
   university_recommended_books: RecommendedBooks,
