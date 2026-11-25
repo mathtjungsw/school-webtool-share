@@ -164,6 +164,26 @@ assert.ok(finishedDay.students.every(student => student.periods[4].homeroom === 
 assert.equal(finishedDay.students[0].periods[2].subject,'출석')
 assert.equal(finishedDay.students[0].note,'시험 비고')
 
+const bulk = (where, field, bulkValue, student) => post({ ...where, action:'attendanceRecord', field, bulkValue, student })
+assert.equal(bulk(daily,'homeroom','결석').ok,false)
+assert.equal(bulk(course,'subject','결석').ok,false)
+assert.equal(bulk(course,'homeroom','미확인').ok,false)
+assert.equal(bulk(daily,'homeroom','결석','outside-class').ok,false)
+assert.equal(bulk(daily,'homeroom','결석',row.id).ok,true)
+const afterAbsence = post({ ...daily, action:'attendanceBoard' }).data
+assert.equal(afterAbsence.students[0].periods[4].homeroom,'결석')
+assert.equal(afterAbsence.students[1].periods[4].homeroom,'출석')
+assert.equal(afterAbsence.students[0].periods[2].subject,'출석')
+assert.equal(bulk(daily,'homeroom','미확인',row.id).ok,true)
+assert.equal(post({ ...daily, action:'attendanceBoard' }).data.students[0].periods[4].homeroom,'미확인')
+assert.equal(bulk(daily,'homeroom','미확인').ok,true)
+const afterReset = post({ ...daily, action:'attendanceBoard' }).data
+assert.ok(afterReset.students.every(student => student.periods[4].homeroom === '미확인' && student.periods[5].homeroom === undefined))
+assert.equal(afterReset.students[0].note,'시험 비고')
+assert.equal(afterReset.students[0].periods[2].subject,'출석')
+assert.equal(bulk(course,'subject','미확인').data.value,'미확인')
+assert.equal(post({ ...course, action:'attendanceBoard' }).data.records[row.id].subject,'미확인')
+
 for (const [grade, name] of [['1','일학년담임'],['2','이학년담임']]) {
   const teacher = mobile(name)
   assert.deepEqual(options(teacher).classes.map(item => item.id), [grade + '-1'])
@@ -204,5 +224,6 @@ for (const name of ['시험교장','시험교감']) {
   assert.equal(postRecord({ ...home, ...elevated, staffToken:undefined },'note','수정 시도').ok,false)
   assert.equal(post({ ...daily, ...elevated, staffToken:undefined, action:'attendanceBoard' }).data.students.length,2)
   assert.equal(whole({ ...daily, ...elevated, staffToken:undefined },'homeroom').ok,false)
+  assert.equal(bulk({ ...daily, ...elevated, staffToken:undefined },'homeroom','미확인').ok,false)
 }
 console.log('PASS all grade assignments, daily homeroom and class or student bulk attendance with atomic scoped writes')

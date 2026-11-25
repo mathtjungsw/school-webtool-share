@@ -47,8 +47,8 @@ function attendanceAction_(body) {
   if (role === 'homeroom' && !elevated && group !== homeClass) throw Error('담당 학급만 열 수 있습니다.');
   if (body.allPeriods === true || body.allPeriods === 'true') {
     if (role !== 'homeroom' || attendanceClassId_(group) !== group) throw Error('담임 학급의 하루 출결을 확인해 주세요.');
-    if (body.action === 'attendanceRecord' && (body.allPresent !== true || body.field !== role)) throw Error('담당 출결만 입력할 수 있습니다.');
     if (body.action !== 'attendanceBoard' && body.action !== 'attendanceRecord') throw Error('허용되지 않는 출결 요청입니다.');
+    const value = body.action === 'attendanceRecord' ? attendanceBulkValue_(body, role, true) : null;
     let data;
     const boards = Array.from({ length: 7 }, function(_, index) {
       const period = index + 1;
@@ -60,7 +60,7 @@ function attendanceAction_(body) {
     });
     const repo = migrationPrimaryRepository_(config);
     if (body.action === 'attendanceBoard') return attendanceReadDay_(repo, date, boards, body.ifRevision);
-    return attendancePresentDay_(repo, date, boards, staffId, body.student);
+    return attendanceSaveDay_(repo, date, boards, staffId, body.student, value);
   }
   const scope = attendanceScope_(date, period, members, viewer);
   const classes = scope.classes.filter(function(item) { return elevated || item.id === homeClass; });
@@ -159,15 +159,25 @@ function attendanceReadDay_(repo, date, boards, ifRevision) {
   return { students: Array.from(students.values()), revision: revision };
 }
 
-function attendancePresentDay_(repo, date, boards, staffId, student) {
+function attendanceBulkValue_(body, role, allPeriods) {
+  if (body.field !== role) throw Error('담당 출결만 입력할 수 있습니다.');
+  const value = body.bulkValue === undefined && body.allPresent === true ? '출석' : body.bulkValue;
+  const studentAbsence = allPeriods && role === 'homeroom' && typeof body.student === 'string' && body.student;
+  if (value !== '출석' && value !== '미확인' && !(value === '결석' && studentAbsence)) {
+    throw Error('전체 출결 입력 내용을 확인해 주세요.');
+  }
+  return value;
+}
+
+function attendanceSaveDay_(repo, date, boards, staffId, student, value) {
   if (student !== undefined && (typeof student !== 'string' || !student)) throw Error('학생 명단을 확인해 주세요.');
   const eligible = boards.map(function(board) {
     return { period: board.period, rows: board.rows.filter(function(row) {
       return row.exception !== '수업 없음' && (student === undefined || student === row.id);
     }) };
   }).filter(function(board) { return board.rows.length; });
-  if (!eligible.length) throw Error('출석을 입력할 학생이 없습니다.');
-  attendanceUpdateRecords_(repo, date, eligible, staffId, 'homeroom', '출석');
+  if (!eligible.length) throw Error('출결을 입력할 학생이 없습니다.');
+  attendanceUpdateRecords_(repo, date, eligible, staffId, 'homeroom', value);
   return { updates: eligible.map(function(board) {
     return { period: board.period, students: board.rows.map(function(row) { return row.id; }) };
   }) };
@@ -175,12 +185,12 @@ function attendancePresentDay_(repo, date, boards, staffId, student) {
 
 function attendanceSaveRecord_(repo, date, period, role, rows, staffId, body) {
   const field = body.field;
-  if (body.allPresent === true) {
-    if (field !== role) throw Error('담당 출결만 입력할 수 있습니다.');
+  if (body.allPresent === true || body.bulkValue !== undefined) {
+    const value = attendanceBulkValue_(body, role, false);
     const eligible = rows.filter(function(row) { return row.exception !== '수업 없음'; });
-    if (!eligible.length) throw Error('출석을 입력할 학생이 없습니다.');
-    attendanceUpdateRecords_(repo, date, [{ period: period, rows: eligible }], staffId, field, '출석');
-    return { students: eligible.map(function(row) { return row.id; }), field: field, value: '출석' };
+    if (!eligible.length) throw Error('출결을 입력할 학생이 없습니다.');
+    attendanceUpdateRecords_(repo, date, [{ period: period, rows: eligible }], staffId, field, value);
+    return { students: eligible.map(function(row) { return row.id; }), field: field, value: value };
   }
   const row = rows.find(function(item) { return item.id === body.student; });
   if (!row || !(field === role || field === 'note' && role === 'homeroom') || field === 'subject' && !row.lesson || typeof body.value !== 'string') throw Error('수정할 수 없는 기록입니다.');

@@ -71,6 +71,8 @@ h1, h2, p { margin: 0; }
 .lab-day-identity small { color: var(--muted); font-size: 12px; }
 .lab-day-identity .lab-day-save-error { color: #8a3336; font-weight: 700; }
 .lab-day-identity strong { color: var(--ink); font-size: 16px; }
+.lab-day-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.lab-day-actions .lab-day-absent { color: #8a3336; background: #f9e9e8; }
 .lab-day-slot { display: flex; flex-direction: column; min-width: 0; gap: 5px; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: #f9fbf8; }
 .lab-day-period { color: var(--green); font-size: 12px; }
 .lab-day-slot .lab-lesson { overflow-wrap: anywhere; }
@@ -142,7 +144,8 @@ button.lab-state:hover { border-color: #35735b; box-shadow: inset 0 0 0 1px #357
   .lab-day-student { grid-template-columns: repeat(var(--lab-day-mobile-period-count, 4), minmax(0, 1fr)); margin-bottom: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: white; }
   .lab-day-identity, .lab-day-note { grid-column: 1 / -1; }
   .lab-day-identity { flex-direction: row; flex-wrap: wrap; align-items: center; }
-  .lab-day-identity .lab-refresh { margin-left: auto; }
+  .lab-day-identity .lab-day-actions { margin-left: auto; }
+  .lab-day-actions button, .lab-counts .lab-refresh { min-height: 36px; }
   .lab-period button { min-height: 42px; }
   .lab-filters select { min-height: 42px; }
   .lab-board { background: transparent; border: 0; overflow: visible; }
