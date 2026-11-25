@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ArrowLeft, ArrowRight, CalendarDays, ClipboardCheck, FlaskConical, GraduationCap, RefreshCw, UsersRound } from 'lucide-react'
 import type {
@@ -223,13 +223,20 @@ type DaySlot = Pick<LabRow, 'lesson' | 'exception'> & Pick<LabRecord, 'homeroom'
 type DayStudent = Omit<LabRow, 'lesson' | 'exception'> & { periods: Record<number, DaySlot>; note?: string }
 type DaySnapshot = { students: DayStudent[] }
 
-function DayBoard({ token, selection, readOnly, executiveToken }: { token: string; selection: string; readOnly: boolean; executiveToken: string }) {
+function hasDayLesson(slot: DaySlot | undefined): slot is DaySlot {
+  return Boolean(slot && slot.exception !== '수업 없음')
+}
+
+export function DayBoard({ token, selection, readOnly, executiveToken }: { token: string; selection: string; readOnly: boolean; executiveToken: string }) {
   const [snapshot, setSnapshot] = useState<DaySnapshot | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [retry, setRetry] = useState(0)
-  const [pending, setPending] = useState(0)
-  const [bulk, setBulk] = useState<string | null>(null)
+  const [pending, setPending] = useState<Record<string, number>>({})
+  const [bulkTargets, setBulkTargets] = useState<ReadonlySet<string>>(() => new Set())
+  const [bulkFailures, setBulkFailures] = useState<ReadonlySet<string>>(() => new Set())
+  const savingTargets = useRef(new Set<string>())
+  const writeQueue = useRef(Promise.resolve())
   const lastSaveAt = useRef(0)
 
   useEffect(() => {
@@ -245,93 +252,131 @@ function DayBoard({ token, selection, readOnly, executiveToken }: { token: strin
     return () => controller.abort()
   }, [token, selection, retry, executiveToken])
 
+  function queueWrite(write: () => Promise<void>) {
+    // Day writes for different students can still touch the same Firestore documents.
+    const queued = writeQueue.current.then(write)
+    writeQueue.current = queued.catch(() => {})
+    return queued
+  }
+
   async function save(student: DayStudent, period: number, field: 'homeroom' | 'note', value: string) {
     setNotice('')
-    setPending(count => count + 1)
+    setPending(counts => ({ ...counts, [student.id]: (counts[student.id] ?? 0) + 1 }))
     const query = new URLSearchParams(selection)
     query.delete('allPeriods')
     query.set('period', String(period))
     try {
-      const updated = await attendanceRequest<LabChange>(token, `record?${query}`, {
-        method: 'POST', body: JSON.stringify({ student: student.id, field, value }),
-      }, executiveToken)
-      lastSaveAt.current = performance.now()
-      setSnapshot(current => current && { students: current.students.map(item => {
-        if (item.id !== student.id) return item
-        if (field === 'note') return { ...item, note: updated.value }
-        return { ...item, periods: { ...item.periods, [period]: { ...item.periods[period], homeroom: updated.value as AttendanceStatus } } }
-      }) })
+      await queueWrite(async () => {
+        const updated = await attendanceRequest<LabChange>(token, `record?${query}`, {
+          method: 'POST', body: JSON.stringify({ student: student.id, field, value }),
+        }, executiveToken)
+        lastSaveAt.current = performance.now()
+        setSnapshot(current => current && { students: current.students.map(item => {
+          if (item.id !== student.id) return item
+          if (field === 'note') return { ...item, note: updated.value }
+          return { ...item, periods: { ...item.periods, [period]: { ...item.periods[period], homeroom: updated.value as AttendanceStatus } } }
+        }) })
+      })
       return true
     } catch {
       setNotice(`${student.name} 학생 기록의 저장을 확인하지 못했습니다.`)
       return false
-    } finally { setPending(count => count - 1) }
+    } finally {
+      setPending(counts => ({ ...counts, [student.id]: counts[student.id] - 1 }))
+    }
   }
 
   async function markPresent(student?: DayStudent) {
-    setBulk(student?.id ?? 'class')
+    const target = student?.id ?? 'class'
+    if (savingTargets.current.has(target) || savingTargets.current.has('class')) return
+    savingTargets.current.add(target)
+    setBulkTargets(new Set(savingTargets.current))
+    setBulkFailures(failures => new Set([...failures].filter(id => id !== target)))
     setNotice('')
     try {
-      const { updates } = await attendanceRequest<{ updates: { period: number; students: string[] }[] }>(token, `record?${selection}`, {
-        method: 'POST', body: JSON.stringify({ allPresent: true, field: 'homeroom', student: student?.id }),
-      }, executiveToken)
-      lastSaveAt.current = performance.now()
-      const updatedByPeriod = new Map(updates.map(item => [item.period, new Set(item.students)]))
-      const students = new Set(updates.flatMap(item => item.students))
-      setSnapshot(current => current && { students: current.students.map(item => {
-        if (!students.has(item.id)) return item
-        const slots = { ...item.periods }
-        periods.forEach(period => {
-          if (updatedByPeriod.get(period)?.has(item.id)) slots[period] = { ...slots[period], homeroom: '출석' }
-        })
-        return { ...item, periods: slots }
-      }) })
-      setNotice(student ? `${student.name} 학생 ${updates.length}개 교시 출석 처리 완료` : `${students.size}명 전체 출석 처리 완료`)
+      await queueWrite(async () => {
+        const { updates } = await attendanceRequest<{ updates: { period: number; students: string[] }[] }>(token, `record?${selection}`, {
+          method: 'POST', body: JSON.stringify({ allPresent: true, field: 'homeroom', student: student?.id }),
+        }, executiveToken)
+        lastSaveAt.current = performance.now()
+        const updatedByPeriod = new Map(updates.map(item => [item.period, new Set(item.students)]))
+        const students = new Set(updates.flatMap(item => item.students))
+        if (!student) setBulkFailures(failures => new Set([...failures].filter(id => !students.has(id))))
+        setSnapshot(current => current && { students: current.students.map(item => {
+          if (!students.has(item.id)) return item
+          const slots = { ...item.periods }
+          periods.forEach(period => {
+            if (updatedByPeriod.get(period)?.has(item.id)) slots[period] = { ...slots[period], homeroom: '출석' }
+          })
+          return { ...item, periods: slots }
+        }) })
+        setNotice(student ? `${student.name} 학생 ${updates.length}개 교시 출석 저장 완료` : `${students.size}명 전체 출석 저장 완료`)
+      })
     } catch {
-      setNotice('전체 출석 저장을 확인하지 못했습니다. 새로고침 후 다시 시도해 주세요.')
-    } finally { setBulk(null) }
+      setBulkFailures(failures => new Set([...failures, target]))
+    } finally {
+      savingTargets.current.delete(target)
+      setBulkTargets(new Set(savingTargets.current))
+    }
   }
 
   const students = snapshot?.students ?? []
-  const hasLesson = (student: DayStudent) => periods.some(period => student.periods[period] && student.periods[period].exception !== '수업 없음')
-  const canEdit = !readOnly && !error && !bulk
-  return <section className="lab-board lab-day" aria-label="담임 하루 출결">
+  const activePeriods = periods.filter(period => students.some(student => hasDayLesson(student.periods[period])))
+  const gridStyle = {
+    '--lab-day-period-count': Math.max(1, activePeriods.length),
+    '--lab-day-mobile-period-count': Math.max(1, Math.min(4, activePeriods.length)),
+  } as CSSProperties
+  const canEdit = !readOnly && !error
+  const classSaving = bulkTargets.has('class')
+  const saving = bulkTargets.size > 0 || Object.values(pending).some(count => count > 0)
+  const saveStatus = classSaving ? '학급 전체 출석 저장 중' : bulkTargets.size ? `학생 ${bulkTargets.size}명 출석 저장 중` : notice
+  return <section className="lab-board lab-day" aria-label="담임 하루 출결" style={gridStyle}>
     <header className="lab-board-header">
       <div><h2>하루 출결 <span>{snapshot ? `${students.length}명` : ''}</span></h2>
         <p>{readOnly ? '교장·교감 전체 조회 · 읽기 전용' : '수업 아래에서 담임 출결을 입력하고 교과 기록을 함께 확인합니다.'}</p></div>
       {snapshot && <div className="lab-counts">
-        {!readOnly && students.some(hasLesson) && <button type="button" className="lab-bulk-present" disabled={!canEdit || pending > 0} aria-busy={bulk === 'class'} onClick={() => void markPresent()}>
-          <ClipboardCheck size={16} aria-hidden="true" />{bulk === 'class' ? '출석 처리 중…' : '학급 전체 출석'}
+        {!readOnly && activePeriods.length > 0 && <button type="button" className="lab-bulk-present" disabled={!canEdit || saving} aria-busy={classSaving} onClick={() => void markPresent()}>
+          <ClipboardCheck size={16} aria-hidden="true" />{classSaving ? '저장 중…' : '학급 전체 출석'}
         </button>}
-        <button type="button" className="lab-refresh" disabled={Boolean(bulk) || pending > 0} onClick={() => setRetry(value => value + 1)}><RefreshCw size={13} /> 새로고침</button>
+        <button type="button" className="lab-refresh" disabled={saving} onClick={() => setRetry(value => value + 1)}><RefreshCw size={13} /> 새로고침</button>
       </div>}
     </header>
     {!readOnly && <div className="lab-attendance-help" id="lab-attendance-help"><strong>출결 입력 방법</strong><span>한 번 <b>출석</b> · 두 번 <b>결석</b> · 세 번 <b>미입력</b>입니다.</span></div>}
     {error && <div className="lab-notice" role="alert">{error} <button type="button" onClick={() => setRetry(value => value + 1)}>다시 시도</button></div>}
-    {notice && <p className="lab-bulk-message" role="status">{notice}</p>}
+    {bulkFailures.has('class') && <p className="lab-notice" role="alert">학급 전체 출석 저장을 확인하지 못했습니다. 버튼을 다시 눌러 주세요.</p>}
+    {snapshot && !readOnly && <p className="lab-bulk-message lab-day-save-status" role="status">{saveStatus}</p>}
     {!snapshot && !error && <p className="lab-empty" role="status">학급의 하루 출결을 불러오는 중입니다.</p>}
     {snapshot && !students.length && <p className="lab-empty">표시할 학생이 없습니다.</p>}
-    {students.map(student => <article className="lab-day-student" key={student.id} aria-label={`${student.name} 학생 하루 출결`}>
-      <div className="lab-day-identity"><small>{student.number}번</small><strong>{student.name}</strong>
-        {!readOnly && hasLesson(student) && <button type="button" className="lab-refresh" aria-label={`${student.name} 학생 전체 출석`} disabled={!canEdit || pending > 0} onClick={() => void markPresent(student)}>
-          {bulk === student.id ? '처리 중…' : '학생 전체 출석'}
-        </button>}
-      </div>
-      {periods.map(period => {
-        const slot = student.periods[period]
-        const row = { ...student, ...slot }
-        return <div className="lab-day-slot" key={period} aria-label={`${period}교시`}>
-          <strong className="lab-day-period">{period}교시</strong>
-          {slot?.lesson ? <Lesson lesson={slot.lesson} /> : <span className="lab-day-exception">{slot?.exception ?? '수업 없음'}</span>}
-          {slot && slot.exception !== '수업 없음' && <div className="lab-day-check">
-            <AttendanceCell row={row} field="homeroom" period={period} value={slot.homeroom ?? '미확인'} editable={!readOnly} available={canEdit}
-              save={value => save(student, period, 'homeroom', value)} />
-            {slot.lesson && <span className="lab-day-subject">교과 <b className={`lab-state ${tones[slot.subject ?? '미확인']}`}>{statusText(slot.subject ?? '미확인')}</b></span>}
-          </div>}
+    {students.length > 0 && !activePeriods.length && <p className="lab-empty">오늘은 이 학급의 수업이 없습니다.</p>}
+    {students.map(student => {
+      const markingPresent = classSaving || bulkTargets.has(student.id)
+      const canEditStudent = canEdit && !bulkTargets.has(student.id)
+      const failed = bulkFailures.has(student.id)
+      return <article className="lab-day-student" key={student.id} aria-label={`${student.name} 학생 하루 출결`}>
+        <div className="lab-day-identity"><small>{student.number}번</small><strong>{student.name}</strong>
+          {!readOnly && activePeriods.some(period => hasDayLesson(student.periods[period])) && <button type="button" className="lab-refresh" aria-label={`${student.name} 학생 전체 출석`} aria-busy={markingPresent}
+            disabled={!canEditStudent || classSaving || (pending[student.id] ?? 0) > 0} onClick={() => void markPresent(student)}>
+            {markingPresent ? '저장 중…' : failed ? '전체 출석 다시 저장' : '학생 전체 출석'}
+          </button>}
+          {failed && <small className="lab-day-save-error" role="alert">저장 확인 필요</small>}
         </div>
-      })}
-      <div className="lab-day-note"><span>오늘 비고</span><Note row={student} value={student.note} editable={!readOnly} available={canEdit} save={value => save(student, 1, 'note', value)} /></div>
-    </article>)}
+        {activePeriods.map(period => {
+          const slot = student.periods[period]
+          if (!hasDayLesson(slot)) return <div key={period} aria-hidden="true" />
+          const row = { ...student, ...slot }
+          return <div className="lab-day-slot" key={period} aria-label={`${period}교시`}>
+            <strong className="lab-day-period">{period}교시</strong>
+            {slot.lesson ? <Lesson lesson={slot.lesson} /> : <span className="lab-day-exception">{slot.exception}</span>}
+            <div className="lab-day-check">
+              <AttendanceCell row={row} field="homeroom" period={period} value={markingPresent ? '출석' : slot.homeroom ?? '미확인'} editable={!readOnly} available={canEditStudent}
+                save={value => save(student, period, 'homeroom', value)} />
+              {slot.lesson && <span className="lab-day-subject">교과 <b className={`lab-state ${tones[slot.subject ?? '미확인']}`}>{statusText(slot.subject ?? '미확인')}</b></span>}
+            </div>
+          </div>
+        })}
+        <div className="lab-day-note"><span>오늘 비고</span><Note row={student} value={student.note} editable={!readOnly} available={canEditStudent} save={value => save(student, 1, 'note', value)} /></div>
+      </article>
+    })}
   </section>
 }
 
@@ -478,4 +523,5 @@ function App() {
   </main>
 }
 
-createRoot(document.getElementById('root')!).render(<App />)
+const root = document.getElementById('root')
+if (root) createRoot(root).render(<App />)
