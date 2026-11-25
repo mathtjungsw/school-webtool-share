@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 78;
+const MOBILE_SERVICE_VERSION = 79;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -361,6 +361,8 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {key:'server-v79',title:'공용 서버 · PC 1.1.46 업데이트 안내',body:'위젯 출결 조회 간격과 PC 본창·위젯의 자료 버전 확인을 개선한 새 버전을 안내합니다.',date:'2026-11-25'},
+  {key:'v1.1.46',title:'[업데이트] 웅천고 업무도우미 v1.1.46 · 위젯 조회 개선',body:'위젯 출결은 자동으로 5분마다 확인하며, 상단 새로고침으로 바로 조회할 수 있습니다. PC 본창과 위젯은 자료 버전 확인을 공유해 중복 요청을 줄였습니다.',date:'2026-11-25'},
   {key:'server-v78',title:'공용 로그인 긴급 복구',body:'공용 서버의 외부 호출 한도가 소진되면 운영본과 같은 버전으로 검증된 비공개 백업을 사용해 로그인과 조회를 지원합니다.',date:'2026-11-25'},
   {key:'server-v77',title:'공용 로그인 서버 연결 개선',body:'학교의 Firestore 서울 리전으로 우선 연결합니다. 읽기 연결이 끊기면 기존 주소로 한 번 다시 확인합니다.',date:'2026-11-25'},
   {key:'server-v76',title:'출결 개인정보와 학교 자료 동기화 개선',body:'모바일 일정에는 출결 인원수를 제공하고, 학생별 비고는 해당 교시에서 조회합니다. 관리자는 명렬·시간표 사본의 갱신 상태를 확인하고 다시 동기화할 수 있습니다.',date:'2026-11-20'},

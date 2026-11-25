@@ -301,7 +301,9 @@ export function invalidateHubResource(resource: HubResource) {
     if (entry.resource === resource) sessionCache.delete(key)
   }
   resourceEpoch.set(resource, (resourceEpoch.get(resource) ?? 0) + 1)
+  manifest = null
   manifestLoadedAt = 0
+  manifestInflight = null
   void window.electron.schoolHubCacheDeleteResource(resource).catch(() => undefined)
 }
 
@@ -409,16 +411,16 @@ async function refreshSyncManifest(force = false): Promise<SyncManifest | null> 
   if (manifestInflight) return manifestInflight
   const generation = cacheGeneration
   let nextRequest: Promise<SyncManifest | null>
-  nextRequest = hubRequest<SyncManifest>({ action: 'getSyncManifest' })
+  nextRequest = hubRequest<SyncManifest>({ action: 'getSyncManifest', force })
     .then(next => {
-      if (cacheGeneration !== generation) return null
+      if (cacheGeneration !== generation || manifestInflight !== nextRequest) return null
       manifest = next
       manifestLoadedAt = Date.now()
       manifestSupported = true
       return next
     })
     .catch(() => {
-      if (cacheGeneration !== generation) return null
+      if (cacheGeneration !== generation || manifestInflight !== nextRequest) return null
       manifestLoadedAt = 0
       return null
     })
@@ -483,8 +485,12 @@ async function revalidateCachedResource<T>(
   const nextManifest = await refreshSyncManifest()
   const serverRevision = nextManifest?.resources?.[resource] ?? ''
   if (serverRevision && entry.revision === serverRevision) {
-    entry.checkedAt = Math.max(entry.checkedAt ?? entry.loadedAt, manifestLoadedAt)
-    if ((resourceFailures.get(cacheKey)?.at ?? 0) <= entry.checkedAt) resourceFailures.delete(cacheKey)
+    const checkedAt = Date.parse(nextManifest?.generatedAt ?? '') || manifestLoadedAt
+    // A version check made before or during a failed download cannot clear it.
+    const failure = resourceFailures.get(cacheKey)
+    if (failure && checkedAt <= failure.at) return
+    entry.checkedAt = Math.max(entry.checkedAt ?? entry.loadedAt, checkedAt)
+    if (failure) resourceFailures.delete(cacheKey)
     return
   }
   if (!serverRevision && Date.now() - entry.loadedAt < BACKGROUND_INTERVAL_MS[resource]) return
@@ -505,7 +511,7 @@ async function cachedHubRequest<T>(
     void revalidateCachedResource<T>(cacheKey, resource, request)
     return cached.data as T
   }
-  const nextManifest = await refreshSyncManifest()
+  const nextManifest = await refreshSyncManifest(force)
   return fetchAndStore<T>(cacheKey, resource, request, nextManifest?.resources?.[resource] ?? '')
 }
 
@@ -841,7 +847,7 @@ async function runSchoolHubBackgroundSync(viewerName: string) {
   backgroundSyncRunning = true
   try {
     await hydratePersistentSchoolHubCache()
-    await refreshSyncManifest(true)
+    await refreshSyncManifest()
     const now = Date.now()
     for (const resource of Object.keys(BACKGROUND_INTERVAL_MS) as HubResource[]) {
       const lastChecked = backgroundLastChecked.get(resource) ?? 0

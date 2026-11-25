@@ -30,6 +30,7 @@ import {
   type PersistentHubCacheEntry,
 } from './school-hub-cache'
 import { getSchoolHubEndpointCandidates, resolveSchoolHubEndpoint, UNGCHEON_SCHOOL_HUB_URL } from './school-hub-endpoint'
+import { createSchoolHubReadCache } from './school-hub-read-cache'
 import { buildTimetablePlanHwp, type TimetablePlanDraftInput } from './timetable-plan-hwp'
 import {
   buildVolunteerCertificateHwp,
@@ -1206,6 +1207,7 @@ async function fetchSchoolHub(
 }
 
 async function requestSchoolHub(payload: Record<string, unknown>) {
+  const sessionGeneration = staffAuth.sessionGeneration()
   if (IS_PREVIEW) {
     if (!HUB_ACTIONS.has(String(payload.action))) return { ok:false, code:'LOCAL_ACTION_BLOCKED', error:'허용되지 않은 요청입니다.' }
     const before = staffAuth.snapshot()
@@ -1213,7 +1215,7 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
     try {
       const data = await staffAuth.request(payload)
       const after = staffAuth.snapshot()
-      if (!after.authenticated || before.expiresAt !== after.expiresAt || before.teacherName !== after.teacherName) throw Error('로그인이 변경되었습니다.')
+      if (staffAuth.sessionGeneration() !== sessionGeneration || !after.authenticated || before.expiresAt !== after.expiresAt || before.teacherName !== after.teacherName) throw Error('로그인이 변경되었습니다.')
       return {ok:true,data}
     } catch (error) { return { ok: false, error:error instanceof Error ? error.message : '시험 서버 연결을 확인해 주세요.' } }
   }
@@ -1260,7 +1262,7 @@ async function requestSchoolHub(payload: Record<string, unknown>) {
         if (res.ok) {
           const result = await res.json() as Record<string, unknown>
           const currentIdentity = staffAuth.snapshot()
-          if (!currentIdentity.authenticated || currentIdentity.teacherName !== requestIdentity.teacherName || currentIdentity.expiresAt !== requestIdentity.expiresAt) return { ok: false, code: 'AUTH_REQUIRED', error: '이전 로그인에서 시작한 요청이 취소되었습니다.' }
+          if (staffAuth.sessionGeneration() !== sessionGeneration || !currentIdentity.authenticated || currentIdentity.teacherName !== requestIdentity.teacherName || currentIdentity.expiresAt !== requestIdentity.expiresAt) return { ok: false, code: 'AUTH_REQUIRED', error: '이전 로그인에서 시작한 요청이 취소되었습니다.' }
           if (!result.ok && String(result.error || '').startsWith('AUTH_REQUIRED')) { staffAuth.clear(); return { ...result, code: 'AUTH_REQUIRED' } }
           if (endpointIndex > 0 && endpoint === UNGCHEON_SCHOOL_HUB_URL) {
             store.set('config.schoolHubUrl', UNGCHEON_SCHOOL_HUB_URL)
@@ -1409,10 +1411,26 @@ function checkTodaySchedule() {
 ipcMain.handle('notifier:check',()=>checkTodaySchedule())
 ipcMain.handle('notifier:list',()=>store.get('notifier.events.'+createHash('sha256').update(staffAuth.snapshot().teacherName).digest('hex'),[]))
 const hubReads = new Map<string, ReturnType<typeof requestSchoolHub>>()
-ipcMain.handle('schoolHub:request', (_, payload: Record<string, unknown>) => {
-  if (!HUB_READ_ACTIONS.has(String(payload.action))) return requestSchoolHub(payload)
+const sharedHubReads = createSchoolHubReadCache<Awaited<ReturnType<typeof requestSchoolHub>>>()
+ipcMain.handle('schoolHub:request', (event, payload: Record<string, unknown>) => {
+  if (!trustedApp(event)) return { ok: false, error: '허용되지 않은 화면입니다.' }
+  const action = String(payload.action)
+  if (!HUB_READ_ACTIONS.has(action)) {
+    return requestSchoolHub(payload).then(result => {
+      if (result.ok) sharedHubReads.invalidateManifest()
+      return result
+    })
+  }
   const identity = staffAuth.snapshot()
-  const key = JSON.stringify([identity.teacherName,identity.expiresAt,payload])
+  if (!identity.authenticated) return requestSchoolHub(payload)
+  if (action === 'getSyncManifest' || action === 'getWidgetAttendanceSummaries') {
+    const force = payload.force === true
+    const request = action === 'getSyncManifest' ? { action } : { ...payload, force }
+    const scope = action === 'getWidgetAttendanceSummaries' ? [payload.viewerName, payload.date] : []
+    const key = JSON.stringify([staffAuth.sessionGeneration(), identity.teacherName, identity.expiresAt, ...scope])
+    return sharedHubReads.read(action, key, force, () => requestSchoolHub(request))
+  }
+  const key = JSON.stringify([staffAuth.sessionGeneration(), identity.teacherName, identity.expiresAt, payload])
   const pending = hubReads.get(key)
   if (pending) return pending
   const request = requestSchoolHub(payload).finally(()=>hubReads.delete(key))

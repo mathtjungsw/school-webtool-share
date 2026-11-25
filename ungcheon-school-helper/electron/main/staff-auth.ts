@@ -30,6 +30,7 @@ export function createStaffAuth(endpoint: () => string, trusted: (event: Electro
       if (generation !== current) throw new Error('인증이 취소되었습니다.')
       retryRequired = false
       state = result
+      generation++
       if (safeStorage.isEncryptionAvailable()) { mkdirSync(app.getPath('userData'), { recursive: true }); writeFileSync(path, safeStorage.encryptString(JSON.stringify(state))) }
       broadcast(); return snapshot()
     }
@@ -62,5 +63,5 @@ export function createStaffAuth(endpoint: () => string, trusted: (event: Electro
     if (action === 'logout') { const token = state?.token; clear(); if (token) await call({ action: 'staffLogout', staffToken: token }).catch(() => undefined); return snapshot() }
     throw new Error('허용되지 않은 인증 요청입니다.')
   })
-  return { snapshot, request: authorizedRequest, clear, authorizePayload: (payload: Record<string, unknown>) => { if (!snapshot().authenticated || !state) throw new Error('로그인이 필요합니다.'); return { ...payload, staffToken: state.token } } }
+  return { snapshot, sessionGeneration: () => generation, request: authorizedRequest, clear, authorizePayload: (payload: Record<string, unknown>) => { if (!snapshot().authenticated || !state) throw new Error('로그인이 필요합니다.'); return { ...payload, staffToken: state.token } } }
 }
