@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 82;
+const MOBILE_SERVICE_VERSION = 83;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -361,6 +361,8 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {key:'server-v83',title:'공용 서버 · 1~3학년 수업 출결',body:'1~3학년 학급수업과 이동수업의 교시별 출결을 조회하고 입력할 수 있습니다.',date:'2026-11-25'},
+  {key:'v1.1.49',title:'PC v1.1.49 · 전 학년 수업 출결',body:'웅천고 도우미 실험실의 수업 출결에서 학년과 교시를 고를 수 있습니다. 1~3학년 학급수업과 등록된 이동수업의 담임·교과 출결을 확인합니다.',date:'2026-11-25'},
   {key:'server-v82',title:'공용 서버 · 이동수업 출결',body:'3학년 담임 학급과 담당 수업의 출결·비고를 Firebase에 저장합니다. 교장·교감 전체 조회에는 기존 보호 메뉴 인증을 사용합니다.',date:'2026-11-25'},
   {key:'v1.1.48',title:'[업데이트] 웅천고 업무도우미 v1.1.48 · 이동수업 출결',body:'왼쪽 내 바로가기 아래 실험실과 모바일 일정에서 3학년 이동수업 출결을 엽니다. 담임과 교과 출결을 나란히 비교하고 빠르게 입력할 수 있습니다. 로그인 전에도 PC 창과 위젯을 닫을 수 있습니다.',date:'2026-11-25'},
   {key:'server-v81',title:'공용 서버 · PC 1.1.47 메뉴 개편 안내',body:'전체 메뉴와 기능 훑어보기를 추가하고 PC의 고정 메뉴와 대시보드 즐겨찾기를 내 바로가기로 합쳤습니다.',date:'2026-11-25'},
@@ -3624,16 +3626,20 @@ function mobileAttendanceNumber_(value) {
   return digits ? String(Number(digits[0])) : '';
 }
 
-function mobileAttendanceSourceSlot_(date, period, timetableOverrides) {
-  if (mobileCancelledGradePeriod_(date, '3', period)) return null;
+function mobileAttendanceSourceSlot_(date, period, timetableOverrides, grade, classNo) {
+  grade = String(grade || '3');
+  if (mobileCancelledGradePeriod_(date, grade, period)) return null;
   const overrides = Array.isArray(timetableOverrides) ? timetableOverrides : listTimetableOverrides_({ includeInactive: false });
   const applicable = overrides.filter(function(item) {
     return item.active && item.date === date && Number(item.targetPeriod) === Number(period) &&
-      (!item.targetGrade || item.targetGrade === '3') && !item.targetClass;
+      (!item.targetGrade || String(item.targetGrade) === grade) &&
+      (!item.targetClass || (classNo && Number(item.targetClass) === Number(classNo)));
   });
   if (!applicable.length) return { date: date, period: period };
   applicable.sort(function(a, b) {
-    return Number(Boolean(b.targetGrade)) - Number(Boolean(a.targetGrade)) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));
+    return Number(Boolean(b.targetClass)) - Number(Boolean(a.targetClass)) ||
+      Number(Boolean(b.targetGrade)) - Number(Boolean(a.targetGrade)) ||
+      String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));
   });
   const override = applicable[0];
   if (override.action === 'clear') return null;
@@ -3666,8 +3672,8 @@ function mobileAttendanceSheetSnapshot_(expectedDate) {
   return { sourceDate: sourceDate, classes: classes };
 }
 
-function mobileAttendanceContext_(viewerName, date, period, timetableOverrides, timetableChanges, pulledLessons) {
-  if (mobileCancelledGradePeriod_(date, '3', period)) return null;
+function mobileAttendanceContext_(viewerName, date, period, timetableOverrides, timetableChanges, pulledLessons, plannedSlot) {
+  if (!plannedSlot && mobileCancelledGradePeriod_(date, '3', period)) return null;
   const pulled = (Array.isArray(pulledLessons) ? pulledLessons : []).find(function(item) {
     // 클라이언트가 보내는 최소 색인은 로그인 교사 본인의 원수업 이동만 허용합니다.
     return clean_(item.teacherName, 30) === viewerName && clean_(item.originalTeacherName, 30) === viewerName && clean_(item.date, 10) === date && Number(item.period) === Number(period);
@@ -3707,7 +3713,7 @@ function mobileAttendanceContext_(viewerName, date, period, timetableOverrides, 
     return clean_(item.originalTeacherName || item.teacherName, 30) === viewerName && clean_(item.originalDate, 10) === date && matched && Number(matched[1]) === Number(period) && (clean_(item.date, 10) !== date || Number(item.period) !== Number(period));
   });
   if (movedOriginal) return null;
-  const sourceSlot = mobileAttendanceSourceSlot_(date, period, timetableOverrides);
+  const sourceSlot = plannedSlot || mobileAttendanceSourceSlot_(date, period, timetableOverrides);
   if (!sourceSlot) return null;
   return { date: sourceSlot.date, period: sourceSlot.period, teacherName: viewerName, changeType: sourceSlot.date !== date || Number(sourceSlot.period) !== Number(period) ? 'override' : '', originalLabel: '' };
 }

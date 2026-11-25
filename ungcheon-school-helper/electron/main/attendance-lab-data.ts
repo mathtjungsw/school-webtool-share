@@ -4,6 +4,7 @@ export type LabField = LabRole | 'note'
 export type LabStudent = { id: string; name: string; classId: string; number: number }
 export type LabLesson = {
   id: string
+  grade?: string
   subject: string
   teacher: string
   teacherId: string
@@ -16,7 +17,7 @@ export type LabRow = LabStudent & {
   lesson?: LabLesson
   exception?: '자습' | '장소 이동' | '명단 확인 필요' | '수업 없음'
 }
-export type LabOptions = { classes: { id: string; label: string }[]; lessons: LabLesson[] }
+export type LabOptions = { classes: { id: string; label: string }[]; lessons: LabLesson[]; electiveRosterGrades?: string[] }
 export type LabRecord = { homeroom?: AttendanceStatus; subject?: AttendanceStatus; note?: string }
 export type LabBoard = { rows: LabRow[]; records: Record<string, LabRecord> }
 export type LabChange = { student: string; field: LabField; value: string }

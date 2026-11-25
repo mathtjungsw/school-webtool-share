@@ -25,10 +25,10 @@ export interface NavigationItem {
 
 export const ATTENDANCE_LAB_MENU = {
   id: 'attendance_lab',
-  label: '이동수업 출결',
+  label: '수업 출결',
   icon: ClipboardCheck,
   assistantCategory: '학생·학사',
-  description: '담임과 교과교사가 교시별 출결을 체크하고 같은 학생의 기록을 비교합니다.',
+  description: '1~3학년 학급수업과 이동수업의 담임·교과 출결을 교시별로 확인합니다.',
 }
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [

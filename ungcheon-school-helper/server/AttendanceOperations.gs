@@ -31,10 +31,12 @@ function attendanceAction_(body) {
   const homeClass = attendanceClassId_(member.homeroom);
   if (body.action === 'attendanceInfo') {
     const timetable = leadership ? null : mobileSchoolData_('timetable', getTimetable_);
-    const hasLessons = Boolean(timetable && timetable.teachers && timetable.teachers.some(function(teacher) {
+    const teaches = Boolean(timetable && timetable.teachers && timetable.teachers.some(function(teacher) {
       return clean_(teacher.name, 30) === viewer;
     }));
-    const roles = elevated ? ['homeroom', 'subject'] : leadership ? [] : [homeClass ? 'homeroom' : '', hasLessons ? 'subject' : ''].filter(Boolean);
+    const substitute = !leadership && !teaches && listTimetableChanges_({ viewerName: viewer, includeSchool: true, fromDate: date, toDate: date })
+      .some(function(item) { return item.kind === 'substitution' && item.originalDate === date && item.replacementTeacher === viewer; });
+    const roles = elevated ? ['homeroom', 'subject'] : leadership ? [] : [homeClass ? 'homeroom' : '', teaches || substitute ? 'subject' : ''].filter(Boolean);
     return { dates: [date], access: { roles: roles, readOnly: leadership, requiresExecutive: leadership && !elevated } };
   }
   if (leadership && !elevated) throw Error('교장·교감 보호 메뉴 인증을 먼저 해 주세요.');
@@ -46,11 +48,10 @@ function attendanceAction_(body) {
   const scope = attendanceScope_(date, period, members, viewer);
   const classes = scope.classes.filter(function(item) { return elevated || item.id === homeClass; });
   const lessons = scope.lessons.filter(function(item) { return elevated || item.teacherIds.indexOf(staffId) >= 0; });
-  if (body.action === 'attendanceOptions') return { classes: classes, lessons: lessons.map(attendancePublicLesson_) };
+  if (body.action === 'attendanceOptions') return { classes: classes, lessons: lessons.map(attendancePublicLesson_), electiveRosterGrades: scope.electiveRosterGrades };
   const allowed = (role === 'homeroom' ? classes : lessons).some(function(item) { return item.id === group; });
   if (!allowed) throw Error('담당 학급 또는 담당 수업만 열 수 있습니다.');
   const rows = scope.rows.filter(function(row) { return role === 'homeroom' ? row.classId === group : row.lesson && row.lesson.id === group; });
-  if (scope.noLesson && body.action === 'attendanceRecord' && body.field !== 'note') throw Error('수업이 없는 교시에는 출결을 입력할 수 없습니다.');
   const repo = migrationPrimaryRepository_(config);
   if (body.action === 'attendanceBoard') return attendanceReadBoard_(repo, date, period, rows, body.ifRevision);
   if (body.action === 'attendanceRecord') return attendanceSaveRecord_(repo, date, period, role, rows, staffId, body);
@@ -58,7 +59,7 @@ function attendanceAction_(body) {
 }
 
 function attendancePublicLesson_(lesson) {
-  const dto = { id: lesson.id, subject: lesson.subject, teacher: lesson.teacher, kind: lesson.kind, room: lesson.room };
+  const dto = { id: lesson.id, grade: lesson.grade, subject: lesson.subject, teacher: lesson.teacher, kind: lesson.kind, room: lesson.room };
   if (lesson.change) dto.change = lesson.change;
   if (lesson.from) dto.from = lesson.from;
   return dto;
@@ -108,6 +109,7 @@ function attendanceReadBoard_(repo, date, period, rows, ifRevision) {
 function attendanceSaveRecord_(repo, date, period, role, rows, staffId, body) {
   const field = body.field, row = rows.find(function(item) { return item.id === body.student; });
   if (!row || !(field === role || field === 'note' && role === 'homeroom') || field === 'subject' && !row.lesson || typeof body.value !== 'string') throw Error('수정할 수 없는 기록입니다.');
+  if (row.exception === '수업 없음' && field !== 'note') throw Error('수업이 없는 교시에는 출결을 입력할 수 없습니다.');
   if (field === 'note' ? body.value.length > 160 : ['미확인', '출석', '결석'].indexOf(body.value) < 0) throw Error('입력한 출결 내용을 확인해 주세요.');
   const value = body.value.trim(), path = attendanceRecordPath_(date, period, row, field);
   for (let attempt = 0; attempt < 3; attempt++) {

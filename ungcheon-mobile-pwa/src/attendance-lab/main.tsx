@@ -10,6 +10,7 @@ import './styles.css'
 const labels = { homeroom: '담임 출결', subject: '교과 출결' }
 const tones: Record<AttendanceStatus, string> = { 미확인: 'pending', 출석: 'present', 지각: 'late', 조퇴: 'early', 결석: 'absent' }
 const noteOptions = ['지각', '결과', '결석']
+const attendanceGrades = ['1', '2', '3']
 
 const statusText = (status: AttendanceStatus) => status === '미확인' ? '미입력' : status
 
@@ -196,6 +197,7 @@ function Attendance({ token }: { token: string }) {
   const [dates, setDates] = useState<string[]>([])
   const [date, setDate] = useState('')
   const [period, setPeriod] = useState(2)
+  const [grade, setGrade] = useState('')
   const [classId, setClassId] = useState('')
   const [lessonId, setLessonId] = useState('')
   const [error, setError] = useState('')
@@ -205,8 +207,10 @@ function Attendance({ token }: { token: string }) {
   const options = loaded?.key === optionsKey ? loaded.options : null
   const role = requestedRole && access?.roles.includes(requestedRole) ? requestedRole : access?.roles[0]
   const canLoadOptions = Boolean(access?.roles.length)
-  const selectedClass = options?.classes.find(item => item.id === classId) ?? options?.classes[0]
-  const course = options?.lessons.find(lesson => lesson.id === lessonId) ?? options?.lessons[0]
+  const classes = options?.classes.filter(item => !grade || item.id.startsWith(grade + '-')) ?? []
+  const lessons = options?.lessons.filter(lesson => !grade || (lesson.grade ?? '3') === grade) ?? []
+  const selectedClass = classes.find(item => item.id === classId) ?? classes[0]
+  const course = lessons.find(lesson => lesson.id === lessonId) ?? lessons[0]
   const group = role === 'homeroom' ? selectedClass?.id : course?.id
 
   useEffect(() => {
@@ -217,7 +221,7 @@ function Attendance({ token }: { token: string }) {
       setDate(result.dates[1] ?? result.dates[0] ?? '')
       setAccess(result.access)
       setError('')
-    }).catch(error => { if (!controller.signal.aborted) setError(error instanceof Error ? error.message : '시험 날짜를 불러오지 못했습니다.') })
+    }).catch(error => { if (!controller.signal.aborted) setError(error instanceof Error ? error.message : '출결 날짜를 불러오지 못했습니다.') })
     return () => controller.abort()
   }, [token, executiveToken, retry])
 
@@ -271,25 +275,32 @@ function Attendance({ token }: { token: string }) {
       {access?.roles.includes('homeroom') && <button type="button" aria-pressed={role === 'homeroom'} onClick={() => setRole('homeroom')}><UsersRound size={18} />담임 교사 확인창</button>}
       {access?.roles.includes('subject') && <button type="button" aria-pressed={role === 'subject'} onClick={() => setRole('subject')}><GraduationCap size={19} />교과 교사 확인창</button>}
     </div>
-    <section className="lab-filters" aria-label="출결 조회 조건">
+    <section className={IS_ATTENDANCE_PREVIEW ? 'lab-filters' : 'lab-filters lab-filters-all-grades'} aria-label="출결 조회 조건">
       <label className="lab-date"><span><CalendarDays size={15} /> 날짜</span><select value={date} onChange={event => setDate(event.target.value)}>
         {dates.map(day => <option key={day}>{day}</option>)}
       </select></label>
+      {!IS_ATTENDANCE_PREVIEW && <label className="lab-grade"><span>학년</span><select value={grade} onChange={event => setGrade(event.target.value)}>
+        <option value="">전체 학년</option>
+        {attendanceGrades.map(value => <option key={value} value={value}>{value}학년</option>)}
+      </select></label>}
       <div className="lab-period"><span>교시</span><div role="group" aria-label="교시">
         {Array.from({ length: 7 }, (_, i) => i + 1).map(p => <button type="button" key={p} aria-label={`${p}교시`} aria-pressed={p === period} onClick={() => setPeriod(p)}>{p}<small>교시</small></button>)}
       </div></div>
       <label className="lab-group"><span>{role === 'homeroom' ? '학급' : '수업'}</span>
-        {role === 'homeroom' ? <select value={selectedClass?.id ?? ''} disabled={!selectedClass || options?.classes.length === 1} onChange={event => setClassId(event.target.value)}>
-          {options?.classes.map(item => <option value={item.id} key={item.id}>{item.label}</option>)}
+        {role === 'homeroom' ? <select value={selectedClass?.id ?? ''} disabled={classes.length < 2} onChange={event => setClassId(event.target.value)}>
+          {classes.length ? classes.map(item => <option value={item.id} key={item.id}>{item.label}</option>) : <option>선택할 학급 없음</option>}
         </select> : <select value={course?.id ?? ''} disabled={!course} onChange={event => setLessonId(event.target.value)}>
-          {course ? options?.lessons.map(lesson => <option key={lesson.id} value={lesson.id}>{lesson.subject} · {lesson.kind} · {lesson.teacher}</option>) : <option>선택할 수업 없음</option>}
+          {course ? lessons.map(lesson => <option key={lesson.id} value={lesson.id}>{lesson.grade ? lesson.grade + '학년 · ' : ''}{lesson.subject} · {lesson.kind} · {lesson.room}</option>) : <option>선택할 수업 없음</option>}
         </select>}
       </label>
     </section>
+    {grade && options?.electiveRosterGrades && !options.electiveRosterGrades.includes(grade) && (
+      <p className="lab-notice" role="status">{grade}학년 이동수업 수강 명단이 아직 등록되지 않았습니다.</p>
+    )}
     {role === 'subject' && course && <div className="lab-selected-course"><Lesson lesson={course} /></div>}
     {error ? <div className="lab-notice" role="alert">{error} <button type="button" onClick={() => { setError(''); setRetry(value => value + 1) }}><RefreshCw size={14} /> 다시 시도</button></div>
       : options && group ? <Board key={selection} token={token} selection={selection} role={role} readOnly={Boolean(access?.readOnly)} executiveToken={executiveToken} />
-      : <p className="lab-empty" role="status">{options ? '이 교시에 담당 수업이 없습니다.' : '출결에 필요한 시간표를 불러오는 중입니다.'}</p>}
+      : <p className="lab-empty" role="status">{options ? (role === 'homeroom' ? '선택한 학년에 담당 학급이 없습니다.' : '선택한 학년과 교시에 담당 수업이 없습니다.') : '출결에 필요한 시간표를 불러오는 중입니다.'}</p>}
   </>
 }
 
@@ -301,16 +312,16 @@ function App() {
     {!desktop && <a className="lab-back" href="./"><ArrowLeft size={16} /> 모바일 일정</a>}
     <header className="lab-header">
       <div className="lab-brand"><FlaskConical size={17} />{opened ? <button type="button" onClick={() => setOpened(false)}>웅천고 도우미 실험실</button> : <span>웅천고 도우미 실험실</span>}</div>
-      <h1>{opened ? '이동수업 출결' : '실험실'}</h1>
+      <h1>{opened ? '수업 출결' : '실험실'}</h1>
       <p>{opened ? '교시별로 담임과 교과의 출결을 확인합니다.' : IS_ATTENDANCE_PREVIEW ? '개발 중인 기능을 예시 자료로 사용해 볼 수 있습니다.' : '교직원 업무 기능을 확인합니다.'}</p>
-      {opened && <span className="lab-demo">{IS_ATTENDANCE_PREVIEW ? '시험용 자료 · 3학년' : '3학년 · 오늘 출결'}</span>}
+      {opened && <span className="lab-demo">{IS_ATTENDANCE_PREVIEW ? '시험용 자료 · 3학년' : '1~3학년 · 오늘 출결'}</span>}
     </header>
     {opened ? token ? <Attendance key={token} token={token} /> : <p className="lab-empty" role="status">
       {token === null ? '로그인 상태를 확인하는 중입니다.' : '업무도우미 또는 모바일 일정에 로그인한 뒤 다시 열어 주세요.'}
     </p> : <section className="lab-feature" aria-labelledby="lab-feature-title">
       <div className="lab-feature-icon"><ClipboardCheck size={25} /></div>
-      <div><span className="lab-badge moving">{IS_ATTENDANCE_PREVIEW ? '시험 사용 가능' : '3학년'}</span><h2 id="lab-feature-title">이동수업 출결</h2><p>담임과 교과교사가 교시별 출결을 직접 체크하고 같은 학생의 기록을 비교합니다.</p></div>
-      <button type="button" onClick={() => setOpened(true)}>이동수업 출결 열기 <ArrowRight size={17} /></button>
+      <div><span className="lab-badge moving">{IS_ATTENDANCE_PREVIEW ? '시험 사용 가능' : '1~3학년'}</span><h2 id="lab-feature-title">수업 출결</h2><p>학급수업과 이동수업의 담임·교과 출결을 교시별로 확인합니다.</p></div>
+      <button type="button" onClick={() => setOpened(true)}>수업 출결 열기 <ArrowRight size={17} /></button>
     </section>}
   </main>
 }
