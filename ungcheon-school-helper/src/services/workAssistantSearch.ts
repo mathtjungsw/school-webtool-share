@@ -1,4 +1,4 @@
-import { NAVIGATION_BY_ID, NAVIGATION_ITEMS } from '../config/navigationRegistry'
+import { ATTENDANCE_LAB_MENU, NAVIGATION_BY_ID, NAVIGATION_ITEMS } from '../config/navigationRegistry'
 
 export interface WorkAssistantEntry {
   id: string
@@ -113,6 +113,7 @@ const DETAILED_WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
       '출결 비고가 자습인 학생은 실제 결석 인원과 분리해 연두색 장소 이동 항목으로 표시됩니다.',
       '위젯 출결을 자동으로 5분마다 확인합니다. 바로 확인하려면 상단 새로고침을 누릅니다.',
       '위젯 설정의 모듈 편집에서 표시할 기능과 순서를 고르고 간단히·기본·자세히 밀도를 선택합니다.',
+      '위젯 오른쪽 위 ×는 로그인 전에도 사용할 수 있습니다. 위젯을 닫았다가 트레이에서 다시 열 수 있습니다.',
       '접으면 내용만큼 위젯 높이가 줄고, 화면보다 내용이 길면 본문 안에서 스크롤합니다. 상단 조작 버튼과 하단 업무·새 알림·프로그램 열기는 계속 표시됩니다.',
       '필요하면 내일 첫 일정, 날씨 행동 알림, 업무 마감 타임라인, 빠른 메모와 학교생활 도구를 켭니다.',
       '빠른 메모는 이 PC에만 저장되며 사용자가 직접 선택한 경우에만 개인 업무로 옮겨집니다.',
@@ -149,8 +150,8 @@ const DETAILED_WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
   {
     id: 'login-school-network', title: '로그인·학교 공유 서비스 연결 확인', page: 'help', category: '설정·도움말',
     summary: '학교망에서 로그인 서버 연결 오류가 나면 최신 수정본과 프록시·보안 프로그램 설정을 확인합니다. 로그인도 Windows 시스템 설정을 따르는 앱 통신을 사용합니다.',
-    steps: ['앱을 완전히 종료한 뒤 다시 실행합니다. 학교 공유 URL이 누락된 PC는 시작할 때 자동 복구됩니다.', '인터넷 연결을 확인한 뒤 본인 이름과 공통 비밀번호를 입력합니다. PC 로그인은 120시간(5일) 유지됩니다.', '학교 Wi-Fi에서는 되지만 유선망에서만 안 되면 v1.1.40 이상인지 확인합니다.', '최신 버전에서도 계속 실패하면 표시되는 오류 문구와 사용 중인 네트워크를 관리자에게 전달합니다.'],
-    keywords: ['로그인 안됨', '로그인 오류', '공통 비밀번호', '로그인 유지 120시간', '120시간 로그인', '5일 로그인', 'fetch failed', '패치 페일', '학교 공유 url이 활성화 되지 않았습니다', '학교 공유 URL 누락', '학교 공유 URL 자동 복구', '학교 공유 서비스', '공유 서비스 연결', '유선망', '학교 랜선', '프록시', '보안 필터', '인터넷 연결', '자동 재시도'],
+    steps: ['로그인 화면 오른쪽 위의 종료를 눌러 앱을 완전히 종료한 뒤 다시 실행합니다. 학교 공유 URL이 누락된 PC는 시작할 때 자동 복구됩니다.', '인터넷 연결을 확인한 뒤 본인 이름과 공통 비밀번호를 입력합니다. PC 로그인은 120시간(5일) 유지됩니다.', '학교 Wi-Fi에서는 되지만 유선망에서만 안 되면 v1.1.40 이상인지 확인합니다.', '최신 버전에서도 계속 실패하면 표시되는 오류 문구와 사용 중인 네트워크를 관리자에게 전달합니다.'],
+    keywords: ['로그인 안됨', '로그인 오류', '로그인 전 종료', '닫기 버튼', '공통 비밀번호', '로그인 유지 120시간', '120시간 로그인', '5일 로그인', 'fetch failed', '패치 페일', '학교 공유 url이 활성화 되지 않았습니다', '학교 공유 URL 누락', '학교 공유 URL 자동 복구', '학교 공유 서비스', '공유 서비스 연결', '유선망', '학교 랜선', '프록시', '보안 필터', '인터넷 연결', '자동 재시도'],
   },
   {
     id: 'external-schedule-network', title: '학교 PC 외부 일정 연결·로컬 복구', page: 'calendar', category: '일정',
@@ -550,8 +551,19 @@ function scoreEntry(query: string, entry: WorkAssistantEntry) {
   return score
 }
 
-export function searchWorkAssistant(query: string, limit = 5): WorkAssistantResult[] {
-  return WORK_ASSISTANT_ENTRIES
+const attendanceLabEntry: WorkAssistantEntry = {
+  id: 'attendance-lab-preview',
+  title: ATTENDANCE_LAB_MENU.label,
+  page: ATTENDANCE_LAB_MENU.id,
+  category: ATTENDANCE_LAB_MENU.assistantCategory,
+  summary: ATTENDANCE_LAB_MENU.description,
+  steps: ['왼쪽 내 바로가기 아래의 웅천고 도우미 실험실에서 이동수업 출결을 엽니다.', '담임 교사 확인창이나 교과 교사 확인창을 선택합니다.', '미입력 버튼을 한 번 누르면 출석, 두 번 누르면 결석으로 바뀝니다.'],
+  keywords: ['웅천고 도우미 실험실', '이동수업 출결', '담임 출결', '교과 출결', '교시별 출결'],
+}
+
+export function searchWorkAssistant(query: string, limit = 5, attendanceLabEnabled = false): WorkAssistantResult[] {
+  const entries = attendanceLabEnabled ? [...WORK_ASSISTANT_ENTRIES, attendanceLabEntry] : WORK_ASSISTANT_ENTRIES
+  return entries
     .map(entry => ({ ...entry, score: scoreEntry(query, entry) }))
     .filter(entry => entry.score > 0)
     .sort((a, b) => b.score - a.score || a.title.localeCompare(b.title, 'ko'))

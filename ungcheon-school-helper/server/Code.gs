@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 81;
+const MOBILE_SERVICE_VERSION = 82;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -361,6 +361,8 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {key:'server-v82',title:'공용 서버 · 이동수업 출결',body:'3학년 담임 학급과 담당 수업의 출결·비고를 Firebase에 저장합니다. 교장·교감 전체 조회에는 기존 보호 메뉴 인증을 사용합니다.',date:'2026-11-25'},
+  {key:'v1.1.48',title:'[업데이트] 웅천고 업무도우미 v1.1.48 · 이동수업 출결',body:'왼쪽 내 바로가기 아래 실험실과 모바일 일정에서 3학년 이동수업 출결을 엽니다. 담임과 교과 출결을 나란히 비교하고 빠르게 입력할 수 있습니다. 로그인 전에도 PC 창과 위젯을 닫을 수 있습니다.',date:'2026-11-25'},
   {key:'server-v81',title:'공용 서버 · PC 1.1.47 메뉴 개편 안내',body:'전체 메뉴와 기능 훑어보기를 추가하고 PC의 고정 메뉴와 대시보드 즐겨찾기를 내 바로가기로 합쳤습니다.',date:'2026-11-25'},
   {key:'v1.1.47',title:'[업데이트] 웅천고 업무도우미 v1.1.47 · 전체 메뉴와 기능 훑어보기',body:'왼쪽 메뉴는 내 바로가기 중심으로 정리했습니다. 전체 메뉴에서 분야를 펼치거나 검색하고, 기능 훑어보기에서 예시 그림과 한 줄 설명을 확인할 수 있습니다. ★로 추가한 기능은 왼쪽 메뉴와 대시보드에 함께 표시됩니다.',date:'2026-11-25'},
   {key:'server-v80',title:'공용 서버 · 진학·대입 메뉴 추가 안내',body:'정식 PC 1.1.46에서 전년도 입시결과, 경남 고교 교육과정 편제표, 수행평가 영역명 가이드를 열 수 있습니다.',date:'2026-11-25'},
@@ -980,6 +982,8 @@ function doPost(e) {
   try {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     const action = String(body.action || '');
+    const attendanceAction = ['attendanceInfo','attendanceOptions','attendanceBoard','attendanceRecord','attendanceLeadership'].indexOf(action) >= 0;
+    if (attendanceAction && !body.staffToken && (!body.viewerName || !body.accessToken)) throw Error('로그인 후 이용해 주세요.');
 
     // The mirror retry takes its own lock and reads the latest committed Firestore snapshot.
     if (action === 'retryPrivateSchoolMirror') return json_({ok:true,data:privateSchoolRetryMirror_(body)});
@@ -987,6 +991,10 @@ function doPost(e) {
     // Select the data source before roster-based authentication as well as reads.
     if (typeof migrationPrimaryDispatchNeeded_ === 'function' && migrationPrimaryDispatchNeeded_(action)) {
       return migrationPrimaryDispatch_(body, function() { return doPost(e); });
+    }
+
+    if (attendanceAction) {
+      return json_({ ok: true, data: attendanceAction_(body) });
     }
 
     // Staff authentication is mandatory for all non-mobile protected actions.

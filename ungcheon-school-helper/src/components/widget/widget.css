@@ -740,8 +740,13 @@ footer button {
 }
 .widget-login,
 .widget-loading {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
   gap: 8px;
   text-align: center;
   padding: 22px;
@@ -753,7 +758,7 @@ footer button {
   font-size: 11px;
   color: #64748b;
 }
-.widget-login button {
+.widget-login > button {
   border: 0;
   border-radius: 10px;
   background: #e7c700;

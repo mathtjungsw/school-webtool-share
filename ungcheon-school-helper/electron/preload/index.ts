@@ -6,6 +6,9 @@ contextBridge.exposeInMainWorld('preview', {
   loginHint: () => ipcRenderer.invoke('preview:loginHint'),
   filePath: (file: File) => webUtils.getPathForFile(file),
   mobile: () => ipcRenderer.invoke('preview:mobile'),
+  attendanceLab: (): Promise<string> => ipcRenderer.invoke('preview:attendanceLab'),
+  attendanceLabAccess: (): Promise<string> => ipcRenderer.invoke('preview:attendanceLabAccess'),
+  attendanceLabRequest: (action: string, payload: Record<string, unknown>): Promise<unknown> => ipcRenderer.invoke('preview:attendanceLabRequest', action, payload),
   checkSchedule: () => ipcRenderer.invoke('notifier:check'),
   scheduleAlerts: () => ipcRenderer.invoke('notifier:list'),
   onScheduleAlerts: (cb:()=>void) => {ipcRenderer.on('notifier:changed',cb);return ()=>ipcRenderer.removeListener('notifier:changed',cb)},
@@ -22,6 +25,7 @@ contextBridge.exposeInMainWorld('electron', {
   minimize: () => ipcRenderer.send('window:minimize'),
   maximize: () => ipcRenderer.send('window:maximize'),
   close: () => ipcRenderer.send('window:close'),
+  quit: () => ipcRenderer.send('window:quit'),
 
   // Config
   configGet: (key: string) => ipcRenderer.invoke('config:get', key),

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { X } from 'lucide-react'
 import { useAppStore } from './stores/appStore'
 import { useNoticeStore } from './stores/noticeStore'
 import Layout from './components/Layout'
@@ -79,10 +80,28 @@ export default function App() {
     return startSchoolHubBackgroundSync(useAuthStore.getState().teacherName)
   }, [authenticated, config.schoolHubUrl])
 
-  if (!useAppStore.getState().isConfigLoaded || !authReady) {
-    return <div className="min-h-screen bg-surface-950 grid place-items-center text-sm text-slate-400">시작 준비 중...</div>
+  const ready = useAppStore.getState().isConfigLoaded && authReady
+  if (!ready || !authenticated) {
+    return (
+      <div className="flex h-screen flex-col bg-surface-950">
+        <header className="app-titlebar drag-region flex h-10 shrink-0 items-center justify-end border-b px-2">
+          <button
+            type="button"
+            title="프로그램 종료"
+            className="no-drag inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-rose-100 hover:text-rose-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-700"
+            onClick={() => window.electron.quit()}
+          >
+            <X size={16} aria-hidden="true" /> 종료
+          </button>
+        </header>
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {ready ? <><UpdateStatus /><PilotLogin /></> : (
+            <div className="grid flex-1 place-items-center text-sm text-slate-400">시작 준비 중...</div>
+          )}
+        </div>
+      </div>
+    )
   }
-  if (!authenticated) return <><UpdateStatus /><PilotLogin /></>
 
   return (
     <>

@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { ChevronDown, Pin, PinOff, ScrollText } from 'lucide-react'
+import { ChevronDown, FlaskConical, Pin, PinOff, ScrollText } from 'lucide-react'
 import clsx from 'clsx'
 import schoolLogo from '../assets/ungcheon-logo.png'
-import { NAVIGATION_BY_ID, type NavigationItem } from '../config/navigationRegistry'
+import { ATTENDANCE_LAB_MENU, NAVIGATION_BY_ID, type NavigationItem } from '../config/navigationRegistry'
 import { isSidebarExpanded, normalizeSidebarExpandedPinned, SIDEBAR_EXPANDED_PINNED_KEY } from '../services/sidebarPreferences'
 import { useAppStore } from '../stores/appStore'
 
 const SHORTCUT_LIMIT = 8
 
 export default function Sidebar({
-  currentPage, shortcuts, onNavigate, onOpenLog, logErrorCount,
+  currentPage, shortcuts, attendanceLabEnabled, onNavigate, onOpenLog, logErrorCount,
 }: {
   currentPage: string
   shortcuts: NavigationItem[]
+  attendanceLabEnabled: boolean
   onNavigate: (id: string) => void
   onOpenLog: () => void
   logErrorCount: number
@@ -21,6 +22,7 @@ export default function Sidebar({
   const [hovered, setHovered] = useState(false)
   const [expandedPinned, setExpandedPinned] = useState(true)
   const [showAll, setShowAll] = useState(false)
+  const [labOpen, setLabOpen] = useState(true)
   const teacherName = useAppStore(s => s.config.teacherName)
   const expanded = isSidebarExpanded(expandedPinned, hovered, false)
   const showingAll = expanded && showAll
@@ -39,7 +41,7 @@ export default function Sidebar({
     void window.electron?.configSet(SIDEBAR_EXPANDED_PINNED_KEY, next).catch(() => undefined)
   }
 
-  const itemButton = (item: NavigationItem, active = currentPage === item.id) => {
+  const itemButton = (item: Pick<NavigationItem, 'id' | 'label' | 'icon'>, active = currentPage === item.id) => {
     const Icon = item.icon
     return (
       <button
@@ -110,6 +112,19 @@ export default function Sidebar({
             </button>
           )}
         </section>
+
+        {attendanceLabEnabled && <section aria-label="웅천고 도우미 실험실" className="mt-3 border-t border-slate-200/60 pt-2">
+          <button type="button" onClick={() => setLabOpen(open => !open)} aria-label="웅천고 도우미 실험실"
+            aria-expanded={labOpen} aria-controls="attendance-lab-menu" title={expanded ? undefined : '웅천고 도우미 실험실'}
+            className="mx-1.5 flex h-9 w-[calc(100%-0.75rem)] items-center gap-2 rounded-xl px-3 text-left text-slate-700 hover:bg-amber-100">
+            <FlaskConical size={16} aria-hidden="true" className="shrink-0" />
+            {expanded && <><span className="flex-1 whitespace-nowrap text-xs font-bold">웅천고 도우미 실험실</span>
+              <ChevronDown size={14} aria-hidden="true" className={clsx('shrink-0', !labOpen && '-rotate-90')} /></>}
+          </button>
+          <div id="attendance-lab-menu" hidden={!labOpen} className={expanded ? 'pl-3' : undefined}>
+            {itemButton(ATTENDANCE_LAB_MENU)}
+          </div>
+        </section>}
       </nav>
 
       <div className="shrink-0 border-t border-slate-200/60 py-1">

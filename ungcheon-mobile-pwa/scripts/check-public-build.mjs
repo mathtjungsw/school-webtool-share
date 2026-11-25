@@ -18,6 +18,7 @@ async function inspect(dir) {
     if (/\.pdf$/i.test(item.name)) assert.equal(item.name, 'ungcheon-mobile-install-guide.pdf')
     if (!/\.(?:js|mjs|json|html)$/i.test(item.name)) continue
     const content = await readFile(file, 'utf8')
+    assert.ok(!/attendance-lab-api\/|demo-ungcheon-attendance|시험물리교사|윤가람/.test(content), '운영 화면에 시험용 출결 API 또는 명단이 있습니다.')
     // Runtime field names are expected. Populated school timetable records may never be shipped.
     for (const [row] of content.matchAll(/\{[^{}]{0,2400}(?:originalSlot|originalTeacherName)[^{}]{0,2400}\}/g)) {
       assert.ok(!/["']?teacherName["']?\s*:\s*["'][^"']+["']/.test(row), '공개 빌드에 교사별 수업 레코드가 있습니다.')

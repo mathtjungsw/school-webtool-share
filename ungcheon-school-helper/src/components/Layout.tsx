@@ -1,6 +1,6 @@
 import { useNoticeStore } from '../stores/noticeStore'
 import { acceptChangeNavigation, acceptTaskNavigation } from '../services/taskNavigation'
-import { Component, type ReactNode, lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Component, type ReactNode, lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { KeyRound, ShieldCheck, X } from 'lucide-react'
 import TitleBar from './TitleBar'
@@ -136,12 +136,40 @@ class ToolErrorBoundary extends Component<{children:ReactNode},{failed:boolean}>
 }
 const INITIAL_PAGE = 'dashboard'
 
+function AttendanceLabFrame({ url }: { url: string }) {
+  const frame = useRef<HTMLIFrameElement>(null)
+  useEffect(() => {
+    const origin = new URL(url).origin
+    let mounted = true
+    const grantAccess = async (event: MessageEvent) => {
+      const target = frame.current?.contentWindow
+      if (!target || event.origin !== origin || event.source !== target) return
+      if (event.data?.type === 'ungcheon-attendance-ready') {
+        const ticket = origin.startsWith('https:') ? 'desktop' : await window.preview.attendanceLabAccess().catch(() => '')
+        if (mounted && frame.current?.contentWindow === target) target.postMessage({ type: 'ungcheon-attendance-session', ticket }, origin)
+      }
+      if (origin === 'https://ungcheon-school-helper-mobile.web.app' && event.data?.type === 'ungcheon-attendance-request') {
+        const { id, action, payload } = event.data
+        if (typeof id !== 'string' || !/^[\w-]{1,60}$/.test(id) || typeof action !== 'string') return
+        const executiveToken = useAuthStore.getState().executiveAccessToken
+        const response = await window.preview.attendanceLabRequest(action, { ...payload, executiveToken })
+          .then(data => ({ data })).catch(error => ({ error: String(error.message || error).replace(/^Error invoking remote method .*?: (?:Error: )?/, '') }))
+        if (mounted && frame.current?.contentWindow === target) target.postMessage({ type: 'ungcheon-attendance-response', id, ...response }, origin)
+      }
+    }
+    window.addEventListener('message', grantAccess)
+    return () => { mounted = false; window.removeEventListener('message', grantAccess) }
+  }, [url])
+  return <iframe ref={frame} src={url} title="웅천고 도우미 실험실" sandbox="allow-scripts allow-same-origin allow-forms" className="block h-full w-full border-0" />
+}
+
 export default function Layout() {
   // 앱을 새로 실행하거나 로그인 세션이 시작될 때는 이전 화면과 관계없이 대시보드에서 시작한다.
   const [history, setHistory] = useState([INITIAL_PAGE])
   const [historyIndex, setHistoryIndex] = useState(0)
   const [logOpen, setLogOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
+  const [attendanceLabUrl, setAttendanceLabUrl] = useState('')
   const [requestedExecutivePage, setRequestedExecutivePage] = useState('')
   const [executivePassword, setExecutivePassword] = useState('')
   const page = history[historyIndex]
@@ -162,6 +190,10 @@ export default function Layout() {
   const logErrorCount = logs.filter(log => log.level === 'error').length
   const Page = PAGES[page]
 
+  useEffect(() => {
+    void window.preview?.attendanceLab().then(setAttendanceLabUrl).catch(() => setAttendanceLabUrl(''))
+  }, [])
+
   const navigate = (target: string) => {
     let id = acceptChangeNavigation(acceptTaskNavigation(target))
     if (id.startsWith('dashboard?notice=')) {
@@ -170,9 +202,10 @@ export default function Layout() {
       id = 'dashboard'
     }
     if (id === 'admin_center' && !isAdmin) return
+    if (id === 'attendance_lab' && !attendanceLabUrl) return
     if (id === 'mini_widget') { void window.electron?.showWidget(); return }
     if (id.startsWith('executive_') && !executiveIdentityRole) return
-    if (id.startsWith('executive_') && !executiveRole) {
+    if ((id.startsWith('executive_') || id === 'attendance_lab' && attendanceLabUrl.startsWith('https:') && executiveIdentityRole) && !executiveRole) {
       useAuthStore.setState({ error: '' })
       setRequestedExecutivePage(id)
       setExecutivePassword('')
@@ -209,11 +242,11 @@ export default function Layout() {
   }, [isAdmin, page])
 
   useEffect(() => {
-    if (!executiveRole && page.startsWith('executive_')) {
+    if (!executiveRole && (page.startsWith('executive_') || page === 'attendance_lab' && attendanceLabUrl.startsWith('https:') && executiveIdentityRole)) {
       setHistory([INITIAL_PAGE])
       setHistoryIndex(0)
     }
-  }, [executiveRole, page])
+  }, [attendanceLabUrl, executiveIdentityRole, executiveRole, page])
 
   useEffect(() => {
     const openAssistant = (event: KeyboardEvent) => {
@@ -254,12 +287,13 @@ export default function Layout() {
         <Sidebar
           currentPage={page}
           shortcuts={shortcuts}
+          attendanceLabEnabled={Boolean(attendanceLabUrl)}
           onNavigate={navigate}
           onOpenLog={() => setLogOpen(open => !open)}
           logErrorCount={logErrorCount}
         />
         <main className="app-main-surface flex-1 relative overflow-hidden">
-          <AnimatePresence mode="wait">
+          {page === 'attendance_lab' && attendanceLabUrl ? <AttendanceLabFrame url={attendanceLabUrl} /> : <AnimatePresence mode="wait">
             <motion.div
               key={viewKey}
               initial={{ opacity: 0 }}
@@ -278,12 +312,12 @@ export default function Layout() {
                 )}
               </Suspense></ToolErrorBoundary>
             </motion.div>
-          </AnimatePresence>
+          </AnimatePresence>}
           {navigation.error && <p role="alert" className="absolute bottom-3 right-3 z-20 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{navigation.error}</p>}
         </main>
       </div>
       <LogPanel open={logOpen} onClose={() => setLogOpen(false)} />
-      <WorkAssistantSearch open={assistantOpen} onClose={() => setAssistantOpen(false)} onNavigate={navigate} />
+      <WorkAssistantSearch open={assistantOpen} attendanceLabEnabled={Boolean(attendanceLabUrl)} onClose={() => setAssistantOpen(false)} onNavigate={navigate} />
       {requestedExecutivePage && <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/45 p-5" role="presentation" onMouseDown={closeExecutiveUnlock}>
         <form onSubmit={submitExecutiveUnlock} onMouseDown={event => event.stopPropagation()} className="w-full max-w-sm rounded-3xl border border-emerald-200 bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="executive-unlock-title">
           <div className="flex items-start justify-between gap-4"><div className="flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-100 text-emerald-800"><ShieldCheck size={21} /></span><div><p className="text-[11px] font-black text-emerald-700">보호 메뉴 추가 인증</p><h2 id="executive-unlock-title" className="text-lg font-black text-slate-950">{executiveIdentityRole === 'principal' ? '교장메뉴' : '교감메뉴'} 열기</h2></div></div><button type="button" aria-label="닫기" onClick={closeExecutiveUnlock} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"><X size={18} /></button></div>

@@ -2,13 +2,14 @@ export {}
 
 declare global {
   interface Window {
-    preview: { clearArea:(area:string)=>Promise<void>; checkSchedule:()=>Promise<{neisPending:number;edufaiPending:number;timestamp:string}>; scheduleAlerts:()=>Promise<import('./features/futureOperations/types').OperationsNotification[]>; onScheduleAlerts:(cb:()=>void)=>()=>void; onSync: (cb:()=>void)=>()=>void; filePath: (file: File) => string; loginHint: () => Promise<{name:string;password:string}|null>; mobile: () => Promise<void>; saveGradeWork: (key:string, value:string) => Promise<boolean>; gradeVault: (action: string, key: string, value?: string) => {ok:boolean;value:string|null}; auth: (action: string, args?: unknown) => Promise<any>; view: (p: any) => Promise<any>; update: (action: string) => Promise<any>; onUpdate: (cb: (s: any) => void) => () => void }
+    preview: { attendanceLab: () => Promise<string>; attendanceLabAccess: () => Promise<string>; attendanceLabRequest: (action: string, payload: Record<string, unknown>) => Promise<unknown>; clearArea:(area:string)=>Promise<void>; checkSchedule:()=>Promise<{neisPending:number;edufaiPending:number;timestamp:string}>; scheduleAlerts:()=>Promise<import('./features/futureOperations/types').OperationsNotification[]>; onScheduleAlerts:(cb:()=>void)=>()=>void; onSync: (cb:()=>void)=>()=>void; filePath: (file: File) => string; loginHint: () => Promise<{name:string;password:string;accounts:string[]}|null>; mobile: () => Promise<void>; saveGradeWork: (key:string, value:string) => Promise<boolean>; gradeVault: (action: string, key: string, value?: string) => {ok:boolean;value:string|null}; auth: (action: string, args?: unknown) => Promise<any>; view: (p: any) => Promise<any>; update: (action: string) => Promise<any>; onUpdate: (cb: (s: any) => void) => () => void }
     privateTool: { call: (action: string, args?: unknown) => Promise<any>; progress: (cb: (p: number) => void) => () => void }
 
     electron: {
       minimize: () => void
       maximize: () => void
       close: () => void
+      quit: () => void
       configGet: (key: string) => Promise<unknown>
       configSet: (key: string, value: unknown) => Promise<void>
       configSetMany: (patch: Record<string, unknown>) => Promise<void>

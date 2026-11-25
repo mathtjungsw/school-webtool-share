@@ -11,9 +11,10 @@ export default function PilotLogin() {
   const error = useAuthStore(state => state.error)
 
   const auth = useAuthStore()
-  const [hint,setHint] = useState<{name:string;password:string}|null>(null)
+  const [hint,setHint] = useState<Awaited<ReturnType<typeof window.preview.loginHint>>>(null)
+  const [testAccount, setTestAccount] = useState('')
   useEffect(() => { void window.preview.loginHint().then(setHint) }, [])
-  if (auth.retryRequired) return <main className="min-h-screen grid place-items-center"><section className="card p-8 space-y-4">
+  if (auth.retryRequired) return <main className="grid flex-1 place-items-center p-5"><section className="card p-8 space-y-4">
     <h1 className="page-title">학교 서버에 연결할 수 없습니다</h1><p>연결 상태를 확인한 뒤 다시 시도해 주세요.</p>
     <button className="btn-primary" onClick={() => void auth.bootstrap()}>연결 다시 확인</button>
     <button className="btn-ghost" onClick={() => void auth.logout()}>로그아웃</button>
@@ -26,7 +27,7 @@ export default function PilotLogin() {
   }
 
   return (
-    <main className="min-h-screen bg-surface-950 grid place-items-center p-5">
+    <main className="grid flex-1 place-items-center p-5">
       <section className="w-full max-w-md rounded-3xl border border-amber-400/20 bg-surface-900 p-8 shadow-2xl">
         <div className="mx-auto mb-5 h-20 w-20 rounded-2xl bg-white p-2 shadow-lg">
           <img src={schoolLogo} alt="웅천고등학교" className="h-full w-full object-contain" />
@@ -37,7 +38,12 @@ export default function PilotLogin() {
         </div>
         {hint && <div className="mt-4 rounded-xl bg-amber-50 p-3 space-y-2"><strong>통합 시험판 · 가상 자료</strong>
           <p className="text-sm">모바일 시험 계정 {hint.name} · {hint.password}</p>
-          <button className="btn-secondary" onClick={() => void login(hint.name,hint.password)}>시험 계정으로 로그인</button>
+          <label className="block text-sm font-semibold">시험 계정
+            <select className="input-field mt-1 w-full" value={testAccount || hint.name} onChange={event => setTestAccount(event.target.value)}>
+              {hint.accounts.map(account => <option key={account}>{account}</option>)}
+            </select>
+          </label>
+          <button className="btn-secondary" onClick={() => void login(testAccount || hint.name,hint.password)}>시험 계정으로 로그인</button>
           <button className="btn-ghost" onClick={() => void window.preview.mobile()}>모바일 시험 화면 열기</button></div>}
         <form onSubmit={submit} className="mt-7 space-y-4">
           <label className="block">

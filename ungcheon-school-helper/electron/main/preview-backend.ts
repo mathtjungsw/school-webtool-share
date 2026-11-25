@@ -3,22 +3,46 @@ import { resolve, sep, extname } from 'node:path'
 import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync, statSync } from 'fs'
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'crypto'
+import { createAttendanceLab } from './attendance-lab'
+import { LAB_STAFF } from './attendance-lab-data'
 
 export async function startPreviewBackend(configPath: string, mobileDirectory: string) {
   let cfg: any = null
   const sessions = new Map<string, { name: string; expiresAt: string }>()
+  const labTickets = new Map<string, string>()
+  const staffTicket = new Map<string, string>()
   const grants = new Map<string, { session: string; expires: number }>()
   const failures = new Map<string, { count: number; until: number }>()
   const sha = (v: string) => createHash('sha256').update(v).digest('hex')
   const sessionFile = configPath + '.sessions'
   let fingerprint = ''
+  const activeSession = (key: string) => {
+    const session = sessions.get(key)
+    return session && cfg?.names.includes(session.name) && Date.parse(session.expiresAt) > Date.now() ? session : null
+  }
+  const attendanceLab = createAttendanceLab(token => {
+    refreshConfiguration()
+    const key = labTickets.get(sha(token)) ?? 'mobile:' + sha(token)
+    const session = activeSession(key)
+    const staff = session && LAB_STAFF.find(member => member.name === session.name)
+    if (!session || !staff) return null
+    return { staff, expiresAt: Date.parse(session.expiresAt), active: () => activeSession(key) === session }
+  })
+
+  const revokeLabTicket = (key: string) => {
+    const token = staffTicket.get(key)
+    if (token) labTickets.delete(sha(token))
+    staffTicket.delete(key)
+  }
   const refreshConfiguration = () => {
     let next: any = null
     try { if(existsSync(configPath))next=JSON.parse(readFileSync(configPath,'utf8')) } catch {}
-    if(!next || typeof next.salt!=='string' || !/^[a-f0-9]{64}$/.test(next.verifier||'') || !Array.isArray(next.names)){cfg=null;sessions.clear();return}
+    if(!next || typeof next.salt!=='string' || !/^[a-f0-9]{64}$/.test(next.verifier||'') || !Array.isArray(next.names)){cfg=null;sessions.clear();labTickets.clear();staffTicket.clear();attendanceLab.closeUnauthorized();return}
     const nextFingerprint=sha(next.salt+next.verifier)
     if(nextFingerprint!==fingerprint){sessions.clear();failures.clear();try{const saved=JSON.parse(readFileSync(sessionFile,'utf8'));if(saved.fingerprint===nextFingerprint)for(const [key,value] of saved.sessions)sessions.set(key,value)}catch{}fingerprint=nextFingerprint}
     cfg=next
+    for (const key of staffTicket.keys()) if (!activeSession(key)) revokeLabTicket(key)
+    attendanceLab.closeUnauthorized()
   }
   refreshConfiguration()
   const persist = () => { if(cfg) writeFileSync(sessionFile,JSON.stringify({fingerprint,sessions:[...sessions].filter(([,value])=>Date.parse(value.expiresAt)>Date.now())})) }
@@ -28,7 +52,10 @@ export async function startPreviewBackend(configPath: string, mobileDirectory: s
     res.setHeader('Content-Type', 'application/json; charset=utf-8')
     res.setHeader('Cache-Control', 'no-store')
     const host = '127.0.0.1:' + req.socket.localPort
-    if (req.headers.host !== host || (req.headers.origin && req.headers.origin !== 'http://' + host) || req.headers['sec-fetch-site'] === 'cross-site') { res.writeHead(403); res.end(); return }
+    const desktopLabFrame = req.method === 'GET' && req.headers['sec-fetch-dest'] === 'iframe' && req.url === '/attendance-lab.html?layout=desktop'
+    if (req.headers.host !== host || (req.headers.origin && req.headers.origin !== 'http://' + host) || (req.headers['sec-fetch-site'] === 'cross-site' && !desktopLabFrame)) { res.writeHead(403); res.end(); return }
+    const url = new URL(req.url || '/', `http://${host}`)
+    if (await attendanceLab.handle(req, res, url)) return
     if (req.method === 'GET' && mobileDirectory) {
       const file = resolve(mobileDirectory, '.' + (req.url === '/' ? '/index.html' : (req.url || '').split('?')[0]))
       if (!file.startsWith(resolve(mobileDirectory)+sep) || !existsSync(file) || !statSync(file).isFile()) { res.writeHead(404);res.end();return }
@@ -64,7 +91,7 @@ export async function startPreviewBackend(configPath: string, mobileDirectory: s
       if (['getMobileScheduleBundle','getMobileAttendanceRoster','logoutMobileViewer','getMobileResource'].includes(body.action)) {
         const key='mobile:'+sha(String(body.accessToken || '')), viewer=sessions.get(key)
         if(!viewer || viewer.name!==body.viewerName || Date.parse(viewer.expiresAt)<=Date.now()){res.end(JSON.stringify({ok:false,code:'MOBILE_SESSION_EXPIRED'}));return}
-        if(body.action==='logoutMobileViewer'){sessions.delete(key);persist();ok(true);return}
+        if(body.action==='logoutMobileViewer'){sessions.delete(key);attendanceLab.closeUnauthorized();persist();ok(true);return}
         const date=String(body.fromDate || body.date || ''), now=new Date().toISOString()
         const slots=Array.from({length:35},(_,i)=>({value:i%7===0?'1-1\n시험 과목':'',locked:false}))
         const meals=[{date,mealType:'중식',dishNames:['시험용 급식'],calories:'700 Kcal'}]
@@ -80,7 +107,17 @@ export async function startPreviewBackend(configPath: string, mobileDirectory: s
       if (!auth || Date.parse(auth.expiresAt) <= Date.now() || !cfg.names.includes(auth.name)) { fail('AUTH_REQUIRED'); return }
       if (body.action === 'health') {ok({service:'시험 학교 서버',version:75});return}
       if (body.action === 'staffSession') { ok(auth); return }
-      if (body.action === 'staffLogout') { sessions.delete(tokenKey); persist(); ok(true); return }
+      if (body.action === 'staffLogout') { sessions.delete(tokenKey); revokeLabTicket(tokenKey); attendanceLab.closeUnauthorized(); persist(); ok(true); return }
+      if (body.action === 'attendanceLabTicket') {
+        if (!LAB_STAFF.some(staff => staff.name === auth.name)) { fail('AUTH_REQUIRED'); return }
+        let ticket = staffTicket.get(tokenKey)
+        if (!ticket) {
+          ticket = randomBytes(32).toString('hex')
+          staffTicket.set(tokenKey, ticket)
+          labTickets.set(sha(ticket), tokenKey)
+        }
+        ok({ ticket }); return
+      }
       if (body.action === 'caseUnlock') {
         const guess = sha(String(body.password || ''))
         const prior = failures.get('case:'+tokenKey)
@@ -137,5 +174,5 @@ export async function startPreviewBackend(configPath: string, mobileDirectory: s
     }).listen(19743, '127.0.0.1', resolve)
   })
   const address = server.address() as { port: number }
-  return { url: `http://127.0.0.1:${address.port}`, close: () => server.close() }
+  return { url: `http://127.0.0.1:${address.port}`, close: () => { attendanceLab.close(); server.close() } }
 }

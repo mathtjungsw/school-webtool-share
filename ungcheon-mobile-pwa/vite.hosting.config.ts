@@ -4,5 +4,5 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: './',
-  build: { outDir: 'dist-hosting' },
+  build: { outDir: 'dist-hosting', rollupOptions: { input: ['index.html', 'attendance-lab.html'] } },
 })

@@ -25,10 +25,12 @@ function loadRecentQuestions() {
 
 export default function WorkAssistantSearch({
   open,
+  attendanceLabEnabled,
   onClose,
   onNavigate,
 }: {
   open: boolean
+  attendanceLabEnabled: boolean
   onClose: () => void
   onNavigate: (page: string) => void
 }) {
@@ -38,7 +40,8 @@ export default function WorkAssistantSearch({
   const [recent, setRecent] = useState<string[]>(loadRecentQuestions)
   const teacherName = useAppStore(state => state.config.teacherName?.trim())
   const executiveRole = useAuthStore(state => state.executiveRole)
-  const results = useMemo(() => searchWorkAssistant(query).filter(result => executiveRole || !result.page.startsWith('executive_')), [executiveRole, query])
+  const results = useMemo(() => searchWorkAssistant(query, 5, attendanceLabEnabled)
+    .filter(result => executiveRole || !result.page.startsWith('executive_')), [attendanceLabEnabled, executiveRole, query])
 
   useEffect(() => {
     if (!open) return

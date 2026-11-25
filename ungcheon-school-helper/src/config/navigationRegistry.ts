@@ -23,6 +23,14 @@ export interface NavigationItem {
   searchAliases?: string[]
 }
 
+export const ATTENDANCE_LAB_MENU = {
+  id: 'attendance_lab',
+  label: '이동수업 출결',
+  icon: ClipboardCheck,
+  assistantCategory: '학생·학사',
+  description: '담임과 교과교사가 교시별 출결을 체크하고 같은 학생의 기록을 비교합니다.',
+}
+
 export const NAVIGATION_ITEMS: NavigationItem[] = [
   { id: 'feature_catalog', label: '전체 메뉴', icon: Grid2X2, assistantCategory: '설정·도움말', description: '분야별 기능을 찾아 열고 내 바로가기에 추가합니다.', preview: 'tools', searchAliases: ['메뉴 찾기', '전체 기능', '내 바로가기', '즐겨찾기'] },
   { id: 'feature_overview', label: '기능 훑어보기', icon: Images, assistantCategory: '설정·도움말', description: '각 기능으로 할 수 있는 일을 그림과 한 문장으로 살펴봅니다.', preview: 'tools', searchAliases: ['기능 소개', '기능 목록', '어떤 기능', '한눈에 보기'] },

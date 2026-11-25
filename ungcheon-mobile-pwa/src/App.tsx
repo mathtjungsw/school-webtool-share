@@ -16,21 +16,20 @@ import type { DashboardPayload, LessonView, MealInfo, MobileAttendanceRoster, Mo
 import { formatCheckedAt, RESOURCE_LABELS, resourceStatus, summarizeStatus, type StatusSummary } from './dataStatus'
 import { VISUAL_NAME, visualFixture } from './visualFixture'
 import { getSpecialTimetableDay } from './shared/specialTimetableDays'
+import { SESSION_KEY, readStoredSession, type MobileSession } from './session'
 
-const SESSION_KEY = 'ungcheon.mobile.session.v1'
 const FILTER_KEY = 'ungcheon.mobile.filters.v1'
 const THEME_KEY = 'ungcheon.mobile.theme.v1'
 const SESSION_MS = 72 * 60 * 60 * 1000
 const RESUME_COALESCE_MS = 1_500
 type View = 'today' | 'week' | 'next' | 'timetable'
-interface MobileSession { name: string; accessToken: string; expiresAt: number }
 const visualMode = import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('visual') === '1'
 
 function readSession() {
   const empty = { session: null as MobileSession | null, notice: '' }
   if (typeof window === 'undefined') return empty
   try {
-    const value = JSON.parse(localStorage.getItem(SESSION_KEY) ?? '{}') as Partial<MobileSession>
+    const value = readStoredSession()
     if (value.name && value.accessToken && Number(value.expiresAt) > Date.now()) return { session: { name: value.name, accessToken: value.accessToken, expiresAt: Number(value.expiresAt) }, notice: '' }
     if (value.name) void deleteUserCache(value.name)
     localStorage.removeItem(SESSION_KEY)
@@ -574,6 +573,8 @@ export default function App() {
       <div className="brand-lockup"><span><img className="school-logo" src="./icon-192.png" alt="웅천고등학교 로고" /></span><div><p>웅천고등학교</p><strong>모바일 일정</strong></div></div>
       <div className="header-actions"><a href="./ungcheon-mobile-install-guide.pdf" target="_blank" rel="noreferrer" aria-label="홈 화면 설치 안내서"><Download /></a><button aria-label="테마 전환" onClick={() => setTheme(value => value === 'light' ? 'dark' : 'light')}>{theme === 'light' ? <Moon /> : <Sun />}</button><button aria-label="로그아웃" onClick={logout}><LogOut /></button></div>
     </header>
+    {(import.meta.env.MODE === 'preview' || typeof window !== 'undefined' && ['ungcheon-school-helper-mobile.web.app', 'ungcheon-school-helper-mobile.firebaseapp.com'].includes(window.location.hostname)) &&
+      <a className="lab-preview-link" href="./attendance-lab.html">웅천고 도우미 실험실 <ChevronRight size={16} /></a>}
     <details className="pc-only-note"><summary>이용 안내 · 개인 업무·일정은 PC에서</summary><p>개인 업무와 개인 일정은 <strong>PC용 웅천고 업무도우미</strong>에서만 확인할 수 있습니다.</p></details>
     {(offline || message) && <div className="offline-note" aria-live="polite"><CloudOff size={16} /><span>{offline && data ? '연결이 불안정해 마지막 정상 조회 자료를 표시합니다.' : message || '오프라인입니다. 이 기간의 저장 자료를 확인해 주세요.'}</span></div>}
     {cacheWarning && <div className="offline-note" role="status"><AlertTriangle size={16} /><span>{cacheWarning}</span></div>}

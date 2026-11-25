@@ -16,7 +16,7 @@
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       },
       {
-        "source": "/@(index.html|sw.js|manifest.webmanifest)",
+        "source": "/@(index.html|attendance-lab.html|sw.js|manifest.webmanifest)",
         "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
       },
       {

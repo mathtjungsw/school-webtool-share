@@ -448,6 +448,14 @@ export function isWidgetActionableChange(
     && lastLessonDate >= today;
 }
 
+function WidgetCloseButton() {
+  return (
+    <button type="button" title="위젯 닫기" aria-label="위젯 닫기" onClick={() => void window.electron.hideWidget()}>
+      <X size={16} aria-hidden="true" />
+    </button>
+  );
+}
+
 export default function WidgetApp() {
   const dragSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -1127,23 +1135,29 @@ export default function WidgetApp() {
     }
   };
 
-  if (!auth.ready) {
-    return <div className="widget-shell widget-loading">위젯 준비 중…</div>;
-  }
-  if (!auth.authenticated) {
+  if (!auth.ready || !auth.authenticated || dataOwner !== auth.teacherName) {
+    const needsLogin = auth.ready && !auth.authenticated;
     return (
-      <div className="widget-shell widget-login">
-        <UpdateStatus compact /><strong>{auth.retryRequired ? "학교 서버에 연결할 수 없습니다" : "로그인이 필요합니다"}</strong>
-        {auth.retryRequired && <button onClick={() => void auth.bootstrap()}>연결 다시 확인</button>}
-        <span>개인 시간표와 업무는 로그인 후 표시됩니다.</span>
-        <button onClick={() => window.electron.widgetOpenMain("dashboard")}>
-          업무도우미에서 로그인
-        </button>
+      <div className="widget-shell">
+        <header className="widget-header drag-region">
+          <div className="widget-identity"><b>웅천고 업무도우미</b></div>
+          <nav className="no-drag"><WidgetCloseButton /></nav>
+        </header>
+        {needsLogin ? (
+          <div className="widget-login">
+            <UpdateStatus compact />
+            <strong>{auth.retryRequired ? "학교 서버에 연결할 수 없습니다" : "로그인이 필요합니다"}</strong>
+            {auth.retryRequired && <button onClick={() => void auth.bootstrap()}>연결 다시 확인</button>}
+            <span>개인 시간표와 업무는 로그인 후 표시됩니다.</span>
+            <button onClick={() => window.electron.widgetOpenMain("dashboard")}>
+              업무도우미에서 로그인
+            </button>
+          </div>
+        ) : (
+          <div className="widget-loading">{auth.ready ? "교사별 위젯 자료 준비 중…" : "위젯 준비 중…"}</div>
+        )}
       </div>
     );
-  }
-  if (dataOwner !== auth.teacherName) {
-    return <div className="widget-shell widget-loading">교사별 위젯 자료 준비 중…</div>;
   }
 
   const timetableModule = (
@@ -1342,7 +1356,7 @@ export default function WidgetApp() {
             <button title={settings.expanded ? "접기" : "펼치기"} onClick={() => void applySettings({ expanded: !settings.expanded })}>
               {settings.expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
-            <button title="위젯 숨기기" onClick={() => window.electron.hideWidget()}><X size={16} /></button>
+            <WidgetCloseButton />
           </nav>
         </header>
         <UpdateStatus compact />

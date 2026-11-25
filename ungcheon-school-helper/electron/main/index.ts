@@ -10,6 +10,7 @@ import { autoUpdater } from 'electron-updater'
 import { randomBytes, scryptSync, createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { startPreviewBackend } from './preview-backend'
+import { LAB_STAFF } from './attendance-lab-data'
 import { createStaffAuth } from './staff-auth'
 import { registerGradeVault } from './grade-vault'
 import { registerFeatureViews } from './feature-views'
@@ -81,7 +82,7 @@ if (IS_VALIDATION) {
 }
 if (IS_PREVIEW) {
   app.setName('웅천고 업무도우미 통합 시험판')
-  app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), 'UngcheonSchoolHelper-Preview-20261118'))
+  app.setPath('userData', join(process.env.LOCALAPPDATA || app.getPath('appData'), `UngcheonSchoolHelper-${app.getVersion()}`))
   app.setAppUserModelId('kr.hs.ungcheon.schoolhelper.preview20261118')
 } else app.setAppUserModelId(IS_VALIDATION ? 'kr.hs.ungcheon.schoolhelper.validation' : 'kr.hs.ungcheon.schoolhelper')
 const store = new Store()
@@ -108,13 +109,28 @@ function syncWindows(force = false) {
   windows.forEach(w=>w.webContents.send('schedule:sync'))
 }
 let previewEndpoint = ''
-let previewLogin: {name:string;password:string} | null = null
+let previewLogin: { name: string; password: string; accounts: string[] } | null = null
 const trustedApp = (event: Electron.IpcMainInvokeEvent) => [mainWindow?.webContents, widgetWindow?.webContents].includes(event.sender) && event.senderFrame === event.sender.mainFrame
 const staffAuth = createStaffAuth(() => previewEndpoint || UNGCHEON_SCHOOL_HUB_URL, trustedApp)
 bindHubCacheOwner(()=>staffAuth.snapshot().authenticated ? staffAuth.snapshot().teacherName : '')
 const flushGradeWork = registerGradeVault(() => mainWindow, () => staffAuth.snapshot().authenticated ? staffAuth.snapshot().teacherName : '')
 ipcMain.handle('preview:loginHint', event => IS_PREVIEW && trustedApp(event) ? previewLogin : null)
 ipcMain.handle('preview:mobile', event => { if (trustedApp(event) && IS_PREVIEW && previewEndpoint) return shell.openExternal(previewEndpoint + '/'); })
+ipcMain.handle('preview:attendanceLab', event => {
+  if (!trustedApp(event) || !staffAuth.snapshot().authenticated) return ''
+  const origin = IS_PREVIEW ? previewEndpoint : 'https://ungcheon-school-helper-mobile.web.app'
+  return origin ? `${origin}/attendance-lab.html?layout=desktop` : ''
+})
+ipcMain.handle('preview:attendanceLabAccess', async event => {
+  if (!IS_PREVIEW || !previewEndpoint || event.sender !== mainWindow?.webContents || !trustedApp(event)) return ''
+  const grant = await staffAuth.request({ action: 'attendanceLabTicket' })
+  return typeof grant?.ticket === 'string' ? grant.ticket : ''
+})
+ipcMain.handle('preview:attendanceLabRequest', async (event, action: string, payload: Record<string, unknown>) => {
+  if (IS_PREVIEW || event.sender !== mainWindow?.webContents || !trustedApp(event) ||
+      !['attendanceInfo','attendanceOptions','attendanceBoard','attendanceRecord'].includes(action)) throw Error('허용되지 않는 출결 요청입니다.')
+  return staffAuth.request({ ...payload, action })
+})
 const featureViews = registerFeatureViews(() => mainWindow, staffAuth)
 const updateManager = registerUpdateManager(autoUpdater, () => { showMainWindow(); mainWindow?.webContents.send('navigate:request', 'help'); mainWindow?.webContents.executeJavaScript("window.dispatchEvent(new Event('update:open'))").catch(() => undefined) }, trustedApp, flushGradeWork)
 
@@ -224,13 +240,15 @@ app.whenReady().then(async () => {
     const password = existsSync(credential) && safeStorage.isEncryptionAvailable()
       ? safeStorage.decryptString(readFileSync(credential)) : randomBytes(12).toString('base64url')
     if (!existsSync(credential) && safeStorage.isEncryptionAvailable()) writeFileSync(credential, safeStorage.encryptString(password))
-    const name = '테스트교사'
-    previewLogin = {name,password}
+    const accounts = LAB_STAFF.map(staff => staff.name)
+    const name = accounts[0]
+    previewLogin = {name,password,accounts}
     const salt = randomBytes(16).toString('hex')
     const documents = [{id:'demo',title:'시험용 인문계열 사례집',path:join(app.isPackaged ? process.resourcesPath : join(app.getAppPath(),'resources'),'fixtures','admissions-synthetic.pdf')}]
     const config = existsSync(profileConfig) && existsSync(credential) ? JSON.parse(readFileSync(profileConfig,'utf8')) : {salt,verifier:scryptSync(password,salt,32).toString('hex'),names:[name],caseVerifier:createHash('sha256').update('0000').digest('hex')}
-    writeFileSync(profileConfig,JSON.stringify({...config,documents}))
-    const server = await startPreviewBackend(profileConfig, join(process.resourcesPath,'mobile-preview'))
+    writeFileSync(profileConfig,JSON.stringify({...config,names:accounts,documents}))
+    const mobileDirectory = app.isPackaged ? join(process.resourcesPath, 'mobile-preview') : join(app.getAppPath(), '..', 'ungcheon-mobile-pwa', 'dist-preview')
+    const server = await startPreviewBackend(profileConfig, mobileDirectory)
     previewEndpoint = server.url
     writeFileSync(join(dir,'preview-address.txt'),previewEndpoint)
     app.on('will-quit', () => server.close())
@@ -296,6 +314,9 @@ ipcMain.on('window:maximize', () => {
   else mainWindow?.maximize()
 })
 ipcMain.on('window:close', () => mainWindow?.close())
+ipcMain.on('window:quit', event => {
+  if (event.sender === mainWindow?.webContents && event.senderFrame === event.sender.mainFrame) app.quit()
+})
 ipcMain.handle('widget:show', () => { createWidgetWindow(); return true })
 ipcMain.handle('widget:hide', () => { widgetWindow?.hide(); return true })
 ipcMain.handle('widget:getSettings', () => widgetSettings())
