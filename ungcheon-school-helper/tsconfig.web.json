@@ -134,6 +134,9 @@
     "src/services/fileParser/**/*",
     "src/pages/ExternalToolPage.tsx",
     "src/pages/AdmissionsResourcePage.tsx",
+    "src/pages/FeatureCatalogPage.tsx",
+    "src/services/navigationPreferences.ts",
+    "src/services/useNavigationPreferences.ts",
     "src/pages/RecommendedBooksPage.tsx",
     "src/data/recommendedBooks.json"
   ]

@@ -1,24 +1,15 @@
-﻿import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import SchoolDataStatus from '../components/SchoolDataStatus'
+import type { NavigationItem } from '../config/navigationRegistry'
 import {
-  RefreshCw, ChevronLeft, ChevronRight, AlertCircle,
-  Utensils, CalendarDays, BookOpen, Globe, CloudSun,
-  ShieldCheck, Brain, PenLine, Table2, Calculator,
-  Shuffle, CalendarClock, ClipboardCheck,
-  Shield, GraduationCap, Backpack,
-  DollarSign, Briefcase, ClipboardList, School, ShoppingCart,
-  Landmark, Trophy, FileSearch, FileDown, FileText,
-  FileSpreadsheet, HelpCircle, Waves, SquareStack, CircleDot, Star,
-  FileScan, FileCode2, MapPinned, ScanSearch,
-  Clapperboard, SquarePen, MessagesSquare, BarChart3, Mic, CalendarRange, UsersRound,
-  ArrowUpRight, BellRing, Eye, EyeOff,
-  type LucideIcon,
+  AlertCircle, ArrowUpRight, BellRing, BookOpen, CalendarDays, ChevronLeft, ChevronRight,
+  CloudSun, Eye, EyeOff, Grid2X2, GripVertical, HelpCircle, Images, RefreshCw, Star, Utensils,
 } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
-  PointerSensor,
+  PointerSensor, KeyboardSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -26,7 +17,7 @@ import {
 import {
   SortableContext,
   useSortable,
-  arrayMove,
+  sortableKeyboardCoordinates,
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -79,18 +70,6 @@ import {
 import { ko } from 'date-fns/locale'
 import clsx from 'clsx'
 
-// ─── 포트폴리오 데이터 ─────────────────────────────────────────────
-const COLOR_MAP: Record<string, { bg: string; icon: string; dot: string }> = {
-  violet:  { bg: 'bg-violet-500/10',  icon: 'text-violet-400',  dot: 'bg-violet-500' },
-  sky:     { bg: 'bg-sky-500/10',     icon: 'text-sky-400',     dot: 'bg-sky-500' },
-  emerald: { bg: 'bg-emerald-500/10', icon: 'text-emerald-400', dot: 'bg-emerald-500' },
-  amber:   { bg: 'bg-amber-500/10',   icon: 'text-amber-400',   dot: 'bg-amber-500' },
-  rose:    { bg: 'bg-rose-500/10',    icon: 'text-rose-400',    dot: 'bg-rose-500' },
-  slate:   { bg: 'bg-white/5',        icon: 'text-slate-400',   dot: 'bg-slate-500' },
-  indigo:  { bg: 'bg-indigo-500/10',  icon: 'text-indigo-400',  dot: 'bg-indigo-500' },
-}
-interface PortfolioItem { id: string; label: string; icon: LucideIcon; desc: string; badge?: string; hidden?: boolean }
-interface PortfolioGroup { group: string; color: string; items: PortfolioItem[] }
 interface DashboardScheduleEvent {
   date: string
   eventName: string
@@ -139,47 +118,6 @@ const DEFAULT_DASHBOARD_SOURCE_VISIBILITY: DashboardSourceVisibility = {
   mealDuty: true,
   timetableChange: true,
   pulledLesson: true,
-}
-
-const PORTFOLIO_GROUPS: PortfolioGroup[] = [
-  { group: '학사·기록', color: 'amber', items: [
-    { id: 'timetable_swap', label: '교사 시간표', icon: Shuffle, desc: '내 시간표·교환·대강·공동 공강과 계획서' },
-    { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange, desc: '과목선택 자료를 반영한 개인 시간표 조회·인쇄' },
-    { id: 'student_locator', label: '학생 위치 찾기', icon: FileSearch, desc: '학번·이름으로 현재 수업과 교실 확인' },
-    { id: 'student_identity_audit', label: '학생 학번·이름 교정기', icon: ScanSearch, desc: '파일·붙여넣기의 잘못 연결된 학번과 이름 확인' },
-    { id: 'attendance_print', label: '출석부 출력', icon: ClipboardList, desc: '학급·수업·교사·과목별 출석부 묶음 출력' },
-    { id: 'grade_preview', label: '등급 미리보기', icon: BarChart3, desc: '평가 점수 합산·석차등급·성취도 사전 확인' },
-    { id: 'estimated_split_score', label: '추정분할점수 도우미', icon: SquareStack, desc: '분할점수 구성·성취도 분포 예측과 목표 분포 역산' },
-    { id: 'curriculum', label: '교육과정 편제표 출력', icon: FileText, desc: '4개 편제표 확인·PDF 출력과 과목선택 상담' },
-  ]},
-  { group: '학교운영', color: 'rose', items: [
-    { id: 'staff_tasks', label: '업무센터', icon: ClipboardCheck, desc: '내 업무·부서 업무·개인 업무와 완료 현황 관리' },
-    { id: 'staff_roster', label: '교직원 명렬', icon: UsersRound, desc: '교직원 명렬 관리와 연수등록부 출력' },
-    { id: 'committees', label: '각종 위원회 현황', icon: Landmark, desc: '위원 명단·개최 일정과 중복 확인' },
-  ]},
-  { group: '학교 공유 링크', color: 'violet', items: [
-    { id: 'school_hub', label: '부서별 링크·공지', icon: Globe, desc: '교직원 공용 링크와 학교 공지' },
-  ]},
-  { group: '자료·진로', color: 'sky', items: [
-    { id: 'excel_processor', label: 'Excel 전처리', icon: Table2, desc: '공백·날짜·중복 등 데이터 정제' },
-    { id: 'recommended_subjects', label: '대학 권장과목', icon: GraduationCap, desc: '학년별 2027·2028 대학 권장 이수과목 검색' },
-  ]},
-  { group: '인사행정', color: 'emerald', items: [
-    { id: 'payroll', label: '호봉획정 계산기', icon: Calculator, desc: '경력 인정과 초임 호봉 계산' },
-    { id: 'transfer_score', label: '전보내신점수 계산기', icon: MapPinned, desc: '2027 경남 일반교사 전보 점수 자동 계산' },
-    { id: 'insa_analysis', label: 'NEIS 인사기록 분석', icon: FileScan, desc: '인사기록 PDF 분석과 법정연수 점검' },
-  ]},
-  { group: '파일·알림', color: 'slate', items: [
-    { id: 'pdf_extractor', label: 'PDF 텍스트 추출', icon: FileDown, desc: '일반·스캔 PDF 텍스트 추출' },
-    { id: 'file_parser', label: '만능 파일 파서', icon: FileCode2, desc: 'Excel·HWP·PDF 구조 분석' },
-    { id: 'notifier', label: '업무 알리미', icon: CalendarClock, desc: '오늘의 학사일정 주기 확인' },
-  ]},
-]
-
-// id → color 정적 맵 (즐겨찾기 카드에서 색상 조회용)
-const ITEM_COLOR_MAP: Record<string, string> = {}
-for (const { color, items } of PORTFOLIO_GROUPS) {
-  for (const item of items) ITEM_COLOR_MAP[item.id] = color
 }
 
 // ─── util ────────────────────────────────────────────────────────
@@ -247,71 +185,39 @@ const TC_COLORS = [
   { bg: 'bg-rose-500/20',   text: 'text-rose-300',   now: 'bg-rose-500/35',   badge: 'bg-rose-500/30 text-rose-300'   },
 ]
 
-// ─── SortableCard (즐겨찾기 섹션용) ──────────────────────────────
-function SortableCard({
-  item, color, onNavigate, onToggleFav,
-}: {
-  item: PortfolioItem
-  color: string
+function ShortcutCard({ item, onNavigate, onRemove }: {
+  item: NavigationItem
   onNavigate: (id: string) => void
-  onToggleFav: (id: string) => void
+  onRemove: (id: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
-  const c = COLOR_MAP[color] ?? COLOR_MAP.slate
   const Icon = item.icon
-
   return (
-    <div
-      ref={setNodeRef}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.4 : 1,
-        zIndex: isDragging ? 10 : undefined,
-      }}
-      className="relative group"
-    >
-      <button
-        onClick={() => onNavigate(item.id)}
-        className="w-full text-left p-4 rounded-[16px_16px_16px_5px] bg-surface-800 border border-amber-500/25 hover:border-amber-500/60 hover:bg-surface-700 transition-all duration-200 active:scale-[0.98] shadow-sm"
-      >
-        {/* 드래그 핸들 */}
-        <div
-          {...attributes}
-          {...listeners}
-          onClick={e => e.stopPropagation()}
-          className="absolute top-2 left-2 opacity-0 group-hover:opacity-40 hover:!opacity-70 transition-opacity cursor-grab active:cursor-grabbing text-slate-500 select-none px-0.5"
-          title="드래그로 순서 변경"
-        >
-          ⠿
-        </div>
-
-        {/* 즐겨찾기 해제 버튼 */}
-        <button
-          onClick={e => { e.stopPropagation(); onToggleFav(item.id) }}
-          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-amber-400 hover:text-amber-300"
-          title="즐겨찾기 해제"
-        >
-          <Star size={13} fill="currentColor" />
-        </button>
-
-        <div className={clsx('w-8 h-8 rounded-lg flex items-center justify-center mb-3', c.bg)}>
-          <Icon size={16} className={c.icon} />
-        </div>
-        <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{item.label}</p>
-        <p className="text-xs mt-1 leading-snug" style={{ color: 'var(--text-secondary)' }}>{item.desc}</p>
-        {item.badge && (
-          <span className="mt-2 inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500 text-white">
-            {item.badge}
-          </span>
-        )}
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.55 : 1 }}
+      className="flex items-center gap-1 rounded-xl border border-amber-200 bg-white px-1 py-1">
+      <button type="button" {...attributes} {...listeners} aria-label={item.label + ' 순서 이동'}
+        title="드래그로 순서 변경" className="grid h-8 w-7 shrink-0 cursor-grab place-items-center rounded-lg text-slate-500 hover:bg-amber-50">
+        <GripVertical size={15} aria-hidden="true" />
+      </button>
+      <button type="button" onClick={() => onNavigate(item.id)}
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1.5 py-2 text-left text-sm font-semibold text-slate-900 hover:bg-amber-50">
+        <Icon size={16} aria-hidden="true" className="shrink-0 text-amber-800" />
+        <span className="break-keep">{item.label}</span>
+      </button>
+      <button type="button" onClick={() => onRemove(item.id)} aria-label={item.label + ' 바로가기에서 빼기'}
+        title="바로가기에서 빼기" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-amber-800 hover:bg-amber-50">
+        <Star size={15} aria-hidden="true" fill="currentColor" />
       </button>
     </div>
   )
 }
 
-// ─── main component ───────────────────────────────────────────────
-export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => void }) {
+export default function Dashboard({ onNavigate, shortcuts, onToggleShortcut, onReorderShortcuts }: {
+  onNavigate: (id: string) => void
+  shortcuts: NavigationItem[]
+  onToggleShortcut: (id: string) => void
+  onReorderShortcuts: (active: string, target: string) => void
+}) {
   const { config, saveConfig } = useAppStore()
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const timetableDate = todayStr()
@@ -397,15 +303,6 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
   // ── 2번째 위치 날씨 (설정 시 날씨 카드 하단에 함께 표시) ──
   const { data: weather2, displayName: weather2Place } = useWeather(undefined, config.secondLocationName)
 
-  // ── 즐겨찾기 상태 ──
-  const [favorites, setFavorites] = useState<string[]>([])
-
-  useEffect(() => {
-    window.electron?.configGet('dashboard.favorites').then((saved: unknown) => {
-      if (Array.isArray(saved)) setFavorites(saved as string[])
-    })
-  }, [])
-
   useEffect(() => {
     let cancelled = false
     Promise.all([loadPersonalTasks(), loadPersonalMemo()]).then(([tasks, memo]) => {
@@ -427,32 +324,14 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
     return () => window.clearTimeout(timer)
   }, [memoLoaded, personalMemo])
 
-  const toggleFavorite = useCallback((id: string) => {
-    setFavorites(prev => {
-      const next = prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]
-      window.electron?.configSet('dashboard.favorites', next)
-      return next
-    })
-  }, [])
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (over) onReorderShortcuts(String(active.id), String(over.id))
+  }
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
-
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    setFavorites(prev => {
-      const oldIdx = prev.indexOf(String(active.id))
-      const newIdx = prev.indexOf(String(over.id))
-      const next = arrayMove(prev, oldIdx, newIdx)
-      window.electron?.configSet('dashboard.favorites', next)
-      return next
-    })
-  }, [])
-
-  const allItemsMap = useMemo<Record<string, PortfolioItem>>(() =>
-    Object.fromEntries(
-      PORTFOLIO_GROUPS.flatMap(g => g.items).map(i => [i.id, i])
-    ), [])
 
   const hasSchool = !!(config.officeCode && config.schoolCode)
   const hasNeisApiKey = Boolean(config.schoolHubUrl?.trim())
@@ -1122,96 +1001,28 @@ export default function Dashboard({ onNavigate }: { onNavigate: (id: string) => 
         memo={<PersonalMemoWidget value={personalMemo} onChange={setPersonalMemo} loaded={memoLoaded} />}
       />
 
-      {/* ── 즐겨찾기 섹션 ── */}
-      {favorites.length > 0 && (
-        <div className="mt-8">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="w-1 h-5 rounded-full bg-gradient-to-b from-amber-400 to-amber-600 inline-block" />
-            <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>즐겨찾기</h2>
-            <span className="text-xs text-slate-600 ml-1">드래그로 순서 변경</span>
+      <section className="mb-4 mt-8" aria-labelledby="dashboard-shortcuts">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="dashboard-shortcuts" className="text-base font-bold text-slate-900">내 바로가기</h2>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary" onClick={() => onNavigate('feature_catalog')}>
+              <Grid2X2 size={15} aria-hidden="true" /> 전체 메뉴
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => onNavigate('feature_overview')}>
+              <Images size={15} aria-hidden="true" /> 기능 훑어보기
+            </button>
           </div>
+        </div>
+        {shortcuts.length ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={favorites} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-2">
-                {favorites.map(id => {
-                  const item = allItemsMap[id]
-                  if (!item) return null
-                  return (
-                    <SortableCard
-                      key={id}
-                      item={item}
-                      color={ITEM_COLOR_MAP[id] ?? 'slate'}
-                      onNavigate={onNavigate}
-                      onToggleFav={toggleFavorite}
-                    />
-                  )
-                })}
+            <SortableContext items={shortcuts.map(item => item.id)} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {shortcuts.map(item => <ShortcutCard key={item.id} item={item} onNavigate={onNavigate} onRemove={onToggleShortcut} />)}
               </div>
             </SortableContext>
           </DndContext>
-        </div>
-      )}
-
-      {/* ── 전체 프로그램 포트폴리오 ── */}
-      <div className="mt-8 pb-4">
-        <div className="flex items-center gap-2 mb-6">
-          <span className="w-1.5 h-5 rounded-sm bg-amber-400 inline-block" />
-          <h2 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>전체 프로그램</h2>
-          <span className="text-xs text-slate-600">(★ 즐겨찾기 추가 가능 · 즐겨찾기에서 ⠿ 드래그로 순서 편집)</span>
-        </div>
-        {PORTFOLIO_GROUPS.map(({ group, color, items }) => {
-          const c = COLOR_MAP[color] ?? COLOR_MAP.slate
-          return (
-            <div key={group} className="mb-8">
-              <div className="flex items-center gap-2 mb-3">
-                <span className={clsx('w-2 h-2 rounded-full flex-shrink-0', c.dot)} />
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-500">{group}</h3>
-              </div>
-              {items.filter(i => !i.hidden).length === 0 ? (
-                <p className="text-xs text-slate-600 italic">항목이 없습니다.</p>
-              ) : null}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {items.filter(i => !i.hidden).map(item => {
-                  const Icon = item.icon
-                  const isFav = favorites.includes(item.id)
-                  return (
-                    <div key={item.id} className="relative group">
-                      <button
-                        onClick={() => onNavigate(item.id)}
-                        className="w-full text-left p-4 rounded-[16px_16px_16px_5px] bg-surface-800 border border-white/5 hover:border-amber-500/45 hover:bg-surface-700 transition-all duration-200 active:scale-[0.98] shadow-sm"
-                      >
-                        <div className={clsx('w-8 h-8 rounded-lg flex items-center justify-center mb-3', c.bg)}>
-                          <Icon size={16} className={c.icon} />
-                        </div>
-                        <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{item.label}</p>
-                        <p className="text-xs mt-1 leading-snug" style={{ color: 'var(--text-secondary)' }}>{item.desc}</p>
-                        {item.badge && (
-                          <span className="mt-2 inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500 text-white">
-                            {item.badge}
-                          </span>
-                        )}
-                      </button>
-                      {/* 즐겨찾기 토글 버튼 */}
-                      <button
-                        onClick={() => toggleFavorite(item.id)}
-                        className={clsx(
-                          'absolute top-2 right-2 transition-all',
-                          isFav
-                            ? 'opacity-70 hover:opacity-100 text-amber-400'
-                            : 'opacity-0 group-hover:opacity-50 hover:!opacity-100 text-slate-400 hover:text-amber-400'
-                        )}
-                        title={isFav ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-                      >
-                        <Star size={13} fill={isFav ? 'currentColor' : 'none'} />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
+        ) : <p className="text-sm text-slate-600">전체 메뉴에서 ★를 눌러 내 바로가기를 추가할 수 있습니다.</p>}
+      </section>
       <QuickOrganizerModal date={quickAddDate} onClose={() => setQuickAddDate(null)} onSaved={() => void loadPersonalTasks().then(setPersonalTasks)} />
       <QuickOrganizerTrigger hint={quickAddHint} onClose={() => setQuickAddHint(null)} onOpen={date => { setQuickAddHint(null); setQuickAddDate(date) }} />
     </div>

@@ -1,6 +1,6 @@
 import { useNoticeStore } from '../stores/noticeStore'
 import { acceptChangeNavigation, acceptTaskNavigation } from '../services/taskNavigation'
-import { Component, type ReactNode, lazy, Suspense, useEffect, useState, type FormEvent } from 'react'
+import { Component, type ReactNode, lazy, Suspense, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { KeyRound, ShieldCheck, X } from 'lucide-react'
 import TitleBar from './TitleBar'
@@ -11,6 +11,8 @@ import Dashboard from '../pages/Dashboard'
 import { useAppStore } from '../stores/appStore'
 import { useAdminStore } from '../stores/adminStore'
 import { executiveRoleForName, useAuthStore } from '../stores/authStore'
+import { availableMenus } from '../services/navigationPreferences'
+import { useNavigationPreferences } from '../services/useNavigationPreferences'
 
 const NeisPage = lazy(() => import('../pages/NeisPage'))
 const CalendarPage = lazy(() => import('../pages/CalendarPage'))
@@ -69,6 +71,7 @@ const FutureOperationsPage = lazy(() => import('../features/futureOperations/Fut
 
 const ExternalTool = lazy(() => import('../pages/ExternalToolPage'))
 const AdmissionsResourcePage = lazy(() => import('../pages/AdmissionsResourcePage'))
+const FeatureCatalogPage = lazy(() => import('../pages/FeatureCatalogPage'))
 const PrivateSurface = lazy(() => import('../pages/ExternalToolPage').then(m => ({ default: m.FeatureSurface })))
 const RecommendedBooks = lazy(() => import('../pages/RecommendedBooksPage'))
 const PAGES: Record<string, React.ComponentType> = {
@@ -150,6 +153,12 @@ export default function Layout() {
   const authLoading = useAuthStore(state => state.loading)
   const authError = useAuthStore(state => state.error)
   const executiveIdentityRole = executiveRoleForName(teacherName)
+  const navigation = useNavigationPreferences()
+  const menuItems = useMemo(() => availableMenus(navigation.order, navigation.hidden, navigation.shortcuts, isAdmin, !!executiveIdentityRole),
+    [navigation.order, navigation.hidden, navigation.shortcuts, isAdmin, executiveIdentityRole])
+  const shortcuts = navigation.shortcuts.flatMap(id => menuItems.filter(item => item.id === id))
+  const catalogMode = page === 'feature_catalog' ? 'catalog' : page === 'feature_overview' ? 'overview' : null
+  const viewKey = catalogMode ? 'feature_directory' : page
   const logErrorCount = logs.filter(log => log.level === 'error').length
   const Page = PAGES[page]
 
@@ -161,6 +170,7 @@ export default function Layout() {
       id = 'dashboard'
     }
     if (id === 'admin_center' && !isAdmin) return
+    if (id === 'mini_widget') { void window.electron?.showWidget(); return }
     if (id.startsWith('executive_') && !executiveIdentityRole) return
     if (id.startsWith('executive_') && !executiveRole) {
       useAuthStore.setState({ error: '' })
@@ -243,6 +253,7 @@ export default function Layout() {
       <div className="flex flex-1 min-h-0">
         <Sidebar
           currentPage={page}
+          shortcuts={shortcuts}
           onNavigate={navigate}
           onOpenLog={() => setLogOpen(open => !open)}
           logErrorCount={logErrorCount}
@@ -250,18 +261,25 @@ export default function Layout() {
         <main className="app-main-surface flex-1 relative overflow-hidden">
           <AnimatePresence mode="wait">
             <motion.div
-              key={page}
+              key={viewKey}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.13 }}
               className="absolute inset-0 overflow-y-auto"
             >
-              <ToolErrorBoundary key={page}><Suspense fallback={<div className="h-full grid place-items-center text-sm text-slate-500">불러오는 중...</div>}>
-                {page === 'dashboard' ? <Dashboard onNavigate={navigate} /> : Page ? <Page /> : <Dashboard onNavigate={navigate} />}
+              <ToolErrorBoundary key={viewKey}><Suspense fallback={<div className="h-full grid place-items-center text-sm text-slate-500">불러오는 중...</div>}>
+                {catalogMode ? (
+                  <FeatureCatalogPage mode={catalogMode} items={menuItems} shortcuts={navigation.shortcuts} canEdit={navigation.ready}
+                    onNavigate={navigate} onToggleShortcut={navigation.toggleShortcut} onHide={navigation.hideMenu} />
+                ) : Page ? <Page /> : (
+                  <Dashboard onNavigate={navigate} shortcuts={shortcuts}
+                    onToggleShortcut={navigation.toggleShortcut} onReorderShortcuts={navigation.reorderShortcuts} />
+                )}
               </Suspense></ToolErrorBoundary>
             </motion.div>
           </AnimatePresence>
+          {navigation.error && <p role="alert" className="absolute bottom-3 right-3 z-20 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{navigation.error}</p>}
         </main>
       </div>
       <LogPanel open={logOpen} onClose={() => setLogOpen(false)} />

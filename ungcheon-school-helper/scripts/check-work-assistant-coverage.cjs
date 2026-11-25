@@ -1,5 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
+const assert = require('node:assert/strict')
+const ts = require('typescript')
 
 const projectRoot = path.resolve(__dirname, '..')
 const registrySource = fs.readFileSync(path.join(projectRoot, 'src/config/navigationRegistry.ts'), 'utf8')
@@ -24,7 +26,7 @@ if (duplicates.length) {
   throw new Error(`중복된 메뉴 id가 있습니다: ${[...new Set(duplicates)].join(', ')}`)
 }
 
-if (!sidebarSource.includes("from '../config/navigationRegistry'") || !sidebarSource.includes('NAVIGATION_ITEMS')) {
+if (!sidebarSource.includes("from '../config/navigationRegistry'") || !sidebarSource.includes('NAVIGATION_BY_ID')) {
   throw new Error('Sidebar.tsx가 공통 메뉴 레지스트리를 사용하지 않습니다.')
 }
 if (!assistantSource.includes("from '../config/navigationRegistry'") || !assistantSource.includes('.filter(item => !detailedPages.has(item.id))')) {
@@ -55,3 +57,36 @@ for (const required of ["page: 'settings'", mobileUrl, '공통 비밀번호', '7
   if (!mobileEntry.includes(required)) throw new Error(`모바일 일정 검색 안내가 누락되었습니다: ${required}`)
 }
 console.log('PASS 모바일 일정 공식 주소·환경설정 검색 경로·로그인 및 설치 안내')
+
+function loadTs(source, imports) {
+  const { outputText } = ts.transpileModule(source, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+  })
+  const exports = {}
+  new Function('exports', 'require', outputText)(exports, key => imports[key])
+  return exports
+}
+
+const registry = loadTs(registrySource, { 'lucide-react': require('lucide-react') })
+const preferences = loadTs(fs.readFileSync(path.join(projectRoot, 'src/services/navigationPreferences.ts'), 'utf8'), {
+  '../config/navigationRegistry': registry,
+})
+const { restoreShortcuts, availableMenus } = preferences
+assert.deepEqual(
+  restoreShortcuts(undefined, ['staff_tasks', 'calendar', 'calendar', 'old-menu'], ['attendance_print', 'calendar', 'executive_live_classes'], ['calendar', 'staff_tasks']),
+  ['calendar', 'staff_tasks', 'attendance_print'],
+)
+assert.deepEqual(restoreShortcuts([], ['calendar'], ['staff_tasks'], []), [], 'A deliberately empty saved list stays empty')
+assert.equal(restoreShortcuts(undefined, undefined, undefined, undefined).length, 5)
+assert.deepEqual(restoreShortcuts(undefined, [], [], []), [])
+const ordinary = availableMenus([], ['gyeongnam_curriculum'], [], false, false).map(item => item.id)
+for (const id of ['gyeongnam_curriculum', 'admin_center', 'executive_live_classes', 'feature_overview', 'file_parser']) {
+  assert.ok(!ordinary.includes(id), 'Unexpected ordinary menu: ' + id)
+}
+const admin = availableMenus([], [], ['file_parser'], true, true).map(item => item.id)
+for (const id of ['gyeongnam_curriculum', 'admin_center', 'executive_live_classes', 'file_parser']) assert.ok(admin.includes(id))
+for (const item of registry.NAVIGATION_ITEMS) {
+  assert.ok(item.description.trim())
+  assert.ok(fs.existsSync(path.join(projectRoot, 'src/assets/function-previews', item.preview + '.webp')))
+}
+console.log('PASS 기존 고정·즐겨찾기 순서 통합, 숨김·권한 보존과 기능별 설명·그림 연결')

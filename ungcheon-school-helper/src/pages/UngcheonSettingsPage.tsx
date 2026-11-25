@@ -357,7 +357,7 @@ export default function UngcheonSettingsPage() {
         </div>
         <div className="mt-5 border-t border-black/10 pt-4 dark:border-white/10">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div><h3 className="flex items-center gap-2 text-sm font-black text-slate-950 dark:text-white"><Eye size={15} className="text-violet-500" /> 숨긴 메뉴 관리</h3><p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400">사이드바에서 숨긴 메뉴를 다시 표시합니다. 대시보드와 환경설정은 숨길 수 없습니다.</p></div>
+            <div><h3 className="flex items-center gap-2 text-sm font-black text-slate-950 dark:text-white"><Eye size={15} className="text-violet-500" /> 숨긴 메뉴 관리</h3><p className="mt-1 text-xs font-semibold text-slate-600 dark:text-slate-400">이 PC에서 숨긴 기능을 전체 메뉴와 기능 훑어보기에 다시 표시합니다.</p></div>
             <button type="button" onClick={restoreAllMenus} disabled={!hiddenMenus.length} className="btn-ghost inline-flex items-center gap-1.5 text-xs disabled:opacity-40"><RotateCcw size={13} />전체 복원</button>
           </div>
           {hiddenMenus.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{hiddenMenus.map(id => {
