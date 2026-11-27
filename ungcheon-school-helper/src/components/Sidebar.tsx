@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { ChevronDown, FlaskConical, Pin, PinOff, ScrollText } from 'lucide-react'
 import clsx from 'clsx'
 import schoolLogo from '../assets/ungcheon-logo.png'
+import { MIGRATION_LAB_IDS } from '../config/migrationLabs'
 import { ATTENDANCE_LAB_MENU, NAVIGATION_BY_ID, type NavigationItem } from '../config/navigationRegistry'
 import { isSidebarExpanded, normalizeSidebarExpandedPinned, SIDEBAR_EXPANDED_PINNED_KEY } from '../services/sidebarPreferences'
 import { useAppStore } from '../stores/appStore'
@@ -113,7 +114,7 @@ export default function Sidebar({
           )}
         </section>
 
-        {attendanceLabEnabled && <section aria-label="웅천고 도우미 실험실" className="mt-3 border-t border-slate-200/60 pt-2">
+        <section aria-label="웅천고 도우미 실험실" className="mt-3 border-t border-slate-200/60 pt-2">
           <button type="button" onClick={() => setLabOpen(open => !open)} aria-label="웅천고 도우미 실험실"
             aria-expanded={labOpen} aria-controls="attendance-lab-menu" title={expanded ? undefined : '웅천고 도우미 실험실'}
             className="mx-1.5 flex h-9 w-[calc(100%-0.75rem)] items-center gap-2 rounded-xl px-3 text-left text-slate-700 hover:bg-amber-100">
@@ -122,9 +123,10 @@ export default function Sidebar({
               <ChevronDown size={14} aria-hidden="true" className={clsx('shrink-0', !labOpen && '-rotate-90')} /></>}
           </button>
           <div id="attendance-lab-menu" hidden={!labOpen} className={expanded ? 'pl-3' : undefined}>
-            {itemButton(ATTENDANCE_LAB_MENU)}
+            {attendanceLabEnabled && itemButton(ATTENDANCE_LAB_MENU)}
+            {MIGRATION_LAB_IDS.map(id => itemButton(NAVIGATION_BY_ID.get(id)!))}
           </div>
-        </section>}
+        </section>
       </nav>
 
       <div className="shrink-0 border-t border-slate-200/60 py-1">

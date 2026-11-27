@@ -51,6 +51,9 @@
     "src/pages/ExcelProcessorPage.tsx",
     "src/pages/RecommendedSubjectsPage.tsx",
     "src/pages/YajaAttendancePage.tsx",
+    "src/pages/MigrationLabPage.tsx",
+    "src/pages/SchoolLibraryDemo.tsx",
+    "src/config/migrationLabs.ts",
     "src/pages/SchoolInfoEvaluationPage.tsx",
     "src/pages/PayrollPage.tsx",
     "src/pages/AfterSchoolCheckerPage.tsx",
@@ -139,6 +142,7 @@
     "src/services/navigationPreferences.ts",
     "src/services/useNavigationPreferences.ts",
     "src/pages/RecommendedBooksPage.tsx",
+    "src/pages/SchoolBookStatus.tsx",
     "src/data/recommendedBooks.json"
   ]
 }

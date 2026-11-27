@@ -1,3 +1,4 @@
+import { MIGRATION_LAB_IDS } from '../config/migrationLabs'
 import { NAVIGATION_BY_ID, NAVIGATION_ITEMS } from '../config/navigationRegistry'
 
 export const MAIN_MENU_IDS = ['dashboard', 'feature_catalog', 'feature_overview', 'settings']
@@ -10,7 +11,7 @@ const DEFAULT_SHORTCUTS = ['calendar', 'timetable_swap', 'staff_tasks', 'student
 
 export function knownMenuIds(value: unknown): string[] {
   return Array.isArray(value)
-    ? [...new Set(value.filter((id): id is string => typeof id === 'string' && NAVIGATION_BY_ID.has(id)))]
+    ? [...new Set(value.map(id => id === 'ungcheon_library' ? 'school_seoga' : id).filter((id): id is string => typeof id === 'string' && NAVIGATION_BY_ID.has(id)))]
     : []
 }
 
@@ -38,12 +39,13 @@ export function availableMenus(order: string[], hidden: string[], shortcuts: str
 }
 
 export const MENU_GROUPS = [
+  { id: 'migration_lab', label: '웅천고 도우미 실험실', items: [...MIGRATION_LAB_IDS] },
   { id: 'schedule', label: '일정·시간표', items: ['calendar', 'timetable_swap', 'mini_widget', 'operations_notifications', 'notifier'] },
   { id: 'school', label: '학교운영', items: ['staff_tasks', 'mandatory_training', 'audit_evidence', 'school_hub', 'staff_roster', 'committees', 'feature_requests', 'form_center', 'admin_center'] },
-  { id: 'student', label: '학생·학사', items: ['student_timetable', 'yaja_attendance', 'attendance_print', 'volunteer_work', 'student_locator', 'student_identity_audit', 'subject_remarks_print', 'record_privacy_blind'] },
+  { id: 'student', label: '학생·학사', items: ['student_timetable', 'attendance_print', 'volunteer_work', 'student_locator', 'student_identity_audit', 'subject_remarks_print', 'record_privacy_blind'] },
   { id: 'evaluation', label: '평가·교육과정', items: ['grade_preview', 'estimated_split_score', 'curriculum', 'schoolinfo_evaluation'] },
   { id: 'admissions', label: '진학·대입', items: ['admission_results', 'recommended_subjects', 'gyeongnam_curriculum', 'performance_assessment_guide', 'saenggibu_generator', 'university_webzines', 'average_grade_calculator', 'admission_success_cases'] },
-  { id: 'reading', label: '독서교육', items: ['ungcheon_library', 'university_recommended_books'] },
+  { id: 'reading', label: '독서교육', items: ['university_recommended_books'] },
   { id: 'tools', label: '인사·교사용 도구', items: ['transfer_score', 'teacher_tools', 'excel_processor', 'payroll', 'insa_analysis', 'pdf_extractor', 'file_parser'] },
   { id: 'help', label: '시작·도움말', items: ['dashboard', 'settings', 'help'] },
   { id: 'executive', label: '교장·교감', items: EXECUTIVE_MENU_IDS },

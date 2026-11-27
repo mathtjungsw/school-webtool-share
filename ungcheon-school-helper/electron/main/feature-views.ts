@@ -4,6 +4,7 @@ import { join, basename, resolve } from 'path'
 import { randomBytes, createCipheriv, createDecipheriv, createHash } from 'crypto'
 import { Worker } from 'worker_threads'
 import { CASE_PARSER_VERSION } from './case-layout'
+import { lookupSchoolBook } from './school-books'
 import { createSchoolDesktop } from './school-desktop'
 export const TOOL_SITES: Record<string, string> = {
   mandatory_training_submit: 'https://script.google.com/macros/s/AKfycbxG52rulCO1jtpxtkus-YMkZrhxaTB4bXpP-2TxDtv37MTb9rAJWzspakNIK8U7GdFIWA/exec',
@@ -30,6 +31,8 @@ const admissionPopupPath = '/uct/acd/ade/criteriaAndResultPopup.do'
 
 export function registerFeatureViews(main: () => BrowserWindow | null, auth: Parameters<typeof createSchoolDesktop>[1] & { onChange: (listener: () => void) => unknown }) {
   const schoolTools = new Map([
+    ['career_tests', createSchoolDesktop(main, auth, 'career')],
+    ['school_seoga', createSchoolDesktop(main, auth, 'seoga')],
     ['yaja_attendance', createSchoolDesktop(main, auth, 'yaja')],
   ])
   const closeSchoolTools = () => schoolTools.forEach(tool => tool.close())
@@ -84,6 +87,11 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: Par
     if (schoolTool && p.action === 'schoolLeave') { schoolTool.close(); return true }
     if(p.action==='leave'){active='';hide();closePrivate();return true}
     if(!auth.snapshot().authenticated){hide();closePrivate();throw new Error('로그인이 필요합니다.')}
+    if (p.id === 'school_seoga' && p.action === 'schoolOpen' && (app.isPackaged || !process.env.UNGCHEON_SEOGA_LOCAL_ORIGIN)) {
+      hide()
+      return { state: 'sample' }
+    }
+    if (p.id === 'university_recommended_books' && p.action === 'schoolBook') return lookupSchoolBook(p.bookId, p.mode)
     if(p.action==='hide'){hide();return true}
     const id=String(p.id||''); const isPrivate=['average_grade_calculator','admission_success_cases'].includes(id)
     if (schoolTool && (p.action === 'schoolOpen' || p.action === 'schoolForget')) {

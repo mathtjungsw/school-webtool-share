@@ -56,9 +56,15 @@ export const WORK_ASSISTANT_SUGGESTIONS = [
 
 const DETAILED_WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
   {
-    id: 'yaja-attendance', title: '야간자율학습 출석 QR과 도장판', page: 'yaja_attendance', category: '학생·학사',
+    id: 'career-tests', title: '진로검사 도우미', page: 'career_tests', category: '웅천고 도우미 실험실',
+    summary: '기존 진로검사 서비스를 열거나 학교 전용 교사 화면의 이전을 테스트합니다.',
+    steps: ['실험실에서 진로검사를 엽니다.', '실제 사용은 기존 서비스 열기를 선택합니다.', '테스트할 때는 이전 테스트 화면 열기를 선택합니다.'],
+    keywords: ['커리어넷', '검사 QR', '진로심리검사', '이전 테스트'],
+  },
+  {
+    id: 'yaja-attendance', title: '야간자율학습 출석 QR과 도장판', page: 'yaja_attendance', category: '웅천고 도우미 실험실',
     summary: '학생이 휴대폰으로 출석하면 담당 교사의 야자 도장판에 표시됩니다.',
-    steps: ['학생·학사에서 야자 도장판을 엽니다. 이 PC의 첫 연결에는 교사 개인 PIN 6자리가 필요합니다.', '담당 학년과 교시를 고른 뒤 출석 QR을 엽니다.', '학생은 QR을 스캔하고 학번과 개인 PIN으로 출석합니다. 교사는 도장판에서 출석을 확인하고 접수를 마감합니다.'],
+    steps: ['실험실에서 야자 도장판을 엽니다. 실사용은 기존 서비스 열기, 테스트는 이전 테스트 화면 열기를 선택합니다. 이 PC의 첫 연결에는 교사 개인 PIN 6자리가 필요합니다.', '담당 학년과 교시를 고른 뒤 출석 QR을 엽니다.', '학생은 QR을 스캔하고 학번과 개인 PIN으로 출석합니다. 교사는 도장판에서 출석을 확인하고 접수를 마감합니다.'],
     keywords: ['야자', '야간자율학습', '야간 자율학습', '출석 QR', '출석 도장', '야자 마감'],
   },
   {
@@ -318,6 +324,12 @@ const DETAILED_WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
     summary: '평가 점수를 합산해 환산점수·석차등급·성취도 분포를 미리 확인합니다.',
     steps: ['등급 미리보기(이전 이름: 성적 산출 미리보기) 메뉴를 엽니다.', '평가 구성과 반영 비율을 설정합니다.', '점수 Excel을 불러와 결과와 오류 검사를 확인합니다.'],
     keywords: ['성적 산출', '성적 계산', '등급 계산', '석차 등급', '성취도 분포', '점수 합산', '성적 미리보기'],
+  },
+  {
+    id: 'school-seoga', title: '우리 반 독서 기록', page: 'school_seoga', category: '웅천고 도우미 실험실',
+    summary: '시험용 학급의 독서 기록을 학생·책·내용으로 찾습니다.',
+    steps: ['실험실에서 웅천 서가를 엽니다.', '기존 서비스 열기로 실제 서가를 이용하거나 이전 테스트 화면에서 가상 학급의 기록을 검색합니다.'],
+    keywords: ['웅천 서가 시험판', '독서 기록', '학급 독서'],
   },
   {
     id: 'snu-reading-list', title: '서울대 권장도서 표지·웅천고 소장 확인', page: 'university_recommended_books', category: '독서교육',

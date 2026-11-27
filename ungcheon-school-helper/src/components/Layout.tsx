@@ -1,5 +1,6 @@
 import { useNoticeStore } from '../stores/noticeStore'
 import { acceptChangeNavigation, acceptTaskNavigation } from '../services/taskNavigation'
+import { isMigrationLab } from '../config/migrationLabs'
 import { Component, type ReactNode, lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { KeyRound, ShieldCheck, X } from 'lucide-react'
@@ -73,12 +74,11 @@ const ExternalTool = lazy(() => import('../pages/ExternalToolPage'))
 const AdmissionsResourcePage = lazy(() => import('../pages/AdmissionsResourcePage'))
 const FeatureCatalogPage = lazy(() => import('../pages/FeatureCatalogPage'))
 const PrivateSurface = lazy(() => import('../pages/ExternalToolPage').then(m => ({ default: m.FeatureSurface })))
+const MigrationLabPage = lazy(() => import('../pages/MigrationLabPage'))
 const RecommendedBooks = lazy(() => import('../pages/RecommendedBooksPage'))
 const PAGES: Record<string, React.ComponentType> = {
-  yaja_attendance: lazy(() => import('../pages/YajaAttendancePage')),
   mandatory_training: () => <ExternalTool kind="mandatory_training" />,
   saenggibu_generator: () => <ExternalTool kind="saenggibu_generator" />,
-  ungcheon_library: () => <ExternalTool kind="ungcheon_library" />,
   university_webzines: () => <ExternalTool kind="university_webzines" />,
   admission_results: () => <AdmissionsResourcePage kind="admission_results" />,
   gyeongnam_curriculum: () => <AdmissionsResourcePage kind="gyeongnam_curriculum" />,
@@ -170,6 +170,7 @@ function AttendanceLabFrame({ url }: { url: string }) {
 export default function Layout() {
   // 앱을 새로 실행하거나 로그인 세션이 시작될 때는 이전 화면과 관계없이 대시보드에서 시작한다.
   const [history, setHistory] = useState([INITIAL_PAGE])
+  const [labVisit, setLabVisit] = useState(0)
   const [historyIndex, setHistoryIndex] = useState(0)
   const [logOpen, setLogOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
@@ -190,7 +191,7 @@ export default function Layout() {
     [navigation.order, navigation.hidden, navigation.shortcuts, isAdmin, executiveIdentityRole])
   const shortcuts = navigation.shortcuts.flatMap(id => menuItems.filter(item => item.id === id))
   const catalogMode = page === 'feature_catalog' ? 'catalog' : page === 'feature_overview' ? 'overview' : null
-  const viewKey = catalogMode ? 'feature_directory' : page
+  const viewKey = catalogMode ? 'feature_directory' : isMigrationLab(page) ? page + '-' + labVisit : page
   const logErrorCount = logs.filter(log => log.level === 'error').length
   const Page = PAGES[page]
 
@@ -200,6 +201,7 @@ export default function Layout() {
 
   const navigate = (target: string) => {
     let id = acceptChangeNavigation(acceptTaskNavigation(target))
+    if (id === 'ungcheon_library') id = 'school_seoga'
     if (id.startsWith('dashboard?notice=')) {
       const noticeId = Number(new URLSearchParams(id.slice(id.indexOf('?') + 1)).get('notice'))
       if (Number.isFinite(noticeId)) useNoticeStore.getState().openNotice(noticeId)
@@ -215,7 +217,7 @@ export default function Layout() {
       setExecutivePassword('')
       return
     }
-    if (id === page) { if (id === 'admission_success_cases') void window.preview.view({ action: 'leave' }).then(() => window.dispatchEvent(new Event('feature:refresh'))); return }
+    if (id === page) { if (isMigrationLab(id)) setLabVisit(v => v + 1); if (id === 'admission_success_cases') void window.preview.view({ action: 'leave' }).then(() => window.dispatchEvent(new Event('feature:refresh'))); return }
     const next = [...history.slice(0, historyIndex + 1), id].slice(-MAX_HISTORY)
     setHistory(next)
     setHistoryIndex(next.length - 1)
@@ -297,7 +299,11 @@ export default function Layout() {
           logErrorCount={logErrorCount}
         />
         <main className="app-main-surface flex-1 relative overflow-hidden">
-          {page === 'attendance_lab' && attendanceLabUrl ? <AttendanceLabFrame url={attendanceLabUrl} /> : <AnimatePresence mode="wait">
+          {isMigrationLab(page) ? <div className="absolute inset-0 overflow-y-auto" key={viewKey}>
+            <ToolErrorBoundary><Suspense fallback={<p className="p-5">이용 안내를 여는 중입니다…</p>}>
+              <MigrationLabPage id={page} />
+            </Suspense></ToolErrorBoundary>
+          </div> : page === 'attendance_lab' && attendanceLabUrl ? <AttendanceLabFrame url={attendanceLabUrl} /> : <AnimatePresence mode="wait">
             <motion.div
               key={viewKey}
               initial={{ opacity: 0 }}

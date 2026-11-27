@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { SchoolLibraryDemo } from './SchoolLibraryDemo'
 import { FeatureSurface } from './ExternalToolPage'
 
-type Connection = { state: 'loading' | 'pin' | 'ready' | 'error'; message?: string }
+type Connection = { state: 'loading' | 'pin' | 'ready' | 'sample' | 'error'; message?: string }
 
-export default function YajaAttendancePage() {
-  return <SchoolToolPage id="yaja_attendance" title="야자 도장판" pinId="yaja-pin" />
-}
-
-function SchoolToolPage({ id, title, pinId }: { id: string; title: string; pinId: string }) {
+export function SchoolToolPage({ id, title, pinId }: { id: string; title: string; pinId: string }) {
   const [connection, setConnection] = useState<Connection>({ state: 'loading' })
   const [pin, setPin] = useState('')
   const sequence = useRef(0)
@@ -27,6 +24,7 @@ function SchoolToolPage({ id, title, pinId }: { id: string; title: string; pinId
     return () => { sequence.current++; void window.preview.view({ id, action: 'schoolLeave' }) }
   }, [connect, id])
 
+  if (id === 'school_seoga' && connection.state === 'sample') return <SchoolLibraryDemo />
   return <div className="flex h-full flex-col">
     <header className="flex items-center justify-between gap-4 border-b bg-white px-6 py-4">
       <h1 className="text-xl font-bold">{title}</h1>
@@ -39,7 +37,7 @@ function SchoolToolPage({ id, title, pinId }: { id: string; title: string; pinId
         {connection.state === 'loading' && <p>교사 화면을 여는 중입니다…</p>}
         {connection.state === 'pin' && <form onSubmit={e => { e.preventDefault(); if (pin.length === 6) void connect('schoolOpen', pin) }}>
           <h2 className="text-lg font-bold">이 PC를 내 {title} 계정에 연결</h2>
-          <p className="my-3">2027학년도 감독교사로 등록된 뒤, 본인 전용 PC에서 개인 PIN을 한 번 입력하세요. 다음부터는 업무도우미 로그인으로 바로 열립니다.</p>
+          <p className="my-3">{id === 'school_seoga' ? '시험 실행 창에서 내 이름 옆의 PIN을 확인하세요. 같은 실행 중에는 처음 한 번만 입력하면 담당 학급으로 연결됩니다.' : id === 'career_tests' ? '진로검사에 등록된 교사 개인 PIN으로 이 PC를 한 번 연결하세요.' : '2027학년도 감독교사로 등록된 뒤, 본인 전용 PC에서 개인 PIN을 한 번 입력하세요. 다음부터는 업무도우미 로그인으로 바로 열립니다.'}</p>
           <label className="block font-semibold" htmlFor={pinId}>개인 PIN 6자리</label>
           <input className="my-2 w-full rounded-lg border p-3" id={pinId} type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))} />
           {connection.message && <p role="alert" className="my-2 text-red-700">{connection.message}</p>}

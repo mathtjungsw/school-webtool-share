@@ -70,6 +70,7 @@ function loadTs(source, imports) {
 const registry = loadTs(registrySource, { 'lucide-react': require('lucide-react') })
 const preferences = loadTs(fs.readFileSync(path.join(projectRoot, 'src/services/navigationPreferences.ts'), 'utf8'), {
   '../config/navigationRegistry': registry,
+  '../config/migrationLabs': loadTs(fs.readFileSync(path.join(projectRoot, 'src/config/migrationLabs.ts'), 'utf8'), {}),
 })
 const { restoreShortcuts, availableMenus } = preferences
 assert.deepEqual(
@@ -79,6 +80,10 @@ assert.deepEqual(
 assert.deepEqual(restoreShortcuts([], ['calendar'], ['staff_tasks'], []), [], 'A deliberately empty saved list stays empty')
 assert.equal(restoreShortcuts(undefined, undefined, undefined, undefined).length, 5)
 assert.deepEqual(restoreShortcuts(undefined, [], [], []), [])
+assert.deepEqual(restoreShortcuts(['ungcheon_library','school_seoga'], [], [], []), ['school_seoga'])
+const labIds = ['career_tests', 'yaja_attendance', 'school_seoga']
+assert.deepEqual(preferences.MENU_GROUPS.find(group => group.id === 'migration_lab').items, labIds)
+for (const id of labIds) assert.equal(preferences.MENU_GROUPS.filter(group => group.items.includes(id)).length, 1)
 const ordinary = availableMenus([], ['gyeongnam_curriculum'], [], false, false).map(item => item.id)
 for (const id of ['gyeongnam_curriculum', 'admin_center', 'executive_live_classes', 'feature_overview', 'file_parser']) {
   assert.ok(!ordinary.includes(id), 'Unexpected ordinary menu: ' + id)

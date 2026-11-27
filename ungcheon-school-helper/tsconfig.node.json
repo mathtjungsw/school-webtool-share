@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "composite": true,
+    "resolveJsonModule": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -16,6 +17,8 @@
   },
   "include": [
     "electron/**/*",
+    "src/data/recommendedBooks.json",
+    "src/data/recommendedBookEditions.json",
     "electron.vite.config.ts",
     "src/services/widgetSettings.ts",
     "src/features/private/domain.ts",
