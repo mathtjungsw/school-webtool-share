@@ -9,6 +9,7 @@
 - 야자 기능은 구글 시트 연결 없이 운영한다. 학생이 휴대폰으로 QR을 찍으면 교사는 PC 업무도우미에서 같은 학교 서버의 출석 기록을 확인한다. 담임 시트 동기화와 시트 백업은 구성하지 않는다.
 - PC의 **전체 메뉴 → 학생·학사 → 야자 도장판**에 교사용 화면을 연결했다. 담당 학년의 야자 1·2교시 QR을 열고 마감할 수 있다. 학생이 본인 학번과 개인 PIN으로 출석을 확인하면 교사 화면에 자동 반영된다.
 - 학교 전용 소스는 `%USERPROFILE%\Documents\GitHub\ungcheon-yaja-school`에서 관리한다. 이 프로젝트의 `야자 도장판 시험 실행.cmd`로 가상 명단을 사용하는 PC 시험본을 열 수 있다. 학교 운영 주소는 https://ungcheon-yaja-school.vercel.app 이며 Supabase의 별도 스키마에 연결한다. 첫 배포는 학생·감독교사 모두 0명으로 시작한다.
+- 운영 웹 주소의 로그인·명단 보호, Windows 설치본과 자동 업데이트 게시, 공용 서버 v87(@113) 적용을 확인했다. [Windows 1.1.52 배포](https://github.com/mathtjungsw/school-webtool-share/releases/tag/ungcheon-helper-v1.1.52)
 
 ## 2026-11-26 지난 출결 수정과 학급 출결 엑셀 내려받기
 
