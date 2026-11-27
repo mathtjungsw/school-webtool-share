@@ -75,6 +75,7 @@ const FeatureCatalogPage = lazy(() => import('../pages/FeatureCatalogPage'))
 const PrivateSurface = lazy(() => import('../pages/ExternalToolPage').then(m => ({ default: m.FeatureSurface })))
 const RecommendedBooks = lazy(() => import('../pages/RecommendedBooksPage'))
 const PAGES: Record<string, React.ComponentType> = {
+  yaja_attendance: lazy(() => import('../pages/YajaAttendancePage')),
   mandatory_training: () => <ExternalTool kind="mandatory_training" />,
   saenggibu_generator: () => <ExternalTool kind="saenggibu_generator" />,
   ungcheon_library: () => <ExternalTool kind="ungcheon_library" />,

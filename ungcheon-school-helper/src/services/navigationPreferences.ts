@@ -40,7 +40,7 @@ export function availableMenus(order: string[], hidden: string[], shortcuts: str
 export const MENU_GROUPS = [
   { id: 'schedule', label: '일정·시간표', items: ['calendar', 'timetable_swap', 'mini_widget', 'operations_notifications', 'notifier'] },
   { id: 'school', label: '학교운영', items: ['staff_tasks', 'mandatory_training', 'audit_evidence', 'school_hub', 'staff_roster', 'committees', 'feature_requests', 'form_center', 'admin_center'] },
-  { id: 'student', label: '학생·학사', items: ['student_timetable', 'attendance_print', 'volunteer_work', 'student_locator', 'student_identity_audit', 'subject_remarks_print', 'record_privacy_blind'] },
+  { id: 'student', label: '학생·학사', items: ['student_timetable', 'yaja_attendance', 'attendance_print', 'volunteer_work', 'student_locator', 'student_identity_audit', 'subject_remarks_print', 'record_privacy_blind'] },
   { id: 'evaluation', label: '평가·교육과정', items: ['grade_preview', 'estimated_split_score', 'curriculum', 'schoolinfo_evaluation'] },
   { id: 'admissions', label: '진학·대입', items: ['admission_results', 'recommended_subjects', 'gyeongnam_curriculum', 'performance_assessment_guide', 'saenggibu_generator', 'university_webzines', 'average_grade_calculator', 'admission_success_cases'] },
   { id: 'reading', label: '독서교육', items: ['ungcheon_library', 'university_recommended_books'] },

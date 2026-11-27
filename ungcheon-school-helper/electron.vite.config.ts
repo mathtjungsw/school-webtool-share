@@ -47,6 +47,9 @@ const rendererRoot = resolve(__dirname, 'src')
 
 export default defineConfig({
   main: {
+    define: {
+      __YAJA_SCHOOL_ORIGIN__: JSON.stringify(process.env.UNGCHEON_YAJA_SCHOOL_ORIGIN || 'https://ungcheon-yaja-school.vercel.app'),
+    },
     plugins: [externalizeDepsPlugin(), makeHashPathResolverPlugin()],
     build: {
       rollupOptions: {

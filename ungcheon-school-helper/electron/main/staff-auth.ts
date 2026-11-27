@@ -7,9 +7,13 @@ export function createStaffAuth(endpoint: () => string, trusted: (event: Electro
   let retryRequired = false
   let restoring: Promise<ReturnType<typeof snapshot>> | undefined
   let generation = 0
+  const changes = new Set<() => void>()
   const path = join(app.getPath('userData'), 'staff-session.bin')
   const snapshot = () => ({ retryRequired, authenticated: !!state && Date.parse(state.expiresAt) > Date.now(), teacherName: state?.name || '', expiresAt: state?.expiresAt || '' })
-  const broadcast = () => BrowserWindow.getAllWindows().forEach(w => w.webContents.send('auth:changed'))
+  const broadcast = () => {
+    changes.forEach(fn => fn())
+    BrowserWindow.getAllWindows().forEach(w => w.webContents.send('auth:changed'))
+  }
   const call = async (payload: Record<string, unknown>) => {
     const started = generation
     const result = await fetchStaffJson(endpoint(), payload)
@@ -63,5 +67,5 @@ export function createStaffAuth(endpoint: () => string, trusted: (event: Electro
     if (action === 'logout') { const token = state?.token; clear(); if (token) await call({ action: 'staffLogout', staffToken: token }).catch(() => undefined); return snapshot() }
     throw new Error('허용되지 않은 인증 요청입니다.')
   })
-  return { snapshot, sessionGeneration: () => generation, request: authorizedRequest, clear, authorizePayload: (payload: Record<string, unknown>) => { if (!snapshot().authenticated || !state) throw new Error('로그인이 필요합니다.'); return { ...payload, staffToken: state.token } } }
+  return { snapshot, onChange: (fn: () => void) => changes.add(fn), sessionGeneration: () => generation, request: authorizedRequest, clear, authorizePayload: (payload: Record<string, unknown>) => { if (!snapshot().authenticated || !state) throw new Error('로그인이 필요합니다.'); return { ...payload, staffToken: state.token } } }
 }

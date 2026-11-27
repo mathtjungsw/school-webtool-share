@@ -43,7 +43,7 @@ const NEIS_SYNC_REGISTERED_BY_PROPERTY = 'UNG_NEIS_SYNC_REGISTERED_BY';
 const TIMETABLE_SLOT_COUNT = 35;
 // 모바일 PWA는 전체 학생 자료를 전달하지 않고, 서버에서 해당 교사의 3학년 수강생만
 // 대조한 최소 출결 결과와 아래 공개 일정 시트를 읽기 전용으로 중계합니다.
-const MOBILE_SERVICE_VERSION = 86;
+const MOBILE_SERVICE_VERSION = 87;
 // Keep this restricted mobile map in sync with src/services/specialTimetableDays.ts.
 const MOBILE_SPECIAL_TIMETABLE_DAY_INDEX = {
   '2026-08-11': 0,
@@ -361,6 +361,8 @@ const LEGACY_RELEASE_NOTES = [
 ];
 
 const RELEASE_NOTES = [
+  {key:'server-v87',title:'공용 서버 · 야자 도장판 안내',body:'PC 업무도우미의 학생·학사에서 2027학년도 야자 도장판을 열 수 있습니다.',date:'2026-11-27'},
+  {key:'v1.1.52',title:'PC v1.1.52 · 야자 도장판',body:'담당 교사가 학년·교시별 출석 QR을 열면 등록된 학생이 휴대폰으로 출석하고 PC 도장판에 반영됩니다. 새 학년도 명단은 등록 후 사용할 수 있습니다.',date:'2026-11-27'},
   {key:'server-v86',title:'공용 서버 · 지난 출결 수정과 학급 출결 내려받기',body:'담임과 교과 교사가 지난 날짜의 출결을 확인하고 수정할 수 있습니다. 담임은 선택한 기간의 담당 학급 출결을 엑셀 파일로 내려받을 수 있습니다.',date:'2026-11-26'},
   {key:'v1.1.51',title:'PC v1.1.51 · 지난 출결 수정과 엑셀 내려받기',body:'지난 날짜를 선택하면 수정 중인 날짜를 표시합니다. 담임은 담당 학급의 담임 출결을 기간별 엑셀 파일로 내려받을 수 있습니다.',date:'2026-11-26'},
   {key:'server-v85',title:'공용 서버 · 출결 연속 입력과 일괄 수정',body:'PC와 모바일에서 출결을 이어서 입력할 수 있습니다. 학급과 수업의 전체 미입력, 담임 화면의 학생별 전체 미입력과 전체 결석을 지원합니다.',date:'2026-11-25'},

@@ -218,6 +218,11 @@ function createWindow() {
 
   nativeTheme.themeSource = 'light'
 
+  mainWindow.webContents.on('did-start-navigation', (_event, _url, inPlace, mainFrame) => {
+    if (mainFrame && !inPlace) featureViews.closeSchoolTools()
+  })
+  mainWindow.webContents.on('render-process-gone', featureViews.closeSchoolTools)
+
   // User-Agent에서 Electron 제거 — 구글 캘린더 등 Electron 차단 서비스 우회
   const chromeUA = mainWindow.webContents.getUserAgent()
     .replace(/Electron\/[\d.]+ /, '')
@@ -228,6 +233,7 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+    featureViews.closeSchoolTools()
   })
 }
 

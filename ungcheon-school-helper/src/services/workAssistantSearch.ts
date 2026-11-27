@@ -56,6 +56,12 @@ export const WORK_ASSISTANT_SUGGESTIONS = [
 
 const DETAILED_WORK_ASSISTANT_ENTRIES: WorkAssistantEntry[] = [
   {
+    id: 'yaja-attendance', title: '야간자율학습 출석 QR과 도장판', page: 'yaja_attendance', category: '학생·학사',
+    summary: '학생이 휴대폰으로 출석하면 담당 교사의 야자 도장판에 표시됩니다.',
+    steps: ['학생·학사에서 야자 도장판을 엽니다. 이 PC의 첫 연결에는 교사 개인 PIN 6자리가 필요합니다.', '담당 학년과 교시를 고른 뒤 출석 QR을 엽니다.', '학생은 QR을 스캔하고 학번과 개인 PIN으로 출석합니다. 교사는 도장판에서 출석을 확인하고 접수를 마감합니다.'],
+    keywords: ['야자', '야간자율학습', '야간 자율학습', '출석 QR', '출석 도장', '야자 마감'],
+  },
+  {
     id: 'admission-results', title: '전년도 입시결과와 교사용 어디가샘 열기', page: 'admission_results', category: '진학·대입',
     summary: '공개 어디가에서 대학별 전년도 입시결과를 확인하고, 교사용 자료는 어디가샘에서 열람합니다.',
     steps: ['진학·대입에서 전년도 입시결과를 엽니다.', '공개 화면에서 학년도와 대학을 검색합니다.', '교사용 자료가 필요하면 어디가샘 열기를 누릅니다.', '인증서 로그인 후 교사자료 → 대학정보 → 전년도 입시결과를 선택합니다.'],

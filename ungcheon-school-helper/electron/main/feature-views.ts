@@ -4,6 +4,7 @@ import { join, basename, resolve } from 'path'
 import { randomBytes, createCipheriv, createDecipheriv, createHash } from 'crypto'
 import { Worker } from 'worker_threads'
 import { CASE_PARSER_VERSION } from './case-layout'
+import { createSchoolDesktop } from './school-desktop'
 export const TOOL_SITES: Record<string, string> = {
   mandatory_training_submit: 'https://script.google.com/macros/s/AKfycbxG52rulCO1jtpxtkus-YMkZrhxaTB4bXpP-2TxDtv37MTb9rAJWzspakNIK8U7GdFIWA/exec',
   mandatory_training_excel: 'https://script.google.com/macros/s/AKfycbxG52rulCO1jtpxtkus-YMkZrhxaTB4bXpP-2TxDtv37MTb9rAJWzspakNIK8U7GdFIWA/exec?x=%EC%A0%81%EA%B7%B9%ED%96%89%EC%A0%95',
@@ -27,7 +28,12 @@ const ADMISSIONS_BROWSER_LINKS: Record<string, string> = {
 const admissionResultsUrl = new URL(TOOL_SITES.admission_results)
 const admissionPopupPath = '/uct/acd/ade/criteriaAndResultPopup.do'
 
-export function registerFeatureViews(main: () => BrowserWindow | null, auth: { snapshot: () => any; request: (p: any) => Promise<any> }) {
+export function registerFeatureViews(main: () => BrowserWindow | null, auth: Parameters<typeof createSchoolDesktop>[1] & { onChange: (listener: () => void) => unknown }) {
+  const schoolTools = new Map([
+    ['yaja_attendance', createSchoolDesktop(main, auth, 'yaja')],
+  ])
+  const closeSchoolTools = () => schoolTools.forEach(tool => tool.close())
+  auth.onChange(closeSchoolTools)
   const external = new Map<string, WebContentsView>()
   const loadedSites = new Map<string,string>()
   const slotFor = (id: string) => {
@@ -71,18 +77,25 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
     worker.on('exit',()=>{workers.delete(worker);if(epoch!==generation)reject(new Error('작업이 취소되었습니다.'))})
   })
   const host = (e: Electron.IpcMainInvokeEvent) => e.sender === main()?.webContents && e.senderFrame === e.sender.mainFrame
-  const hide = () => { external.forEach(v=>v.setVisible(false)); privateView?.setVisible(false) }
+  const hide = () => { external.forEach(v=>v.setVisible(false)); privateView?.setVisible(false); schoolTools.forEach(tool => tool.currentView()?.setVisible(false)) }
   ipcMain.handle('feature:view',async(e,p:any)=> {
     if(!host(e))throw new Error('허용되지 않은 요청입니다.')
+    const schoolTool = schoolTools.get(p.id)
+    if (schoolTool && p.action === 'schoolLeave') { schoolTool.close(); return true }
     if(p.action==='leave'){active='';hide();closePrivate();return true}
     if(!auth.snapshot().authenticated){hide();closePrivate();throw new Error('로그인이 필요합니다.')}
     if(p.action==='hide'){hide();return true}
     const id=String(p.id||''); const isPrivate=['average_grade_calculator','admission_success_cases'].includes(id)
+    if (schoolTool && (p.action === 'schoolOpen' || p.action === 'schoolForget')) {
+      hide()
+      try { return await schoolTool.connect(p.action === 'schoolForget' ? 'forget' : 'open', p.pin) }
+      catch (error) { return { state: 'error', message: error instanceof Error ? error.message : '학교 서버 연결을 확인해 주세요.' } }
+    }
     if (p.action === 'external' && Object.hasOwn(ADMISSIONS_BROWSER_LINKS, id)) {
       await shell.openExternal(ADMISSIONS_BROWSER_LINKS[id])
       return true
     }
-    if(!isPrivate && !Object.hasOwn(TOOL_SITES,id))throw new Error('등록되지 않은 도구입니다.')
+    if(!isPrivate && !Object.hasOwn(TOOL_SITES,id) && !(schoolTool && p.action === 'show'))throw new Error('등록되지 않은 도구입니다.')
     if(p.action==='external'){if(!isPrivate)await shell.openExternal(TOOL_SITES[id]);return true}
     if(p.action==='reload'){external.get(slotFor(id))?.webContents.reload();return true}
     const rect=p.rect; const window=main(); if(!window || !rect || !['x','y','width','height'].every(k=>Number.isFinite(rect[k])))return false
@@ -90,7 +103,11 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
     if(active!==id && privateView)closePrivate()
     active=id
     let view: WebContentsView
-    if(isPrivate){
+    if(schoolTool){
+      const guest = schoolTool.currentView()
+      if (!guest || guest.webContents.isDestroyed()) return false
+      view = guest
+    }else if(isPrivate){
       if(!privateView){
         privateKind=id;caseUnlocked=false
         const ses=session.fromPartition('local-private-'+Date.now(),{cache:false})
@@ -224,5 +241,5 @@ export function registerFeatureViews(main: () => BrowserWindow | null, auth: { s
     }
     throw new Error('지원되지 않는 요청입니다.')
   })
-  return { close:()=>{hide();closePrivate();external.forEach(v=>v.webContents.close());external.clear()}, privateRoot:localRoot }
+  return { closeSchoolTools, close:()=>{closeSchoolTools();hide();closePrivate();external.forEach(v=>v.webContents.close());external.clear()}, privateRoot:localRoot }
 }

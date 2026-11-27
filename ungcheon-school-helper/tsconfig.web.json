@@ -50,6 +50,7 @@
     "src/pages/StudentTimetablePage.tsx",
     "src/pages/ExcelProcessorPage.tsx",
     "src/pages/RecommendedSubjectsPage.tsx",
+    "src/pages/YajaAttendancePage.tsx",
     "src/pages/SchoolInfoEvaluationPage.tsx",
     "src/pages/PayrollPage.tsx",
     "src/pages/AfterSchoolCheckerPage.tsx",

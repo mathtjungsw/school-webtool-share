@@ -59,6 +59,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   { id: 'school_hub', label: '학교 공유 링크', icon: Link2, assistantCategory: '학교 공유', description: '학교 공지와 부서별 공유 링크를 찾고 새 링크를 등록합니다.', preview: 'document', searchAliases: ['공유 링크', '부서 링크'] },
   { id: 'timetable_swap', label: '교사 시간표', icon: ArrowLeftRight, assistantCategory: '학사·기록', description: '내 시간표를 확인하고 교환·대강이나 공동 공강을 찾습니다.', preview: 'calendar', searchAliases: ['교환·대강 계획', '수업 교체', '대강', '공동 공강'] },
   { id: 'student_timetable', label: '학생별 시간표', icon: CalendarRange, assistantCategory: '학사·기록', description: '과목 선택이 반영된 학생별 시간표를 조회하거나 인쇄합니다.', preview: 'calendar', searchAliases: ['개인 시간표', '학생 시간표'] },
+  { id: 'yaja_attendance', label: '야자 도장판', icon: ClipboardCheck, assistantCategory: '학생·학사', description: '야간자율학습 출석 QR을 열고 담당 학년의 출석 도장을 확인합니다.', preview: 'check', searchAliases: ['야자 출석', '야간자율학습', '야간 자율학습', '야자 QR'] },
   { id: 'attendance_print', label: '출석부 출력', icon: UsersRound, assistantCategory: '학사·기록', description: '학급·과목·담당 교사별 출석부를 인쇄하거나 엑셀로 저장합니다.', preview: 'table', searchAliases: ['학급 출석부', '수업 출석부', '교사별 출석부'] },
   { id: 'volunteer_work', label: '봉사활동 업무', icon: HeartHandshake, assistantCategory: '학생·학사', description: '반별·부서별 봉사활동 확인서를 발급하고 나이스 시수와 대조합니다.', preview: 'document', searchAliases: ['봉사활동 확인서', '봉사 검증'] },
   { id: 'student_locator', label: '학생 위치 찾기', icon: SearchCheck, assistantCategory: '학사·기록', description: '학번이나 이름으로 조회해 해당 교시 학생의 수업과 교실을 찾습니다.', preview: 'search', searchAliases: ['현재 교실', '학생 수업 찾기'] },
